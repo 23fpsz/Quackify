@@ -96,6 +96,7 @@ fun SpotifyPlaylistScreen(
     onPlayPauseClick: () -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
+    onPlaylistOptionsClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     headerColor: Color = Color(0xFFE8115B),
     coverUrl: String? = null
@@ -231,7 +232,7 @@ fun SpotifyPlaylistScreen(
                 EncoreIconButton(
                     iconRes = R.drawable.encore_icon_more_android_24,
                     contentDescription = "Playlist options",
-                    onClick = {},
+                    onClick = onPlaylistOptionsClick,
                     tint = EncoreColors.TextPrimary
                 )
             }
@@ -359,7 +360,7 @@ fun SpotifyPlaylistScreen(
                             EncoreIconButton(
                                 iconRes = R.drawable.encore_icon_more_android_24,
                                 contentDescription = "More",
-                                onClick = {},
+                                onClick = onPlaylistOptionsClick,
                                 tint = EncoreColors.TextSecondary
                             )
                         }

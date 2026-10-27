@@ -67,8 +67,11 @@ import com.spotiduck.compose.screens.SpotifyAlbumScreen
 import com.spotiduck.compose.screens.SpotifyArtistScreen
 import com.spotiduck.compose.search.SpotifySearchScreen
 import com.spotiduck.compose.sheets.LibraryCreateSheet
+import com.spotiduck.compose.sheets.AlbumOptionsSheet
+import com.spotiduck.compose.sheets.ArtistOptionsSheet
 import com.spotiduck.compose.sheets.LibrarySortOption
 import com.spotiduck.compose.sheets.LibrarySortSheet
+import com.spotiduck.compose.sheets.PlaylistOptionsSheet
 import com.spotiduck.compose.sheets.ProfileDrawerSheet
 import com.spotiduck.compose.sheets.SleepTimerOption
 import com.spotiduck.compose.sheets.SleepTimerSheet
@@ -177,6 +180,9 @@ fun SpotifyAppShell(
     var isProfileDrawerOpen by remember { mutableStateOf(false) }
     var isTrackOptionsOpen by remember { mutableStateOf(false) }
     var selectedTrackForOptions by remember { mutableStateOf<TrackItem?>(null) }
+    var isPlaylistOptionsOpen by remember { mutableStateOf(false) }
+    var isAlbumOptionsOpen by remember { mutableStateOf(false) }
+    var isArtistOptionsOpen by remember { mutableStateOf(false) }
     var isSortSheetOpen by remember { mutableStateOf(false) }
     var currentSortOption by remember { mutableStateOf(LibrarySortOption.RECENTS) }
     var isCreateSheetOpen by remember { mutableStateOf(false) }
@@ -376,6 +382,9 @@ fun SpotifyAppShell(
         enabled = isPlayerExpanded ||
                 isProfileDrawerOpen ||
                 isTrackOptionsOpen ||
+                isPlaylistOptionsOpen ||
+                isAlbumOptionsOpen ||
+                isArtistOptionsOpen ||
                 isSortSheetOpen ||
                 isCreateSheetOpen ||
                 currentScreen != ShellScreen.HOME
@@ -386,6 +395,12 @@ fun SpotifyAppShell(
             isProfileDrawerOpen = false
         } else if (isTrackOptionsOpen) {
             isTrackOptionsOpen = false
+        } else if (isPlaylistOptionsOpen) {
+            isPlaylistOptionsOpen = false
+        } else if (isAlbumOptionsOpen) {
+            isAlbumOptionsOpen = false
+        } else if (isArtistOptionsOpen) {
+            isArtistOptionsOpen = false
         } else if (isSortSheetOpen) {
             isSortSheetOpen = false
         } else if (isCreateSheetOpen) {
@@ -587,7 +602,8 @@ fun SpotifyAppShell(
                     onTrackOptionsClick = { track ->
                         selectedTrackForOptions = track
                         isTrackOptionsOpen = true
-                    }
+                    },
+                    onPlaylistOptionsClick = { isPlaylistOptionsOpen = true }
                 )
             }
             ShellScreen.ALBUM -> {
@@ -630,6 +646,7 @@ fun SpotifyAppShell(
                         selectedTrackForOptions = track
                         isTrackOptionsOpen = true
                     },
+                    onAlbumOptionsClick = { isAlbumOptionsOpen = true },
                     onArtistClick = { artist ->
                         activeArtistName = artist
                         previousScreen = currentScreen
@@ -674,6 +691,7 @@ fun SpotifyAppShell(
                         selectedTrackForOptions = track
                         isTrackOptionsOpen = true
                     },
+                    onArtistOptionsClick = { isArtistOptionsOpen = true },
                     onReleaseClick = { release ->
                         openAlbum(release.title, activeArtistName)
                     }
@@ -904,6 +922,34 @@ fun SpotifyAppShell(
             },
             onShare = {},
             onSleepTimerClick = { isSleepTimerOpen = true }
+        )
+
+        PlaylistOptionsSheet(
+            title = activePlaylistTitle,
+            creator = "Spotify",
+            coverUrl = activePlaylistCoverUrl,
+            isOpen = isPlaylistOptionsOpen,
+            onDismiss = { isPlaylistOptionsOpen = false }
+        )
+
+        AlbumOptionsSheet(
+            title = activeAlbumTitle,
+            artist = activeAlbumArtist,
+            coverUrl = activeAlbumCoverUrl,
+            isOpen = isAlbumOptionsOpen,
+            onDismiss = { isAlbumOptionsOpen = false },
+            onGoToArtist = { artist ->
+                activeArtistName = artist
+                previousScreen = currentScreen
+                currentScreen = ShellScreen.ARTIST
+            }
+        )
+
+        ArtistOptionsSheet(
+            artistName = activeArtistName,
+            avatarUrl = activeArtistAvatarUrl,
+            isOpen = isArtistOptionsOpen,
+            onDismiss = { isArtistOptionsOpen = false }
         )
 
         LibrarySortSheet(

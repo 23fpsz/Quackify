@@ -1,5 +1,9 @@
 package com.spotiduck.compose.sheets
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +17,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -28,7 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -38,6 +44,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
+import com.spotiduck.compose.components.SpotifyArtworkImage
 import com.spotiduck.compose.playlist.TrackItem
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
@@ -45,7 +52,13 @@ import com.spotiduck.compose.theme.SpotifyTheme
 
 /**
  * Spotify Track Context Options Sheet (3-dot menu).
- * Includes cover art, track info, Like toggle, and Spotify actions.
+ * Fully matches decompiled Spotify Mobile specs:
+ * - 112dp artwork thumbnail with 8dp rounded corners
+ * - Centered title & artist metadata
+ * - Quick action row: Like (with spring heart-pop animation), Add to playlist, Add to queue
+ * - Vertical action list: Ban/Hide song, Add to playlist, Go to artist, Go to album, Show credits, Sleep timer, Share
+ * - Grapple dimensions: 36dp x 4dp with 10dp vertical margin
+ * - Background: #242424 (bg_page_bottom_sheet_color)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,24 +73,40 @@ fun TrackOptionsSheet(
     onViewAlbum: (String) -> Unit = {},
     onShare: () -> Unit = {},
     onSleepTimerClick: () -> Unit = {},
+    onHideSong: () -> Unit = {},
+    onShowCredits: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || track == null) return
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var isLiked by remember(track) { mutableStateOf(track.isExplicit) }
+    var isHeartPopping by remember { mutableStateOf(false) }
+
+    val heartScale by animateFloatAsState(
+        targetValue = if (isHeartPopping) 1.25f else 1f,
+        animationSpec = if (isHeartPopping) {
+            tween(durationMillis = 120)
+        } else {
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+        },
+        label = "TrackOptionsHeartPop",
+        finishedListener = {
+            if (isHeartPopping) isHeartPopping = false
+        }
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = Color(0xFF242424),
         dragHandle = {
             Box(
                 modifier = Modifier
-                    .padding(vertical = 12.dp)
+                    .padding(vertical = 10.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
+                    .background(Color.White.copy(alpha = 0.3f))
             )
         },
         modifier = modifier
@@ -85,85 +114,98 @@ fun TrackOptionsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Track Art Thumbnail (Center)
-            Box(
-                modifier = Modifier
-                    .size(110.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(Color(0xFF8D67AB), Color(0xFF1E3264))
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "♫",
-                    fontSize = 40.sp,
-                    color = Color.White
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Text(
-                text = track.title,
-                style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp),
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = track.artist,
-                style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            // Track Art Thumbnail (Centered, 112dp x 112dp, 8dp corner radius)
+            SpotifyArtworkImage(
+                imageUrl = track.imageUrl,
+                contentDescription = track.title,
+                cornerRadius = 8.dp,
+                modifier = Modifier.size(112.dp)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action Icons Row: Like, Ban, Add to Playlist
+            // Track Title
+            Text(
+                text = track.title,
+                style = SpotifyTheme.typography.titleLarge.copy(
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EncoreColors.TextPrimary
+                ),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Track Artist
+            Text(
+                text = track.artist,
+                style = SpotifyTheme.typography.bodyMedium.copy(
+                    fontSize = 14.sp,
+                    color = EncoreColors.TextSecondary
+                ),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Quick Action Icons Row: Like, Add to Playlist, Add to Queue
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Like / Liked Button
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable {
-                        isLiked = !isLiked
-                        onLikeToggle(isLiked)
-                    }
+                    modifier = Modifier
+                        .clickable {
+                            isLiked = !isLiked
+                            if (isLiked) isHeartPopping = true
+                            onLikeToggle(isLiked)
+                        }
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Icon(
                         painter = painterResource(
                             id = if (isLiked) R.drawable.encore_icon_heart_active_24 else R.drawable.encore_icon_heart_24
                         ),
-                        contentDescription = "Like",
+                        contentDescription = if (isLiked) "Remove from Liked Songs" else "Add to Liked Songs",
                         tint = if (isLiked) EncoreColors.Green else EncoreColors.TextPrimary,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier
+                            .size(28.dp)
+                            .scale(heartScale)
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = if (isLiked) "Liked" else "Like",
-                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                        style = SpotifyTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp,
+                            color = if (isLiked) EncoreColors.Green else EncoreColors.TextSecondary
+                        )
                     )
                 }
 
+                // Add to Playlist Button
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable {
-                        onDismiss()
-                        onAddToPlaylist()
-                    }
+                    modifier = Modifier
+                        .clickable {
+                            onDismiss()
+                            onAddToPlaylist()
+                        }
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_add_to_playlist_24),
@@ -171,19 +213,25 @@ fun TrackOptionsSheet(
                         tint = EncoreColors.TextPrimary,
                         modifier = Modifier.size(28.dp)
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Add to playlist",
-                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                        style = SpotifyTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp,
+                            color = EncoreColors.TextSecondary
+                        )
                     )
                 }
 
+                // Add to Queue Button
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable {
-                        onDismiss()
-                        onAddToQueue()
-                    }
+                    modifier = Modifier
+                        .clickable {
+                            onDismiss()
+                            onAddToQueue()
+                        }
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_add_to_queue_24),
@@ -191,54 +239,84 @@ fun TrackOptionsSheet(
                         tint = EncoreColors.TextPrimary,
                         modifier = Modifier.size(28.dp)
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Add to queue",
-                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                        style = SpotifyTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp,
+                            color = EncoreColors.TextSecondary
+                        )
                     )
                 }
             }
 
             HorizontalDivider(
-                color = EncoreColors.PureBlack.copy(alpha = 0.5f),
+                color = Color.White.copy(alpha = 0.1f),
                 thickness = 1.dp,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
 
-            // Context Menu List Items
-            OptionRowItem(
-                title = "View artist",
-                iconRes = R.drawable.encore_icon_user_24,
+            // Context Menu List Items (matching Spotify decompiled strings & icons)
+            ContextMenuRowItem(
+                title = "Hide this song",
+                iconRes = R.drawable.encore_icon_ban_24,
+                onClick = {
+                    onDismiss()
+                    onHideSong()
+                }
+            )
+
+            ContextMenuRowItem(
+                title = "Add to playlist",
+                iconRes = R.drawable.encore_icon_add_to_playlist_24,
+                onClick = {
+                    onDismiss()
+                    onAddToPlaylist()
+                }
+            )
+
+            ContextMenuRowItem(
+                title = "Go to artist",
+                iconRes = R.drawable.encore_icon_artist_24,
                 onClick = {
                     onDismiss()
                     onViewArtist(track.artist)
                 }
             )
 
-            OptionRowItem(
-                title = "View album",
-                iconRes = R.drawable.encore_icon_playlist_24,
+            ContextMenuRowItem(
+                title = "Go to album",
+                iconRes = R.drawable.encore_icon_album_24,
                 onClick = {
                     onDismiss()
                     onViewAlbum(track.title)
                 }
             )
 
-            OptionRowItem(
-                title = "Share",
-                iconRes = R.drawable.encore_icon_share_android_24,
+            ContextMenuRowItem(
+                title = "View song credits",
+                iconRes = R.drawable.encore_icon_user_24,
                 onClick = {
                     onDismiss()
-                    onShare()
+                    onShowCredits()
                 }
             )
 
-            OptionRowItem(
+            ContextMenuRowItem(
                 title = "Sleep timer",
                 iconRes = R.drawable.encore_icon_time_24,
                 onClick = {
                     onDismiss()
                     onSleepTimerClick()
+                }
+            )
+
+            ContextMenuRowItem(
+                title = "Share",
+                iconRes = R.drawable.encore_icon_share_android_24,
+                onClick = {
+                    onDismiss()
+                    onShare()
                 }
             )
 
@@ -248,29 +326,35 @@ fun TrackOptionsSheet(
 }
 
 @Composable
-private fun OptionRowItem(
+fun ContextMenuRowItem(
     title: String,
     iconRes: Int,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconTint: Color = EncoreColors.TextPrimary,
+    textColor: Color = EncoreColors.TextPrimary
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = 14.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             painter = painterResource(id = iconRes),
             contentDescription = title,
-            tint = EncoreColors.TextPrimary,
-            modifier = Modifier.size(22.dp)
+            tint = iconTint,
+            modifier = Modifier.size(24.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = title,
-            style = SpotifyTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+            style = SpotifyTheme.typography.bodyMedium.copy(
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = textColor
+            ),
             modifier = Modifier.weight(1f)
         )
     }

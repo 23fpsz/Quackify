@@ -97,6 +97,7 @@ fun SpotifyArtistScreen(
     onPlayPauseClick: () -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
+    onArtistOptionsClick: () -> Unit = {},
     onReleaseClick: (ArtistRelease) -> Unit = {},
     modifier: Modifier = Modifier,
     headerImageUrl: String? = null
@@ -231,7 +232,7 @@ fun SpotifyArtistScreen(
                         EncoreIconButton(
                             iconRes = R.drawable.encore_icon_more_android_24,
                             contentDescription = "More options",
-                            onClick = {},
+                            onClick = onArtistOptionsClick,
                             tint = EncoreColors.TextSecondary
                         )
                     }
@@ -482,7 +483,7 @@ fun SpotifyArtistScreen(
                 EncoreIconButton(
                     iconRes = R.drawable.encore_icon_more_android_24,
                     contentDescription = "Artist options",
-                    onClick = {},
+                    onClick = onArtistOptionsClick,
                     tint = EncoreColors.TextPrimary
                 )
             }
