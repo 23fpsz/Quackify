@@ -1,0 +1,29 @@
+# Android Studio / IntelliJ / Gradle
+*.iml
+.gradle
+.kotlin
+/local.properties
+local.properties
+/.idea/
+.DS_Store
+/build
+build/
+*build_corrupt*
+/captures
+.externalNativeBuild
+.cxx
+
+# Build outputs
+*.apk
+*.aar
+
+# Agent Guidelines & Internal Runbooks
+agents.md
+AGENT.md
+AGENTS.md
+
+# Secrets & local credentials
+sp_dc.txt
+*.env
+
+
