@@ -1,5 +1,6 @@
 package com.spotiduck.compose.engine
 
+import android.util.Log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,6 +27,8 @@ import java.util.concurrent.TimeUnit
  */
 object SpotifyConnectResolver {
 
+    private const val TAG = "SpotifyConnectResolver"
+
     private val httpClient = OkHttpClient.Builder()
         .readTimeout(10, TimeUnit.SECONDS)
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -39,13 +42,20 @@ object SpotifyConnectResolver {
     // In-memory cache: trackUri -> fileId
     private val fileIdCache = ConcurrentHashMap<String, String>()
 
+    fun clearCache() {
+        fileIdCache.clear()
+    }
+
     /**
      * Dynamically resolves the Spotify 40-character storage fileId for any track URI
      * using the Spotify Connect State machine over the Dealer WebSocket.
      */
     suspend fun resolveFileId(trackUri: String, accessToken: String): String = withContext(Dispatchers.IO) {
         // Return from cache if already resolved
-        fileIdCache[trackUri]?.let { return@withContext it }
+        fileIdCache[trackUri]?.let {
+            Log.i(TAG, "Serving cached fileId=$it for trackUri=$trackUri")
+            return@withContext it
+        }
 
         val connectionIdDeferred = CompletableDeferred<String>()
         val fileIdDeferred = CompletableDeferred<String>()
@@ -76,17 +86,33 @@ object SpotifyConnectResolver {
                             val payload = payloads.optJSONObject(i) ?: continue
                             val stateMachine = payload.optJSONObject("state_machine") ?: continue
                             val tracks = stateMachine.optJSONArray("tracks") ?: continue
+
+                            // Step 1: Find the exact track matching trackUri
+                            var targetTrack: JSONObject? = null
                             for (t in 0 until tracks.length()) {
                                 val trackObj = tracks.optJSONObject(t) ?: continue
-                                val manifest = trackObj.optJSONObject("manifest") ?: continue
-                                val fileIdsMp4 = manifest.optJSONArray("file_ids_mp4") ?: JSONArray()
-                                for (f in 0 until fileIdsMp4.length()) {
-                                    val fileObj = fileIdsMp4.optJSONObject(f) ?: continue
-                                    val fId = fileObj.optString("file_id", "")
-                                    if (fId.isNotEmpty()) {
-                                        fileIdDeferred.complete(fId)
-                                        return
-                                    }
+                                val metaUri = trackObj.optJSONObject("metadata")?.optString("uri", "") ?: ""
+                                if (metaUri.isNotEmpty() && metaUri == trackUri) {
+                                    targetTrack = trackObj
+                                    break
+                                }
+                            }
+
+                            // Step 2: Fallback to the first track with a manifest if exact URI wasn't explicitly matched
+                            if (targetTrack == null && tracks.length() > 0) {
+                                targetTrack = tracks.optJSONObject(0)
+                            }
+
+                            val manifest = targetTrack?.optJSONObject("manifest")
+                            val fileIdsMp4 = manifest?.optJSONArray("file_ids_mp4") ?: JSONArray()
+                            for (f in 0 until fileIdsMp4.length()) {
+                                val fileObj = fileIdsMp4.optJSONObject(f) ?: continue
+                                val fId = fileObj.optString("file_id", "")
+                                if (fId.isNotEmpty()) {
+                                    val matchedTitle = targetTrack?.optJSONObject("metadata")?.optString("name", "") ?: ""
+                                    Log.i(TAG, "Resolved trackUri=$trackUri -> fileId=$fId ('$matchedTitle')")
+                                    fileIdDeferred.complete(fId)
+                                    return
                                 }
                             }
                         }
@@ -202,12 +228,10 @@ object SpotifyConnectResolver {
                     })
                 })
                 put("play_origin", JSONObject().apply {
-                    put("feature_identifier", "search")
+                    put("feature_identifier", "playlist")
                     put("feature_version", "1.0.0")
-                    put("referrer_identifier", "search")
                 })
                 put("options", JSONObject().apply {
-                    put("license", "tft")
                     put("skip_to", JSONObject().apply {
                         put("track_uri", trackUri)
                     })
