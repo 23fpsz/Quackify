@@ -692,3 +692,45 @@ fun EncoreHeartButton(
     }
 }
 
+/**
+ * Standard Spotify Profile Avatar (faceheader_image) with 36dp default size.
+ * Displays user avatar image when [avatarUrl] is provided, or a colored circle with the user's initial.
+ */
+@Composable
+fun EncoreProfileAvatar(
+    userDisplayName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    avatarUrl: String? = null,
+    size: Dp = 36.dp,
+    backgroundColor: Color = Color(0xFFE91429)
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(backgroundColor)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!avatarUrl.isNullOrBlank()) {
+            SpotifyArtworkImage(
+                imageUrl = avatarUrl,
+                contentDescription = userDisplayName,
+                shape = CircleShape,
+                fallbackColor = backgroundColor,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Text(
+                text = (userDisplayName.trim().firstOrNull() ?: 'D').uppercaseChar().toString(),
+                style = SpotifyTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            )
+        }
+    }
+}
+
+

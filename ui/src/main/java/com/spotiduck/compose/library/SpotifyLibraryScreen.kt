@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
 import com.spotiduck.compose.components.EncoreChip
 import com.spotiduck.compose.components.EncoreIconButton
+import com.spotiduck.compose.components.EncoreProfileAvatar
 import com.spotiduck.compose.components.SpotifyArtworkImage
 import com.spotiduck.compose.sheets.LibrarySortOption
 import com.spotiduck.compose.theme.EncoreColors
@@ -283,34 +284,28 @@ fun SpotifyLibraryScreen(
                     )
                 }
             } else {
-                // Standard Title Header
+                // Standard Title Header: Profile Avatar + "Your Library" + Search + Plus
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Profile Avatar (Clickable -> Opens Profile Drawer)
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE91429))
-                            .clickable(onClick = onProfileClick),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = (userDisplayName.trim().firstOrNull() ?: 'D').uppercaseChar().toString(),
-                            style = SpotifyTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                    }
+                    EncoreProfileAvatar(
+                        userDisplayName = userDisplayName,
+                        avatarUrl = userAvatarUrl.ifBlank { null },
+                        onClick = onProfileClick
+                    )
 
                     Spacer(modifier = Modifier.width(12.dp))
 
                     Text(
                         text = "Your Library",
-                        style = SpotifyTheme.typography.headlineLarge.copy(fontSize = 24.sp),
+                        style = SpotifyTheme.typography.titleMedium.copy(
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EncoreColors.TextPrimary
+                        ),
                         modifier = Modifier.weight(1f)
                     )
 
@@ -319,6 +314,8 @@ fun SpotifyLibraryScreen(
                         iconRes = R.drawable.encore_icon_search_24,
                         contentDescription = "Search in library",
                         onClick = { isSearchActive = true },
+                        size = 40.dp,
+                        iconSize = 24.dp,
                         tint = EncoreColors.TextPrimary
                     )
 
@@ -327,6 +324,8 @@ fun SpotifyLibraryScreen(
                         iconRes = R.drawable.encore_icon_plus_24,
                         contentDescription = "Create",
                         onClick = onPlusClick,
+                        size = 40.dp,
+                        iconSize = 24.dp,
                         tint = EncoreColors.TextPrimary
                     )
                 }

@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.components.SpotifyArtworkImage
 import com.spotiduck.compose.R
 import com.spotiduck.compose.components.EncoreChip
+import com.spotiduck.compose.components.EncoreProfileAvatar
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.components.EncorePlayButton
 import com.spotiduck.compose.components.EncorePlayIndicator
@@ -313,48 +314,43 @@ fun SpotifySearchScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             if (!isSearching) {
-                // Browse Header: Profile Avatar + "Search" Title + Camera/Mic
+                // Browse Header: Profile Avatar + "Search" Title + Camera Button
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE91429))
-                            .clickable(onClick = onProfileClick),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = (userDisplayName.trim().firstOrNull() ?: 'D').uppercaseChar().toString(),
-                            style = SpotifyTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                    }
+                    EncoreProfileAvatar(
+                        userDisplayName = userDisplayName,
+                        avatarUrl = userAvatarUrl.ifBlank { null },
+                        onClick = onProfileClick
+                    )
 
                     Spacer(modifier = Modifier.width(12.dp))
 
                     Text(
                         text = "Search",
-                        style = SpotifyTheme.typography.headlineLarge.copy(fontSize = 24.sp),
+                        style = SpotifyTheme.typography.titleMedium.copy(
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EncoreColors.TextPrimary
+                        ),
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Camera Button (find_header_profile.xml camera_button: encore_camera_button_size = 32dp)
+                    // Camera Button (find_header_profile.xml: encore_camera_button_size)
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_camera_24,
                         contentDescription = "Scan Spotify Code",
                         onClick = { /* Open Camera Scan */ },
-                        size = 32.dp,
+                        size = 40.dp,
                         iconSize = 24.dp,
                         tint = EncoreColors.TextPrimary
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             // Spotify Search Pill Bar (matching modern_search_header.xml)
