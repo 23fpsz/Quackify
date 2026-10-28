@@ -341,6 +341,23 @@ fun SpotifyAppShell(
         currentScreen = ShellScreen.ALBUM
     }
 
+    val openArtist: (String, String?) -> Unit = { artist, imageUrl ->
+        activeArtistName = artist
+        val resolvedUrl = imageUrl
+            ?: libraryItems?.find { it.title.equals(artist, ignoreCase = true) }?.imageUrl
+            ?: when {
+                artist.contains("Honey Singh", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb2a921d72545592fc624c43ee"
+                artist.contains("Weeknd", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb968a3770e060cf56306e9f1a"
+                artist.contains("Arijit", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb0261696c5df3be99da6ed3f3"
+                artist.contains("Drake", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb4293385d324db8558179afd9"
+                artist.contains("Taylor Swift", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0"
+                else -> activeArtistAvatarUrl ?: "https://i.scdn.co/image/ab6761610000e5eb2a921d72545592fc624c43ee"
+            }
+        activeArtistAvatarUrl = resolvedUrl
+        previousScreen = currentScreen
+        currentScreen = ShellScreen.ARTIST
+    }
+
     val handleSkipNext: () -> Unit = {
         if (playerListener != null) {
             playerListener.onSkipNext()
@@ -471,11 +488,7 @@ fun SpotifyAppShell(
                     onSettingsClick = handleOpenSettings,
                     quickAccessItems = homeQuickAccessItems,
                     recommendations = homeRecommendations,
-                    onArtistClick = { artist ->
-                        activeArtistName = artist
-                        previousScreen = ShellScreen.HOME
-                        currentScreen = ShellScreen.ARTIST
-                    },
+                    onArtistClick = { artist -> openArtist(artist, null) },
                     userDisplayName = userDisplayName,
                     userAvatarUrl = userAvatarUrl
                 )
@@ -490,11 +503,7 @@ fun SpotifyAppShell(
                         playerListener?.onLoadPlaylist("spotify:search:$category")
                     },
                     onAlbumClick = { title, artist -> openAlbum(title, artist) },
-                    onArtistClick = { artist ->
-                        activeArtistName = artist
-                        previousScreen = ShellScreen.SEARCH
-                        currentScreen = ShellScreen.ARTIST
-                    },
+                    onArtistClick = { artist -> openArtist(artist, null) },
                     onPlaylistClick = { title, uri ->
                         activePlaylistTitle = title
                         activePlaylistUri = uri
@@ -548,11 +557,7 @@ fun SpotifyAppShell(
                         }
                     },
                     onAlbumClick = { title, artist -> openAlbum(title, artist) },
-                    onArtistClick = { artist ->
-                        activeArtistName = artist
-                        previousScreen = ShellScreen.LIBRARY
-                        currentScreen = ShellScreen.ARTIST
-                    },
+                    onArtistClick = { artist -> openArtist(artist, null) },
                     items = libraryItems,
                     userDisplayName = userDisplayName,
                     userAvatarUrl = userAvatarUrl,
@@ -648,29 +653,49 @@ fun SpotifyAppShell(
                         isTrackOptionsOpen = true
                     },
                     onAlbumOptionsClick = { isAlbumOptionsOpen = true },
-                    onArtistClick = { artist ->
-                        activeArtistName = artist
-                        previousScreen = currentScreen
-                        currentScreen = ShellScreen.ARTIST
-                    },
+                    onArtistClick = { artist -> openArtist(artist, null) },
                     onAlbumClick = { title ->
                         openAlbum(title, activeAlbumArtist)
                     }
                 )
             }
             ShellScreen.ARTIST -> {
-                SpotifyArtistScreen(
-                    artistName = activeArtistName,
-                    monthlyListeners = "104,239,812",
-                    heroColor = Color(0xFF6B1A24),
-                    headerImageUrl = activeArtistAvatarUrl,
-                    popularTracks = sampleTracks.take(5).map { PopularTrack(it, "3,119,402,118") },
-                    releases = listOf(
+                val isHoneySingh = activeArtistName.contains("Honey Singh", ignoreCase = true)
+                val artistTracks = if (isHoneySingh) {
+                    listOf(
+                        PopularTrack(TrackItem("Millionaire", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82"), "312,410,950"),
+                        PopularTrack(TrackItem("Brown Rang", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"), "284,519,040"),
+                        PopularTrack(TrackItem("Blue Eyes", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273c52e466b033aa7cb08cf119a"), "255,109,820"),
+                        PopularTrack(TrackItem("Dope Shope", "Yo Yo Honey Singh, Deep Money", imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"), "220,194,520"),
+                        PopularTrack(TrackItem("Love Dose", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273c52e466b033aa7cb08cf119a"), "198,341,080")
+                    )
+                } else {
+                    sampleTracks.take(5).map { PopularTrack(it, "3,119,402,118") }
+                }
+
+                val artistReleases = if (isHoneySingh) {
+                    listOf(
+                        ArtistRelease("GLORY", "2024", "Album", Color(0xFF1E3264), imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82"),
+                        ArtistRelease("International Villager", "2011", "Album", Color(0xFF8D67AB), imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"),
+                        ArtistRelease("Desi Kalakaar", "2014", "Album", Color(0xFFBA5D07), imageUrl = "https://i.scdn.co/image/ab67616d0000b273c52e466b033aa7cb08cf119a"),
+                        ArtistRelease("Millionaire", "2024", "Single", Color(0xFFE91429), imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82")
+                    )
+                } else {
+                    listOf(
                         ArtistRelease("After Hours", "2020", "Album", Color(0xFF5A1A22), imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
                         ArtistRelease("Dawn FM", "2022", "Album", Color(0xFF243B55), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734ab25200366c1b3f942d937a"),
                         ArtistRelease("Starboy", "2016", "Album", Color(0xFF8E0E00), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
                         ArtistRelease("Timeless", "2024", "Single", Color(0xFF333333), imageUrl = "https://i.scdn.co/image/ab67616d0000b273b0dd6a5cd1dec96c4119c262")
-                    ),
+                    )
+                }
+
+                SpotifyArtistScreen(
+                    artistName = activeArtistName,
+                    monthlyListeners = if (isHoneySingh) "20,742,810" else "104,239,812",
+                    heroColor = if (isHoneySingh) Color(0xFF2B3A48) else Color(0xFF6B1A24),
+                    headerImageUrl = activeArtistAvatarUrl,
+                    popularTracks = artistTracks,
+                    releases = artistReleases,
                     currentTrackTitle = currentTrackTitle,
                     isPlaying = isPlaying,
                     onBackClick = { currentScreen = previousScreen },
@@ -913,11 +938,7 @@ fun SpotifyAppShell(
             onAddToQueue = {
                 selectedTrackForOptions?.let { userQueueList.add(it) }
             },
-            onViewArtist = { artist ->
-                activeArtistName = artist
-                previousScreen = currentScreen
-                currentScreen = ShellScreen.ARTIST
-            },
+            onViewArtist = { artist -> openArtist(artist, null) },
             onViewAlbum = { album ->
                 openAlbum(album, selectedTrackForOptions?.artist ?: "")
             },
@@ -939,11 +960,7 @@ fun SpotifyAppShell(
             coverUrl = activeAlbumCoverUrl,
             isOpen = isAlbumOptionsOpen,
             onDismiss = { isAlbumOptionsOpen = false },
-            onGoToArtist = { artist ->
-                activeArtistName = artist
-                previousScreen = currentScreen
-                currentScreen = ShellScreen.ARTIST
-            }
+            onGoToArtist = { artist -> openArtist(artist, null) }
         )
 
         ArtistOptionsSheet(

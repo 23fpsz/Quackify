@@ -121,9 +121,11 @@ fun SpotifyArtistScreen(
     val playButtonHalf = 26.dp
     val pinnedTop = toolbarBottom - playButtonHalf
     val pinnedTopPx = with(density) { pinnedTop.toPx() }
+    val heroHeight = 360.dp
+    val heroHeightPx = with(density) { heroHeight.toPx() }
 
     val isHeaderOffScreen = listState.firstVisibleItemIndex > 0
-    val defaultActionRowYPx = with(density) { (statusBarTop + 340.dp).toPx() }
+    val defaultActionRowYPx = with(density) { (heroHeight).toPx() }
     val currentActionRowYPx = when {
         isHeaderOffScreen -> -1000f
         actionRowYInRoot != Float.MAX_VALUE -> actionRowYInRoot
@@ -158,86 +160,133 @@ fun SpotifyArtistScreen(
             .fillMaxSize()
             .background(Color(0xFF121212))
     ) {
+        // 1:1 Edge-to-Edge Background Hero Image with Parallax & Scrim
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(heroHeight)
+                .graphicsLayer {
+                    val scrollOffset = if (listState.firstVisibleItemIndex == 0) {
+                        listState.firstVisibleItemScrollOffset.toFloat()
+                    } else {
+                        heroHeightPx
+                    }
+                    translationY = -scrollOffset * 0.45f
+                    alpha = (1f - (scrollOffset / (heroHeightPx * 0.85f))).coerceIn(0f, 1f)
+                }
+        ) {
+            if (headerImageUrl != null) {
+                SpotifyArtworkImage(
+                    imageUrl = headerImageUrl,
+                    contentDescription = artistName,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 0.dp
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(heroColor)
+                )
+            }
+
+            // Top scrim for status bar and navigation buttons contrast
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.5f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            // Bottom gradient fading smoothly into #121212 background (keeping artist face clear)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                0.45f to Color.Transparent,
+                                0.78f to Color(0xCC121212),
+                                1.0f to Color(0xFF121212)
+                            )
+                        )
+                    )
+            )
+        }
+
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = bottomPadding)
         ) {
-            // Hero Header Section with Gradient (stretches edge-to-edge behind status bar)
+            // Overlaid Typography on Hero Section (transparent container over background image)
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(340.dp)
+                        .height(heroHeight)
+                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Base),
+                    contentAlignment = Alignment.BottomStart
                 ) {
-                    if (headerImageUrl != null) {
-                        SpotifyArtworkImage(
-                            imageUrl = headerImageUrl,
-                            contentDescription = artistName,
-                            modifier = Modifier.fillMaxSize(),
-                            cornerRadius = 0.dp
+                    Column {
+                        // Giant Artist Title (44sp Bold White)
+                        Text(
+                            text = artistName,
+                            style = SpotifyTheme.typography.headlineLarge.copy(
+                                color = Color.White,
+                                fontSize = 44.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-1).sp,
+                                lineHeight = 46.sp
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
-                    }
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        if (headerImageUrl != null) Color.Transparent else heroColor,
-                                        heroColor.copy(alpha = 0.8f),
-                                        Color(0xFF121212)
-                                    )
-                                )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Verified Artist Badge
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_verified_check_active_24),
+                                contentDescription = "Verified Artist",
+                                tint = Color(0xFF3D91F4),
+                                modifier = Modifier.size(16.dp)
                             )
-                            .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Base),
-                        contentAlignment = Alignment.BottomStart
-                    ) {
-                        Column {
-                            // Verified Artist Badge
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.encore_icon_verified_check_active_24),
-                                    contentDescription = "Verified Artist",
-                                    tint = Color(0xFF3D91F4),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(EncoreSpacers.Tighter3))
-                                Text(
-                                    text = "Verified Artist",
-                                    style = SpotifyTheme.typography.bodySmall.copy(
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(EncoreSpacers.Tighter3))
-
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = artistName,
-                                style = SpotifyTheme.typography.headlineLarge.copy(
+                                text = "Verified Artist",
+                                style = SpotifyTheme.typography.bodySmall.copy(
                                     color = Color.White,
-                                    fontSize = 32.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-
-                            Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
-
-                            Text(
-                                text = "$monthlyListeners monthly listeners",
-                                style = SpotifyTheme.typography.bodySmall.copy(color = Color(0xFFE0E0E0))
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(3.dp))
+
+                        // Monthly Listeners
+                        Text(
+                            text = "$monthlyListeners monthly listeners",
+                            style = SpotifyTheme.typography.bodySmall.copy(
+                                color = Color(0xFFB3B3B3),
+                                fontSize = 13.sp
+                            )
+                        )
                     }
                 }
             }
 
-            // Action Row: Follow Pill, 3-dots, Shuffle, Green Play Button
+            // Action Row: Latest Release Preview / Follow Pill, 3-dots, Shuffle, Green Play Button
             item {
                 Row(
                     modifier = Modifier
@@ -253,6 +302,24 @@ fun SpotifyArtistScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter)
                     ) {
+                        // Latest release preview thumbnail card if available
+                        val latestRelease = releases.firstOrNull()
+                        if (latestRelease?.imageUrl != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable { onReleaseClick(latestRelease) }
+                            ) {
+                                SpotifyArtworkImage(
+                                    imageUrl = latestRelease.imageUrl,
+                                    contentDescription = latestRelease.title,
+                                    modifier = Modifier.fillMaxSize(),
+                                    cornerRadius = 4.dp
+                                )
+                            }
+                        }
+
                         // Follow Pill Button
                         Box(
                             modifier = Modifier
