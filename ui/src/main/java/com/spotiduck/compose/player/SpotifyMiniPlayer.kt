@@ -1,8 +1,7 @@
 package com.spotiduck.compose.player
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -123,17 +122,17 @@ fun SpotifyMiniPlayer(
                                         val threshold = (containerWidthPx * 0.25f).coerceAtLeast(40f)
                                         val exitDistance = containerWidthPx.coerceAtLeast(200f)
                                         if (offset < -threshold) {
-                                            titleOffsetX.animateTo(-exitDistance, tween(150, easing = EncoreAnimation.DecelerateInterpolator))
+                                            titleOffsetX.animateTo(-exitDistance, tween(160, easing = FastOutSlowInEasing))
                                             onSkipNextClick()
                                             titleOffsetX.snapTo(exitDistance)
-                                            titleOffsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+                                            titleOffsetX.animateTo(0f, tween(200, easing = FastOutSlowInEasing))
                                         } else if (offset > threshold) {
-                                            titleOffsetX.animateTo(exitDistance, tween(150, easing = EncoreAnimation.DecelerateInterpolator))
+                                            titleOffsetX.animateTo(exitDistance, tween(160, easing = FastOutSlowInEasing))
                                             onSkipPreviousClick()
                                             titleOffsetX.snapTo(-exitDistance)
-                                            titleOffsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+                                            titleOffsetX.animateTo(0f, tween(200, easing = FastOutSlowInEasing))
                                         } else {
-                                            titleOffsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+                                            titleOffsetX.animateTo(0f, tween(180, easing = FastOutSlowInEasing))
                                         }
                                     }
                                 },
