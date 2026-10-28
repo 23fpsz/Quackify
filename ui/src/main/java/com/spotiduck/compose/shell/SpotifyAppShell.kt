@@ -129,9 +129,18 @@ interface ComposePlayerListener {
     fun onPlayUri(uri: String) {}
     fun onSearch(query: String) {}
     fun onLoadPlaylist(uri: String) {}
+    fun onLoadAlbum(uri: String, albumName: String = "", artist: String = "") {}
+    fun onLoadArtist(uri: String, artistName: String = "") {}
     fun onRefreshLibrary() {}
     fun onRefreshHome() {}
 }
+
+private data class AlbumInfo(
+    val year: String,
+    val date: String,
+    val color: Color,
+    val uri: String
+)
 
 /**
  * Spotify App Shell containing:
@@ -154,6 +163,10 @@ fun SpotifyAppShell(
     libraryItems: List<LibraryItem>? = null,
     searchResults: List<TrackItem>? = null,
     playlistTracks: List<TrackItem>? = null,
+    albumTracks: List<TrackItem>? = null,
+    artistTracks: List<PopularTrack>? = null,
+    artistReleases: List<ArtistRelease>? = null,
+    artistMonthlyListeners: String? = null,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = ""
 ) {
@@ -311,49 +324,76 @@ fun SpotifyAppShell(
     val openAlbum: (String, String) -> Unit = { title, artist ->
         activeAlbumTitle = title
         activeAlbumArtist = if (artist.isNotEmpty()) artist else if (title.contains("Random Access Memories", ignoreCase = true)) "Daft Punk" else "The Weeknd"
-        when {
+        val foundEntity = libraryItems?.find { it.title.equals(title, ignoreCase = true) }
+        val resolvedCover = foundEntity?.imageUrl
+
+        val albumInfo = when {
             title.contains("Starboy", ignoreCase = true) -> {
-                activeAlbumYear = "2016"
-                activeAlbumReleaseDate = "November 25, 2016"
-                activeAlbumColor = Color(0xFF4F46E5)
-                activeAlbumCoverUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"
+                AlbumInfo("2016", "November 25, 2016", Color(0xFF4F46E5), "spotify:album:2ODvWsOgouMbaA5xf0RkJe")
             }
             title.contains("Random Access Memories", ignoreCase = true) -> {
-                activeAlbumYear = "2013"
-                activeAlbumReleaseDate = "May 17, 2013"
-                activeAlbumColor = Color(0xFF6B7280)
-                activeAlbumCoverUrl = "https://i.scdn.co/image/ab67616d0000b2739b9b36b0e22870b9f542d937"
+                AlbumInfo("2013", "May 17, 2013", Color(0xFF6B7280), "spotify:album:4m2880jivSbbyEGAKfITCa")
             }
             title.contains("Dawn FM", ignoreCase = true) -> {
-                activeAlbumYear = "2022"
-                activeAlbumReleaseDate = "January 7, 2022"
-                activeAlbumColor = Color(0xFF243B55)
-                activeAlbumCoverUrl = "https://i.scdn.co/image/ab67616d0000b2734ab25200366c1b3f942d937a"
+                AlbumInfo("2022", "January 7, 2022", Color(0xFF243B55), "spotify:album:2nLOHgz97rqx9cqvhCyZa5")
+            }
+            title.contains("After Hours", ignoreCase = true) -> {
+                AlbumInfo("2020", "March 20, 2020", Color(0xFF901A1E), "spotify:album:4yP0hdKOgrTwcyWu21s0Ad")
+            }
+            title.contains("GLORY", ignoreCase = true) -> {
+                AlbumInfo("2024", "August 26, 2024", Color(0xFF1E3264), "spotify:album:3iKxL3h4a6G7fWqU4v1I8g")
+            }
+            title.contains("International Villager", ignoreCase = true) -> {
+                AlbumInfo("2011", "November 11, 2011", Color(0xFF8D67AB), "spotify:album:2jP3v1C6m5p6e3U2r7a2B1")
             }
             else -> {
-                activeAlbumYear = "2020"
-                activeAlbumReleaseDate = "March 20, 2020"
-                activeAlbumColor = Color(0xFF901A1E)
-                activeAlbumCoverUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"
+                AlbumInfo("2024", "2024", Color(0xFF333333), foundEntity?.uri?.takeIf { it.isNotEmpty() } ?: "")
             }
         }
+        activeAlbumYear = albumInfo.year
+        activeAlbumReleaseDate = albumInfo.date
+        activeAlbumColor = albumInfo.color
+        if (resolvedCover != null) {
+            activeAlbumCoverUrl = resolvedCover
+        } else if (title.contains("Starboy", ignoreCase = true)) {
+            activeAlbumCoverUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"
+        } else if (title.contains("After Hours", ignoreCase = true)) {
+            activeAlbumCoverUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"
+        }
+
+        val albumUriToLoad = foundEntity?.uri?.takeIf { it.startsWith("spotify:album:") } ?: albumInfo.uri
+        playerListener?.onLoadAlbum(albumUriToLoad, title, activeAlbumArtist)
+
         previousScreen = currentScreen
         currentScreen = ShellScreen.ALBUM
     }
 
     val openArtist: (String, String?) -> Unit = { artist, imageUrl ->
         activeArtistName = artist
+        val foundEntity = libraryItems?.find { it.title.equals(artist, ignoreCase = true) }
         val resolvedUrl = imageUrl
-            ?: libraryItems?.find { it.title.equals(artist, ignoreCase = true) }?.imageUrl
+            ?: foundEntity?.imageUrl
             ?: when {
                 artist.contains("Honey Singh", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb2a921d72545592fc624c43ee"
                 artist.contains("Weeknd", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb968a3770e060cf56306e9f1a"
                 artist.contains("Arijit", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb0261696c5df3be99da6ed3f3"
                 artist.contains("Drake", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb4293385d324db8558179afd9"
                 artist.contains("Taylor Swift", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0"
+                artist.contains("Stephen Sanchez", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5ebb08d4b38bfd2c0b71e191cf0"
                 else -> activeArtistAvatarUrl ?: "https://i.scdn.co/image/ab6761610000e5eb2a921d72545592fc624c43ee"
             }
         activeArtistAvatarUrl = resolvedUrl
+
+        val artistUriToLoad = foundEntity?.uri?.takeIf { it.startsWith("spotify:artist:") }
+            ?: when {
+                artist.contains("Honey Singh", ignoreCase = true) -> "spotify:artist:7uIbLdzzRuQIngLFcu8mgr"
+                artist.contains("Weeknd", ignoreCase = true) -> "spotify:artist:1Xyo4u8uXC1ZmMpatF05PJ"
+                artist.contains("Arijit", ignoreCase = true) -> "spotify:artist:4YRxDV8wJFPHPTeXepOstw"
+                artist.contains("Stephen Sanchez", ignoreCase = true) -> "spotify:artist:1NZsSd7h4SZ8cuUtwi0GQZ"
+                else -> ""
+            }
+        playerListener?.onLoadArtist(artistUriToLoad, artist)
+
         previousScreen = currentScreen
         currentScreen = ShellScreen.ARTIST
     }
@@ -613,13 +653,14 @@ fun SpotifyAppShell(
                 )
             }
             ShellScreen.ALBUM -> {
+                val effectiveAlbumTracks = if (!albumTracks.isNullOrEmpty()) albumTracks else activeAlbumTracks
                 SpotifyAlbumScreen(
                     albumTitle = activeAlbumTitle,
                     artistName = activeAlbumArtist,
                     releaseYear = activeAlbumYear,
                     releaseDate = activeAlbumReleaseDate,
                     coverColor = activeAlbumColor,
-                    tracks = activeAlbumTracks,
+                    tracks = effectiveAlbumTracks,
                     currentTrackTitle = currentTrackTitle,
                     isPlaying = isPlaying,
                     coverUrl = activeAlbumCoverUrl,
@@ -661,7 +702,7 @@ fun SpotifyAppShell(
             }
             ShellScreen.ARTIST -> {
                 val isHoneySingh = activeArtistName.contains("Honey Singh", ignoreCase = true)
-                val artistTracks = if (isHoneySingh) {
+                val fallbackArtistTracks = if (isHoneySingh) {
                     listOf(
                         PopularTrack(TrackItem("Millionaire", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82"), "312,410,950"),
                         PopularTrack(TrackItem("Brown Rang", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"), "284,519,040"),
@@ -673,7 +714,7 @@ fun SpotifyAppShell(
                     sampleTracks.take(5).map { PopularTrack(it, "3,119,402,118") }
                 }
 
-                val artistReleases = if (isHoneySingh) {
+                val fallbackReleases = if (isHoneySingh) {
                     listOf(
                         ArtistRelease("GLORY", "2024", "Album", Color(0xFF1E3264), imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82"),
                         ArtistRelease("International Villager", "2011", "Album", Color(0xFF8D67AB), imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"),
@@ -689,13 +730,18 @@ fun SpotifyAppShell(
                     )
                 }
 
+                val effectiveArtistTracks = if (!artistTracks.isNullOrEmpty()) artistTracks else fallbackArtistTracks
+                val effectiveReleases = if (!artistReleases.isNullOrEmpty()) artistReleases else fallbackReleases
+                val effectiveListeners = artistMonthlyListeners?.takeIf { it.isNotBlank() }
+                    ?: (if (isHoneySingh) "20,742,810" else "104,239,812")
+
                 SpotifyArtistScreen(
                     artistName = activeArtistName,
-                    monthlyListeners = if (isHoneySingh) "20,742,810" else "104,239,812",
+                    monthlyListeners = effectiveListeners,
                     heroColor = if (isHoneySingh) Color(0xFF2B3A48) else Color(0xFF6B1A24),
                     headerImageUrl = activeArtistAvatarUrl,
-                    popularTracks = artistTracks,
-                    releases = artistReleases,
+                    popularTracks = effectiveArtistTracks,
+                    releases = effectiveReleases,
                     currentTrackTitle = currentTrackTitle,
                     isPlaying = isPlaying,
                     onBackClick = { currentScreen = previousScreen },
