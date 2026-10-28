@@ -481,24 +481,34 @@ fun SpotifyPlaylistScreen(
                 derivedStateOf { ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f) }
             }
 
-            val gradientHeightDp = 280.dp
+            val gradientHeightDp = 550.dp
+            val gradientHeightPx = with(density) { gradientHeightDp.toPx() }
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFF121212))
             ) {
-                // Header Gradient Background: fixed at the top of the screen, fades to pure #121212 before Action Controls & Add/Edit row
+                // Header Gradient Background (matches official Spotify 1:1)
+                // Seamlessly illuminates entire artwork, title, and controls, fading completely to pure #121212 before Add/Edit chips row
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(gradientHeightDp)
+                        .graphicsLayer {
+                            translationY = if (listState.firstVisibleItemIndex == 0) {
+                                -listState.firstVisibleItemScrollOffset.toFloat()
+                            } else {
+                                -gradientHeightPx
+                            }
+                        }
                         .background(
                             Brush.verticalGradient(
                                 colorStops = arrayOf(
                                     0.0f to headerColor,
-                                    0.45f to headerColor.copy(alpha = 0.65f),
-                                    0.75f to headerColor.copy(alpha = 0.20f),
+                                    0.35f to headerColor.copy(alpha = 0.75f),
+                                    0.65f to headerColor.copy(alpha = 0.40f),
+                                    0.85f to headerColor.copy(alpha = 0.15f),
                                     1.0f to Color(0xFF121212)
                                 )
                             )
@@ -831,6 +841,7 @@ fun SpotifyPlaylistScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .background(Color(0xFF121212))
                             .onGloballyPositioned { coords ->
                                 chipsRowYInRoot = coords.positionInRoot().y
                             }
