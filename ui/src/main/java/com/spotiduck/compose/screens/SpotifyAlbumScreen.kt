@@ -28,7 +28,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -110,6 +112,8 @@ fun SpotifyAlbumScreen(
     val listState = rememberLazyListState()
 
     var actionRowYInRoot by remember { mutableStateOf(Float.MAX_VALUE) }
+    var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
+    var isPlayButtonSlotMeasured by remember { mutableStateOf(false) }
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val toolbarHeight = 54.dp
@@ -121,18 +125,18 @@ fun SpotifyAlbumScreen(
     val pinnedTopPx = with(density) { pinnedTop.toPx() }
 
     val isHeaderOffScreen = listState.firstVisibleItemIndex > 0
-    val defaultActionRowYPx = with(density) { (statusBarTop + 390.dp).toPx() }
-    val currentActionRowYPx = when {
-        isHeaderOffScreen -> -1000f
-        actionRowYInRoot != Float.MAX_VALUE -> actionRowYInRoot
-        else -> defaultActionRowYPx
+
+    val dockDistancePx by remember {
+        derivedStateOf {
+            if (isHeaderOffScreen) {
+                0f
+            } else if (isPlayButtonSlotMeasured) {
+                (playButtonSlotYInRoot - pinnedTopPx).coerceAtLeast(0f)
+            } else {
+                with(density) { 300.dp.toPx() }
+            }
+        }
     }
-
-    // Continuous gliding & docking matching Spotify ComposePlayButtonBehavior:
-    val playButtonYPx = maxOf(pinnedTopPx, currentActionRowYPx)
-    val playButtonYDp = with(density) { playButtonYPx.toDp() }
-
-    val dockDistancePx = if (isHeaderOffScreen) 0f else (playButtonYPx - pinnedTopPx)
     val dockThresholdPx = with(density) { 56.dp.toPx() }
     val dockFraction = (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f)
 
@@ -143,10 +147,17 @@ fun SpotifyAlbumScreen(
     val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
     val topOffsetPx = with(density) { (toolbarHeight - 8.dp).toPx().toInt() }
 
-    val headerBottomYPx = if (isHeaderOffScreen) toolbarBottomPx else maxOf(
-        toolbarBottomPx,
-        currentActionRowYPx + with(density) { 66.dp.toPx() }
-    )
+    val currentGradientHeightDp by remember {
+        derivedStateOf {
+            if (isHeaderOffScreen) {
+                toolbarBottom
+            } else if (isPlayButtonSlotMeasured && playButtonSlotYInRoot > 0f) {
+                maxOf(toolbarBottom, with(density) { (playButtonSlotYInRoot + playButtonSize.toPx() + with(density) { 14.dp.toPx() }).toDp() })
+            } else {
+                toolbarBottom + 390.dp
+            }
+        }
+    }
 
     // Dynamic Artwork Shrink Calculation
     val scrollOffset = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset else 500
@@ -159,19 +170,20 @@ fun SpotifyAlbumScreen(
             .fillMaxSize()
             .background(Color(0xFF121212))
     ) {
-        // Collapsible Header Gradient Background (Image 1, 2, 4, 5 & Latest Screenshot)
+        // Collapsible Header Gradient Background
         // Spans from top of screen (Y = 0) down to the bottom of the action row,
-        // seamlessly transitioning into pure #121212 so there is never an abrupt cutoff.
+        // dynamically bounded so it smoothly contracts into toolbarBottom without scroll bleed or popping.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(with(density) { headerBottomYPx.toDp() })
+                .height(currentGradientHeightDp)
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
                             0.0f to coverColor,
-                            0.50f to coverColor.copy(alpha = 0.65f),
-                            0.80f to coverColor.copy(alpha = 0.20f),
+                            0.35f to coverColor.copy(alpha = 0.90f),
+                            0.65f to coverColor.copy(alpha = 0.55f),
+                            0.85f to coverColor.copy(alpha = 0.20f),
                             1.0f to Color(0xFF121212)
                         )
                     )
@@ -386,8 +398,27 @@ fun SpotifyAlbumScreen(
                                     )
                                 }
 
-                                // Reserved slot for the single gliding/docked play button
-                                Spacer(modifier = Modifier.size(playButtonSize))
+                                // Play Button Slot: rendered directly in the Action Controls row
+                                Box(
+                                    modifier = Modifier
+                                        .size(playButtonSize)
+                                        .onGloballyPositioned { coords ->
+                                            isPlayButtonSlotMeasured = true
+                                            playButtonSlotYInRoot = coords.positionInRoot().y
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Visible directly in the row whenever below the top bar
+                                    if (!isPlayButtonSlotMeasured || playButtonSlotYInRoot > toolbarBottomPx) {
+                                        EncorePlayButton(
+                                            isPlaying = isPlaying,
+                                            onClick = onPlayPauseClick,
+                                            size = playButtonSize,
+                                            iconSize = 24.dp,
+                                            showShuffleBadge = false
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -628,21 +659,31 @@ fun SpotifyAlbumScreen(
             }
         }
 
-        // Single Play Button implementing Spotify's ComposePlayButtonBehavior:
-        // Glides smoothly from the actions row and clamps at pinnedTop at the top bar boundary
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = playButtonYDp, end = 16.dp)
-                .zIndex(20f)
-        ) {
-            EncorePlayButton(
-                isPlaying = isPlaying,
-                onClick = onPlayPauseClick,
-                size = playButtonSize,
-                iconSize = 24.dp,
-                showShuffleBadge = false
-            )
+        // Pinned Play Button (matching Spotify ComposePlayButtonBehavior):
+        // Floats above top bar at zIndex(20f) as soon as it reaches toolbar, docking at pinnedTopPx
+        if (isPlayButtonSlotMeasured && (playButtonSlotYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
+            val targetY = if (isHeaderOffScreen || playButtonSlotYInRoot < pinnedTopPx) {
+                pinnedTopPx
+            } else {
+                playButtonSlotYInRoot
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 16.dp)
+                    .graphicsLayer {
+                        translationY = targetY
+                    }
+                    .zIndex(20f)
+            ) {
+                EncorePlayButton(
+                    isPlaying = isPlaying,
+                    onClick = onPlayPauseClick,
+                    size = playButtonSize,
+                    iconSize = 24.dp,
+                    showShuffleBadge = false
+                )
+            }
         }
     }
 }
