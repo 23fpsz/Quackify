@@ -875,6 +875,129 @@ private fun getCategoryContent(
             )
             shelves to subgenres
         }
+        "Chill" -> {
+            val shelves = listOf(
+                CategoryShelf(
+                    title = "Popular Chill Playlists",
+                    subtitle = "Peaceful, calm, and cozy selections",
+                    items = listOf(
+                        CategoryRecommendationItem(
+                            title = "Chill Hits",
+                            subtitle = "Kick back to the best new and recent chill hits",
+                            coverColor = Color(0xFF432371),
+                            uri = "spotify:playlist:chillhits"
+                        ),
+                        CategoryRecommendationItem(
+                            title = "Lo-Fi Beats",
+                            subtitle = "Beats to relax, study, and focus to",
+                            coverColor = Color(0xFF1E3264),
+                            uri = "spotify:playlist:lofi"
+                        ),
+                        CategoryRecommendationItem(
+                            title = "Night Rain",
+                            subtitle = "Gentle rain sounds and soothing sleep ambient",
+                            coverColor = Color(0xFF282828),
+                            uri = "spotify:playlist:nightrain"
+                        )
+                    )
+                ),
+                CategoryShelf(
+                    title = "Acoustic & Instrumental",
+                    subtitle = "Stripped back strings and piano chords",
+                    items = listOf(
+                        CategoryRecommendationItem(
+                            title = "Acoustic Concentration",
+                            subtitle = "Calm acoustic instrumentals to keep you centered",
+                            coverColor = Color(0xFF608108),
+                            uri = "spotify:playlist:acousticfocus"
+                        ),
+                        CategoryRecommendationItem(
+                            title = "Peaceful Piano",
+                            subtitle = "Relax and indulge with beautiful piano pieces",
+                            coverColor = Color(0xFF8D67AB),
+                            uri = "spotify:playlist:peacefulpiano"
+                        )
+                    )
+                )
+            )
+            val subgenres = listOf(
+                CategorySubgenre("Lo-Fi", Color(0xFF432371)),
+                CategorySubgenre("Acoustic", Color(0xFF608108)),
+                CategorySubgenre("Ambient", Color(0xFF1E3264)),
+                CategorySubgenre("Focus", Color(0xFF7358FF))
+            )
+            shelves to subgenres
+        }
+        "Workout" -> {
+            val shelves = listOf(
+                CategoryShelf(
+                    title = "High Energy Playlists",
+                    subtitle = "Get pumped and crush your workout",
+                    items = listOf(
+                        CategoryRecommendationItem(
+                            title = "Beast Mode",
+                            subtitle = "Get your beast mode on with high energy hip hop",
+                            coverColor = Color(0xFF777777),
+                            uri = "spotify:playlist:beastmode"
+                        ),
+                        CategoryRecommendationItem(
+                            title = "Workout Beats",
+                            subtitle = "Dance and electronic beats to power your cardio",
+                            coverColor = Color(0xFFD84000),
+                            uri = "spotify:playlist:workoutbeats"
+                        ),
+                        CategoryRecommendationItem(
+                            title = "Pumped Pop",
+                            subtitle = "High tempo pop hits to keep the adrenaline going",
+                            coverColor = Color(0xFFE8115B),
+                            uri = "spotify:playlist:pumpedpop"
+                        )
+                    )
+                )
+            )
+            val subgenres = listOf(
+                CategorySubgenre("Cardio", Color(0xFFD84000)),
+                CategorySubgenre("Weight Lifting", Color(0xFF777777)),
+                CategorySubgenre("Running", Color(0xFF148A08)),
+                CategorySubgenre("Yoga & Cool Down", Color(0xFF432371))
+            )
+            shelves to subgenres
+        }
+        "Dance/Electronic" -> {
+            val shelves = listOf(
+                CategoryShelf(
+                    title = "Top Dance Playlists",
+                    subtitle = "Club bangers, festivals, and late night sets",
+                    items = listOf(
+                        CategoryRecommendationItem(
+                            title = "Mint",
+                            subtitle = "The world's biggest dance & EDM tracks",
+                            coverColor = Color(0xFFD84000),
+                            uri = "spotify:playlist:mint"
+                        ),
+                        CategoryRecommendationItem(
+                            title = "Dance Party",
+                            subtitle = "Non-stop party anthems from Calvin Harris, David Guetta, and Tiësto",
+                            coverColor = Color(0xFF7358FF),
+                            uri = "spotify:playlist:danceparty"
+                        ),
+                        CategoryRecommendationItem(
+                            title = "Deep House Relax",
+                            subtitle = "Mellow deep house grooves for after hours",
+                            coverColor = Color(0xFF1E3264),
+                            uri = "spotify:playlist:deephouse"
+                        )
+                    )
+                )
+            )
+            val subgenres = listOf(
+                CategorySubgenre("EDM", Color(0xFFD84000)),
+                CategorySubgenre("House", Color(0xFF7358FF)),
+                CategorySubgenre("Techno", Color(0xFF282828)),
+                CategorySubgenre("Drum & Bass", Color(0xFFE91429))
+            )
+            shelves to subgenres
+        }
         else -> {
             // General Hub Layout for any other category
             val shelves = listOf(
