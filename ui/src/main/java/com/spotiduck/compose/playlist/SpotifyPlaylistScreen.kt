@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -267,9 +268,6 @@ fun SpotifyPlaylistScreen(
         }
     }
 
-    // Tracking the exact on-screen Y position of the action row to drive PlayButtonBehavior
-    var actionRowYInRoot by remember { mutableStateOf(Float.MAX_VALUE) }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -424,27 +422,71 @@ fun SpotifyPlaylistScreen(
             val toolbarBottomPx = with(density) { toolbarBottom.toPx() }
             val chipsHeight = 48.dp
 
-            val isHeaderOffScreen = listState.firstVisibleItemIndex > 0
-            val defaultActionRowYPx = with(density) { (statusBarTop + 390.dp).toPx() }
-            val currentActionRowYPx = when {
-                isHeaderOffScreen -> -1000f
-                actionRowYInRoot != Float.MAX_VALUE -> actionRowYInRoot
-                else -> defaultActionRowYPx
+            var actionRowRestYPx by remember { mutableFloatStateOf(0f) }
+
+            val artworkShrinkPx by remember {
+                derivedStateOf {
+                    with(density) { (240.dp - artworkSize).toPx() }
+                }
             }
 
-            // Continuous gliding & docking matching Spotify ComposePlayButtonBehavior:
-            val playButtonYPx = maxOf(pinnedTopPx, currentActionRowYPx)
-            val playButtonYDp = with(density) { playButtonYPx.toDp() }
+            val chipsOffsetUnderActionRowPx = with(density) { (playButtonSize + 14.dp).toPx() }
+            val defaultActionRowYPx = with(density) { (statusBarTop + 390.dp).toPx() }
 
-            val dockDistancePx = if (isHeaderOffScreen) 0f else (playButtonYPx - pinnedTopPx)
+            val currentActionRowYPx by remember {
+                derivedStateOf {
+                    if (listState.firstVisibleItemIndex == 0) {
+                        val base = if (actionRowRestYPx > 0f) actionRowRestYPx else defaultActionRowYPx
+                        base + searchOffsetAnim.value - listState.firstVisibleItemScrollOffset.toFloat() - artworkShrinkPx
+                    } else {
+                        -1000f
+                    }
+                }
+            }
+
+            val playButtonYPx by remember {
+                derivedStateOf {
+                    maxOf(pinnedTopPx, currentActionRowYPx)
+                }
+            }
+
+            val pinnedChipsYPx by remember {
+                derivedStateOf {
+                    val chipsY = currentActionRowYPx + chipsOffsetUnderActionRowPx
+                    maxOf(toolbarBottomPx, chipsY)
+                }
+            }
+
+            val isHeaderOffScreen by remember {
+                derivedStateOf { listState.firstVisibleItemIndex > 0 }
+            }
+
+            val dockDistancePx by remember {
+                derivedStateOf {
+                    if (isHeaderOffScreen) 0f else (playButtonYPx - pinnedTopPx)
+                }
+            }
             val dockThresholdPx = with(density) { 56.dp.toPx() }
-            val dockFraction = (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f)
+            val dockFraction by remember {
+                derivedStateOf { (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f) }
+            }
 
-            val topBarThreeDotsAlpha = if (isHeaderOffScreen) 0f else dockFraction
-            val topBarTitleAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
-            val topBarAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
-            val topBarBgColor = headerColor.copy(alpha = topBarAlpha)
-            val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
+            val topBarThreeDotsAlpha by remember {
+                derivedStateOf { if (isHeaderOffScreen) 0f else dockFraction }
+            }
+            val topBarTitleAlpha by remember {
+                derivedStateOf {
+                    if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
+                }
+            }
+            val topBarAlpha by remember {
+                derivedStateOf {
+                    if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
+                }
+            }
+            val circleBtnAlpha by remember {
+                derivedStateOf { ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f) }
+            }
 
             // Dynamic top offset for header:
             // When search bar is hidden (progress 0), artwork is tucked up at statusBarTop + 8.dp (under top bar).
@@ -453,14 +495,8 @@ fun SpotifyPlaylistScreen(
             val dynamicTopOffsetDp = (toolbarHeight - 8.dp) * (1f - searchProgress)
             val dynamicTopOffsetPx = with(density) { dynamicTopOffsetDp.toPx().toInt() }
 
-            val chipsYPx = currentActionRowYPx + with(density) { (playButtonSize + 14.dp).toPx() }
-            val pinnedChipsYPx = if (isHeaderOffScreen) toolbarBottomPx else maxOf(toolbarBottomPx, chipsYPx)
-            val pinnedChipsYDp = with(density) { pinnedChipsYPx.toDp() }
-
-            val headerBottomYPx = if (isHeaderOffScreen) toolbarBottomPx else maxOf(
-                toolbarBottomPx,
-                currentActionRowYPx + with(density) { 66.dp.toPx() }
-            )
+            val gradientHeightDp = 440.dp
+            val gradientHeightPx = with(density) { gradientHeightDp.toPx() }
 
             Box(
                 modifier = Modifier
@@ -468,13 +504,18 @@ fun SpotifyPlaylistScreen(
                     .background(Color(0xFF121212))
             ) {
                 // Collapsible Header Gradient Background (Image 1, 2, 4, 5 & Latest Screenshot)
-                // Spans from the top of the screen (Y = 0) down to the bottom of the action row,
-                // seamlessly transitioning into pure #121212 so there is never an abrupt cutoff.
-                // As the playlist scrolls, the gradient naturally contracts towards the top bar.
+                // Translated smoothly during scroll via graphicsLayer with zero layout thrashing
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(with(density) { headerBottomYPx.toDp() })
+                        .height(gradientHeightDp)
+                        .graphicsLayer {
+                            translationY = if (listState.firstVisibleItemIndex == 0) {
+                                -listState.firstVisibleItemScrollOffset.toFloat()
+                            } else {
+                                -gradientHeightPx
+                            }
+                        }
                         .background(
                             Brush.verticalGradient(
                                 colorStops = arrayOf(
@@ -684,13 +725,15 @@ fun SpotifyPlaylistScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Action Controls Row with onGloballyPositioned to drive ComposePlayButtonBehavior
+                            // Action Controls Row
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp)
                                     .onGloballyPositioned { coords ->
-                                        actionRowYInRoot = coords.positionInRoot().y
+                                        if (actionRowRestYPx == 0f || (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 && searchOffsetAnim.value == 0f)) {
+                                            actionRowRestYPx = coords.positionInRoot().y
+                                        }
                                     },
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
@@ -793,7 +836,7 @@ fun SpotifyPlaylistScreen(
                 }
 
                 // Reserved slot for the pinned filter chips bar
-                item {
+                item(key = "chips_spacer") {
                     Spacer(modifier = Modifier.height(chipsHeight))
                 }
 
@@ -968,7 +1011,9 @@ fun SpotifyPlaylistScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .padding(top = pinnedChipsYDp)
+                    .graphicsLayer {
+                        translationY = pinnedChipsYPx
+                    }
                     .background(Color(0xFF121212))
                     .zIndex(9f)
                     .padding(vertical = 8.dp)
@@ -1022,12 +1067,25 @@ fun SpotifyPlaylistScreen(
                 }
             }
 
+            // Collapsing Header Background for Pinned Top Bar (Solid transition)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .height(toolbarHeight)
+                    .graphicsLayer {
+                        alpha = topBarAlpha
+                    }
+                    .background(headerColor)
+                    .zIndex(9.8f)
+            )
+
             // Pinned Top Navigation Bar (Overlays top of screen, transparent at rest, solid when scrolled)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .background(topBarBgColor)
                     .statusBarsPadding()
                     .height(toolbarHeight)
                     .padding(horizontal = 16.dp)
@@ -1106,7 +1164,10 @@ fun SpotifyPlaylistScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = playButtonYDp, end = 16.dp)
+                    .padding(end = 16.dp)
+                    .graphicsLayer {
+                        translationY = playButtonYPx
+                    }
                     .zIndex(20f)
             ) {
                 EncorePlayButton(
