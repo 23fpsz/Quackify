@@ -161,6 +161,7 @@ class SpotifyNativePlayerManager(private val context: Context) {
                 val drmConfig = MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
                     .setLicenseUri("https://gae2-spclient.spotify.com/widevine-license/v1/audio/license")
                     .setLicenseRequestHeaders(drmHeaders)
+                    .setMultiSession(true)
                     .build()
 
                 val mediaItem = MediaItem.Builder()
