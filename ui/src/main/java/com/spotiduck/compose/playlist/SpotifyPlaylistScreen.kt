@@ -420,42 +420,28 @@ fun SpotifyPlaylistScreen(
             val pinnedTopPx = with(density) { pinnedTop.toPx() }
 
             val toolbarBottomPx = with(density) { toolbarBottom.toPx() }
-            val chipsHeight = 48.dp
+            val defaultPlayButtonYPx = with(density) { (statusBarTop + 390.dp).toPx() }
 
-            var actionRowRestYPx by remember { mutableFloatStateOf(0f) }
+            var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
 
-            val artworkShrinkPx by remember {
+            val playButtonYPx by remember {
                 derivedStateOf {
-                    with(density) { (240.dp - artworkSize).toPx() }
-                }
-            }
-
-            val chipsOffsetUnderActionRowPx = with(density) { (playButtonSize + 14.dp).toPx() }
-            val defaultActionRowYPx = with(density) { (statusBarTop + 390.dp).toPx() }
-
-            val currentActionRowYPx by remember {
-                derivedStateOf {
-                    if (listState.firstVisibleItemIndex == 0) {
-                        val base = if (actionRowRestYPx > 0f) actionRowRestYPx else defaultActionRowYPx
-                        base + searchOffsetAnim.value - listState.firstVisibleItemScrollOffset.toFloat() - artworkShrinkPx
+                    if (listState.firstVisibleItemIndex > 0) {
+                        pinnedTopPx
+                    } else if (playButtonSlotYInRoot >= 0f) {
+                        maxOf(pinnedTopPx, playButtonSlotYInRoot)
                     } else {
-                        -1000f
+                        defaultPlayButtonYPx
                     }
                 }
             }
 
-            val playButtonYPx by remember {
-                derivedStateOf {
-                    maxOf(pinnedTopPx, currentActionRowYPx)
-                }
-            }
-
-            val pinnedChipsYPx by remember {
-                derivedStateOf {
-                    val chipsY = currentActionRowYPx + chipsOffsetUnderActionRowPx
-                    maxOf(toolbarBottomPx, chipsY)
-                }
-            }
+            // Dynamic top offset for header:
+            // When search bar is hidden (progress 0), artwork is tucked up at statusBarTop + 8.dp (under top bar).
+            // When search bar is revealed (progress 1), offset smoothly drops to 0 so search bar sits cleanly below the top bar!
+            val searchProgress = (currentSearchHeightDp / maxSearchHeightDp).coerceIn(0f, 1f)
+            val dynamicTopOffsetDp = (toolbarHeight - 8.dp) * (1f - searchProgress)
+            val dynamicTopOffsetPx = with(density) { dynamicTopOffsetDp.toPx().toInt() }
 
             val isHeaderOffScreen by remember {
                 derivedStateOf { listState.firstVisibleItemIndex > 0 }
@@ -476,24 +462,27 @@ fun SpotifyPlaylistScreen(
             }
             val topBarTitleAlpha by remember {
                 derivedStateOf {
-                    if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
+                    if (isHeaderOffScreen) {
+                        1f
+                    } else {
+                        val titleScrollStartPx = with(density) { 160.dp.toPx() }
+                        val titleScrollFadeRangePx = with(density) { 60.dp.toPx() }
+                        ((listState.firstVisibleItemScrollOffset.toFloat() - titleScrollStartPx) / titleScrollFadeRangePx).coerceIn(0f, 1f)
+                    }
                 }
             }
             val topBarAlpha by remember {
                 derivedStateOf {
-                    if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
+                    if (isHeaderOffScreen) {
+                        1f
+                    } else {
+                        (listState.firstVisibleItemScrollOffset.toFloat() / with(density) { 90.dp.toPx() }).coerceIn(0f, 1f)
+                    }
                 }
             }
             val circleBtnAlpha by remember {
                 derivedStateOf { ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f) }
             }
-
-            // Dynamic top offset for header:
-            // When search bar is hidden (progress 0), artwork is tucked up at statusBarTop + 8.dp (under top bar).
-            // When search bar is revealed (progress 1), offset smoothly drops to 0 so search bar sits cleanly below the top bar!
-            val searchProgress = (currentSearchHeightDp / maxSearchHeightDp).coerceIn(0f, 1f)
-            val dynamicTopOffsetDp = (toolbarHeight - 8.dp) * (1f - searchProgress)
-            val dynamicTopOffsetPx = with(density) { dynamicTopOffsetDp.toPx().toInt() }
 
             val gradientHeightDp = 440.dp
             val gradientHeightPx = with(density) { gradientHeightDp.toPx() }
@@ -729,12 +718,7 @@ fun SpotifyPlaylistScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp)
-                                    .onGloballyPositioned { coords ->
-                                        if (actionRowRestYPx == 0f || (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 && searchOffsetAnim.value == 0f)) {
-                                            actionRowRestYPx = coords.positionInRoot().y
-                                        }
-                                    },
+                                    .padding(horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -826,7 +810,13 @@ fun SpotifyPlaylistScreen(
                                     }
 
                                     // Reserved slot for the single gliding/docked play button
-                                    Spacer(modifier = Modifier.size(playButtonSize))
+                                    Spacer(
+                                        modifier = Modifier
+                                            .size(playButtonSize)
+                                            .onGloballyPositioned { coords ->
+                                                playButtonSlotYInRoot = coords.positionInRoot().y
+                                            }
+                                    )
                                 }
                             }
 
@@ -835,9 +825,63 @@ fun SpotifyPlaylistScreen(
                     }
                 }
 
-                // Reserved slot for the pinned filter chips bar
-                item(key = "chips_spacer") {
-                    Spacer(modifier = Modifier.height(chipsHeight))
+                // Sticky Filter Chips Bar matching Spotify specs:
+                stickyHeader(key = "filter_chips") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF121212))
+                            .zIndex(5f)
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            PlaylistChip(
+                                iconRes = R.drawable.encore_icon_plus_24,
+                                label = "Add",
+                                onClick = {
+                                    scope.launch {
+                                        listState.animateScrollToItem(displayedTracks.size + 2)
+                                    }
+                                }
+                            )
+
+                            PlaylistChip(
+                                iconRes = R.drawable.encore_icon_list_view_24,
+                                label = "Edit",
+                                onClick = onPlaylistOptionsClick
+                            )
+
+                            PlaylistChip(
+                                iconRes = R.drawable.encore_icon_edit_24,
+                                label = "Name & details",
+                                onClick = onPlaylistOptionsClick
+                            )
+
+                            PlaylistChip(
+                                iconRes = R.drawable.encore_icon_sort_24,
+                                label = "Sort",
+                                onClick = {
+                                    sortOption = when (sortOption) {
+                                        PlaylistSort.CUSTOM -> PlaylistSort.TITLE
+                                        PlaylistSort.TITLE -> PlaylistSort.ARTIST
+                                        PlaylistSort.ARTIST -> PlaylistSort.CUSTOM
+                                        else -> PlaylistSort.CUSTOM
+                                    }
+                                }
+                            )
+
+                            // Generous end padding so Sort chip can be scrolled completely clear of the sticky play button
+                            Spacer(modifier = Modifier.width(72.dp))
+                        }
+                    }
                 }
 
                 // Track Rows (Solid pure #121212 background, 60dp standard row height, scrolls under sticky chips)
@@ -1004,76 +1048,12 @@ fun SpotifyPlaylistScreen(
                 }
             }
 
-            // Pinned Filter Chips Bar (Image 1, 2, 4 & Latest Screenshot)
-            // Glides up with the playlist and locks at toolbarBottom directly below the Top Bar.
-            // Opaque #121212 background ensures content scrolling underneath is completely covered.
+            // Collapsing Header Background covering status bar + top bar (Solid transition)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .graphicsLayer {
-                        translationY = pinnedChipsYPx
-                    }
-                    .background(Color(0xFF121212))
-                    .zIndex(9f)
-                    .padding(vertical = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    PlaylistChip(
-                        iconRes = R.drawable.encore_icon_plus_24,
-                        label = "Add",
-                        onClick = {
-                            scope.launch {
-                                listState.animateScrollToItem(displayedTracks.size + 2)
-                            }
-                        }
-                    )
-
-                    PlaylistChip(
-                        iconRes = R.drawable.encore_icon_list_view_24,
-                        label = "Edit",
-                        onClick = onPlaylistOptionsClick
-                    )
-
-                    PlaylistChip(
-                        iconRes = R.drawable.encore_icon_edit_24,
-                        label = "Name & details",
-                        onClick = onPlaylistOptionsClick
-                    )
-
-                    PlaylistChip(
-                        iconRes = R.drawable.encore_icon_sort_24,
-                        label = "Sort",
-                        onClick = {
-                            sortOption = when (sortOption) {
-                                PlaylistSort.CUSTOM -> PlaylistSort.TITLE
-                                PlaylistSort.TITLE -> PlaylistSort.ARTIST
-                                PlaylistSort.ARTIST -> PlaylistSort.CUSTOM
-                                else -> PlaylistSort.CUSTOM
-                            }
-                        }
-                    )
-
-                    // Generous end padding so Sort chip can be scrolled completely clear of the sticky play button
-                    Spacer(modifier = Modifier.width(72.dp))
-                }
-            }
-
-            // Collapsing Header Background for Pinned Top Bar (Solid transition)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .height(toolbarHeight)
+                    .height(toolbarBottom)
                     .graphicsLayer {
                         alpha = topBarAlpha
                     }
@@ -1117,20 +1097,18 @@ fun SpotifyPlaylistScreen(
                         .padding(horizontal = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (topBarTitleAlpha > 0.01f) {
-                        Text(
-                            text = title,
-                            style = SpotifyTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 17.sp
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.graphicsLayer { alpha = topBarTitleAlpha }
-                        )
-                    }
+                    Text(
+                        text = title,
+                        style = SpotifyTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 17.sp
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.graphicsLayer { alpha = topBarTitleAlpha }
+                    )
                 }
 
                 // 3-Dots Button (smoothly cross-fades out as play button docks)
@@ -1138,23 +1116,21 @@ fun SpotifyPlaylistScreen(
                     modifier = Modifier.size(38.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (topBarThreeDotsAlpha > 0.01f) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = circleBtnAlpha * topBarThreeDotsAlpha))
-                                .clickable(onClick = onPlaylistOptionsClick)
-                                .graphicsLayer { alpha = topBarThreeDotsAlpha },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.encore_icon_more_android_24),
-                                contentDescription = "Playlist options",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = circleBtnAlpha * topBarThreeDotsAlpha))
+                            .clickable(onClick = onPlaylistOptionsClick)
+                            .graphicsLayer { alpha = topBarThreeDotsAlpha },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_more_android_24),
+                            contentDescription = "Playlist options",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
