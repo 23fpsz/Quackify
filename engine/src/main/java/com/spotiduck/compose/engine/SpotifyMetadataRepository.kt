@@ -155,68 +155,127 @@ class SpotifyMetadataRepository(
     }
 
     /**
-     * Fetches track metadata for the given playlist using Pathfinder's fetchPlaylistMetadata.
+     * Parses an authentic track directly from Pathfinder GraphQL data objects without
+     * needing redundant decorateContextTracks calls.
      */
-    suspend fun fetchPlaylistTracks(spDc: String, playlistUri: String, limit: Int = 30): Result<List<PlaybackTrack>> = withContext(Dispatchers.IO) {
+    private fun parseTrackFromData(data: JSONObject, fallbackCover: String = ""): PlaybackTrack? {
+        val uri = data.optString("uri", "")
+        if (!uri.startsWith("spotify:track:")) return null
+
+        val name = data.optString("name", "Unknown Track")
+        val durationMs = data.optJSONObject("duration")?.optLong("totalMilliseconds", 0L)
+            ?: data.optJSONObject("trackDuration")?.optLong("totalMilliseconds", 0L)
+            ?: 0L
+
+        val artistsArr = data.optJSONObject("artists")?.optJSONArray("items")
+            ?: data.optJSONObject("firstArtist")?.let { JSONArray().put(it) }
+            ?: JSONArray()
+        val artistNames = mutableListOf<String>()
+        for (a in 0 until artistsArr.length()) {
+            val aObj = artistsArr.optJSONObject(a) ?: continue
+            val aName = aObj.optJSONObject("profile")?.optString("name", "")
+                ?: aObj.optString("name", "")
+            if (aName.isNotEmpty()) artistNames.add(aName)
+        }
+        val artistString = if (artistNames.isNotEmpty()) artistNames.joinToString(", ") else "Spotify"
+
+        val coverUrl = extractImageUrl(data.optJSONObject("albumOfTrack")?.optJSONObject("coverArt"))
+            ?: fallbackCover
+
+        return PlaybackTrack(
+            uri = uri,
+            fileId = "",
+            title = name,
+            artist = artistString,
+            albumArtUrl = coverUrl,
+            durationMs = durationMs
+        )
+    }
+
+    /**
+     * Fetches track metadata for the given playlist using Pathfinder's fetchPlaylistMetadata.
+     * Supports fetching full playlists up to 500 tracks with automatic pagination.
+     */
+    suspend fun fetchPlaylistTracks(spDc: String, playlistUri: String, maxLimit: Int = 500): Result<List<PlaybackTrack>> = withContext(Dispatchers.IO) {
         runCatching {
             val token = SpotifyTokenProvider.getAccessToken(spDc)
+            val allTracks = mutableListOf<PlaybackTrack>()
+            var offset = 0
+            val pageSize = 100
+            var hasMore = true
 
-            val variables = JSONObject().apply {
-                put("uri", playlistUri)
-                put("offset", 0)
-                put("limit", limit)
-                put("enableWatchFeedEntrypoint", true)
-            }
+            while (hasMore && allTracks.size < maxLimit) {
+                val variables = JSONObject().apply {
+                    put("uri", playlistUri)
+                    put("offset", offset)
+                    put("limit", pageSize)
+                    put("enableWatchFeedEntrypoint", true)
+                }
 
-            val payload = JSONObject().apply {
-                put("variables", variables)
-                put("operationName", "fetchPlaylistMetadata")
-                put("extensions", JSONObject().apply {
-                    put("persistedQuery", JSONObject().apply {
-                        put("version", 1)
-                        put("sha256Hash", HASH_PLAYLIST_METADATA)
+                val payload = JSONObject().apply {
+                    put("variables", variables)
+                    put("operationName", "fetchPlaylistMetadata")
+                    put("extensions", JSONObject().apply {
+                        put("persistedQuery", JSONObject().apply {
+                            put("version", 1)
+                            put("sha256Hash", HASH_PLAYLIST_METADATA)
+                        })
                     })
-                })
-            }
+                }
 
-            val request = Request.Builder()
-                .url(PATHFINDER_URL)
-                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
-                .header("Authorization", "Bearer $token")
-                .header("User-Agent", USER_AGENT)
-                .header("app-platform", "WebPlayer")
-                .header("Origin", "https://open.spotify.com")
-                .header("Referer", "https://open.spotify.com/")
-                .build()
+                val request = Request.Builder()
+                    .url(PATHFINDER_URL)
+                    .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                    .header("Authorization", "Bearer $token")
+                    .header("User-Agent", USER_AGENT)
+                    .header("app-platform", "WebPlayer")
+                    .header("Origin", "https://open.spotify.com")
+                    .header("Referer", "https://open.spotify.com/")
+                    .build()
 
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                throw IllegalStateException("fetchPlaylistMetadata failed: HTTP ${response.code}")
-            }
+                val response = httpClient.newCall(request).execute()
+                if (!response.isSuccessful) break
 
-            val body = response.body?.string() ?: throw IllegalStateException("Empty playlist response")
-            val json = JSONObject(body)
+                val body = response.body?.string() ?: break
+                val json = JSONObject(body)
 
-            val items = json.optJSONObject("data")
-                ?.optJSONObject("playlistV2")
-                ?.optJSONObject("content")
-                ?.optJSONArray("items") ?: JSONArray()
+                val content = json.optJSONObject("data")
+                    ?.optJSONObject("playlistV2")
+                    ?.optJSONObject("content") ?: break
 
-            val trackUris = mutableListOf<String>()
-            for (i in 0 until items.length()) {
-                val item = items.optJSONObject(i) ?: continue
-                val trackData = item.optJSONObject("itemV2")?.optJSONObject("data") ?: continue
-                val uri = trackData.optString("uri", "")
-                if (uri.startsWith("spotify:track:")) {
-                    trackUris.add(uri)
+                val totalCount = content.optInt("totalCount", 0)
+                val items = content.optJSONArray("items") ?: break
+                if (items.length() == 0) break
+
+                val fallbackPlaylistCover = extractPlaylistImage(
+                    json.optJSONObject("data")?.optJSONObject("playlistV2")?.optJSONObject("images")
+                ) ?: ""
+
+                val unparsedUris = mutableListOf<String>()
+                for (i in 0 until items.length()) {
+                    val item = items.optJSONObject(i) ?: continue
+                    val trackData = item.optJSONObject("itemV2")?.optJSONObject("data") ?: continue
+                    val parsed = parseTrackFromData(trackData, fallbackPlaylistCover)
+                    if (parsed != null) {
+                        allTracks.add(parsed)
+                    } else {
+                        val uri = trackData.optString("uri", "")
+                        if (uri.startsWith("spotify:track:")) unparsedUris.add(uri)
+                    }
+                }
+
+                if (unparsedUris.isNotEmpty()) {
+                    val decorated = decorateTracks(spDc, unparsedUris).getOrNull()
+                    if (decorated != null) allTracks.addAll(decorated)
+                }
+
+                offset += items.length()
+                if (offset >= totalCount || items.length() < pageSize) {
+                    hasMore = false
                 }
             }
 
-            if (trackUris.isEmpty()) {
-                return@runCatching emptyList<PlaybackTrack>()
-            }
-
-            decorateTracks(spDc, trackUris).getOrThrow()
+            allTracks
         }
     }
 
@@ -421,64 +480,84 @@ class SpotifyMetadataRepository(
     }
 
     /**
-     * Fetches the user's authentic Liked Songs collection.
+     * Fetches the user's authentic Liked Songs collection with automatic pagination (up to 500 songs).
      */
-    suspend fun fetchLikedSongs(spDc: String, limit: Int = 50): Result<List<PlaybackTrack>> = withContext(Dispatchers.IO) {
+    suspend fun fetchLikedSongs(spDc: String, maxLimit: Int = 500): Result<List<PlaybackTrack>> = withContext(Dispatchers.IO) {
         runCatching {
             val token = SpotifyTokenProvider.getAccessToken(spDc)
+            val allTracks = mutableListOf<PlaybackTrack>()
+            var offset = 0
+            val pageSize = 100
+            var hasMore = true
 
-            val variables = JSONObject().apply {
-                put("offset", 0)
-                put("limit", limit)
-            }
+            while (hasMore && allTracks.size < maxLimit) {
+                val variables = JSONObject().apply {
+                    put("offset", offset)
+                    put("limit", pageSize)
+                }
 
-            val payload = JSONObject().apply {
-                put("variables", variables)
-                put("operationName", "fetchLibraryTracks")
-                put("extensions", JSONObject().apply {
-                    put("persistedQuery", JSONObject().apply {
-                        put("version", 1)
-                        put("sha256Hash", HASH_LIBRARY_TRACKS)
+                val payload = JSONObject().apply {
+                    put("variables", variables)
+                    put("operationName", "fetchLibraryTracks")
+                    put("extensions", JSONObject().apply {
+                        put("persistedQuery", JSONObject().apply {
+                            put("version", 1)
+                            put("sha256Hash", HASH_LIBRARY_TRACKS)
+                        })
                     })
-                })
-            }
+                }
 
-            val request = Request.Builder()
-                .url(PATHFINDER_URL)
-                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
-                .header("Authorization", "Bearer $token")
-                .header("User-Agent", USER_AGENT)
-                .header("app-platform", "WebPlayer")
-                .header("Origin", "https://open.spotify.com")
-                .header("Referer", "https://open.spotify.com/")
-                .build()
+                val request = Request.Builder()
+                    .url(PATHFINDER_URL)
+                    .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                    .header("Authorization", "Bearer $token")
+                    .header("User-Agent", USER_AGENT)
+                    .header("app-platform", "WebPlayer")
+                    .header("Origin", "https://open.spotify.com")
+                    .header("Referer", "https://open.spotify.com/")
+                    .build()
 
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                throw IllegalStateException("fetchLibraryTracks failed: HTTP ${response.code}")
-            }
+                val response = httpClient.newCall(request).execute()
+                if (!response.isSuccessful) break
 
-            val body = response.body?.string() ?: throw IllegalStateException("Empty library tracks response")
-            val json = JSONObject(body)
+                val body = response.body?.string() ?: break
+                val json = JSONObject(body)
 
-            val items = json.optJSONObject("data")
-                ?.optJSONObject("me")
-                ?.optJSONObject("library")
-                ?.optJSONObject("tracks")
-                ?.optJSONArray("items") ?: JSONArray()
+                val tracksObj = json.optJSONObject("data")
+                    ?.optJSONObject("me")
+                    ?.optJSONObject("library")
+                    ?.optJSONObject("tracks") ?: break
 
-            val trackUris = mutableListOf<String>()
-            for (i in 0 until items.length()) {
-                val item = items.optJSONObject(i) ?: continue
-                val track = item.optJSONObject("track") ?: continue
-                val uri = track.optString("uri", "")
-                if (uri.startsWith("spotify:track:")) {
-                    trackUris.add(uri)
+                val totalCount = tracksObj.optInt("totalCount", 0)
+                val items = tracksObj.optJSONArray("items") ?: break
+                if (items.length() == 0) break
+
+                val unparsedUris = mutableListOf<String>()
+                for (i in 0 until items.length()) {
+                    val item = items.optJSONObject(i) ?: continue
+                    val trackObj = item.optJSONObject("track") ?: continue
+                    val data = trackObj.optJSONObject("data") ?: trackObj
+                    val parsed = parseTrackFromData(data)
+                    if (parsed != null) {
+                        allTracks.add(parsed)
+                    } else {
+                        val uri = data.optString("uri", trackObj.optString("_uri", ""))
+                        if (uri.startsWith("spotify:track:")) unparsedUris.add(uri)
+                    }
+                }
+
+                if (unparsedUris.isNotEmpty()) {
+                    val decorated = decorateTracks(spDc, unparsedUris).getOrNull()
+                    if (decorated != null) allTracks.addAll(decorated)
+                }
+
+                offset += items.length()
+                if (offset >= totalCount || items.length() < pageSize) {
+                    hasMore = false
                 }
             }
 
-            if (trackUris.isEmpty()) return@runCatching emptyList<PlaybackTrack>()
-            decorateTracks(spDc, trackUris).getOrThrow()
+            allTracks
         }
     }
 
@@ -556,89 +635,87 @@ class SpotifyMetadataRepository(
     suspend fun decorateTracks(spDc: String, trackUris: List<String>): Result<List<PlaybackTrack>> = withContext(Dispatchers.IO) {
         runCatching {
             val token = SpotifyTokenProvider.getAccessToken(spDc)
-
-            val urisArray = JSONArray().apply {
-                trackUris.forEach { put(it) }
-            }
-
-            val variables = JSONObject().apply {
-                put("uris", urisArray)
-            }
-
-            val payload = JSONObject().apply {
-                put("variables", variables)
-                put("operationName", "decorateContextTracks")
-                put("extensions", JSONObject().apply {
-                    put("persistedQuery", JSONObject().apply {
-                        put("version", 1)
-                        put("sha256Hash", HASH_DECORATE_TRACKS)
-                    })
-                })
-            }
-
-            val request = Request.Builder()
-                .url(PATHFINDER_URL)
-                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
-                .header("Authorization", "Bearer $token")
-                .header("User-Agent", USER_AGENT)
-                .header("app-platform", "WebPlayer")
-                .header("Origin", "https://open.spotify.com")
-                .header("Referer", "https://open.spotify.com/")
-                .build()
-
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                throw IllegalStateException("decorateContextTracks failed: HTTP ${response.code}")
-            }
-
-            val body = response.body?.string() ?: throw IllegalStateException("Empty decorate response")
-            val json = JSONObject(body)
-
-            val tracksArray = json.optJSONObject("data")?.optJSONArray("tracks") ?: JSONArray()
             val playbackTracks = mutableListOf<PlaybackTrack>()
 
-            for (i in 0 until tracksArray.length()) {
-                val t = tracksArray.optJSONObject(i) ?: continue
-                val uri = t.optString("uri", "")
-                val name = t.optString("name", "Unknown Track")
-
-                val durationMs = t.optJSONObject("duration")?.optLong("totalMilliseconds", 0L) ?: 0L
-
-                // Extract artist names
-                val artistsItems = t.optJSONObject("artists")?.optJSONArray("items") ?: JSONArray()
-                val artistNames = mutableListOf<String>()
-                for (a in 0 until artistsItems.length()) {
-                    val artObj = artistsItems.optJSONObject(a) ?: continue
-                    val artName = artObj.optJSONObject("profile")?.optString("name", "") ?: ""
-                    if (artName.isNotEmpty()) artistNames.add(artName)
+            for (chunk in trackUris.chunked(50)) {
+                val urisArray = JSONArray().apply {
+                    chunk.forEach { put(it) }
                 }
-                val artistString = if (artistNames.isNotEmpty()) artistNames.joinToString(", ") else "Unknown Artist"
 
-                // Extract cover art
-                val coverArtSources = t.optJSONObject("albumOfTrack")
-                    ?.optJSONObject("coverArt")
-                    ?.optJSONArray("sources") ?: JSONArray()
+                val variables = JSONObject().apply {
+                    put("uris", urisArray)
+                }
 
-                var coverUrl = ""
-                for (c in 0 until coverArtSources.length()) {
-                    val s = coverArtSources.optJSONObject(c) ?: continue
-                    val url = s.optString("url", "")
-                    if (url.isNotEmpty()) {
-                        coverUrl = url
-                        break
+                val payload = JSONObject().apply {
+                    put("variables", variables)
+                    put("operationName", "decorateContextTracks")
+                    put("extensions", JSONObject().apply {
+                        put("persistedQuery", JSONObject().apply {
+                            put("version", 1)
+                            put("sha256Hash", HASH_DECORATE_TRACKS)
+                        })
+                    })
+                }
+
+                val request = Request.Builder()
+                    .url(PATHFINDER_URL)
+                    .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                    .header("Authorization", "Bearer $token")
+                    .header("User-Agent", USER_AGENT)
+                    .header("app-platform", "WebPlayer")
+                    .header("Origin", "https://open.spotify.com")
+                    .header("Referer", "https://open.spotify.com/")
+                    .build()
+
+                val response = httpClient.newCall(request).execute()
+                if (!response.isSuccessful) continue
+
+                val body = response.body?.string() ?: continue
+                val json = JSONObject(body)
+
+                val tracksArray = json.optJSONObject("data")?.optJSONArray("tracks") ?: JSONArray()
+
+                for (i in 0 until tracksArray.length()) {
+                    val t = tracksArray.optJSONObject(i) ?: continue
+                    val uri = t.optString("uri", "")
+                    val name = t.optString("name", "Unknown Track")
+
+                    val durationMs = t.optJSONObject("duration")?.optLong("totalMilliseconds", 0L) ?: 0L
+
+                    val artistsItems = t.optJSONObject("artists")?.optJSONArray("items") ?: JSONArray()
+                    val artistNames = mutableListOf<String>()
+                    for (a in 0 until artistsItems.length()) {
+                        val artObj = artistsItems.optJSONObject(a) ?: continue
+                        val artName = artObj.optJSONObject("profile")?.optString("name", "") ?: ""
+                        if (artName.isNotEmpty()) artistNames.add(artName)
                     }
-                }
+                    val artistString = if (artistNames.isNotEmpty()) artistNames.joinToString(", ") else "Unknown Artist"
 
-                playbackTracks.add(
-                    PlaybackTrack(
-                        uri = uri,
-                        fileId = "",
-                        title = name,
-                        artist = artistString,
-                        albumArtUrl = coverUrl,
-                        durationMs = durationMs
+                    val coverArtSources = t.optJSONObject("albumOfTrack")
+                        ?.optJSONObject("coverArt")
+                        ?.optJSONArray("sources") ?: JSONArray()
+
+                    var coverUrl = ""
+                    for (c in 0 until coverArtSources.length()) {
+                        val s = coverArtSources.optJSONObject(c) ?: continue
+                        val url = s.optString("url", "")
+                        if (url.isNotEmpty()) {
+                            coverUrl = url
+                            break
+                        }
+                    }
+
+                    playbackTracks.add(
+                        PlaybackTrack(
+                            uri = uri,
+                            fileId = "",
+                            title = name,
+                            artist = artistString,
+                            albumArtUrl = coverUrl,
+                            durationMs = durationMs
+                        )
                     )
-                )
+                }
             }
 
             playbackTracks
