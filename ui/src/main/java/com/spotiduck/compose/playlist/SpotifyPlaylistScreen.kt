@@ -481,34 +481,37 @@ fun SpotifyPlaylistScreen(
                 derivedStateOf { ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f) }
             }
 
-            val gradientHeightDp = 550.dp
-            val gradientHeightPx = with(density) { gradientHeightDp.toPx() }
+            val currentGradientHeightDp by remember {
+                derivedStateOf {
+                    if (isHeaderOffScreen) {
+                        toolbarBottom
+                    } else if (chipsRowYInRoot != Float.MAX_VALUE && chipsRowYInRoot > 0f) {
+                        maxOf(toolbarBottom, with(density) { chipsRowYInRoot.toDp() })
+                    } else {
+                        470.dp + currentSearchHeightDp
+                    }
+                }
+            }
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFF121212))
             ) {
-                // Header Gradient Background (matches official Spotify 1:1)
-                // Seamlessly illuminates entire artwork, title, and controls, fading completely to pure #121212 before Add/Edit chips row
+                // Header Gradient Background: dynamically bounded by the Add/Edit filter chips row (chipsRowYInRoot)
+                // Never extends past the Add/Edit row, eliminating any gradient bleed onto tracks when scrolling,
+                // and smoothly contracts to toolbarBottom without any abrupt jump or disappearance.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(gradientHeightDp)
-                        .graphicsLayer {
-                            translationY = if (listState.firstVisibleItemIndex == 0) {
-                                -listState.firstVisibleItemScrollOffset.toFloat()
-                            } else {
-                                -gradientHeightPx
-                            }
-                        }
+                        .height(currentGradientHeightDp)
                         .background(
                             Brush.verticalGradient(
                                 colorStops = arrayOf(
                                     0.0f to headerColor,
-                                    0.35f to headerColor.copy(alpha = 0.75f),
-                                    0.65f to headerColor.copy(alpha = 0.40f),
-                                    0.85f to headerColor.copy(alpha = 0.15f),
+                                    0.35f to headerColor.copy(alpha = 0.90f),
+                                    0.65f to headerColor.copy(alpha = 0.55f),
+                                    0.85f to headerColor.copy(alpha = 0.20f),
                                     1.0f to Color(0xFF121212)
                                 )
                             )
