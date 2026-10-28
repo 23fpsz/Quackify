@@ -726,22 +726,21 @@ fun SpotifyPlaylistScreen(
                                         }
                                     }
 
-                                    // Download Circle Button (↓)
+                                    // Download Button (Matches official Spotify 1:1)
                                     Box(
                                         modifier = Modifier
                                             .size(32.dp)
                                             .clip(CircleShape)
-                                            .background(if (isDownloaded) EncoreColors.Green else Color.White.copy(alpha = 0.12f))
                                             .clickable { isDownloaded = !isDownloaded },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             painter = painterResource(
-                                                id = if (isDownloaded) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_download_24
+                                                id = if (isDownloaded) R.drawable.encore_icon_downloaded_24 else R.drawable.encore_icon_download_24
                                             ),
-                                            contentDescription = "Download",
-                                            tint = if (isDownloaded) Color.Black else EncoreColors.TextSecondary,
-                                            modifier = Modifier.size(16.dp)
+                                            contentDescription = if (isDownloaded) "Downloaded" else "Download",
+                                            tint = if (isDownloaded) EncoreColors.Green else EncoreColors.TextSecondary,
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
 
