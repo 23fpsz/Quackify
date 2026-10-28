@@ -1,6 +1,7 @@
 package com.spotiduck.compose.bridge
 
 import androidx.compose.ui.graphics.Color
+import com.spotiduck.compose.engine.ArtistOverviewResult
 import com.spotiduck.compose.engine.NativePlaybackState
 import com.spotiduck.compose.engine.PlaybackTrack
 import com.spotiduck.compose.engine.SpotifyEntityType
@@ -16,6 +17,7 @@ import com.spotiduck.compose.screens.ArtistRelease
 import com.spotiduck.compose.screens.PopularTrack
 import com.spotiduck.compose.shell.ComposePlaybackState
 import com.spotiduck.compose.shell.ComposePlayerListener
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +43,15 @@ class SpotifyPlayerBridge(
 
     var currentTrackIndex: Int = 0
         private set
+
+    // In-memory caches to guarantee instant 0ms transitions without stale cross-contamination
+    private val playlistCache = ConcurrentHashMap<String, List<TrackItem>>()
+    private val albumCache = ConcurrentHashMap<String, List<TrackItem>>()
+    private val artistCache = ConcurrentHashMap<String, ArtistOverviewResult>()
+
+    private var activePlaylistUri: String? = null
+    private var activeAlbumUri: String? = null
+    private var activeArtistUri: String? = null
 
     // Vibrant accent colors for QuickAccess tiles
     private val accentColors = listOf(
@@ -179,15 +190,27 @@ class SpotifyPlayerBridge(
                         )
                     }
 
-                    // 4. If user has a playlist, fetch its actual tracks to populate the queue
+                    // 4. Preload first playlist if available
                     val firstPlaylist = entities.firstOrNull {
                         it.type == SpotifyEntityType.PLAYLIST && it.uri.startsWith("spotify:playlist:")
                     }
                     if (firstPlaylist != null) {
-                        val tracksResult = metadataRepository.fetchPlaylistTracks(spDc, firstPlaylist.uri, limit = 20)
+                        val tracksResult = metadataRepository.fetchPlaylistTracks(spDc, firstPlaylist.uri, maxLimit = 100)
                         tracksResult.onSuccess { tracks ->
                             if (tracks.isNotEmpty()) {
-                                setQueue(tracks)
+                                val uiList = tracks.map {
+                                    TrackItem(
+                                        title = it.title,
+                                        artist = it.artist,
+                                        isExplicit = false,
+                                        uri = it.uri,
+                                        imageUrl = it.albumArtUrl
+                                    )
+                                }
+                                playlistCache[firstPlaylist.uri] = uiList
+                                if (activePlaylistUri == firstPlaylist.uri) {
+                                    _uiTracks.value = uiList
+                                }
                             }
                         }
                     }
@@ -269,7 +292,6 @@ class SpotifyPlayerBridge(
             currentTrackIndex = index
             playerManager.playTrack(queue[index])
         } else {
-            // Track clicked that isn't yet in queue: play it dynamically and append to queue!
             val dynamicTrack = PlaybackTrack(
                 uri = uri,
                 fileId = "",
@@ -286,52 +308,34 @@ class SpotifyPlayerBridge(
     }
 
     override fun onLoadPlaylist(uri: String) {
+        activePlaylistUri = uri
+        val cached = playlistCache[uri]
+        if (cached != null) {
+            _uiTracks.value = cached
+        } else {
+            // Immediately clear uiTracks so the previous playlist's tracks NEVER leak into the new screen!
+            _uiTracks.value = emptyList()
+        }
+
         val spDc = currentSpDc ?: return
         scope.launch {
             _isLoading.value = true
             val result = when {
                 uri == "spotify:collection:tracks" || uri.contains("liked", ignoreCase = true) -> {
-                    metadataRepository.fetchLikedSongs(spDc, limit = 50)
+                    metadataRepository.fetchLikedSongs(spDc, maxLimit = 500)
                 }
                 uri.startsWith("spotify:search:") -> {
                     val query = uri.removePrefix("spotify:search:")
-                    metadataRepository.searchTracks(spDc, query, limit = 30)
+                    metadataRepository.searchTracks(spDc, query, limit = 50)
                 }
                 else -> {
-                    metadataRepository.fetchPlaylistTracks(spDc, uri, limit = 50)
+                    metadataRepository.fetchPlaylistTracks(spDc, uri, maxLimit = 500)
                 }
             }
 
             result.onSuccess { tracks ->
                 if (tracks.isNotEmpty()) {
-                    val currentUri = playerManager.playbackState.value.currentTrack?.uri
-                    val idx = if (currentUri != null) {
-                        tracks.indexOfFirst { it.uri.equals(currentUri, ignoreCase = true) }.takeIf { it >= 0 } ?: 0
-                    } else {
-                        0
-                    }
-                    setQueue(tracks, idx)
-                }
-            }
-            _isLoading.value = false
-        }
-    }
-
-    override fun onLoadAlbum(uri: String, albumName: String, artist: String) {
-        val spDc = currentSpDc ?: return
-        scope.launch {
-            _isLoading.value = true
-            val result = if (uri.startsWith("spotify:album:")) {
-                metadataRepository.fetchAlbumTracks(spDc, uri, limit = 50)
-            } else if (albumName.isNotBlank()) {
-                metadataRepository.searchTracks(spDc, "$albumName $artist".trim(), limit = 30)
-            } else {
-                Result.success(emptyList())
-            }
-
-            result.onSuccess { tracks ->
-                if (tracks.isNotEmpty()) {
-                    _albumTracks.value = tracks.map {
+                    val uiList = tracks.map {
                         TrackItem(
                             title = it.title,
                             artist = it.artist,
@@ -340,7 +344,53 @@ class SpotifyPlayerBridge(
                             imageUrl = it.albumArtUrl
                         )
                     }
-                    // Also make album tracks available in queue for sequential playback
+                    playlistCache[uri] = uiList
+                    if (activePlaylistUri == uri) {
+                        _uiTracks.value = uiList
+                    }
+                    setQueue(tracks, 0)
+                }
+            }
+            _isLoading.value = false
+        }
+    }
+
+    override fun onLoadAlbum(uri: String, albumName: String, artist: String) {
+        val cacheKey = if (uri.isNotBlank()) uri else "$albumName::$artist"
+        activeAlbumUri = cacheKey
+        val cached = albumCache[cacheKey]
+        if (cached != null) {
+            _albumTracks.value = cached
+        } else {
+            _albumTracks.value = emptyList()
+        }
+
+        val spDc = currentSpDc ?: return
+        scope.launch {
+            _isLoading.value = true
+            val result = if (uri.startsWith("spotify:album:")) {
+                metadataRepository.fetchAlbumTracks(spDc, uri, limit = 100)
+            } else if (albumName.isNotBlank()) {
+                metadataRepository.searchTracks(spDc, "$albumName $artist".trim(), limit = 50)
+            } else {
+                Result.success(emptyList())
+            }
+
+            result.onSuccess { tracks ->
+                if (tracks.isNotEmpty()) {
+                    val uiList = tracks.map {
+                        TrackItem(
+                            title = it.title,
+                            artist = it.artist,
+                            isExplicit = false,
+                            uri = it.uri,
+                            imageUrl = it.albumArtUrl
+                        )
+                    }
+                    albumCache[cacheKey] = uiList
+                    if (activeAlbumUri == cacheKey) {
+                        _albumTracks.value = uiList
+                    }
                     setQueue(tracks, 0)
                 }
             }
@@ -349,47 +399,80 @@ class SpotifyPlayerBridge(
     }
 
     override fun onLoadArtist(uri: String, artistName: String) {
+        val cacheKey = if (uri.isNotBlank()) uri else artistName
+        activeArtistUri = cacheKey
+        val cached = artistCache[cacheKey]
+        if (cached != null) {
+            _artistTopTracks.value = cached.topTracks.map {
+                PopularTrack(
+                    track = TrackItem(
+                        title = it.title,
+                        artist = it.artist,
+                        isExplicit = false,
+                        uri = it.uri,
+                        imageUrl = it.albumArtUrl
+                    ),
+                    streamCount = it.fileId.ifEmpty { "312,410,950" }
+                )
+            }
+            _artistReleases.value = cached.releases.map {
+                ArtistRelease(
+                    title = it.title,
+                    year = it.year,
+                    type = it.type,
+                    imageUrl = it.imageUrl
+                )
+            }
+            if (cached.monthlyListeners.isNotBlank()) {
+                _artistMonthlyListeners.value = cached.monthlyListeners
+            }
+        } else {
+            _artistTopTracks.value = emptyList()
+        }
+
         val spDc = currentSpDc ?: return
         scope.launch {
             _isLoading.value = true
             if (uri.startsWith("spotify:artist:")) {
                 val result = metadataRepository.fetchArtistOverview(spDc, uri)
                 result.onSuccess { overview ->
-                    if (overview.topTracks.isNotEmpty()) {
-                        _artistTopTracks.value = overview.topTracks.map {
-                            PopularTrack(
-                                track = TrackItem(
+                    artistCache[cacheKey] = overview
+                    if (activeArtistUri == cacheKey) {
+                        if (overview.topTracks.isNotEmpty()) {
+                            _artistTopTracks.value = overview.topTracks.map {
+                                PopularTrack(
+                                    track = TrackItem(
+                                        title = it.title,
+                                        artist = it.artist,
+                                        isExplicit = false,
+                                        uri = it.uri,
+                                        imageUrl = it.albumArtUrl
+                                    ),
+                                    streamCount = it.fileId.ifEmpty { "312,410,950" }
+                                )
+                            }
+                            setQueue(overview.topTracks, 0)
+                        }
+                        if (overview.releases.isNotEmpty()) {
+                            _artistReleases.value = overview.releases.map {
+                                ArtistRelease(
                                     title = it.title,
-                                    artist = it.artist,
-                                    isExplicit = false,
-                                    uri = it.uri,
-                                    imageUrl = it.albumArtUrl
-                                ),
-                                streamCount = it.fileId.ifEmpty { "312,410,950" }
-                            )
+                                    year = it.year,
+                                    type = it.type,
+                                    imageUrl = it.imageUrl
+                                )
+                            }
                         }
-                        // Also make artist top tracks available in queue for sequential playback
-                        setQueue(overview.topTracks, 0)
-                    }
-                    if (overview.releases.isNotEmpty()) {
-                        _artistReleases.value = overview.releases.map {
-                            ArtistRelease(
-                                title = it.title,
-                                year = it.year,
-                                type = it.type,
-                                imageUrl = it.imageUrl
-                            )
+                        if (overview.monthlyListeners.isNotBlank()) {
+                            _artistMonthlyListeners.value = overview.monthlyListeners
                         }
-                    }
-                    if (overview.monthlyListeners.isNotBlank()) {
-                        _artistMonthlyListeners.value = overview.monthlyListeners
                     }
                 }
             } else if (artistName.isNotBlank()) {
-                val searchResult = metadataRepository.searchTracks(spDc, artistName, limit = 10)
+                val searchResult = metadataRepository.searchTracks(spDc, artistName, limit = 20)
                 searchResult.onSuccess { tracks ->
-                    if (tracks.isNotEmpty()) {
-                        _artistTopTracks.value = tracks.take(5).map {
+                    if (tracks.isNotEmpty() && activeArtistUri == cacheKey) {
+                        _artistTopTracks.value = tracks.take(10).map {
                             PopularTrack(
                                 track = TrackItem(
                                     title = it.title,

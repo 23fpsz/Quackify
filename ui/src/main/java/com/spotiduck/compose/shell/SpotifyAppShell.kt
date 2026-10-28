@@ -608,166 +608,177 @@ fun SpotifyAppShell(
                 )
             }
             ShellScreen.PLAYLIST -> {
-                SpotifyPlaylistScreen(
-                    title = activePlaylistTitle,
-                    description = "This is $activePlaylistTitle. The essential tracks, all in one place.",
-                    creator = if (activePlaylistTitle.contains("This Is") || activePlaylistTitle.contains("Today's")) "Spotify" else (userDisplayName ?: "中 • OV32LO2D • 中"),
-                    saveCount = "6,482,109 saves",
-                    tracks = playlistTracks ?: sampleTracks,
-                    currentTrackTitle = currentTrackTitle,
-                    isPlaying = isPlaying,
-                    headerColor = Color(0xFF144D3F),
-                    coverUrl = activePlaylistCoverUrl ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl,
-                    onBackClick = { currentScreen = previousScreen },
-                    onPlayPauseClick = {
-                        if (playerListener != null) {
-                            if (activePlaylistUri.isNotEmpty() && !isPlaying) {
-                                playerListener.onPlayUri(activePlaylistUri)
+                androidx.compose.runtime.key(activePlaylistUri.ifEmpty { activePlaylistTitle }) {
+                    val effectivePlaylistTracks = if (activePlaylistUri.isNotEmpty()) {
+                        playlistTracks ?: emptyList()
+                    } else {
+                        playlistTracks ?: sampleTracks
+                    }
+                    SpotifyPlaylistScreen(
+                        title = activePlaylistTitle,
+                        description = "This is $activePlaylistTitle. The essential tracks, all in one place.",
+                        creator = if (activePlaylistTitle.contains("This Is") || activePlaylistTitle.contains("Today's")) "Spotify" else (userDisplayName ?: "中 • OV32LO2D • 中"),
+                        saveCount = "6,482,109 saves",
+                        tracks = effectivePlaylistTracks,
+                        currentTrackTitle = currentTrackTitle,
+                        isPlaying = isPlaying,
+                        headerColor = Color(0xFF144D3F),
+                        coverUrl = activePlaylistCoverUrl ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl,
+                        onBackClick = { currentScreen = previousScreen },
+                        onPlayPauseClick = {
+                            if (playerListener != null) {
+                                if (activePlaylistUri.isNotEmpty() && !isPlaying) {
+                                    playerListener.onPlayUri(activePlaylistUri)
+                                } else {
+                                    playerListener.onPlayPause()
+                                }
                             } else {
-                                playerListener.onPlayPause()
+                                localIsPlaying = !localIsPlaying
                             }
-                        } else {
-                            localIsPlaying = !localIsPlaying
-                        }
-                    },
-                    onTrackSelect = { track ->
-                        if (playerListener != null) {
-                            if (track.uri.isNotEmpty()) {
-                                playerListener.onPlayUri(track.uri)
+                        },
+                        onTrackSelect = { track ->
+                            if (playerListener != null) {
+                                if (track.uri.isNotEmpty()) {
+                                    playerListener.onPlayUri(track.uri)
+                                } else {
+                                    playerListener.onTrackSelect(track.title, track.artist)
+                                }
                             } else {
-                                playerListener.onTrackSelect(track.title, track.artist)
+                                localTrackTitle = track.title
+                                localArtist = track.artist
+                                localIsPlaying = true
+                                localProgress = 0.05f
+                                localPositionMs = 12000L
                             }
-                        } else {
-                            localTrackTitle = track.title
-                            localArtist = track.artist
-                            localIsPlaying = true
-                            localProgress = 0.05f
-                            localPositionMs = 12000L
-                        }
-                    },
-                    onTrackOptionsClick = { track ->
-                        selectedTrackForOptions = track
-                        isTrackOptionsOpen = true
-                    },
-                    onPlaylistOptionsClick = { isPlaylistOptionsOpen = true }
-                )
+                        },
+                        onTrackOptionsClick = { track ->
+                            selectedTrackForOptions = track
+                            isTrackOptionsOpen = true
+                        },
+                        onPlaylistOptionsClick = { isPlaylistOptionsOpen = true }
+                    )
+                }
             }
             ShellScreen.ALBUM -> {
-                val effectiveAlbumTracks = if (!albumTracks.isNullOrEmpty()) albumTracks else activeAlbumTracks
-                SpotifyAlbumScreen(
-                    albumTitle = activeAlbumTitle,
-                    artistName = activeAlbumArtist,
-                    releaseYear = activeAlbumYear,
-                    releaseDate = activeAlbumReleaseDate,
-                    coverColor = activeAlbumColor,
-                    tracks = effectiveAlbumTracks,
-                    currentTrackTitle = currentTrackTitle,
-                    isPlaying = isPlaying,
-                    coverUrl = activeAlbumCoverUrl,
-                    moreByArtist = listOf(
-                        ArtistRelease("After Hours", "2020", "Album", Color(0xFF5A1A22), imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
-                        ArtistRelease("Dawn FM", "2022", "Album", Color(0xFF243B55), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734ab25200366c1b3f942d937a"),
-                        ArtistRelease("Starboy", "2016", "Album", Color(0xFF8E0E00), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
-                        ArtistRelease("Timeless", "2024", "Single", Color(0xFF333333), imageUrl = "https://i.scdn.co/image/ab67616d0000b273b0dd6a5cd1dec96c4119c262")
-                    ),
-                    onBackClick = { currentScreen = previousScreen },
-                    onPlayPauseClick = {
-                        if (playerListener != null) playerListener.onPlayPause() else localIsPlaying = !localIsPlaying
-                    },
-                    onTrackSelect = { track ->
-                        if (playerListener != null) {
-                            if (track.uri.isNotEmpty()) {
-                                playerListener.onPlayUri(track.uri)
+                androidx.compose.runtime.key(activeAlbumTitle, activeAlbumArtist) {
+                    val effectiveAlbumTracks = if (!albumTracks.isNullOrEmpty()) albumTracks else activeAlbumTracks
+                    SpotifyAlbumScreen(
+                        albumTitle = activeAlbumTitle,
+                        artistName = activeAlbumArtist,
+                        releaseYear = activeAlbumYear,
+                        releaseDate = activeAlbumReleaseDate,
+                        coverColor = activeAlbumColor,
+                        tracks = effectiveAlbumTracks,
+                        currentTrackTitle = currentTrackTitle,
+                        isPlaying = isPlaying,
+                        coverUrl = activeAlbumCoverUrl,
+                        moreByArtist = listOf(
+                            ArtistRelease("After Hours", "2020", "Album", Color(0xFF5A1A22), imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
+                            ArtistRelease("Dawn FM", "2022", "Album", Color(0xFF243B55), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734ab25200366c1b3f942d937a"),
+                            ArtistRelease("Starboy", "2016", "Album", Color(0xFF8E0E00), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
+                            ArtistRelease("Timeless", "2024", "Single", Color(0xFF333333), imageUrl = "https://i.scdn.co/image/ab67616d0000b273b0dd6a5cd1dec96c4119c262")
+                        ),
+                        onBackClick = { currentScreen = previousScreen },
+                        onPlayPauseClick = {
+                            if (playerListener != null) playerListener.onPlayPause() else localIsPlaying = !localIsPlaying
+                        },
+                        onTrackSelect = { track ->
+                            if (playerListener != null) {
+                                if (track.uri.isNotEmpty()) {
+                                    playerListener.onPlayUri(track.uri)
+                                } else {
+                                    playerListener.onTrackSelect(track.title, track.artist)
+                                }
                             } else {
-                                playerListener.onTrackSelect(track.title, track.artist)
+                                localTrackTitle = track.title
+                                localArtist = track.artist
+                                localIsPlaying = true
+                                localProgress = 0.05f
+                                localPositionMs = 12000L
                             }
-                        } else {
-                            localTrackTitle = track.title
-                            localArtist = track.artist
-                            localIsPlaying = true
-                            localProgress = 0.05f
-                            localPositionMs = 12000L
+                        },
+                        onTrackOptionsClick = { track ->
+                            selectedTrackForOptions = track
+                            isTrackOptionsOpen = true
+                        },
+                        onAlbumOptionsClick = { isAlbumOptionsOpen = true },
+                        onArtistClick = { artist -> openArtist(artist, null) },
+                        onAlbumClick = { title ->
+                            openAlbum(title, activeAlbumArtist)
                         }
-                    },
-                    onTrackOptionsClick = { track ->
-                        selectedTrackForOptions = track
-                        isTrackOptionsOpen = true
-                    },
-                    onAlbumOptionsClick = { isAlbumOptionsOpen = true },
-                    onArtistClick = { artist -> openArtist(artist, null) },
-                    onAlbumClick = { title ->
-                        openAlbum(title, activeAlbumArtist)
-                    }
-                )
+                    )
+                }
             }
             ShellScreen.ARTIST -> {
-                val isHoneySingh = activeArtistName.contains("Honey Singh", ignoreCase = true)
-                val fallbackArtistTracks = if (isHoneySingh) {
-                    listOf(
-                        PopularTrack(TrackItem("Millionaire", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82"), "312,410,950"),
-                        PopularTrack(TrackItem("Brown Rang", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"), "284,519,040"),
-                        PopularTrack(TrackItem("Blue Eyes", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273c52e466b033aa7cb08cf119a"), "255,109,820"),
-                        PopularTrack(TrackItem("Dope Shope", "Yo Yo Honey Singh, Deep Money", imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"), "220,194,520"),
-                        PopularTrack(TrackItem("Love Dose", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273c52e466b033aa7cb08cf119a"), "198,341,080")
-                    )
-                } else {
-                    sampleTracks.take(5).map { PopularTrack(it, "3,119,402,118") }
-                }
-
-                val fallbackReleases = if (isHoneySingh) {
-                    listOf(
-                        ArtistRelease("GLORY", "2024", "Album", Color(0xFF1E3264), imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82"),
-                        ArtistRelease("International Villager", "2011", "Album", Color(0xFF8D67AB), imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"),
-                        ArtistRelease("Desi Kalakaar", "2014", "Album", Color(0xFFBA5D07), imageUrl = "https://i.scdn.co/image/ab67616d0000b273c52e466b033aa7cb08cf119a"),
-                        ArtistRelease("Millionaire", "2024", "Single", Color(0xFFE91429), imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82")
-                    )
-                } else {
-                    listOf(
-                        ArtistRelease("After Hours", "2020", "Album", Color(0xFF5A1A22), imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
-                        ArtistRelease("Dawn FM", "2022", "Album", Color(0xFF243B55), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734ab25200366c1b3f942d937a"),
-                        ArtistRelease("Starboy", "2016", "Album", Color(0xFF8E0E00), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
-                        ArtistRelease("Timeless", "2024", "Single", Color(0xFF333333), imageUrl = "https://i.scdn.co/image/ab67616d0000b273b0dd6a5cd1dec96c4119c262")
-                    )
-                }
-
-                val effectiveArtistTracks = if (!artistTracks.isNullOrEmpty()) artistTracks else fallbackArtistTracks
-                val effectiveReleases = if (!artistReleases.isNullOrEmpty()) artistReleases else fallbackReleases
-                val effectiveListeners = artistMonthlyListeners?.takeIf { it.isNotBlank() }
-                    ?: (if (isHoneySingh) "20,742,810" else "104,239,812")
-
-                SpotifyArtistScreen(
-                    artistName = activeArtistName,
-                    monthlyListeners = effectiveListeners,
-                    heroColor = if (isHoneySingh) Color(0xFF2B3A48) else Color(0xFF6B1A24),
-                    headerImageUrl = activeArtistAvatarUrl,
-                    popularTracks = effectiveArtistTracks,
-                    releases = effectiveReleases,
-                    currentTrackTitle = currentTrackTitle,
-                    isPlaying = isPlaying,
-                    onBackClick = { currentScreen = previousScreen },
-                    onPlayPauseClick = {
-                        if (playerListener != null) playerListener.onPlayPause() else localIsPlaying = !localIsPlaying
-                    },
-                    onTrackSelect = { track ->
-                        if (playerListener != null) {
-                            playerListener.onTrackSelect(track.title, track.artist)
-                        } else {
-                            localTrackTitle = track.title
-                            localArtist = track.artist
-                            localIsPlaying = true
-                            localProgress = 0.05f
-                            localPositionMs = 12000L
-                        }
-                    },
-                    onTrackOptionsClick = { track ->
-                        selectedTrackForOptions = track
-                        isTrackOptionsOpen = true
-                    },
-                    onArtistOptionsClick = { isArtistOptionsOpen = true },
-                    onReleaseClick = { release ->
-                        openAlbum(release.title, activeArtistName)
+                androidx.compose.runtime.key(activeArtistName) {
+                    val isHoneySingh = activeArtistName.contains("Honey Singh", ignoreCase = true)
+                    val fallbackArtistTracks = if (isHoneySingh) {
+                        listOf(
+                            PopularTrack(TrackItem("Millionaire", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82"), "312,410,950"),
+                            PopularTrack(TrackItem("Brown Rang", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"), "284,519,040"),
+                            PopularTrack(TrackItem("Blue Eyes", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273c52e466b033aa7cb08cf119a"), "255,109,820"),
+                            PopularTrack(TrackItem("Dope Shope", "Yo Yo Honey Singh, Deep Money", imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"), "220,194,520"),
+                            PopularTrack(TrackItem("Love Dose", "Yo Yo Honey Singh", imageUrl = "https://i.scdn.co/image/ab67616d0000b273c52e466b033aa7cb08cf119a"), "198,341,080")
+                        )
+                    } else {
+                        sampleTracks.take(5).map { PopularTrack(it, "3,119,402,118") }
                     }
-                )
+
+                    val fallbackReleases = if (isHoneySingh) {
+                        listOf(
+                            ArtistRelease("GLORY", "2024", "Album", Color(0xFF1E3264), imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82"),
+                            ArtistRelease("International Villager", "2011", "Album", Color(0xFF8D67AB), imageUrl = "https://i.scdn.co/image/ab67616d0000b273295843b04c8f000bcaaa7c88"),
+                            ArtistRelease("Desi Kalakaar", "2014", "Album", Color(0xFFBA5D07), imageUrl = "https://i.scdn.co/image/ab67616d0000b273c52e466b033aa7cb08cf119a"),
+                            ArtistRelease("Millionaire", "2024", "Single", Color(0xFFE91429), imageUrl = "https://i.scdn.co/image/ab67616d0000b2736b4122d64bd9f0298a0ebc82")
+                        )
+                    } else {
+                        listOf(
+                            ArtistRelease("After Hours", "2020", "Album", Color(0xFF5A1A22), imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
+                            ArtistRelease("Dawn FM", "2022", "Album", Color(0xFF243B55), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734ab25200366c1b3f942d937a"),
+                            ArtistRelease("Starboy", "2016", "Album", Color(0xFF8E0E00), imageUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
+                            ArtistRelease("Timeless", "2024", "Single", Color(0xFF333333), imageUrl = "https://i.scdn.co/image/ab67616d0000b273b0dd6a5cd1dec96c4119c262")
+                        )
+                    }
+
+                    val effectiveArtistTracks = if (!artistTracks.isNullOrEmpty()) artistTracks else fallbackArtistTracks
+                    val effectiveReleases = if (!artistReleases.isNullOrEmpty()) artistReleases else fallbackReleases
+                    val effectiveListeners = artistMonthlyListeners?.takeIf { it.isNotBlank() }
+                        ?: (if (isHoneySingh) "20,742,810" else "104,239,812")
+
+                    SpotifyArtistScreen(
+                        artistName = activeArtistName,
+                        monthlyListeners = effectiveListeners,
+                        heroColor = if (isHoneySingh) Color(0xFF2B3A48) else Color(0xFF6B1A24),
+                        headerImageUrl = activeArtistAvatarUrl,
+                        popularTracks = effectiveArtistTracks,
+                        releases = effectiveReleases,
+                        currentTrackTitle = currentTrackTitle,
+                        isPlaying = isPlaying,
+                        onBackClick = { currentScreen = previousScreen },
+                        onPlayPauseClick = {
+                            if (playerListener != null) playerListener.onPlayPause() else localIsPlaying = !localIsPlaying
+                        },
+                        onTrackSelect = { track ->
+                            if (playerListener != null) {
+                                playerListener.onTrackSelect(track.title, track.artist)
+                            } else {
+                                localTrackTitle = track.title
+                                localArtist = track.artist
+                                localIsPlaying = true
+                                localProgress = 0.05f
+                                localPositionMs = 12000L
+                            }
+                        },
+                        onTrackOptionsClick = { track ->
+                            selectedTrackForOptions = track
+                            isTrackOptionsOpen = true
+                        },
+                        onArtistOptionsClick = { isArtistOptionsOpen = true },
+                        onReleaseClick = { release ->
+                            openAlbum(release.title, activeArtistName)
+                        }
+                    )
+                }
             }
             ShellScreen.SETTINGS -> {
                 SettingsScreen(
