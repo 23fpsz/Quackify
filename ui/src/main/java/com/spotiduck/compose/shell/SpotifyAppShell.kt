@@ -65,6 +65,8 @@ import com.spotiduck.compose.screens.PopularTrack
 import com.spotiduck.compose.screens.SettingsScreen
 import com.spotiduck.compose.screens.SpotifyAlbumScreen
 import com.spotiduck.compose.screens.SpotifyArtistScreen
+import com.spotiduck.compose.screens.SpotifyCategoryScreen
+import com.spotiduck.compose.screens.getCategoryColor
 import com.spotiduck.compose.search.SpotifySearchScreen
 import com.spotiduck.compose.sheets.LibraryCreateSheet
 import com.spotiduck.compose.sheets.AlbumOptionsSheet
@@ -90,6 +92,7 @@ enum class ShellScreen {
     PLAYLIST,
     ALBUM,
     ARTIST,
+    CATEGORY,
     SETTINGS,
     NOTIFICATIONS,
     HISTORY
@@ -188,6 +191,8 @@ fun SpotifyAppShell(
     var activePlaylistCoverUrl by remember { mutableStateOf<String?>("https://i.scdn.co/image/ab67706f000000021c3fa36c4b92b67f40192e44") }
     var activeAlbumCoverUrl by remember { mutableStateOf<String?>("https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36") }
     var activeArtistAvatarUrl by remember { mutableStateOf<String?>("https://i.scdn.co/image/ab6761610000e5eb968a3770e060cf56306e9f1a") }
+    var activeCategoryTitle by remember { mutableStateOf("Pop") }
+    var activeCategoryColor by remember { mutableStateOf(Color(0xFF148A08)) }
 
     // Bottom Sheet States
     var isProfileDrawerOpen by remember { mutableStateOf(false) }
@@ -465,6 +470,7 @@ fun SpotifyAppShell(
         } else if (currentScreen == ShellScreen.PLAYLIST ||
             currentScreen == ShellScreen.ALBUM ||
             currentScreen == ShellScreen.ARTIST ||
+            currentScreen == ShellScreen.CATEGORY ||
             currentScreen == ShellScreen.SETTINGS ||
             currentScreen == ShellScreen.NOTIFICATIONS ||
             currentScreen == ShellScreen.HISTORY
@@ -478,7 +484,7 @@ fun SpotifyAppShell(
 
     val currentNavIndex = when (currentScreen) {
         ShellScreen.HOME -> 0
-        ShellScreen.SEARCH -> 1
+        ShellScreen.SEARCH, ShellScreen.CATEGORY -> 1
         ShellScreen.LIBRARY -> 2
         else -> selectedNavIndex
     }
@@ -536,11 +542,10 @@ fun SpotifyAppShell(
             ShellScreen.SEARCH -> {
                 SpotifySearchScreen(
                     onCategoryClick = { category ->
-                        activePlaylistTitle = category
-                        activePlaylistUri = "spotify:search:$category"
+                        activeCategoryTitle = category
+                        activeCategoryColor = getCategoryColor(category)
                         previousScreen = ShellScreen.SEARCH
-                        currentScreen = ShellScreen.PLAYLIST
-                        playerListener?.onLoadPlaylist("spotify:search:$category")
+                        currentScreen = ShellScreen.CATEGORY
                     },
                     onAlbumClick = { title, artist -> openAlbum(title, artist) },
                     onArtistClick = { artist -> openArtist(artist, null) },
@@ -779,6 +784,56 @@ fun SpotifyAppShell(
                         }
                     )
                 }
+            }
+            ShellScreen.CATEGORY -> {
+                SpotifyCategoryScreen(
+                    categoryTitle = activeCategoryTitle,
+                    categoryColor = activeCategoryColor,
+                    onBackClick = { currentScreen = previousScreen },
+                    onPlaylistClick = { title, uri ->
+                        val foundItem = homeQuickAccessItems?.find { it.uri == uri || it.title == title }
+                        val foundRec = homeRecommendations?.find { it.uri == uri || it.title == title }
+                        val foundLib = libraryItems?.find { it.uri == uri || it.title == title }
+                        val cover = foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl
+                        if (cover != null) {
+                            activePlaylistCoverUrl = cover
+                        }
+                        activePlaylistTitle = title
+                        activePlaylistUri = uri
+                        previousScreen = ShellScreen.CATEGORY
+                        currentScreen = ShellScreen.PLAYLIST
+                        if (uri.isNotEmpty()) {
+                            playerListener?.onLoadPlaylist(uri)
+                        }
+                    },
+                    onAlbumClick = { title, artist ->
+                        openAlbum(title, artist)
+                    },
+                    onArtistClick = { artist ->
+                        openArtist(artist, null)
+                    },
+                    onSubcategoryClick = { subcategory ->
+                        activeCategoryTitle = subcategory
+                        activeCategoryColor = getCategoryColor(subcategory)
+                        previousScreen = ShellScreen.CATEGORY
+                        currentScreen = ShellScreen.CATEGORY
+                    },
+                    onTrackSelect = { track ->
+                        if (playerListener != null) {
+                            if (track.uri.isNotEmpty()) {
+                                playerListener.onPlayUri(track.uri)
+                            } else {
+                                playerListener.onTrackSelect(track.title, track.artist)
+                            }
+                        } else {
+                            localTrackTitle = track.title
+                            localArtist = track.artist
+                            localIsPlaying = true
+                            localProgress = 0.05f
+                            localPositionMs = 12000L
+                        }
+                    }
+                )
             }
             ShellScreen.SETTINGS -> {
                 SettingsScreen(
