@@ -8,7 +8,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import com.spotiduck.compose.bridge.SpotifyPlayerBridge
-import com.spotiduck.compose.engine.PlaybackTrack
 import com.spotiduck.compose.engine.SpotifyNativePlayerManager
 import com.spotiduck.compose.home.QuickAccessItem
 import com.spotiduck.compose.home.RecommendationCard
@@ -21,33 +20,6 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var playerManager: SpotifyNativePlayerManager
     private lateinit var playerBridge: SpotifyPlayerBridge
-
-    private val presetTracks = listOf(
-        PlaybackTrack(
-            uri = "spotify:track:7eQl3Yqv35ioqUfveKHitE",
-            fileId = "484dba2c06bd9875346a29ddf5993d817cd3209f",
-            title = "Tum Se Hi",
-            artist = "Pritam, Mohit Chauhan, Irshad Kamil",
-            albumArtUrl = "https://i.scdn.co/image/ab67616d0000b27352fe6875028c892308ffc2f7",
-            durationMs = 321225L
-        ),
-        PlaybackTrack(
-            uri = "spotify:track:1Y3LN4zO1Edc2EluIoSPJN",
-            fileId = "26bbc85956463c7d4d85ed758aad6957e3db7a3c",
-            title = "Until I Found You (Em Beihold Version)",
-            artist = "Stephen Sanchez, Em Beihold",
-            albumArtUrl = "https://i.scdn.co/image/ab67616d0000b2732bf0876d42b90a8852ad6244",
-            durationMs = 176440L
-        ),
-        PlaybackTrack(
-            uri = "spotify:track:5Z2GQ0eBKoatNYqbGayihP",
-            fileId = "013433e03758ed4010a880e38a1ca6398c18b9e2",
-            title = "Lamhey",
-            artist = "Anubha Bajaj",
-            albumArtUrl = "https://i.scdn.co/image/ab67616d0000b273d4115528421f86756c827429",
-            durationMs = 148966L
-        )
-    )
 
     private val sampleQuickAccess = listOf(
         QuickAccessItem("Liked Songs", Color(0xFF450AF5)),
@@ -89,9 +61,9 @@ class MainActivity : ComponentActivity() {
         }
         playerManager.setSessionCookie(spDc)
 
-        playerBridge = SpotifyPlayerBridge(playerManager, queue = presetTracks.toMutableList())
+        playerBridge = SpotifyPlayerBridge(playerManager, queue = mutableListOf())
         playerBridge.setInitialPresets(
-            initialTracks = presetTracks,
+            initialTracks = emptyList(),
             initialQuickAccess = sampleQuickAccess,
             initialRecommendations = sampleRecommendations,
             initialLibrary = sampleLibraryItems
@@ -105,6 +77,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val composeState by playerBridge.composePlaybackState.collectAsState()
             val uiTracks by playerBridge.uiTracks.collectAsState()
+            val albumTracks by playerBridge.albumTracks.collectAsState()
+            val artistTopTracks by playerBridge.artistTopTracks.collectAsState()
+            val artistReleases by playerBridge.artistReleases.collectAsState()
+            val artistMonthlyListeners by playerBridge.artistMonthlyListeners.collectAsState()
             val quickAccess by playerBridge.quickAccessItems.collectAsState()
             val recommendations by playerBridge.recommendations.collectAsState()
             val libraryItems by playerBridge.libraryItems.collectAsState()
@@ -114,6 +90,10 @@ class MainActivity : ComponentActivity() {
                     playbackState = composeState,
                     playerListener = playerBridge,
                     playlistTracks = uiTracks,
+                    albumTracks = albumTracks,
+                    artistTracks = artistTopTracks,
+                    artistReleases = artistReleases,
+                    artistMonthlyListeners = artistMonthlyListeners.ifEmpty { null },
                     homeQuickAccessItems = quickAccess,
                     homeRecommendations = recommendations,
                     libraryItems = libraryItems
