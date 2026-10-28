@@ -59,6 +59,9 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -139,6 +142,11 @@ fun SpotifyNowPlayingScreen(
     val artworkOffsetX = remember { Animatable(0f) }
     val scrollState = rememberScrollState()
 
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+    val dismissThresholdPx = screenHeightPx * 0.5f
+
     // Reset translation whenever the screen is composed
     LaunchedEffect(Unit) {
         playerOffsetY.snapTo(0f)
@@ -147,7 +155,7 @@ fun SpotifyNowPlayingScreen(
     val dismissPlayer: () -> Unit = {
         coroutineScope.launch {
             playerOffsetY.animateTo(
-                targetValue = 2500f,
+                targetValue = screenHeightPx + 500f,
                 animationSpec = tween(
                     durationMillis = EncoreAnimation.NowPlayingExitDuration,
                     easing = EncoreAnimation.DecelerateInterpolator
@@ -169,7 +177,7 @@ fun SpotifyNowPlayingScreen(
         }
     }
 
-    val nestedScrollConnection = remember {
+    val nestedScrollConnection = remember(dismissThresholdPx, screenHeightPx) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 // When player is dragged down (playerOffsetY > 0), any upward drag pulls the sheet back up
@@ -201,10 +209,17 @@ fun SpotifyNowPlayingScreen(
 
             override suspend fun onPreFling(available: Velocity): Velocity {
                 if (playerOffsetY.value > 0f) {
-                    val threshold = 180f
-                    if (playerOffsetY.value > threshold || available.y > 600f) {
+                    if (available.y < -100f) {
+                        // Flung/swiped UPWARD: no matter the depth, the NPV always stays!
+                        snapBackPlayer()
+                    } else if (available.y > 1000f) {
+                        // Flung/swiped DOWNWARD: dismiss!
+                        dismissPlayer()
+                    } else if (playerOffsetY.value > dismissThresholdPx) {
+                        // Released past halfway point without upward fling: dismiss!
                         dismissPlayer()
                     } else {
+                        // Released in upper half without downward fling: stay!
                         snapBackPlayer()
                     }
                     return available
@@ -213,8 +228,11 @@ fun SpotifyNowPlayingScreen(
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (available.y > 600f && scrollState.value == 0) {
+                if (available.y > 1000f && scrollState.value == 0) {
                     dismissPlayer()
+                    return available
+                } else if (available.y < -100f && playerOffsetY.value > 0f) {
+                    snapBackPlayer()
                     return available
                 }
                 return Velocity.Zero
@@ -307,13 +325,16 @@ fun SpotifyNowPlayingScreen(
                                 colors = listOf(dominantColor.copy(alpha = 0.9f), Color(0xFF1E1035))
                             )
                         )
-                        .pointerInput(Unit) {
+                        .pointerInput(dismissThresholdPx) {
                             var isHorizontalGesture: Boolean? = null
+                            val velocityTracker = VelocityTracker()
                             detectDragGestures(
                                 onDragStart = {
                                     isHorizontalGesture = null
+                                    velocityTracker.resetTracking()
                                 },
                                 onDragEnd = {
+                                    val velocity = velocityTracker.calculateVelocity()
                                     coroutineScope.launch {
                                         if (isHorizontalGesture == true) {
                                             val offset = artworkOffsetX.value
@@ -347,10 +368,17 @@ fun SpotifyNowPlayingScreen(
                                                 )
                                             }
                                         } else if (isHorizontalGesture == false || playerOffsetY.value > 0f) {
-                                            val threshold = 180f
-                                            if (playerOffsetY.value > threshold) {
+                                            if (velocity.y < -100f) {
+                                                // Swiped UPWARD: no matter the offset, NPV always stays!
+                                                snapBackPlayer()
+                                            } else if (velocity.y > 1000f) {
+                                                // Flung DOWNWARD: dismiss!
+                                                dismissPlayer()
+                                            } else if (playerOffsetY.value > dismissThresholdPx) {
+                                                // Released past halfway point without upward swipe: dismiss!
                                                 dismissPlayer()
                                             } else {
+                                                // Released in upper half: stay!
                                                 snapBackPlayer()
                                             }
                                         }
@@ -368,6 +396,7 @@ fun SpotifyNowPlayingScreen(
                                     }
                                 },
                                 onDrag = { change, dragAmount ->
+                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
                                     if (isHorizontalGesture == null) {
                                         if (dragAmount.x.absoluteValue > dragAmount.y.absoluteValue && dragAmount.x.absoluteValue > 10f) {
                                             isHorizontalGesture = true
