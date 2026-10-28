@@ -4,13 +4,16 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,7 +23,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -28,10 +33,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -73,6 +80,13 @@ fun SpotifyMiniPlayer(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val titleOffsetX = remember { Animatable(0f) }
+    var containerWidthPx by remember { mutableFloatStateOf(600f) }
+
+    LaunchedEffect(title) {
+        if (!titleOffsetX.isRunning && titleOffsetX.value != 0f) {
+            titleOffsetX.snapTo(0f)
+        }
+    }
 
     Box(
         modifier = modifier
@@ -96,41 +110,27 @@ fun SpotifyMiniPlayer(
                     .padding(start = 8.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 40dp Album Cover Art with 4dp radius (floating_now_playing_bar_cover_art_radius)
-                com.spotiduck.compose.components.SpotifyArtworkImage(
-                    imageUrl = coverUrl,
-                    contentDescription = title,
-                    shape = RoundedCornerShape(EncoreCornerRadii.Base),
-                    fallbackColor = coverColor,
-                    modifier = Modifier.size(EncoreControlSizes.FloatingPlayerCoverSize)
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Track title & artist (CarouselView swipe-to-skip gesture with real-time motion)
-                Column(
+                // Left interactive region (Cover art + Carousel container): captures horizontal swipe gestures
+                Row(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 4.dp)
-                        .graphicsLayer {
-                            translationX = titleOffsetX.value
-                            alpha = (1f - (titleOffsetX.value.absoluteValue / 250f)).coerceIn(0.2f, 1f)
-                        }
+                        .fillMaxHeight()
                         .pointerInput(Unit) {
                             detectHorizontalDragGestures(
                                 onDragEnd = {
                                     coroutineScope.launch {
                                         val offset = titleOffsetX.value
-                                        val threshold = 50f
+                                        val threshold = (containerWidthPx * 0.25f).coerceAtLeast(40f)
+                                        val exitDistance = containerWidthPx.coerceAtLeast(200f)
                                         if (offset < -threshold) {
-                                            titleOffsetX.animateTo(-250f, tween(150, easing = EncoreAnimation.DecelerateInterpolator))
+                                            titleOffsetX.animateTo(-exitDistance, tween(150, easing = EncoreAnimation.DecelerateInterpolator))
                                             onSkipNextClick()
-                                            titleOffsetX.snapTo(250f)
+                                            titleOffsetX.snapTo(exitDistance)
                                             titleOffsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
                                         } else if (offset > threshold) {
-                                            titleOffsetX.animateTo(250f, tween(150, easing = EncoreAnimation.DecelerateInterpolator))
+                                            titleOffsetX.animateTo(exitDistance, tween(150, easing = EncoreAnimation.DecelerateInterpolator))
                                             onSkipPreviousClick()
-                                            titleOffsetX.snapTo(-250f)
+                                            titleOffsetX.snapTo(-exitDistance)
                                             titleOffsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
                                         } else {
                                             titleOffsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
@@ -143,26 +143,77 @@ fun SpotifyMiniPlayer(
                                     }
                                 }
                             )
-                        }
+                        },
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = title,
-                        style = SpotifyTheme.typography.bodySmallBold.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = EncoreColors.TextPrimary
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    // 40dp Album Cover Art with 4dp radius (stays stationary, does not slide)
+                    com.spotiduck.compose.components.SpotifyArtworkImage(
+                        imageUrl = coverUrl,
+                        contentDescription = title,
+                        shape = RoundedCornerShape(EncoreCornerRadii.Base),
+                        fallbackColor = coverColor,
+                        modifier = Modifier.size(EncoreControlSizes.FloatingPlayerCoverSize)
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = if (connectedDeviceName != null) "🎧 $connectedDeviceName • $artist" else artist,
-                        style = SpotifyTheme.typography.marginal.copy(
-                            color = if (connectedDeviceName != null) EncoreColors.Green else EncoreColors.TextSecondary
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // Track title & artist container (matching Spotify CarouselView):
+                    // Bounded between artwork and buttons, strictly clipping swiping translations and marquee inside
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clipToBounds()
+                            .onSizeChanged { size ->
+                                if (size.width > 0) {
+                                    containerWidthPx = size.width.toFloat()
+                                }
+                            },
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    translationX = titleOffsetX.value
+                                    val alphaFraction = (titleOffsetX.value.absoluteValue / containerWidthPx.coerceAtLeast(1f))
+                                    alpha = (1f - alphaFraction).coerceIn(0.15f, 1f)
+                                }
+                        ) {
+                            Text(
+                                text = title,
+                                style = SpotifyTheme.typography.bodySmallBold.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = EncoreColors.TextPrimary
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .basicMarquee(
+                                        iterations = Int.MAX_VALUE,
+                                        initialDelayMillis = 2000,
+                                        velocity = 30.dp
+                                    )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (connectedDeviceName != null) "🎧 $connectedDeviceName • $artist" else artist,
+                                style = SpotifyTheme.typography.marginal.copy(
+                                    color = if (connectedDeviceName != null) EncoreColors.Green else EncoreColors.TextSecondary
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .basicMarquee(
+                                        iterations = Int.MAX_VALUE,
+                                        initialDelayMillis = 2000,
+                                        velocity = 30.dp
+                                    )
+                            )
+                        }
+                    }
                 }
 
                 // Connect device icon button (now_playing_bar_actions_button_size = 40dp)
