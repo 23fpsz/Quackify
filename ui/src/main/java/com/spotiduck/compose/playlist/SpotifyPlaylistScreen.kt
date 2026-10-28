@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -420,21 +421,10 @@ fun SpotifyPlaylistScreen(
             val pinnedTopPx = with(density) { pinnedTop.toPx() }
 
             val toolbarBottomPx = with(density) { toolbarBottom.toPx() }
-            val defaultPlayButtonYPx = with(density) { (statusBarTop + 390.dp).toPx() }
 
             var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
-
-            val playButtonYPx by remember {
-                derivedStateOf {
-                    if (listState.firstVisibleItemIndex > 0) {
-                        pinnedTopPx
-                    } else if (playButtonSlotYInRoot >= 0f) {
-                        maxOf(pinnedTopPx, playButtonSlotYInRoot)
-                    } else {
-                        defaultPlayButtonYPx
-                    }
-                }
-            }
+            var chipsRowYInRoot by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+            val chipsScrollState = rememberScrollState()
 
             // Dynamic top offset for header:
             // When search bar is hidden (progress 0), artwork is tucked up at statusBarTop + 8.dp (under top bar).
@@ -449,7 +439,13 @@ fun SpotifyPlaylistScreen(
 
             val dockDistancePx by remember {
                 derivedStateOf {
-                    if (isHeaderOffScreen) 0f else (playButtonYPx - pinnedTopPx)
+                    if (isHeaderOffScreen) {
+                        0f
+                    } else if (playButtonSlotYInRoot >= 0f) {
+                        (playButtonSlotYInRoot - pinnedTopPx).coerceAtLeast(0f)
+                    } else {
+                        with(density) { 300.dp.toPx() }
+                    }
                 }
             }
             val dockThresholdPx = with(density) { 56.dp.toPx() }
@@ -809,14 +805,26 @@ fun SpotifyPlaylistScreen(
                                         )
                                     }
 
-                                    // Reserved slot for the single gliding/docked play button
-                                    Spacer(
+                                    // Play Button Slot: rendered directly in the Action Controls row
+                                    Box(
                                         modifier = Modifier
                                             .size(playButtonSize)
                                             .onGloballyPositioned { coords ->
                                                 playButtonSlotYInRoot = coords.positionInRoot().y
-                                            }
-                                    )
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        // Visible directly in the row whenever not pinned to the top bar
+                                        if (playButtonSlotYInRoot > pinnedTopPx || playButtonSlotYInRoot < 0f) {
+                                            EncorePlayButton(
+                                                isPlaying = isPlaying,
+                                                onClick = onPlayPauseClick,
+                                                size = playButtonSize,
+                                                iconSize = 24.dp,
+                                                showShuffleBadge = false
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -825,62 +833,34 @@ fun SpotifyPlaylistScreen(
                     }
                 }
 
-                // Sticky Filter Chips Bar matching Spotify specs:
-                stickyHeader(key = "filter_chips") {
+                // In-List Filter Chips Bar matching Spotify specs:
+                item(key = "filter_chips_row") {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFF121212))
-                            .zIndex(5f)
+                            .onGloballyPositioned { coords ->
+                                chipsRowYInRoot = coords.positionInRoot().y
+                            }
                             .padding(vertical = 8.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            PlaylistChip(
-                                iconRes = R.drawable.encore_icon_plus_24,
-                                label = "Add",
-                                onClick = {
-                                    scope.launch {
-                                        listState.animateScrollToItem(displayedTracks.size + 2)
-                                    }
+                        PlaylistChipsRow(
+                            scrollState = chipsScrollState,
+                            onAddClick = {
+                                scope.launch {
+                                    listState.animateScrollToItem(displayedTracks.size + 2)
                                 }
-                            )
-
-                            PlaylistChip(
-                                iconRes = R.drawable.encore_icon_list_view_24,
-                                label = "Edit",
-                                onClick = onPlaylistOptionsClick
-                            )
-
-                            PlaylistChip(
-                                iconRes = R.drawable.encore_icon_edit_24,
-                                label = "Name & details",
-                                onClick = onPlaylistOptionsClick
-                            )
-
-                            PlaylistChip(
-                                iconRes = R.drawable.encore_icon_sort_24,
-                                label = "Sort",
-                                onClick = {
-                                    sortOption = when (sortOption) {
-                                        PlaylistSort.CUSTOM -> PlaylistSort.TITLE
-                                        PlaylistSort.TITLE -> PlaylistSort.ARTIST
-                                        PlaylistSort.ARTIST -> PlaylistSort.CUSTOM
-                                        else -> PlaylistSort.CUSTOM
-                                    }
+                            },
+                            onEditClick = onPlaylistOptionsClick,
+                            onNameDetailsClick = onPlaylistOptionsClick,
+                            onSortClick = {
+                                sortOption = when (sortOption) {
+                                    PlaylistSort.CUSTOM -> PlaylistSort.TITLE
+                                    PlaylistSort.TITLE -> PlaylistSort.ARTIST
+                                    PlaylistSort.ARTIST -> PlaylistSort.CUSTOM
+                                    else -> PlaylistSort.CUSTOM
                                 }
-                            )
-
-                            // Generous end padding so Sort chip can be scrolled completely clear of the sticky play button
-                            Spacer(modifier = Modifier.width(72.dp))
-                        }
+                            }
+                        )
                     }
                 }
 
@@ -1135,28 +1115,114 @@ fun SpotifyPlaylistScreen(
                 }
             }
 
-            // Single Play Button implementing Spotify's ComposePlayButtonBehavior:
-            // Glides smoothly from the actions row and clamps at pinnedTop at the top bar boundary
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 16.dp)
-                    .graphicsLayer {
-                        translationY = playButtonYPx
-                    }
-                    .zIndex(20f)
-            ) {
-                EncorePlayButton(
-                    isPlaying = isPlaying,
-                    onClick = onPlayPauseClick,
-                    size = playButtonSize,
-                    iconSize = 24.dp,
-                    showShuffleBadge = false
-                )
+            // Pinned Play Button (matching Spotify ComposePlayButtonBehavior):
+            // Docks at pinnedTop half-overlapping toolbar and filter chips when scrolled
+            if (playButtonSlotYInRoot in 0f..pinnedTopPx || isHeaderOffScreen) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 16.dp)
+                        .graphicsLayer {
+                            translationY = pinnedTopPx
+                        }
+                        .zIndex(20f)
+                ) {
+                    EncorePlayButton(
+                        isPlaying = isPlaying,
+                        onClick = onPlayPauseClick,
+                        size = playButtonSize,
+                        iconSize = 24.dp,
+                        showShuffleBadge = false
+                    )
+                }
+            }
+
+            // Pinned Filter Chips Bar directly below the Top Bar:
+            // Locks at toolbarBottom as soon as list scrolls beneath the top bar
+            if (chipsRowYInRoot <= toolbarBottomPx || isHeaderOffScreen) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .graphicsLayer {
+                            translationY = toolbarBottomPx
+                        }
+                        .background(Color(0xFF121212))
+                        .zIndex(9f)
+                        .padding(vertical = 8.dp)
+                ) {
+                    PlaylistChipsRow(
+                        scrollState = chipsScrollState,
+                        onAddClick = {
+                            scope.launch {
+                                listState.animateScrollToItem(displayedTracks.size + 2)
+                            }
+                        },
+                        onEditClick = onPlaylistOptionsClick,
+                        onNameDetailsClick = onPlaylistOptionsClick,
+                        onSortClick = {
+                            sortOption = when (sortOption) {
+                                PlaylistSort.CUSTOM -> PlaylistSort.TITLE
+                                PlaylistSort.TITLE -> PlaylistSort.ARTIST
+                                PlaylistSort.ARTIST -> PlaylistSort.CUSTOM
+                                else -> PlaylistSort.CUSTOM
+                            }
+                        }
+                    )
+                }
             }
         }
     }
 }
+}
+
+/**
+ * Shared Filter Chips Row Composable for seamless in-list and pinned header synchronization
+ */
+@Composable
+private fun PlaylistChipsRow(
+    scrollState: ScrollState,
+    onAddClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onNameDetailsClick: () -> Unit,
+    onSortClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Spacer(modifier = Modifier.width(16.dp))
+
+        PlaylistChip(
+            iconRes = R.drawable.encore_icon_plus_24,
+            label = "Add",
+            onClick = onAddClick
+        )
+
+        PlaylistChip(
+            iconRes = R.drawable.encore_icon_list_view_24,
+            label = "Edit",
+            onClick = onEditClick
+        )
+
+        PlaylistChip(
+            iconRes = R.drawable.encore_icon_edit_24,
+            label = "Name & details",
+            onClick = onNameDetailsClick
+        )
+
+        PlaylistChip(
+            iconRes = R.drawable.encore_icon_sort_24,
+            label = "Sort",
+            onClick = onSortClick
+        )
+
+        Spacer(modifier = Modifier.width(72.dp))
+    }
 }
 
 /**
