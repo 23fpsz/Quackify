@@ -423,6 +423,7 @@ fun SpotifyPlaylistScreen(
             val toolbarBottomPx = with(density) { toolbarBottom.toPx() }
 
             var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
+            var isPlayButtonSlotMeasured by remember { mutableStateOf(false) }
             var chipsRowYInRoot by remember { mutableFloatStateOf(Float.MAX_VALUE) }
             val chipsScrollState = rememberScrollState()
 
@@ -441,7 +442,7 @@ fun SpotifyPlaylistScreen(
                 derivedStateOf {
                     if (isHeaderOffScreen) {
                         0f
-                    } else if (playButtonSlotYInRoot >= 0f) {
+                    } else if (isPlayButtonSlotMeasured) {
                         (playButtonSlotYInRoot - pinnedTopPx).coerceAtLeast(0f)
                     } else {
                         with(density) { 300.dp.toPx() }
@@ -480,33 +481,24 @@ fun SpotifyPlaylistScreen(
                 derivedStateOf { ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f) }
             }
 
-            val gradientHeightDp = 440.dp
-            val gradientHeightPx = with(density) { gradientHeightDp.toPx() }
+            val gradientHeightDp = 280.dp
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFF121212))
             ) {
-                // Collapsible Header Gradient Background (Image 1, 2, 4, 5 & Latest Screenshot)
-                // Translated smoothly during scroll via graphicsLayer with zero layout thrashing
+                // Header Gradient Background: fixed at the top of the screen, fades to pure #121212 before Action Controls & Add/Edit row
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(gradientHeightDp)
-                        .graphicsLayer {
-                            translationY = if (listState.firstVisibleItemIndex == 0) {
-                                -listState.firstVisibleItemScrollOffset.toFloat()
-                            } else {
-                                -gradientHeightPx
-                            }
-                        }
                         .background(
                             Brush.verticalGradient(
                                 colorStops = arrayOf(
                                     0.0f to headerColor,
-                                    0.50f to headerColor.copy(alpha = 0.65f),
-                                    0.80f to headerColor.copy(alpha = 0.20f),
+                                    0.45f to headerColor.copy(alpha = 0.65f),
+                                    0.75f to headerColor.copy(alpha = 0.20f),
                                     1.0f to Color(0xFF121212)
                                 )
                             )
@@ -810,12 +802,13 @@ fun SpotifyPlaylistScreen(
                                         modifier = Modifier
                                             .size(playButtonSize)
                                             .onGloballyPositioned { coords ->
+                                                isPlayButtonSlotMeasured = true
                                                 playButtonSlotYInRoot = coords.positionInRoot().y
                                             },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        // Visible directly in the row whenever not pinned to the top bar
-                                        if (playButtonSlotYInRoot > pinnedTopPx || playButtonSlotYInRoot < 0f) {
+                                        // Visible directly in the row whenever below the top bar
+                                        if (!isPlayButtonSlotMeasured || playButtonSlotYInRoot > toolbarBottomPx) {
                                             EncorePlayButton(
                                                 isPlaying = isPlaying,
                                                 onClick = onPlayPauseClick,
@@ -1116,14 +1109,19 @@ fun SpotifyPlaylistScreen(
             }
 
             // Pinned Play Button (matching Spotify ComposePlayButtonBehavior):
-            // Docks at pinnedTop half-overlapping toolbar and filter chips when scrolled
-            if (playButtonSlotYInRoot in 0f..pinnedTopPx || isHeaderOffScreen) {
+            // Floats above top bar at zIndex(20f) as soon as it reaches toolbar, docking at pinnedTopPx
+            if (isPlayButtonSlotMeasured && (playButtonSlotYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
+                val targetY = if (isHeaderOffScreen || playButtonSlotYInRoot < pinnedTopPx) {
+                    pinnedTopPx
+                } else {
+                    playButtonSlotYInRoot
+                }
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(end = 16.dp)
                         .graphicsLayer {
-                            translationY = pinnedTopPx
+                            translationY = targetY
                         }
                         .zIndex(20f)
                 ) {
