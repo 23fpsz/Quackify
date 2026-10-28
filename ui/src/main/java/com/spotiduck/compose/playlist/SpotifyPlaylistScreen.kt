@@ -268,7 +268,7 @@ fun SpotifyPlaylistScreen(
     }
 
     // Tracking the exact on-screen Y position of the action row to drive PlayButtonBehavior
-    var actionRowYInRoot by remember { mutableStateOf(10000f) }
+    var actionRowYInRoot by remember { mutableStateOf(0f) }
 
     Column(
         modifier = modifier
@@ -421,8 +421,11 @@ fun SpotifyPlaylistScreen(
             val pinnedTop = toolbarBottom - playButtonHalf
             val pinnedTopPx = with(density) { pinnedTop.toPx() }
 
+            val defaultActionRowYPx = with(density) { (statusBarTop + 390.dp).toPx() }
+            val currentActionRowYPx = if (actionRowYInRoot > 0f) actionRowYInRoot else defaultActionRowYPx
+
             // Continuous gliding & docking matching Spotify ComposePlayButtonBehavior:
-            val playButtonYPx = maxOf(pinnedTopPx, actionRowYInRoot)
+            val playButtonYPx = maxOf(pinnedTopPx, currentActionRowYPx)
             val playButtonYDp = with(density) { playButtonYPx.toDp() }
 
             val dockDistancePx = playButtonYPx - pinnedTopPx
@@ -436,11 +439,36 @@ fun SpotifyPlaylistScreen(
             val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
             val topOffsetPx = with(density) { (toolbarHeight - 8.dp).toPx().toInt() }
 
+            val headerBottomYPx = maxOf(
+                with(density) { toolbarBottom.toPx() },
+                currentActionRowYPx + with(density) { 66.dp.toPx() }
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFF121212))
             ) {
+                // Collapsible Header Gradient Background (Image 1, 2, 4, 5 & Latest Screenshot)
+                // Spans from the top of the screen (Y = 0) down to the bottom of the action row,
+                // seamlessly transitioning into pure #121212 so there is never an abrupt cutoff.
+                // As the playlist scrolls, the gradient naturally contracts towards the top bar.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(with(density) { headerBottomYPx.toDp() })
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.0f to headerColor,
+                                    0.50f to headerColor.copy(alpha = 0.65f),
+                                    0.80f to headerColor.copy(alpha = 0.20f),
+                                    1.0f to Color(0xFF121212)
+                                )
+                            )
+                        )
+                )
+
                 // Scrollable LazyColumn with Collapsing Header, Sticky Chips Bar, and Tracks
                 LazyColumn(
                     state = listState,
@@ -461,19 +489,7 @@ fun SpotifyPlaylistScreen(
                                         placeable.placeRelative(0, -topOffsetPx)
                                     }
                                 }
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            headerColor,
-                                        headerColor.copy(alpha = 0.85f),
-                                        headerColor.copy(alpha = 0.35f),
-                                        Color(0xFF121212)
-                                    ),
-                                    startY = 0f,
-                                    endY = 1500f
-                                )
-                            )
-                    ) {
+                        ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
