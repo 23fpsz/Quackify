@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -431,107 +432,39 @@ fun SpotifyPlaylistScreen(
             val topBarThreeDotsAlpha = dockFraction
             val topBarTitleAlpha = (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
             val topBarAlpha = (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
-            val topBarBgColor = headerColor.copy(alpha = (0.85f + (0.15f * topBarAlpha)).coerceIn(0f, 1f))
+            val topBarBgColor = headerColor.copy(alpha = topBarAlpha)
             val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
+            val topOffsetPx = with(density) { (toolbarHeight - 8.dp).toPx().toInt() }
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF121212))
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF121212))
+            ) {
+                // Scrollable LazyColumn with Collapsing Header, Sticky Chips Bar, and Tracks
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        top = statusBarTop + toolbarHeight,
+                        bottom = bottomPadding
+                    )
                 ) {
-                    // Pinned Top Navigation Bar
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(topBarBgColor)
-                            .statusBarsPadding()
-                            .height(54.dp)
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Back Button (Locked in place at 16dp from border)
+                    // Header Item: drawn shifted up by topOffsetPx so artwork sits directly at statusBarTop + 8.dp
+                    item {
                         Box(
                             modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = circleBtnAlpha))
-                                .clickable(onClick = onBackClick),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
-                                contentDescription = "Back",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Centered Title in Top Bar when scrolled (Image 5 & Latest Screenshot)
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (topBarTitleAlpha > 0.01f) {
-                                Text(
-                                    text = title,
-                                    style = SpotifyTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 17.sp
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.graphicsLayer { alpha = topBarTitleAlpha }
-                                )
-                            }
-                        }
-
-                        // 3-Dots Button (smoothly fades out as sticky play button activates)
-                        Box(
-                            modifier = Modifier.size(38.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (topBarThreeDotsAlpha > 0.01f) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.Black.copy(alpha = circleBtnAlpha * topBarThreeDotsAlpha))
-                                        .clickable(onClick = onPlaylistOptionsClick)
-                                        .graphicsLayer { alpha = topBarThreeDotsAlpha },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.encore_icon_more_android_24),
-                                        contentDescription = "Playlist options",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                .fillMaxWidth()
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    layout(placeable.width, placeable.height - topOffsetPx) {
+                                        placeable.placeRelative(0, -topOffsetPx)
+                                    }
                                 }
-                            }
-                        }
-                    }
-
-                    // Scrollable LazyColumn with Collapsing Header, Sticky Chips Bar, and Tracks
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = bottomPadding)
-                    ) {
-                // Header Item: Gradient strictly confined to header area (up to play button)
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        headerColor,
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            headerColor,
                                         headerColor.copy(alpha = 0.85f),
                                         headerColor.copy(alpha = 0.35f),
                                         Color(0xFF121212)
@@ -1046,26 +979,104 @@ fun SpotifyPlaylistScreen(
                     }
                 }
             }
-        }
 
-        // Single Play Button implementing Spotify's ComposePlayButtonBehavior:
-        // Glides smoothly from the actions row and clamps at pinnedTop at the top bar boundary
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = playButtonYDp, end = 16.dp)
-                .zIndex(20f)
-        ) {
-            EncorePlayButton(
-                isPlaying = isPlaying,
-                onClick = onPlayPauseClick,
-                size = playButtonSize,
-                iconSize = 24.dp,
-                showShuffleBadge = false
-            )
+            // Pinned Top Navigation Bar (Overlays top of screen, transparent at rest, solid when scrolled)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .background(topBarBgColor)
+                    .statusBarsPadding()
+                    .height(toolbarHeight)
+                    .padding(horizontal = 16.dp)
+                    .zIndex(10f),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Back Button (Locked at 16dp from left border)
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = circleBtnAlpha))
+                        .clickable(onClick = onBackClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
+                        contentDescription = "Back",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Centered Title in Top Bar when scrolled
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (topBarTitleAlpha > 0.01f) {
+                        Text(
+                            text = title,
+                            style = SpotifyTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 17.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.graphicsLayer { alpha = topBarTitleAlpha }
+                        )
+                    }
+                }
+
+                // 3-Dots Button (smoothly cross-fades out as play button docks)
+                Box(
+                    modifier = Modifier.size(38.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (topBarThreeDotsAlpha > 0.01f) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = circleBtnAlpha * topBarThreeDotsAlpha))
+                                .clickable(onClick = onPlaylistOptionsClick)
+                                .graphicsLayer { alpha = topBarThreeDotsAlpha },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_more_android_24),
+                                contentDescription = "Playlist options",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Single Play Button implementing Spotify's ComposePlayButtonBehavior:
+            // Glides smoothly from the actions row and clamps at pinnedTop at the top bar boundary
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = playButtonYDp, end = 16.dp)
+                    .zIndex(20f)
+            ) {
+                EncorePlayButton(
+                    isPlaying = isPlaying,
+                    onClick = onPlayPauseClick,
+                    size = playButtonSize,
+                    iconSize = 24.dp,
+                    showShuffleBadge = false
+                )
+            }
         }
     }
-}
 }
 }
 
