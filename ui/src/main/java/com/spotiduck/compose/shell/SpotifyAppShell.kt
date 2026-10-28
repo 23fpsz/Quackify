@@ -566,11 +566,12 @@ fun SpotifyAppShell(
                 SpotifyPlaylistScreen(
                     title = activePlaylistTitle,
                     description = "This is $activePlaylistTitle. The essential tracks, all in one place.",
-                    creator = "Spotify",
+                    creator = if (activePlaylistTitle.contains("This Is") || activePlaylistTitle.contains("Today's")) "Spotify" else (userDisplayName ?: "中 • OV32LO2D • 中"),
                     saveCount = "6,482,109 saves",
                     tracks = playlistTracks ?: sampleTracks,
                     currentTrackTitle = currentTrackTitle,
                     isPlaying = isPlaying,
+                    headerColor = Color(0xFF144D3F),
                     coverUrl = activePlaylistCoverUrl ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl,
                     onBackClick = { currentScreen = previousScreen },
                     onPlayPauseClick = {
