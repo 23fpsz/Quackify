@@ -1,10 +1,6 @@
 package com.spotiduck.compose.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,11 +10,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,7 +30,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,15 +37,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.spotiduck.compose.R
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.components.EncorePlayButton
@@ -75,12 +78,13 @@ data class PopularTrack(
 )
 
 /**
- * Spotify Artist Screen matching decompiled `artist_header.xml` and Spotify mobile APK specifications:
+ * 1:1 Pixel-Perfect Spotify Artist Screen matching decompiled collection_artist_header_layout.xml:
+ * - Edge-to-edge Hero image banner with dynamic gradient
  * - Verified Artist badge with monthly listeners count
- * - Dynamic hero banner with gradient fade
- * - Follow/Following pill button
- * - Action controls (Shuffle, 3-dot options, Encore large play button)
- * - Top 5 Popular songs with stream numbers and PlayIndicator equalizer
+ * - Follow / Following pill button with animated state
+ * - Continuous gliding play button docking into the top bar (ComposePlayButtonBehavior)
+ * - Pinned overlay top bar (transparent at rest, solid heroColor when scrolled)
+ * - Top 5 Popular tracks with track numbers, equalizer, stream count, and 3-dots
  * - Popular Releases carousel (Albums & Singles)
  * - "About the artist" biography card
  */
@@ -102,16 +106,43 @@ fun SpotifyArtistScreen(
     modifier: Modifier = Modifier,
     headerImageUrl: String? = null
 ) {
+    val density = LocalDensity.current
     var isFollowing by remember { mutableStateOf(false) }
     var isShuffle by remember { mutableStateOf(false) }
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
 
-    val isScrolledPastHeader by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 240
-        }
+    var actionRowYInRoot by remember { mutableStateOf(Float.MAX_VALUE) }
+
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val toolbarHeight = 54.dp
+    val toolbarBottom = statusBarTop + toolbarHeight
+    val playButtonSize = 52.dp
+    val playButtonHalf = 26.dp
+    val pinnedTop = toolbarBottom - playButtonHalf
+    val pinnedTopPx = with(density) { pinnedTop.toPx() }
+
+    val isHeaderOffScreen = listState.firstVisibleItemIndex > 0
+    val defaultActionRowYPx = with(density) { (statusBarTop + 340.dp).toPx() }
+    val currentActionRowYPx = when {
+        isHeaderOffScreen -> -1000f
+        actionRowYInRoot != Float.MAX_VALUE -> actionRowYInRoot
+        else -> defaultActionRowYPx
     }
+
+    // Continuous gliding & docking matching Spotify ComposePlayButtonBehavior:
+    val playButtonYPx = maxOf(pinnedTopPx, currentActionRowYPx)
+    val playButtonYDp = with(density) { playButtonYPx.toDp() }
+
+    val dockDistancePx = if (isHeaderOffScreen) 0f else (playButtonYPx - pinnedTopPx)
+    val dockThresholdPx = with(density) { 56.dp.toPx() }
+    val dockFraction = (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f)
+
+    val topBarThreeDotsAlpha = if (isHeaderOffScreen) 0f else dockFraction
+    val topBarTitleAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
+    val topBarAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
+    val topBarBgColor = heroColor.copy(alpha = topBarAlpha)
+    val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
 
     val followBorderColor by animateColorAsState(
         targetValue = if (isFollowing) EncoreColors.Green else EncoreColors.TextSecondary,
@@ -125,7 +156,7 @@ fun SpotifyArtistScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreColors.Background)
+            .background(Color(0xFF121212))
     ) {
         LazyColumn(
             state = listState,
@@ -137,7 +168,7 @@ fun SpotifyArtistScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(330.dp)
+                        .height(340.dp)
                 ) {
                     if (headerImageUrl != null) {
                         SpotifyArtworkImage(
@@ -156,7 +187,7 @@ fun SpotifyArtistScreen(
                                     colors = listOf(
                                         if (headerImageUrl != null) Color.Transparent else heroColor,
                                         heroColor.copy(alpha = 0.8f),
-                                        EncoreColors.Background
+                                        Color(0xFF121212)
                                     )
                                 )
                             )
@@ -182,32 +213,39 @@ fun SpotifyArtistScreen(
                                 )
                             }
 
-                        Spacer(modifier = Modifier.height(EncoreSpacers.Tighter3))
+                            Spacer(modifier = Modifier.height(EncoreSpacers.Tighter3))
 
-                        Text(
-                            text = artistName,
-                            style = SpotifyTheme.typography.headlineLarge.copy(color = Color.White),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                            Text(
+                                text = artistName,
+                                style = SpotifyTheme.typography.headlineLarge.copy(
+                                    color = Color.White,
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
 
-                        Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
+                            Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
 
-                        Text(
-                            text = "$monthlyListeners monthly listeners",
-                            style = SpotifyTheme.typography.bodySmall.copy(color = Color(0xFFE0E0E0))
-                        )
+                            Text(
+                                text = "$monthlyListeners monthly listeners",
+                                style = SpotifyTheme.typography.bodySmall.copy(color = Color(0xFFE0E0E0))
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // Action Row: Follow Pill, 3-dots, Shuffle, Green Play Button
-        item {
+            // Action Row: Follow Pill, 3-dots, Shuffle, Green Play Button
+            item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Base),
+                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Base)
+                        .onGloballyPositioned { coords ->
+                            actionRowYInRoot = coords.positionInRoot().y
+                        },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -229,34 +267,45 @@ fun SpotifyArtistScreen(
                             )
                         }
 
-                        EncoreIconButton(
-                            iconRes = R.drawable.encore_icon_more_android_24,
-                            contentDescription = "More options",
-                            onClick = onArtistOptionsClick,
-                            tint = EncoreColors.TextSecondary
-                        )
+                        // 3-Dots Artist Options Button
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = onArtistOptionsClick),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_more_android_24),
+                                contentDescription = "Artist options",
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter)
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        EncoreIconButton(
-                            iconRes = R.drawable.encore_icon_shuffle_24,
-                            contentDescription = "Shuffle artist",
-                            onClick = { isShuffle = !isShuffle },
-                            isActive = isShuffle,
-                            activeTint = EncoreColors.Green,
-                            tint = EncoreColors.TextSecondary
-                        )
+                        // Shuffle Button
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable { isShuffle = !isShuffle },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_shuffle_24),
+                                contentDescription = "Shuffle artist",
+                                tint = if (isShuffle) EncoreColors.Green else EncoreColors.TextSecondary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
 
-                        EncorePlayButton(
-                            isPlaying = isPlaying,
-                            onClick = onPlayPauseClick,
-                            size = 52.dp,
-                            iconSize = 26.dp,
-                            showShuffleBadge = isShuffle
-                        )
+                        // Reserved slot for the single gliding/docked play button
+                        Spacer(modifier = Modifier.size(playButtonSize))
                     }
                 }
             }
@@ -265,7 +314,7 @@ fun SpotifyArtistScreen(
             item {
                 Text(
                     text = "Popular",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
                     modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                 )
             }
@@ -302,11 +351,12 @@ fun SpotifyArtistScreen(
                         }
                     }
 
+                    // Thumbnail image
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(EncoreCornerRadii.Base))
-                            .background(heroColor.copy(alpha = 0.7f)),
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF242424)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (track.imageUrl != null) {
@@ -314,54 +364,60 @@ fun SpotifyArtistScreen(
                                 imageUrl = track.imageUrl,
                                 contentDescription = track.title,
                                 modifier = Modifier.fillMaxSize(),
-                                cornerRadius = EncoreCornerRadii.Base
+                                cornerRadius = 4.dp
                             )
                         } else {
-                            Text(text = "♪", color = Color.White, fontSize = 16.sp)
+                            Text("♫", color = Color.White, fontSize = 20.sp)
                         }
                     }
 
                     Spacer(modifier = Modifier.width(EncoreSpacers.Tighter))
 
+                    // Title & Stream count
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = track.title,
-                            style = SpotifyTheme.typography.bodyMediumBold.copy(
-                                color = if (isCurrentTrack) EncoreColors.Green else EncoreColors.TextPrimary
+                            style = SpotifyTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isCurrentTrack) EncoreColors.Green else Color.White
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = popTrack.streamCount,
-                            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            maxLines = 1
                         )
                     }
 
+                    // 3-dot context menu
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_more_android_24,
-                        contentDescription = "Options",
+                        contentDescription = "Track options",
                         onClick = { onTrackOptionsClick(track) },
+                        tint = EncoreColors.TextSecondary,
                         size = 36.dp,
-                        iconSize = 20.dp,
-                        tint = EncoreColors.TextSecondary
+                        iconSize = 20.dp
                     )
                 }
             }
 
-            // "Popular Releases" Header
+            // "Popular releases" Header
             item {
-                Spacer(modifier = Modifier.height(EncoreSpacers.Looser2))
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "Popular releases",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
                     modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                 )
+            }
 
+            // Popular Releases Carousel
+            item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = EncoreSpacers.Base),
-                    horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Base)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(releases) { release ->
                         Column(
@@ -372,7 +428,7 @@ fun SpotifyArtistScreen(
                             Box(
                                 modifier = Modifier
                                     .size(140.dp)
-                                    .clip(RoundedCornerShape(EncoreCornerRadii.Base))
+                                    .clip(RoundedCornerShape(4.dp))
                                     .background(release.color),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -381,21 +437,25 @@ fun SpotifyArtistScreen(
                                         imageUrl = release.imageUrl,
                                         contentDescription = release.title,
                                         modifier = Modifier.fillMaxSize(),
-                                        cornerRadius = EncoreCornerRadii.Base
+                                        cornerRadius = 4.dp
                                     )
                                 } else {
-                                    Text(text = "💿", fontSize = 40.sp)
+                                    Text("♫", color = Color.White, fontSize = 36.sp)
                                 }
                             }
-                            Spacer(modifier = Modifier.height(EncoreSpacers.Tighter2))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = release.title,
-                                style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
+                                style = SpotifyTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                ),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "${release.year} • ${release.type}",
+                                text = "${release.type} • ${release.year}",
                                 style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                             )
                         }
@@ -403,90 +463,139 @@ fun SpotifyArtistScreen(
                 }
             }
 
-            // "About" Section Card
+            // About Section (Bio Card)
             item {
-                Spacer(modifier = Modifier.height(EncoreSpacers.Looser3))
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = "About",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
                     modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                 )
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = EncoreSpacers.Base)
-                        .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
-                        .background(Color(0xFF282828))
-                        .padding(EncoreSpacers.Looser)
+                        .padding(horizontal = EncoreSpacers.Base, vertical = 8.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF242424))
+                        .clickable { }
+                        .padding(16.dp)
                 ) {
                     Column {
                         Text(
                             text = "$monthlyListeners monthly listeners",
-                            style = SpotifyTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary)
+                            style = SpotifyTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
                         )
-                        Spacer(modifier = Modifier.height(EncoreSpacers.Tighter2))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "$artistName is an acclaimed recording artist and songwriter dominating international charts worldwide.",
+                            text = "$artistName is an acclaimed artist with millions of listeners worldwide.",
                             style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                            maxLines = 4,
+                            maxLines = 3,
                             overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+
+        // Pinned Top Navigation Bar (floats on top of edge-to-edge hero image)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .background(topBarBgColor)
+                .statusBarsPadding()
+                .height(toolbarHeight)
+                .padding(horizontal = 16.dp)
+                .zIndex(10f),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Back Button (Locked at 16dp from left border)
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = circleBtnAlpha))
+                    .clickable(onClick = onBackClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
+                    contentDescription = "Back",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Centered Title in Top Bar when scrolled
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (topBarTitleAlpha > 0.01f) {
+                    Text(
+                        text = artistName,
+                        style = SpotifyTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 17.sp
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.graphicsLayer { alpha = topBarTitleAlpha }
+                    )
+                }
+            }
+
+            // 3-Dots Button (smoothly cross-fades out as play button docks)
+            Box(
+                modifier = Modifier.size(38.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (topBarThreeDotsAlpha > 0.01f) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = circleBtnAlpha * topBarThreeDotsAlpha))
+                            .clickable(onClick = onArtistOptionsClick)
+                            .graphicsLayer { alpha = topBarThreeDotsAlpha },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_more_android_24),
+                            contentDescription = "Artist options",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
         }
 
-        val topBarBgColor by animateColorAsState(
-            targetValue = if (isScrolledPastHeader) heroColor.copy(alpha = 0.98f) else Color.Transparent,
-            animationSpec = tween(durationMillis = 200),
-            label = "artistTopBarBg"
-        )
-
-        // Pinned Top Navigation Bar (floats on top of edge-to-edge hero image)
-        Row(
+        // Single Play Button implementing Spotify's ComposePlayButtonBehavior:
+        // Glides smoothly from the actions row and clamps at pinnedTop at the top bar boundary
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(topBarBgColor)
-                .statusBarsPadding()
-                .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter2),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .align(Alignment.TopEnd)
+                .padding(top = playButtonYDp, end = 16.dp)
+                .zIndex(20f)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                EncoreIconButton(
-                    iconRes = R.drawable.encore_icon_arrow_left_24,
-                    contentDescription = "Back",
-                    onClick = onBackClick,
-                    tint = EncoreColors.TextPrimary
-                )
-
-                AnimatedVisibility(
-                    visible = isScrolledPastHeader,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                    modifier = Modifier.padding(start = 12.dp)
-                ) {
-                    Text(
-                        text = artistName,
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Row {
-                EncoreIconButton(
-                    iconRes = R.drawable.encore_icon_more_android_24,
-                    contentDescription = "Artist options",
-                    onClick = onArtistOptionsClick,
-                    tint = EncoreColors.TextPrimary
-                )
-            }
+            EncorePlayButton(
+                isPlaying = isPlaying,
+                onClick = onPlayPauseClick,
+                size = playButtonSize,
+                iconSize = 24.dp,
+                showShuffleBadge = false
+            )
         }
     }
 }
