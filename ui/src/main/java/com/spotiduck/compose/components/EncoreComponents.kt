@@ -336,13 +336,13 @@ fun EncoreTrackRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(60.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Track number or playing indicator (when imageUrl is absent)
-        if (trackNumber != null && imageUrl == null) {
+        // Track number (Album view)
+        if (trackNumber != null) {
             Box(
                 modifier = Modifier.width(28.dp),
                 contentAlignment = Alignment.CenterStart
@@ -360,13 +360,11 @@ fun EncoreTrackRow(
                     )
                 }
             }
-        }
-
-        // Track Cover Art thumbnail (when imageUrl is present)
-        if (imageUrl != null) {
+        } else {
+            // Track Cover Art thumbnail (Playlist, Search, History)
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(48.dp)
                     .clip(RoundedCornerShape(4.dp)),
                 contentAlignment = Alignment.Center
             ) {
