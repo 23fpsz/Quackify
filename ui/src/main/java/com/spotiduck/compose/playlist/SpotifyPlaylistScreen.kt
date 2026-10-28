@@ -2,6 +2,7 @@ package com.spotiduck.compose.playlist
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -61,12 +62,16 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
@@ -174,63 +179,25 @@ fun SpotifyPlaylistScreen(
     }
 
     val listState = rememberLazyListState()
+    val density = LocalDensity.current
 
-    // Scroll calculations for fluid header collapse and artwork shrink
-    val scrollOffset by remember {
-        derivedStateOf {
-            if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 1000f
-        }
-    }
+    // Magnetic snapping search bar physics:
+    // Tracks interactive drag in real-time, and snaps 100% open or 100% closed on release
+    val maxSearchHeightDp = 50.dp
+    val maxSearchPx = with(density) { maxSearchHeightDp.toPx() }
+    val searchOffsetAnim = remember { Animatable(0f) }
+    val currentSearchHeightDp = with(density) { searchOffsetAnim.value.toDp() }
 
-    val scrollOffsetDp by remember {
-        derivedStateOf {
-            scrollOffset / 2.75f
-        }
-    }
-
-    val shrinkProgress by remember {
-        derivedStateOf {
-            (scrollOffsetDp / 180f).coerceIn(0f, 1f)
-        }
-    }
-
-    val artworkSize by remember {
-        derivedStateOf {
-            (230 - (120 * shrinkProgress)).dp
-        }
-    }
-
-    val artworkAlpha by remember {
-        derivedStateOf {
-            (1f - (shrinkProgress * 0.95f)).coerceIn(0f, 1f)
-        }
-    }
-
-    val topBarAlpha by remember {
-        derivedStateOf {
-            if (listState.firstVisibleItemIndex > 0) 1f else (scrollOffsetDp / 140f).coerceIn(0f, 1f)
-        }
-    }
-
-    val topBarTitleAlpha by remember {
-        derivedStateOf {
-            if (listState.firstVisibleItemIndex > 0) 1f else ((scrollOffsetDp - 140f) / 100f).coerceIn(0f, 1f)
-        }
-    }
-
-    val showStickyPlayButton by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || scrollOffsetDp > 260f
-        }
-    }
-
-    // Magnetic snap nested scroll connection for "Find in playlist" search bar
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // When scrolling down content (swiping up), snap search bar closed
-                if (available.y < -12f && isSearchRevealed) {
-                    isSearchRevealed = false
+                // When search bar is open/partially open and user scrolls up (available.y < 0),
+                // consume scroll to collapse search bar with the finger
+                if (searchOffsetAnim.value > 0f && available.y < 0f) {
+                    val target = (searchOffsetAnim.value + available.y).coerceAtLeast(0f)
+                    val consumedY = target - searchOffsetAnim.value
+                    scope.launch { searchOffsetAnim.snapTo(target) }
+                    return Offset(0f, consumedY)
                 }
                 return Offset.Zero
             }
@@ -240,24 +207,67 @@ fun SpotifyPlaylistScreen(
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
-                // When at the very top and pulling down, snap search bar open like a magnet
-                if (available.y > 18f && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
-                    isSearchRevealed = true
+                // When at the very top of playlist and pulling down (available.y > 0),
+                // drag search bar down interactively with the finger
+                if (available.y > 0f && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                    val target = (searchOffsetAnim.value + available.y).coerceAtMost(maxSearchPx)
+                    val consumedY = target - searchOffsetAnim.value
+                    scope.launch { searchOffsetAnim.snapTo(target) }
+                    return Offset(0f, consumedY)
                 }
                 return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                // Magnetic snapping: on finger release, never leave in half - snap 100% open or closed
+                if (searchOffsetAnim.value > 0f && searchOffsetAnim.value < maxSearchPx) {
+                    val snapTarget = if (available.y > 250f || searchOffsetAnim.value > maxSearchPx * 0.45f) {
+                        maxSearchPx
+                    } else {
+                        0f
+                    }
+                    searchOffsetAnim.animateTo(
+                        targetValue = snapTarget,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    )
+                    return available
+                }
+                return Velocity.Zero
             }
         }
     }
 
-    // Search bar height animation (snaps like a magnet, never in half)
-    val animatedSearchHeight by animateDpAsState(
-        targetValue = if (isSearchRevealed) 48.dp else 0.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "magneticSearchSnap"
-    )
+    // Scroll calculations for fluid header collapse and artwork shrink
+    val scrollPx by remember {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 2000f
+        }
+    }
+
+    val shrinkMaxPx = with(density) { 200.dp.toPx() }
+    val shrinkFraction by remember {
+        derivedStateOf {
+            (scrollPx / shrinkMaxPx).coerceIn(0f, 1f)
+        }
+    }
+
+    val artworkSize by remember {
+        derivedStateOf {
+            (240.dp * (1f - (shrinkFraction * 0.5f))).coerceAtLeast(120.dp)
+        }
+    }
+
+    val artworkAlpha by remember {
+        derivedStateOf {
+            (1f - (shrinkFraction * 0.95f)).coerceIn(0f, 1f)
+        }
+    }
+
+    // Tracking the exact on-screen Y position of the action row to drive PlayButtonBehavior
+    var actionRowYInRoot by remember { mutableStateOf(10000f) }
 
     Column(
         modifier = modifier
@@ -403,15 +413,26 @@ fun SpotifyPlaylistScreen(
             // ==========================================
 
             val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            val topBarBgColor = headerColor.copy(alpha = topBarAlpha * 0.98f)
-            val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
+            val toolbarHeight = 54.dp
+            val toolbarBottom = statusBarTop + toolbarHeight
+            val playButtonSize = 52.dp
+            val playButtonHalf = 26.dp
+            val pinnedTop = toolbarBottom - playButtonHalf
+            val pinnedTopPx = with(density) { pinnedTop.toPx() }
 
-            val stickyPlayButtonAlpha by animateFloatAsState(
-                targetValue = if (showStickyPlayButton) 1f else 0f,
-                animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                label = "stickyPlayAlpha"
-            )
-            val topBarThreeDotsAlpha = (1f - stickyPlayButtonAlpha).coerceIn(0f, 1f)
+            // Continuous gliding & docking matching Spotify ComposePlayButtonBehavior:
+            val playButtonYPx = maxOf(pinnedTopPx, actionRowYInRoot)
+            val playButtonYDp = with(density) { playButtonYPx.toDp() }
+
+            val dockDistancePx = playButtonYPx - pinnedTopPx
+            val dockThresholdPx = with(density) { 56.dp.toPx() }
+            val dockFraction = (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f)
+
+            val topBarThreeDotsAlpha = dockFraction
+            val topBarTitleAlpha = (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
+            val topBarAlpha = (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
+            val topBarBgColor = headerColor.copy(alpha = (0.85f + (0.15f * topBarAlpha)).coerceIn(0f, 1f))
+            val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
 
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(
@@ -525,41 +546,43 @@ fun SpotifyPlaylistScreen(
                                 .fillMaxWidth()
                                 .padding(top = 4.dp)
                         ) {
-                            // Magnetic Snapping Search Bar (Image 2)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(animatedSearchHeight)
-                                    .padding(horizontal = 16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (animatedSearchHeight > 10.dp) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(38.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color.White.copy(alpha = 0.14f))
-                                            .clickable { isSearching = true }
-                                            .padding(horizontal = 12.dp),
-                                        contentAlignment = Alignment.CenterStart
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                painter = painterResource(id = R.drawable.encore_icon_search_24),
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "Find in playlist",
-                                                style = SpotifyTheme.typography.bodyMedium.copy(
-                                                    color = Color.White.copy(alpha = 0.85f),
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = FontWeight.Medium
+                            // Interactive Pull-Down Snapping Search Bar
+                            if (currentSearchHeightDp > 0.dp) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(currentSearchHeightDp)
+                                        .padding(horizontal = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (currentSearchHeightDp > 12.dp) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(38.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color.White.copy(alpha = 0.15f))
+                                                .clickable { isSearching = true }
+                                                .padding(horizontal = 12.dp),
+                                            contentAlignment = Alignment.CenterStart
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    painter = painterResource(id = R.drawable.encore_icon_search_24),
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(18.dp)
                                                 )
-                                            )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "Find in playlist",
+                                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                                        color = Color.White.copy(alpha = 0.85f),
+                                                        fontSize = 13.5.sp,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -581,7 +604,7 @@ fun SpotifyPlaylistScreen(
                                         .graphicsLayer {
                                             alpha = artworkAlpha
                                         }
-                                        .shadow(elevation = (14 * (1f - shrinkProgress)).dp, shape = RoundedCornerShape(4.dp))
+                                        .shadow(elevation = (14 * (1f - shrinkFraction)).dp, shape = RoundedCornerShape(4.dp))
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(headerColor.copy(alpha = 0.9f)),
                                     contentAlignment = Alignment.Center
@@ -693,11 +716,14 @@ fun SpotifyPlaylistScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Action Controls Row: Mini Card, Download (↓), Share | Shuffle, Big Green Play FAB
+                            // Action Controls Row with onGloballyPositioned to drive ComposePlayButtonBehavior
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp),
+                                    .padding(horizontal = 16.dp)
+                                    .onGloballyPositioned { coords ->
+                                        actionRowYInRoot = coords.positionInRoot().y
+                                    },
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -789,14 +815,8 @@ fun SpotifyPlaylistScreen(
                                         )
                                     }
 
-                                    // Big Spotify Green Play FAB (52dp)
-                                    EncorePlayButton(
-                                        isPlaying = isPlaying,
-                                        onClick = onPlayPauseClick,
-                                        size = 52.dp,
-                                        iconSize = 24.dp,
-                                        showShuffleBadge = false
-                                    )
+                                    // Reserved slot for the single gliding/docked play button
+                                    Spacer(modifier = Modifier.size(playButtonSize))
                                 }
                             }
 
@@ -1028,31 +1048,21 @@ fun SpotifyPlaylistScreen(
             }
         }
 
-        // Sticky Floating Green Play FAB anchored at TopEnd boundary
-        // Sits half in TopBar and half in sticky filter chips row (matches Latest Screenshot media_1793155746362_4d67ef53.jpg)
-        if (stickyPlayButtonAlpha > 0.01f) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(
-                        top = statusBarTop + 54.dp - 26.dp,
-                        end = 16.dp
-                    )
-                    .graphicsLayer {
-                        alpha = stickyPlayButtonAlpha
-                        scaleX = 0.8f + (0.2f * stickyPlayButtonAlpha)
-                        scaleY = 0.8f + (0.2f * stickyPlayButtonAlpha)
-                    }
-                    .zIndex(20f)
-            ) {
-                EncorePlayButton(
-                    isPlaying = isPlaying,
-                    onClick = onPlayPauseClick,
-                    size = 52.dp,
-                    iconSize = 24.dp,
-                    showShuffleBadge = false
-                )
-            }
+        // Single Play Button implementing Spotify's ComposePlayButtonBehavior:
+        // Glides smoothly from the actions row and clamps at pinnedTop at the top bar boundary
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = playButtonYDp, end = 16.dp)
+                .zIndex(20f)
+        ) {
+            EncorePlayButton(
+                isPlaying = isPlaying,
+                onClick = onPlayPauseClick,
+                size = playButtonSize,
+                iconSize = 24.dp,
+                showShuffleBadge = false
+            )
         }
     }
 }
