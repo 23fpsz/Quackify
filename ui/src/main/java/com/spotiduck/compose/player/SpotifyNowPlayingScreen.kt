@@ -2,16 +2,15 @@ package com.spotiduck.compose.player
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -51,14 +51,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
@@ -130,137 +135,264 @@ fun SpotifyNowPlayingScreen(
     var isCanvasVisualizerEnabled by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
-    val headerDragOffsetY = remember { Animatable(0f) }
+    val playerOffsetY = remember { Animatable(0f) }
     val artworkOffsetX = remember { Animatable(0f) }
+    val scrollState = rememberScrollState()
 
-    Box(modifier = modifier.fillMaxSize()) {
+    // Reset translation whenever the screen is composed
+    LaunchedEffect(Unit) {
+        playerOffsetY.snapTo(0f)
+    }
+
+    val dismissPlayer: () -> Unit = {
+        coroutineScope.launch {
+            playerOffsetY.animateTo(
+                targetValue = 2500f,
+                animationSpec = tween(
+                    durationMillis = EncoreAnimation.NowPlayingExitDuration,
+                    easing = EncoreAnimation.DecelerateInterpolator
+                )
+            )
+            onCollapseClick()
+        }
+    }
+
+    val snapBackPlayer: () -> Unit = {
+        coroutineScope.launch {
+            playerOffsetY.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(
+                    durationMillis = EncoreAnimation.NowPlayingExitDuration,
+                    easing = EncoreAnimation.DecelerateInterpolator
+                )
+            )
+        }
+    }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // When player is dragged down (playerOffsetY > 0), any upward drag pulls the sheet back up
+                if (available.y < 0f && playerOffsetY.value > 0f) {
+                    val newOffset = (playerOffsetY.value + available.y).coerceAtLeast(0f)
+                    val consumed = newOffset - playerOffsetY.value
+                    coroutineScope.launch {
+                        playerOffsetY.snapTo(newOffset)
+                    }
+                    return Offset(0f, consumed)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                // When scrollState is at top (0), dragging down pulls the player sheet down
+                if (available.y > 0f && scrollState.value == 0) {
+                    coroutineScope.launch {
+                        playerOffsetY.snapTo(playerOffsetY.value + available.y)
+                    }
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (playerOffsetY.value > 0f) {
+                    val threshold = 180f
+                    if (playerOffsetY.value > threshold || available.y > 600f) {
+                        dismissPlayer()
+                    } else {
+                        snapBackPlayer()
+                    }
+                    return available
+                }
+                return Velocity.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (available.y > 600f && scrollState.value == 0) {
+                    dismissPlayer()
+                    return available
+                }
+                return Velocity.Zero
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                translationY = playerOffsetY.value.coerceAtLeast(0f)
+            }
+            .nestedScroll(nestedScrollConnection)
+    ) {
         // Living dynamic Jellyfish wave background extracted from Spotify Mobile JellyfishView.smali
         JellyfishCanvas(
             dominantColor = dominantColor,
             modifier = Modifier.fillMaxSize()
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = EncoreSpacers.Looser2)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
+        @OptIn(ExperimentalFoundationApi::class)
+        CompositionLocalProvider(
+            LocalOverscrollConfiguration provides null
         ) {
-            // Top Navigation Bar (Collapse Chevron, Context Header, More Options)
-            // Supports dragging down to collapse the player sheet
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = EncoreSpacers.Tighter2, bottom = EncoreSpacers.Base)
-                    .graphicsLayer { translationY = headerDragOffsetY.value }
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onDragEnd = {
-                                coroutineScope.launch {
-                                    if (headerDragOffsetY.value > 100f) {
-                                        onCollapseClick()
-                                    }
-                                    headerDragOffsetY.animateTo(
-                                        0f,
-                                        spring(dampingRatio = Spring.DampingRatioMediumBouncy)
-                                    )
-                                }
-                            },
-                            onVerticalDrag = { _, dragAmount ->
-                                if (dragAmount > 0 || headerDragOffsetY.value > 0) {
-                                    coroutineScope.launch {
-                                        headerDragOffsetY.snapTo((headerDragOffsetY.value + dragAmount).coerceAtLeast(0f))
-                                    }
-                                }
-                            }
-                        )
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = EncoreSpacers.Looser2)
+                    .verticalScroll(scrollState),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                EncoreIconButton(
-                    iconRes = R.drawable.encore_icon_chevron_down_24,
-                    contentDescription = "Collapse player",
-                    onClick = onCollapseClick,
-                    tint = EncoreColors.TextPrimary
-                )
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "PLAYING FROM PLAYLIST",
-                        style = SpotifyTheme.typography.marginal.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp,
-                            color = EncoreColors.TextSecondary
-                        )
+                // Top Navigation Bar (Collapse Chevron, Context Header, More Options)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = EncoreSpacers.Tighter2, bottom = EncoreSpacers.Base),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_chevron_down_24,
+                        contentDescription = "Collapse player",
+                        onClick = onCollapseClick,
+                        tint = EncoreColors.TextPrimary
                     )
-                    Text(
-                        text = albumOrPlaylistContext,
-                        style = SpotifyTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "PLAYING FROM PLAYLIST",
+                            style = SpotifyTheme.typography.marginal.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.sp,
+                                color = EncoreColors.TextSecondary
+                            )
+                        )
+                        Text(
+                            text = albumOrPlaylistContext,
+                            style = SpotifyTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_more_android_24,
+                        contentDescription = "More options",
+                        onClick = onMoreClick,
+                        tint = EncoreColors.TextPrimary
                     )
                 }
 
-                EncoreIconButton(
-                    iconRes = R.drawable.encore_icon_more_android_24,
-                    contentDescription = "More options",
-                    onClick = onMoreClick,
-                    tint = EncoreColors.TextPrimary
-                )
-            }
+                Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Base))
-
-            // Large 1:1 Album Artwork with 8dp rounded corners and interactive swipe-to-skip gesture
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1.0f)
-                    .graphicsLayer {
-                        translationX = artworkOffsetX.value
-                        rotationZ = (artworkOffsetX.value / 60f).coerceIn(-6f, 6f)
-                        alpha = 1f - (artworkOffsetX.value.absoluteValue / 1200f).coerceIn(0f, 0.4f)
-                    }
-                    .shadow(elevation = 20.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
-                    .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(dominantColor.copy(alpha = 0.9f), Color(0xFF1E1035))
+                // Large 1:1 Album Artwork with 8dp rounded corners and interactive swipe-to-skip gesture
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1.0f)
+                        .graphicsLayer {
+                            translationX = artworkOffsetX.value
+                            rotationZ = (artworkOffsetX.value / 60f).coerceIn(-6f, 6f)
+                            alpha = 1f - (artworkOffsetX.value.absoluteValue / 1200f).coerceIn(0f, 0.4f)
+                        }
+                        .shadow(elevation = 20.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
+                        .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(dominantColor.copy(alpha = 0.9f), Color(0xFF1E1035))
+                            )
                         )
-                    )
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                coroutineScope.launch {
-                                    val offset = artworkOffsetX.value
-                                    val threshold = 160f
-                                    if (offset < -threshold) {
-                                        artworkOffsetX.animateTo(-800f, tween(150, easing = EncoreAnimation.DecelerateInterpolator))
-                                        onSkipNextClick()
-                                        artworkOffsetX.snapTo(800f)
-                                        artworkOffsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
-                                    } else if (offset > threshold) {
-                                        artworkOffsetX.animateTo(800f, tween(150, easing = EncoreAnimation.DecelerateInterpolator))
-                                        onSkipPreviousClick()
-                                        artworkOffsetX.snapTo(-800f)
-                                        artworkOffsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
-                                    } else {
-                                        artworkOffsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+                        .pointerInput(Unit) {
+                            var isHorizontalGesture: Boolean? = null
+                            detectDragGestures(
+                                onDragStart = {
+                                    isHorizontalGesture = null
+                                },
+                                onDragEnd = {
+                                    coroutineScope.launch {
+                                        if (isHorizontalGesture == true) {
+                                            val offset = artworkOffsetX.value
+                                            val threshold = 160f
+                                            if (offset < -threshold) {
+                                                artworkOffsetX.animateTo(
+                                                    -800f,
+                                                    tween(150, easing = EncoreAnimation.DecelerateInterpolator)
+                                                )
+                                                onSkipNextClick()
+                                                artworkOffsetX.snapTo(800f)
+                                                artworkOffsetX.animateTo(
+                                                    0f,
+                                                    tween(200, easing = EncoreAnimation.DecelerateInterpolator)
+                                                )
+                                            } else if (offset > threshold) {
+                                                artworkOffsetX.animateTo(
+                                                    800f,
+                                                    tween(150, easing = EncoreAnimation.DecelerateInterpolator)
+                                                )
+                                                onSkipPreviousClick()
+                                                artworkOffsetX.snapTo(-800f)
+                                                artworkOffsetX.animateTo(
+                                                    0f,
+                                                    tween(200, easing = EncoreAnimation.DecelerateInterpolator)
+                                                )
+                                            } else {
+                                                artworkOffsetX.animateTo(
+                                                    0f,
+                                                    tween(150, easing = EncoreAnimation.DecelerateInterpolator)
+                                                )
+                                            }
+                                        } else if (isHorizontalGesture == false || playerOffsetY.value > 0f) {
+                                            val threshold = 180f
+                                            if (playerOffsetY.value > threshold) {
+                                                dismissPlayer()
+                                            } else {
+                                                snapBackPlayer()
+                                            }
+                                        }
+                                        isHorizontalGesture = null
+                                    }
+                                },
+                                onDragCancel = {
+                                    coroutineScope.launch {
+                                        artworkOffsetX.animateTo(
+                                            0f,
+                                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
+                                        )
+                                        snapBackPlayer()
+                                        isHorizontalGesture = null
+                                    }
+                                },
+                                onDrag = { change, dragAmount ->
+                                    if (isHorizontalGesture == null) {
+                                        if (dragAmount.x.absoluteValue > dragAmount.y.absoluteValue && dragAmount.x.absoluteValue > 10f) {
+                                            isHorizontalGesture = true
+                                        } else if (dragAmount.y.absoluteValue > 10f) {
+                                            isHorizontalGesture = false
+                                        }
+                                    }
+                                    if (isHorizontalGesture == true) {
+                                        change.consume()
+                                        coroutineScope.launch {
+                                            artworkOffsetX.snapTo(artworkOffsetX.value + dragAmount.x)
+                                        }
+                                    } else if (isHorizontalGesture == false) {
+                                        if (dragAmount.y > 0 || playerOffsetY.value > 0) {
+                                            change.consume()
+                                            coroutineScope.launch {
+                                                playerOffsetY.snapTo((playerOffsetY.value + dragAmount.y).coerceAtLeast(0f))
+                                            }
+                                        }
                                     }
                                 }
-                            },
-                            onHorizontalDrag = { _, dragAmount ->
-                                coroutineScope.launch {
-                                    artworkOffsetX.snapTo(artworkOffsetX.value + dragAmount)
-                                }
-                            }
-                        )
-                    },
-                contentAlignment = Alignment.Center
-            ) {
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
                 if (isCanvasVisualizerEnabled) {
                     JellyfishCanvas(
                         dominantColor = dominantColor,
@@ -634,6 +766,7 @@ fun SpotifyNowPlayingScreen(
             }
 
             Spacer(modifier = Modifier.height(48.dp))
+        }
         }
 
         // Fullscreen Lyrics Overlay (Slides up over player)
