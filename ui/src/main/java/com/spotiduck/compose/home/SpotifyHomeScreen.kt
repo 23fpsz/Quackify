@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
 import com.spotiduck.compose.components.EncoreChip
+import com.spotiduck.compose.components.EncoreProfileAvatar
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.components.EncorePlayButton
 import com.spotiduck.compose.components.EncorePlayIndicator
@@ -370,38 +371,29 @@ fun SpotifyHomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(EncoreColors.Background.copy(alpha = 0.98f))
+                    .background(EncoreColors.Background)
                     .statusBarsPadding()
                     .padding(vertical = 8.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Profile Avatar (Clickable -> Opens Profile Drawer) matching faceheader_image
-                    Box(
-                        modifier = Modifier
-                            .padding(start = 16.dp)
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE91429))
-                            .clickable(onClick = onProfileClick),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = (userDisplayName.trim().firstOrNull() ?: 'D').uppercaseChar().toString(),
-                            style = SpotifyTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                    }
+                    EncoreProfileAvatar(
+                        userDisplayName = userDisplayName,
+                        avatarUrl = userAvatarUrl.ifBlank { null },
+                        onClick = onProfileClick,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
 
                     // Filter Chips Row Container with start gradient fade (funkis_filter_chips_header.xml)
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
+                            .fillMaxHeight(),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         LazyRow(

@@ -31,6 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
+import com.spotiduck.compose.components.EncoreProfileAvatar
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
 import com.spotiduck.compose.theme.SpotifyTheme
@@ -88,21 +89,15 @@ fun ProfileDrawerSheet(
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE91429)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = (userDisplayName.trim().firstOrNull() ?: 'D').uppercaseChar().toString(),
-                        style = SpotifyTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    )
-                }
+                EncoreProfileAvatar(
+                    userDisplayName = userDisplayName,
+                    avatarUrl = userAvatarUrl.ifBlank { null },
+                    onClick = {
+                        onDismiss()
+                        onViewProfileClick()
+                    },
+                    size = 54.dp
+                )
 
                 Spacer(modifier = Modifier.width(16.dp))
 
