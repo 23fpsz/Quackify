@@ -123,6 +123,8 @@ fun SpotifyNowPlayingScreen(
     onQueueClick: () -> Unit,
     onDeviceClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onBanClick: (() -> Unit)? = null,
+    contextHeaderTitle: String? = null,
     isExplicit: Boolean = false,
     shuffleMode: ShuffleMode = if (isShuffle) ShuffleMode.SHUFFLE else ShuffleMode.OFF,
     repeatMode: RepeatMode = if (isRepeat) RepeatMode.REPEAT_ALL else RepeatMode.OFF,
@@ -258,19 +260,25 @@ fun SpotifyNowPlayingScreen(
         CompositionLocalProvider(
             LocalOverscrollConfiguration provides null
         ) {
+            val resolvedContextTitle = contextHeaderTitle ?: when {
+                albumOrPlaylistContext.isBlank() || albumOrPlaylistContext.equals("Recommended for you", ignoreCase = true) -> "Recommended for you"
+                else -> "Playing from playlist"
+            }
+            val hasSubtitle = albumOrPlaylistContext.isNotBlank() && !albumOrPlaylistContext.equals("Recommended for you", ignoreCase = true)
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .padding(horizontal = EncoreSpacers.Looser2)
                     .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Top Navigation Bar (Collapse Chevron, Context Header, More Options)
+                // Reference: context_header.xml & revised_template_overlay.xml (@id/player_overlay_header)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = EncoreSpacers.Tighter2, bottom = EncoreSpacers.Base),
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -278,40 +286,59 @@ fun SpotifyNowPlayingScreen(
                         iconRes = R.drawable.encore_icon_chevron_down_24,
                         contentDescription = "Collapse player",
                         onClick = onCollapseClick,
-                        tint = EncoreColors.TextPrimary
+                        tint = Color.White,
+                        size = 48.dp,
+                        iconSize = 24.dp
                     )
 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(
-                            text = "PLAYING FROM PLAYLIST",
+                            text = resolvedContextTitle,
                             style = SpotifyTheme.typography.marginal.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.sp,
-                                color = EncoreColors.TextSecondary
-                            )
-                        )
-                        Text(
-                            text = albumOrPlaylistContext,
-                            style = SpotifyTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Normal,
+                                color = Color.White
+                            ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        if (hasSubtitle) {
+                            Text(
+                                text = albumOrPlaylistContext,
+                                style = SpotifyTheme.typography.bodySmallBold.copy(
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_more_android_24,
                         contentDescription = "More options",
                         onClick = onMoreClick,
-                        tint = EncoreColors.TextPrimary
+                        tint = Color.White,
+                        size = 48.dp,
+                        iconSize = 24.dp
                     )
                 }
 
-                Spacer(modifier = Modifier.height(EncoreSpacers.Base))
+                Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
 
                 // Large 1:1 Album Artwork with 8dp rounded corners and interactive swipe-to-skip gesture
+                // Reference: revised_template_page_layout.xml (@id/track_carousel) -> bounds [63,308][1017,1262] (24dp margins)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
                         .aspectRatio(1.0f)
                         .graphicsLayer {
                             translationX = artworkOffsetX.value
@@ -456,27 +483,35 @@ fun SpotifyNowPlayingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Looser3))
+            Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
 
-            // Track Title, Artist & Like Button Row
+            // Track Title, Artist & Feedback Buttons Row
+            // Reference: track_info_nowplaying_view.xml & revised_template_overlay.xml (@id/track_info_feedback_container)
+            // Live dump: track_info_view_title [63, 1598], feedback_buttons_container [765, 1596][1038, 1722]
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = SpotifyTheme.typography.titleLarge.copy(fontSize = 22.sp),
+                        style = SpotifyTheme.typography.titleLarge.copy(
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isExplicit) {
-                            // ContentRestrictionBadgeView from track_info_nowplaying_view.xml
+                            // ContentRestrictionBadgeView from track_info_nowplaying_view.xml: 16dp x 16dp, 3dp radius, marginEnd 8dp
                             Box(
                                 modifier = Modifier
-                                    .padding(end = 6.dp)
+                                    .padding(end = 8.dp)
                                     .size(16.dp)
                                     .clip(RoundedCornerShape(3.dp))
                                     .background(EncoreColors.TextSecondary),
@@ -494,43 +529,60 @@ fun SpotifyNowPlayingScreen(
                         }
                         Text(
                             text = artist,
-                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                            style = SpotifyTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.70f)),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                EncoreHeartButton(
-                    isLiked = isLiked,
-                    onLikeToggle = onLikeClick,
-                    size = 48.dp,
-                    iconSize = 28.dp
-                )
+                // Feedback buttons container: Don't Play (Ban) + Add/Like
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onBanClick != null) {
+                        EncoreIconButton(
+                            iconRes = R.drawable.encore_icon_ban_24,
+                            contentDescription = "Don't play this",
+                            onClick = onBanClick,
+                            tint = Color.White.copy(alpha = 0.70f),
+                            size = 48.dp,
+                            iconSize = 24.dp
+                        )
+                    }
+                    EncoreHeartButton(
+                        isLiked = isLiked,
+                        onLikeToggle = onLikeClick,
+                        size = 48.dp,
+                        iconSize = 28.dp
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Base))
+            Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
 
             // 1:1 Spotify Native NPV Scrubber SeekBar
+            // Reference: @dimen/seekbar_margin_horizontal (8dp), @dimen/seekbar_height (3dp)
             SpotifySeekBar(
                 progress = progress,
                 durationMs = durationMs,
                 onSeek = onSeek,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
             )
 
-            // Elapsed time & Remaining time timestamps (TextAppearance.NowPlayingTimestamps, 12sp, tnum)
+            // Elapsed time & Remaining time timestamps (TextAppearance.Encore.Marginal, 12sp, tnum)
+            // Live dump bounds: position [63, 1809], duration [948, 1809] (24dp screen margins)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = EncoreSpacers.Tighter4),
+                    .padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = formatTime(currentPositionMs),
                     style = SpotifyTheme.typography.marginal.copy(
                         fontSize = 12.sp,
-                        color = EncoreColors.TextSecondary,
+                        color = Color.White.copy(alpha = 0.70f),
                         fontFeatureSettings = "tnum"
                     )
                 )
@@ -538,7 +590,7 @@ fun SpotifyNowPlayingScreen(
                     text = formatTime(durationMs),
                     style = SpotifyTheme.typography.marginal.copy(
                         fontSize = 12.sp,
-                        color = EncoreColors.TextSecondary,
+                        color = Color.White.copy(alpha = 0.70f),
                         fontFeatureSettings = "tnum"
                     )
                 )
@@ -547,8 +599,11 @@ fun SpotifyNowPlayingScreen(
             Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
 
             // Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat)
+            // Reference: revised_template_overlay.xml (@id/playback_controls_container) -> paddingHorizontal 16dp
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -597,11 +652,14 @@ fun SpotifyNowPlayingScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Looser2))
+            Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
 
             // Bottom Device & Share / Queue Row
+            // Reference: revised_template_overlay_footer.xml -> marginStart/End 8dp (@dimen/footer_button_margin)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -609,7 +667,7 @@ fun SpotifyNowPlayingScreen(
                     modifier = Modifier
                         .clip(CircleShape)
                         .clickable(onClick = onDeviceClick)
-                        .padding(vertical = EncoreSpacers.Tighter4, horizontal = EncoreSpacers.Tighter3),
+                        .padding(vertical = EncoreSpacers.Tighter4, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     EncoreIconButton(
@@ -617,13 +675,13 @@ fun SpotifyNowPlayingScreen(
                         contentDescription = "Connected devices",
                         onClick = onDeviceClick,
                         tint = EncoreColors.Green,
-                        size = 28.dp,
+                        size = 32.dp,
                         iconSize = 20.dp
                     )
                     Text(
                         text = connectedDeviceName,
                         style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.Green),
-                        modifier = Modifier.padding(start = EncoreSpacers.Tighter4)
+                        modifier = Modifier.padding(start = 2.dp)
                     )
                 }
 
@@ -632,7 +690,7 @@ fun SpotifyNowPlayingScreen(
                         iconRes = R.drawable.encore_icon_share_android_24,
                         contentDescription = "Share",
                         onClick = {},
-                        tint = EncoreColors.TextSecondary,
+                        tint = Color.White.copy(alpha = 0.70f),
                         size = 40.dp,
                         iconSize = 20.dp
                     )
@@ -640,7 +698,7 @@ fun SpotifyNowPlayingScreen(
                         iconRes = R.drawable.encore_icon_queue_24,
                         contentDescription = "Queue",
                         onClick = onQueueClick,
-                        tint = EncoreColors.TextSecondary,
+                        tint = Color.White.copy(alpha = 0.70f),
                         size = 40.dp,
                         iconSize = 22.dp
                     )
@@ -649,10 +707,12 @@ fun SpotifyNowPlayingScreen(
 
             Spacer(modifier = Modifier.height(EncoreSpacers.Looser2))
 
-            // Lyrics Peek Card (16dp rounded corner, dominant color background)
+            // Lyrics Peek Card (16dp rounded corner, dominant color background, horizontal margin 16dp)
+            // Reference: live dump [42, 2269][1038, 2400]
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
                     .background(dominantColor.copy(alpha = 0.65f))
                     .clickable { isLyricsFullscreen = true }
@@ -665,7 +725,7 @@ fun SpotifyNowPlayingScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Lyrics",
+                            text = "Lyrics preview",
                             style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -704,12 +764,15 @@ fun SpotifyNowPlayingScreen(
                 }
             }
 
+
+
             Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
-            // "About the Artist" Card (matches Spotify NPV layout)
+            // "About the Artist" Card (16dp rounded corner, horizontal margin 16dp)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
                     .background(EncoreColors.Card)
                     .padding(EncoreSpacers.Looser)

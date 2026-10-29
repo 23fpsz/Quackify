@@ -1032,10 +1032,17 @@ fun SpotifyAppShell(
                 )
             )
         ) {
+            val (contextHeader, contextSub) = when (currentScreen) {
+                ShellScreen.PLAYLIST -> "Playing from playlist" to activePlaylistTitle
+                ShellScreen.ALBUM -> "Playing from album" to activeAlbumTitle
+                ShellScreen.ARTIST -> "Playing from artist" to activeArtistName
+                else -> "Playing from playlist" to (if (activePlaylistTitle.isNotBlank()) activePlaylistTitle else "Today's Top Hits")
+            }
             SpotifyNowPlayingScreen(
                 title = currentTrackTitle,
                 artist = currentArtist,
-                albumOrPlaylistContext = if (currentScreen == ShellScreen.PLAYLIST) activePlaylistTitle else "Today's Top Hits",
+                contextHeaderTitle = contextHeader,
+                albumOrPlaylistContext = contextSub,
                 isPlaying = isPlaying,
                 progress = currentProgress,
                 durationMs = durationMs,
