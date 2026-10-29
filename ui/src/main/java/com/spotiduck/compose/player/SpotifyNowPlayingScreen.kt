@@ -2,10 +2,12 @@ package com.spotiduck.compose.player
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -134,6 +137,7 @@ fun SpotifyNowPlayingScreen(
     repeatMode: RepeatMode = if (isRepeat) RepeatMode.REPEAT_ALL else RepeatMode.OFF,
     dominantColor: Color = Color(0xFF432371),
     coverUrl: String? = null,
+    isLoading: Boolean = false,
     monthlyListeners: String = "98,421,114 monthly listeners",
     artistBio: String = "The Weeknd is a Canadian singer, songwriter, and record producer known for his sonic versatility and dark lyricism.",
     lyricsSnippet: String = "I'm tryna put you in the worst mood, ah\nP1 cleaner than your church shoes, ah\nMilli point two just to hurt you, ah\nAll red Lamb' leanin' on you, ah",
@@ -153,6 +157,35 @@ fun SpotifyNowPlayingScreen(
         lyrics.indexOfLast { currentPositionMs >= it.startTimeMs }.coerceAtLeast(0)
     }
     val activeLyricLine = lyrics.getOrNull(activeLyricIndex)?.text.orEmpty()
+
+    // Realistic state: track loading animation and async lyrics availability
+    var isSimulatedLoading by remember(title, artist) { mutableStateOf(true) }
+    var isLyricsAvailable by remember(title, artist, lyrics) { mutableStateOf(false) }
+
+    LaunchedEffect(title, artist, lyrics) {
+        isSimulatedLoading = true
+        isLyricsAvailable = false
+        kotlinx.coroutines.delay(800)
+        isSimulatedLoading = false
+        if (lyrics.isNotEmpty()) {
+            kotlinx.coroutines.delay(350)
+            isLyricsAvailable = true
+        }
+    }
+
+    val effectiveIsLoading = isLoading || isSimulatedLoading
+    val effectiveLyricsVisible = isLyricsAvailable && lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
+
+    // When lyrics become available, the album art smoothly glides UPWARD
+    // to accommodate the 1-line lyrics while the player controls remain at their exact vertical positions!
+    val artworkPushUpOffset by animateDpAsState(
+        targetValue = if (effectiveLyricsVisible) 0.dp else 40.dp,
+        animationSpec = tween(
+            durationMillis = 400,
+            easing = EncoreAnimation.DecelerateInterpolator
+        ),
+        label = "artworkPushUpOffset"
+    )
 
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
@@ -255,15 +288,31 @@ fun SpotifyNowPlayingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .background(Color(0xFF121212)) // 100% solid, fully opaque dark base
             .graphicsLayer {
                 translationY = playerOffsetY.value.coerceAtLeast(0f)
             }
             .nestedScroll(nestedScrollConnection)
     ) {
-        // Living dynamic Jellyfish wave background extracted from Spotify Mobile JellyfishView.smali
-        JellyfishCanvas(
-            dominantColor = dominantColor,
-            modifier = Modifier.fillMaxSize()
+        val animatedDominantColor by animateColorAsState(
+            targetValue = dominantColor,
+            animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
+            label = "npvDominantColorTransition"
+        )
+
+        // Authentic album-art-extracted vertical gradient matching Spotify nowplaying_overlay_gradient.xml
+        // 100% solid, fully opaque colors — zero transparency
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to animatedDominantColor,
+                        0.35f to animatedDominantColor,
+                        0.70f to Color(0xFF181818),
+                        1.0f to Color(0xFF121212)
+                    )
+                )
         )
 
         @OptIn(ExperimentalFoundationApi::class)
@@ -341,25 +390,22 @@ fun SpotifyNowPlayingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Large 1:1 Album Artwork with 8dp rounded corners and interactive swipe-to-skip gesture
                 // Reference: revised_template_page_layout.xml (@id/track_carousel) -> bounds [63,308][1017,1262] (24dp margins)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .offset(y = artworkPushUpOffset)
                         .padding(horizontal = 24.dp)
                         .aspectRatio(1.0f)
                         .graphicsLayer {
                             translationX = artworkOffsetX.value
                         }
-                        .shadow(elevation = 20.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
+                        .shadow(elevation = 16.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
                         .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(dominantColor.copy(alpha = 0.9f), Color(0xFF1E1035))
-                            )
-                        )
+                        .background(animatedDominantColor)
                         .pointerInput(dismissThresholdPx) {
                             var isHorizontalGesture: Boolean? = null
                             val velocityTracker = VelocityTracker()
@@ -493,51 +539,49 @@ fun SpotifyNowPlayingScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
             // 1-line real-time synchronized lyrics element
             // Reference: revised_template_overlay.xml (@id/lyrics_element)
-            // Decompiled Dimens: layout_marginHorizontal="@dimen/playback_controls_margin" (16dp), paddingHorizontal="@dimen/spacer_8" (8dp)
-            if (activeLyricLine.isNotBlank()) {
-                Spacer(modifier = Modifier.height(EncoreSpacers.Tighter2))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.08f))
-                        .clickable { isLyricsFullscreen = true }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // Constant 40dp height container ensures track title and controls below NEVER shift position!
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = effectiveLyricsVisible,
+                    enter = fadeIn(tween(300)) + slideInVertically(tween(350)) { it / 2 },
+                    exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it / 2 }
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.encore_icon_mic_24),
-                        contentDescription = "Lyrics preview",
-                        tint = EncoreColors.Green,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
                     AnimatedContent(
                         targetState = activeLyricLine,
                         transitionSpec = {
                             (slideInVertically { height -> height / 2 } + fadeIn(tween(200)))
                                 .togetherWith(slideOutVertically { height -> -height / 2 } + fadeOut(tween(150)))
                         },
-                        label = "1LineLyricsAnimation",
-                        modifier = Modifier.weight(1f)
+                        label = "1LineLyricsContent"
                     ) { lyricText ->
                         Text(
                             text = lyricText,
-                            style = SpotifyTheme.typography.bodySmallBold.copy(
-                                fontSize = 12.sp,
+                            style = SpotifyTheme.typography.titleMedium.copy(
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = Color.White
                             ),
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isLyricsFullscreen = true }
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Track Title, Artist & Feedback Buttons Row
             // Reference: track_info_nowplaying_view.xml & revised_template_overlay.xml (@id/track_info_feedback_container)
@@ -611,17 +655,18 @@ fun SpotifyNowPlayingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
+            Spacer(modifier = Modifier.height(32.dp))
 
             // 1:1 Spotify Native NPV Scrubber SeekBar
-            // Reference: @dimen/seekbar_margin_horizontal (8dp), @dimen/seekbar_height (3dp)
+            // Horizontal padding 24dp aligns perfectly with timestamps, track title, and album artwork
             SpotifySeekBar(
                 progress = progress,
                 durationMs = durationMs,
                 onSeek = onSeek,
+                isLoading = effectiveIsLoading,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
+                    .padding(horizontal = 24.dp)
             )
 
             // Elapsed time & Remaining time timestamps (TextAppearance.Encore.Marginal, 12sp, tnum)
@@ -650,7 +695,7 @@ fun SpotifyNowPlayingScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat)
             // Reference: revised_template_overlay.xml (@id/playback_controls_container) -> paddingHorizontal 16dp
@@ -685,7 +730,8 @@ fun SpotifyNowPlayingScreen(
                     size = 64.dp,
                     iconSize = 32.dp,
                     backgroundColor = Color.White,
-                    iconColor = EncoreColors.PureBlack
+                    iconColor = EncoreColors.PureBlack,
+                    isLoading = effectiveIsLoading
                 )
 
                 // Next
@@ -706,7 +752,7 @@ fun SpotifyNowPlayingScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Bottom Device & Share / Queue Row
             // Reference: revised_template_overlay_footer.xml -> marginStart/End 8dp (@dimen/footer_button_margin)
@@ -759,62 +805,74 @@ fun SpotifyNowPlayingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Looser2))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Lyrics Peek Card (16dp rounded corner, dominant color background, horizontal margin 16dp)
             // Reference: live dump [42, 2269][1038, 2400]
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
-                    .background(dominantColor.copy(alpha = 0.65f))
-                    .clickable { isLyricsFullscreen = true }
-                    .padding(EncoreSpacers.Looser)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = effectiveLyricsVisible,
+                enter = slideInVertically(
+                    initialOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = tween(durationMillis = 400, easing = EncoreAnimation.DecelerateInterpolator)
+                ) + fadeIn(tween(300)),
+                exit = slideOutVertically(
+                    targetOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = tween(durationMillis = 300)
+                ) + fadeOut(tween(200))
             ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Lyrics preview",
-                            style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            EncoreIconButton(
-                                iconRes = R.drawable.encore_icon_share_android_24,
-                                contentDescription = "Share lyrics",
-                                onClick = { isLyricsShareOpen = true },
-                                tint = Color.White,
-                                size = 32.dp,
-                                iconSize = 18.dp
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
+                        .background(dominantColor.copy(alpha = 0.65f))
+                        .clickable { isLyricsFullscreen = true }
+                        .padding(EncoreSpacers.Looser)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Lyrics preview",
+                                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                             )
-                            EncoreIconButton(
-                                iconRes = R.drawable.encore_icon_fullscreen_24,
-                                contentDescription = "Expand lyrics",
-                                onClick = { isLyricsFullscreen = true },
-                                tint = Color.White,
-                                size = 32.dp,
-                                iconSize = 18.dp
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                EncoreIconButton(
+                                    iconRes = R.drawable.encore_icon_share_android_24,
+                                    contentDescription = "Share lyrics",
+                                    onClick = { isLyricsShareOpen = true },
+                                    tint = Color.White,
+                                    size = 32.dp,
+                                    iconSize = 18.dp
+                                )
+                                EncoreIconButton(
+                                    iconRes = R.drawable.encore_icon_fullscreen_24,
+                                    contentDescription = "Expand lyrics",
+                                    onClick = { isLyricsFullscreen = true },
+                                    tint = Color.White,
+                                    size = 32.dp,
+                                    iconSize = 18.dp
+                                )
+                            }
                         }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Text(
+                            text = lyricsSnippet,
+                            style = SpotifyTheme.typography.titleMedium.copy(
+                                fontSize = 18.sp,
+                                lineHeight = 26.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.95f)
+                            ),
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
-
-                    Text(
-                        text = lyricsSnippet,
-                        style = SpotifyTheme.typography.titleMedium.copy(
-                            fontSize = 18.sp,
-                            lineHeight = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White.copy(alpha = 0.95f)
-                        ),
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
 
@@ -895,7 +953,7 @@ fun SpotifyNowPlayingScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     Text(
                         text = artistBio,

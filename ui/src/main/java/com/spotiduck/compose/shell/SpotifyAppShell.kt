@@ -1038,6 +1038,17 @@ fun SpotifyAppShell(
                 ShellScreen.ARTIST -> "Playing from artist" to activeArtistName
                 else -> "Playing from playlist" to (if (activePlaylistTitle.isNotBlank()) activePlaylistTitle else "Today's Top Hits")
             }
+            val npvDominantColor = when {
+                currentTrackTitle.contains("Starboy", ignoreCase = true) -> Color(0xFF1B2C4E)
+                currentTrackTitle.contains("Blinding Lights", ignoreCase = true) -> Color(0xFF8B1E1E)
+                currentTrackTitle.contains("Save Your Tears", ignoreCase = true) -> Color(0xFF7A1C32)
+                currentTrackTitle.contains("Die For You", ignoreCase = true) -> Color(0xFF4A223E)
+                currentTrackTitle.contains("One Of The Girls", ignoreCase = true) -> Color(0xFF26354A)
+                currentTrackTitle.contains("Bairiyaa", ignoreCase = true) -> Color(0xFFB8441E)
+                currentTrackTitle.contains("Naina", ignoreCase = true) -> Color(0xFF4B3533)
+                currentTrackTitle.contains("Faasle", ignoreCase = true) -> Color(0xFF1E3A5F)
+                else -> Color(0xFF432371)
+            }
             SpotifyNowPlayingScreen(
                 title = currentTrackTitle,
                 artist = currentArtist,
@@ -1047,6 +1058,7 @@ fun SpotifyAppShell(
                 progress = currentProgress,
                 durationMs = durationMs,
                 currentPositionMs = currentPositionMs,
+                dominantColor = npvDominantColor,
                 isLiked = isLiked,
                 isExplicit = currentTrackTitle.contains("Starboy", ignoreCase = true) ||
                         currentTrackTitle.contains("One Of The Girls", ignoreCase = true) ||
