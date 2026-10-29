@@ -223,76 +223,12 @@ fun SpotifyNowPlayingScreen(
         }
     }
 
-    val nestedScrollConnection = remember(dismissThresholdPx, screenHeightPx) {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // When player is dragged down (playerOffsetY > 0), any upward drag pulls the sheet back up
-                if (available.y < 0f && playerOffsetY.value > 0f) {
-                    val newOffset = (playerOffsetY.value + available.y).coerceAtLeast(0f)
-                    val consumed = newOffset - playerOffsetY.value
-                    coroutineScope.launch {
-                        playerOffsetY.snapTo(newOffset)
-                    }
-                    return Offset(0f, consumed)
-                }
-                return Offset.Zero
-            }
-
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset {
-                // When scrollState is at top (0), dragging down pulls the player sheet down
-                if (available.y > 0f && scrollState.value == 0) {
-                    coroutineScope.launch {
-                        playerOffsetY.snapTo(playerOffsetY.value + available.y)
-                    }
-                    return Offset(0f, available.y)
-                }
-                return Offset.Zero
-            }
-
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                if (playerOffsetY.value > 0f) {
-                    if (available.y < -100f) {
-                        // Flung/swiped UPWARD: no matter the depth, the NPV always stays!
-                        snapBackPlayer()
-                    } else if (available.y > 1000f) {
-                        // Flung/swiped DOWNWARD: dismiss!
-                        dismissPlayer()
-                    } else if (playerOffsetY.value > dismissThresholdPx) {
-                        // Released past halfway point without upward fling: dismiss!
-                        dismissPlayer()
-                    } else {
-                        // Released in upper half without downward fling: stay!
-                        snapBackPlayer()
-                    }
-                    return available
-                }
-                return Velocity.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (available.y > 1000f && scrollState.value == 0) {
-                    dismissPlayer()
-                    return available
-                } else if (available.y < -100f && playerOffsetY.value > 0f) {
-                    snapBackPlayer()
-                    return available
-                }
-                return Velocity.Zero
-            }
-        }
-    }
-
     Box(
         modifier = modifier
             .fillMaxSize()
             .graphicsLayer {
                 translationY = playerOffsetY.value.coerceAtLeast(0f)
             }
-            .nestedScroll(nestedScrollConnection)
     ) {
         val animatedDominantColor by animateColorAsState(
             targetValue = dominantColor,
@@ -338,7 +274,35 @@ fun SpotifyNowPlayingScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .pointerInput(dismissThresholdPx) {
+                            val velocityTracker = VelocityTracker()
+                            detectDragGestures(
+                                onDragStart = { velocityTracker.resetTracking() },
+                                onDragEnd = {
+                                    val velocity = velocityTracker.calculateVelocity()
+                                    coroutineScope.launch {
+                                        if (velocity.y > 1000f || playerOffsetY.value > dismissThresholdPx) {
+                                            dismissPlayer()
+                                        } else {
+                                            snapBackPlayer()
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    snapBackPlayer()
+                                },
+                                onDrag = { change, dragAmount ->
+                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                    if (dragAmount.y > 0 || playerOffsetY.value > 0) {
+                                        change.consume()
+                                        coroutineScope.launch {
+                                            playerOffsetY.snapTo((playerOffsetY.value + dragAmount.y).coerceAtLeast(0f))
+                                        }
+                                    }
+                                }
+                            )
+                        },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
