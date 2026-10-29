@@ -289,7 +289,6 @@ fun SpotifyNowPlayingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF121212)) // 100% solid, fully opaque dark base
             .graphicsLayer {
                 translationY = playerOffsetY.value.coerceAtLeast(0f)
             }
