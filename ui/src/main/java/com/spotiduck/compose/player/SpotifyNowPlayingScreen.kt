@@ -1,6 +1,10 @@
 package com.spotiduck.compose.player
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
@@ -132,7 +136,8 @@ fun SpotifyNowPlayingScreen(
     coverUrl: String? = null,
     monthlyListeners: String = "98,421,114 monthly listeners",
     artistBio: String = "The Weeknd is a Canadian singer, songwriter, and record producer known for his sonic versatility and dark lyricism.",
-    lyricsSnippet: String = "I'm tryna put you in the worst mood, ah\nP1 cleaner than your church shoes, ah\nMilli point two just to hurt you, ah\nAll red Lamb' leanin' on you, ah"
+    lyricsSnippet: String = "I'm tryna put you in the worst mood, ah\nP1 cleaner than your church shoes, ah\nMilli point two just to hurt you, ah\nAll red Lamb' leanin' on you, ah",
+    lyrics: List<TimeSyncedLyric> = defaultLyricsList
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
@@ -143,6 +148,11 @@ fun SpotifyNowPlayingScreen(
     val playerOffsetY = remember { Animatable(0f) }
     val artworkOffsetX = remember { Animatable(0f) }
     val scrollState = rememberScrollState()
+
+    val activeLyricIndex = remember(currentPositionMs, lyrics) {
+        lyrics.indexOfLast { currentPositionMs >= it.startTimeMs }.coerceAtLeast(0)
+    }
+    val activeLyricLine = lyrics.getOrNull(activeLyricIndex)?.text.orEmpty()
 
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
@@ -480,6 +490,50 @@ fun SpotifyNowPlayingScreen(
                             color = if (isCanvasVisualizerEnabled) EncoreColors.Green else Color.White.copy(alpha = 0.7f)
                         )
                     )
+                }
+            }
+
+            // 1-line real-time synchronized lyrics element
+            // Reference: revised_template_overlay.xml (@id/lyrics_element)
+            // Decompiled Dimens: layout_marginHorizontal="@dimen/playback_controls_margin" (16dp), paddingHorizontal="@dimen/spacer_8" (8dp)
+            if (activeLyricLine.isNotBlank()) {
+                Spacer(modifier = Modifier.height(EncoreSpacers.Tighter2))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .clickable { isLyricsFullscreen = true }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_mic_24),
+                        contentDescription = "Lyrics preview",
+                        tint = EncoreColors.Green,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    AnimatedContent(
+                        targetState = activeLyricLine,
+                        transitionSpec = {
+                            (slideInVertically { height -> height / 2 } + fadeIn(tween(200)))
+                                .togetherWith(slideOutVertically { height -> -height / 2 } + fadeOut(tween(150)))
+                        },
+                        label = "1LineLyricsAnimation",
+                        modifier = Modifier.weight(1f)
+                    ) { lyricText ->
+                        Text(
+                            text = lyricText,
+                            style = SpotifyTheme.typography.bodySmallBold.copy(
+                                fontSize = 12.sp,
+                                color = Color.White
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -876,7 +930,7 @@ fun SpotifyNowPlayingScreen(
                 artist = artist,
                 currentPositionMs = currentPositionMs,
                 dominantColor = dominantColor,
-                lyrics = defaultLyricsList,
+                lyrics = lyrics,
                 onSeekMs = { targetMs -> onSeek(targetMs.toFloat() / durationMs.toFloat()) },
                 onShareClick = { isLyricsShareOpen = true },
                 onClose = { isLyricsFullscreen = false }
@@ -888,7 +942,7 @@ fun SpotifyNowPlayingScreen(
             LyricsShareDialog(
                 title = title,
                 artist = artist,
-                lyrics = defaultLyricsList,
+                lyrics = lyrics,
                 initialDominantColor = dominantColor,
                 onDismiss = { isLyricsShareOpen = false },
                 onShareConfirm = { _, _, _ -> isLyricsShareOpen = false }
