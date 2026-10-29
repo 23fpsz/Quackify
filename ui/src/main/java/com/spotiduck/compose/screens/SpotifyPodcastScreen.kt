@@ -27,17 +27,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Divider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,9 +44,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -59,15 +54,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.spotiduck.compose.R
-import com.spotiduck.compose.components.EncoreIconButton
-import com.spotiduck.compose.components.EncorePlayButton
 import com.spotiduck.compose.components.SpotifyArtworkImage
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.EncoreCornerRadii
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
 import com.spotiduck.compose.theme.SpotifyTheme
 import com.spotiduck.compose.theme.rememberBottomPadding
-import kotlinx.coroutines.launch
 
 data class PodcastEpisode(
     val id: String,
@@ -75,28 +67,61 @@ data class PodcastEpisode(
     val description: String,
     val releaseDate: String,
     val duration: String,
+    val statusText: String? = null,
     val isExplicit: Boolean = false,
     val imageUrl: String? = null,
     val isPlayed: Boolean = false
 )
 
+val DefaultPodcastEpisodes = listOf(
+    PodcastEpisode(
+        id = "fo-580",
+        title = "How Extreme Heat Is Becoming India's \$180 Billion Problem | Arunabha Ghosh | FO580 Raj Shamani",
+        description = "Checkout Mobius: https://mobiusf.org/ Get your hand-picked playbook here: https://www.figuringout.co/pdf/fo-580 Guest Suggestion Form: https://forms.gle/bnaeY3FpoFU9ZjA47 Disclaimer: This video is intended solely for educational purposes.",
+        releaseDate = "Tue",
+        duration = "1h 15m",
+        statusText = null,
+        imageUrl = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552"
+    ),
+    PodcastEpisode(
+        id = "fo-579",
+        title = "How Osama Bin Laden Was Found, Killed & Raid Strategy | Robert J. O'Neill | FO579 Raj Shamani",
+        description = "Download Porter Here: https://porter.in/enterprise Get your hand-picked playbook here: https://www.figuringout.co/pdf/fo-579 Guest Suggestion Form: https://forms.gle/bnaeY3FpoFU9ZjA47",
+        releaseDate = "Sat",
+        duration = "1h 50m left",
+        statusText = "Finished",
+        imageUrl = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552"
+    ),
+    PodcastEpisode(
+        id = "fo-578",
+        title = "How To Build An Unbreakable Mind & Push Beyond Your Limits | Ayyoub El Osrouti | FO578 Raj Shamani",
+        description = "Checkout ASUS ExpertBook Series: https://www.flipkart.com/bbd-eb-intrigue-at-store Get your hand-picked playbook here: https://www.figuringout.co/pdf/fo-578 Guest Suggestion Form: https://forms.gle/bnaeY3FpoFU9ZjA4",
+        releaseDate = "Thu",
+        duration = "2h 50m",
+        statusText = "50K+ plays",
+        imageUrl = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552"
+    )
+)
+
 /**
- * 1:1 Pixel-Perfect Spotify Podcast / Show Screen matching Spotify Mobile specs:
- * - Collapsible overlay top bar (transparent at rest, solid coverColor when scrolled)
- * - Show artwork with 8dp rounded squircle corners starting directly under status bar
- * - Continuous gliding play button implementing Spotify's ComposePlayButtonBehavior
- * - Continuous header gradient smoothly fading to pure #121212
- * - Pinned filter chips row: All episodes, Unplayed, Downloaded, Sort
- * - Detailed episode cards with date, description, duration play pill, and action controls
+ * 1:1 Pixel-Perfect Spotify Podcast / Creator Webpage (CWP) Screen:
+ * - Two-column Header Layout: 112dp cover art on left, Bold title & publisher on right
+ * - Dot-separated metadata badges: Rank badge • Rating • Category
+ * - CWP Action Bar: Trailer teaser play button, Follow pill, Notification bell, Settings gear
+ * - Navigation Tabs: Episodes (with active white underline indicator), About, More like this
+ * - Sort & Filter dropdown pill: "All episodes • Newest"
+ * - Authentic 16:9 widescreen episode cards with snippet, metadata, action buttons, and 32dp solid white play circle
  */
 @Composable
 fun SpotifyPodcastScreen(
-    showTitle: String,
-    publisherName: String,
-    rating: String = "4.8 (124K)",
-    category: String = "Technology",
-    coverColor: Color = Color(0xFF1E3A8A),
-    episodes: List<PodcastEpisode>,
+    showTitle: String = "Figuring Out with Raj Shamani",
+    publisherName: String = "Raj Shamani",
+    rankBadge: String? = "#1 in Top Podcasts",
+    rating: String = "4.6 (6.8K)",
+    category: String = "Educational",
+    coverColor: Color = Color(0xFF2E3A40),
+    coverUrl: String? = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552",
+    episodes: List<PodcastEpisode> = DefaultPodcastEpisodes,
     currentEpisodeId: String = "",
     isPlaying: Boolean = false,
     onBackClick: () -> Unit = {},
@@ -104,70 +129,31 @@ fun SpotifyPodcastScreen(
     onEpisodeSelect: (PodcastEpisode) -> Unit = {},
     onEpisodeOptionsClick: (PodcastEpisode) -> Unit = {},
     onShowOptionsClick: () -> Unit = {},
-    modifier: Modifier = Modifier,
-    coverUrl: String? = null
+    onSettingsClick: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
     var isFollowing by remember { mutableStateOf(false) }
     var hasNotifications by remember { mutableStateOf(false) }
-    var selectedFilter by remember { mutableStateOf("All episodes") }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val tabs = remember { listOf("Episodes", "About", "More like this") }
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
 
-    var actionRowYInRoot by remember { mutableStateOf(Float.MAX_VALUE) }
-    var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
-    var isPlayButtonSlotMeasured by remember { mutableStateOf(false) }
-
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val toolbarHeight = 54.dp
-    val toolbarBottom = statusBarTop + toolbarHeight
-    val toolbarBottomPx = with(density) { toolbarBottom.toPx() }
-    val playButtonSize = 52.dp
-    val playButtonHalf = 26.dp
-    val pinnedTop = toolbarBottom - playButtonHalf
-    val pinnedTopPx = with(density) { pinnedTop.toPx() }
 
-    val chipsHeight = 48.dp
-
-    val isHeaderOffScreen = listState.firstVisibleItemIndex > 0
-
-    val dockDistancePx by remember {
+    // Top Bar Collapsing Transition
+    val scrollOffset by remember {
         derivedStateOf {
-            if (isHeaderOffScreen) {
-                0f
-            } else if (isPlayButtonSlotMeasured) {
-                (playButtonSlotYInRoot - pinnedTopPx).coerceAtLeast(0f)
-            } else {
-                with(density) { 300.dp.toPx() }
-            }
+            if (listState.firstVisibleItemIndex > 0) 1000f else listState.firstVisibleItemScrollOffset.toFloat()
         }
     }
-    val dockThresholdPx = with(density) { 56.dp.toPx() }
-    val dockFraction = (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f)
-
-    val topBarThreeDotsAlpha = if (isHeaderOffScreen) 0f else dockFraction
-    val topBarTitleAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
-    val topBarAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
-    val topBarBgColor = coverColor.copy(alpha = topBarAlpha)
-    val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
-    val topOffsetPx = with(density) { (toolbarHeight - 8.dp).toPx().toInt() }
-
-    val chipsYPx = if (isPlayButtonSlotMeasured) playButtonSlotYInRoot + with(density) { (playButtonSize + 14.dp).toPx() } else with(density) { (statusBarTop + 410.dp).toPx() }
-    val pinnedChipsYPx = if (isHeaderOffScreen) toolbarBottomPx else maxOf(toolbarBottomPx, chipsYPx)
-    val pinnedChipsYDp = with(density) { pinnedChipsYPx.toDp() }
-
-    val currentGradientHeightDp by remember {
-        derivedStateOf {
-            if (isHeaderOffScreen) {
-                toolbarBottom
-            } else if (isPlayButtonSlotMeasured && playButtonSlotYInRoot > 0f) {
-                maxOf(toolbarBottom, with(density) { (playButtonSlotYInRoot + playButtonSize.toPx() + with(density) { 14.dp.toPx() }).toDp() })
-            } else {
-                toolbarBottom + 360.dp
-            }
-        }
-    }
+    val collapseThresholdPx = with(density) { 140.dp.toPx() }
+    val collapseFraction = (scrollOffset / collapseThresholdPx).coerceIn(0f, 1f)
+    val topBarBgColor = coverColor.copy(alpha = collapseFraction)
+    val topBarTitleAlpha = ((collapseFraction - 0.5f) * 2f).coerceIn(0f, 1f)
+    val circleBtnAlpha = ((1f - collapseFraction) * 0.35f).coerceIn(0f, 0.35f)
 
     val followBorderColor by animateColorAsState(
         targetValue = if (isFollowing) EncoreColors.Green else EncoreColors.TextSecondary,
@@ -178,38 +164,29 @@ fun SpotifyPodcastScreen(
         label = "podcastFollowText"
     )
 
-    // Dynamic Artwork Shrink Calculation
-    val scrollOffset = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset else 400
-    val shrinkFraction = (scrollOffset / with(density) { 180.dp.toPx() }).coerceIn(0f, 1f)
-    val artworkSize = 180.dp - (40.dp * shrinkFraction)
-    val artworkAlpha = (1f - (shrinkFraction * 0.35f)).coerceIn(0f, 1f)
-
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFF121212))
     ) {
         // Collapsible Header Gradient Background
-        // Spans from top of screen (Y = 0) down to the bottom of the action row,
-        // dynamically bounded so it smoothly contracts into toolbarBottom without scroll bleed or popping.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(currentGradientHeightDp)
+                .height(340.dp)
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
                             0.0f to coverColor,
-                            0.35f to coverColor.copy(alpha = 0.90f),
-                            0.65f to coverColor.copy(alpha = 0.55f),
-                            0.85f to coverColor.copy(alpha = 0.20f),
+                            0.45f to coverColor.copy(alpha = 0.85f),
+                            0.75f to coverColor.copy(alpha = 0.35f),
                             1.0f to Color(0xFF121212)
                         )
                     )
                 )
         )
 
-        // Scrollable LazyColumn with Collapsing Header, Chips Spacer, and Episodes
+        // Scrollable LazyColumn with Collapsing Header, Tabs, Filter, and Episode Rows
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -218,290 +195,425 @@ fun SpotifyPodcastScreen(
                 bottom = bottomPadding
             )
         ) {
-            // Header Item: drawn shifted up by topOffsetPx so artwork sits directly at statusBarTop + 8.dp
+            // CWP Show Header
             item {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .layout { measurable, constraints ->
-                            val placeable = measurable.measure(constraints)
-                            layout(placeable.width, placeable.height - topOffsetPx) {
-                                placeable.placeRelative(0, -topOffsetPx)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    // Two-Column Header: Cover Art (112x112dp) on Left, Title & Creator on Right
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Show Artwork
+                        Box(
+                            modifier = Modifier
+                                .size(112.dp)
+                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(coverColor.copy(alpha = 0.9f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!coverUrl.isNullOrBlank()) {
+                                SpotifyArtworkImage(
+                                    imageUrl = coverUrl,
+                                    contentDescription = showTitle,
+                                    modifier = Modifier.fillMaxSize(),
+                                    cornerRadius = 8.dp
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.encore_icon_podcasts_24),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(48.dp)
+                                )
                             }
                         }
-                ) {
-                    Column(
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Show Title & Creator
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = showTitle,
+                                style = SpotifyTheme.typography.headlineLarge.copy(
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    lineHeight = 24.sp,
+                                    color = Color.White
+                                ),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = publisherName,
+                                style = SpotifyTheme.typography.bodyMedium.copy(
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Metadata Row: Middle dot separated badges
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (!rankBadge.isNullOrBlank()) {
+                            Text(
+                                text = rankBadge,
+                                style = SpotifyTheme.typography.marginal.copy(
+                                    color = EncoreColors.TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+                            Text(
+                                text = " • ",
+                                style = SpotifyTheme.typography.marginal.copy(
+                                    color = EncoreColors.TextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            )
+                        }
+
+                        Text(
+                            text = "★ $rating",
+                            style = SpotifyTheme.typography.marginal.copy(
+                                color = EncoreColors.TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+
+                        Text(
+                            text = " • ",
+                            style = SpotifyTheme.typography.marginal.copy(
+                                color = EncoreColors.TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        )
+
+                        Text(
+                            text = category,
+                            style = SpotifyTheme.typography.marginal.copy(
+                                color = EncoreColors.TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Header Action Bar: Teaser circular play, Follow pill, Bell, Gear
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Trailer / Teaser Preview Button
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.12f))
+                                .clickable { onPlayPauseClick() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_play_24),
+                                contentDescription = "Play teaser",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        // Follow Pill Button
+                        Box(
+                            modifier = Modifier
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(EncoreCornerRadii.FollowPill))
+                                .border(1.dp, followBorderColor, RoundedCornerShape(EncoreCornerRadii.FollowPill))
+                                .clickable { isFollowing = !isFollowing }
+                                .padding(horizontal = 18.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (isFollowing) "Following" else "Follow",
+                                style = SpotifyTheme.typography.bodySmallBold.copy(
+                                    color = followTextColor,
+                                    fontSize = 13.sp
+                                )
+                            )
+                        }
+
+                        // Notification Bell
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable { hasNotifications = !hasNotifications },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    id = if (hasNotifications) R.drawable.encore_icon_notifications_active_24 else R.drawable.encore_icon_notification_new_24
+                                ),
+                                contentDescription = "Notifications",
+                                tint = if (hasNotifications) EncoreColors.Green else EncoreColors.TextSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        // Settings Gear
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = onSettingsClick),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_settings_24),
+                                contentDescription = "Show settings",
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
+            }
+
+            // Navigation Tabs Bar: Episodes, About, More like this
+            item {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 4.dp)
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Hero Show Artwork (Squircle)
+                        tabs.forEachIndexed { index, title ->
+                            val isSelected = selectedTabIndex == index
+                            Column(
+                                modifier = Modifier
+                                    .clickable { selectedTabIndex = index }
+                                    .padding(vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = title,
+                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                        color = if (isSelected) Color.White else EncoreColors.TextSecondary,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                        fontSize = 15.sp
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(28.dp)
+                                            .height(2.5.dp)
+                                            .background(Color.White, RoundedCornerShape(1.dp))
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.height(2.5.dp))
+                                }
+                            }
+                        }
+                    }
+                    HorizontalDivider(
+                        color = Color.White.copy(alpha = 0.08f),
+                        thickness = 0.5.dp
+                    )
+                }
+            }
+
+            // Tab Content
+            when (selectedTabIndex) {
+                0 -> {
+                    // Episodes Tab
+                    item {
+                        // Sort / Filter Pill Row
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 8.dp, bottom = 4.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(artworkSize)
-                                    .graphicsLayer {
-                                        alpha = artworkAlpha
-                                    }
-                                    .shadow(elevation = (14 * (1f - shrinkFraction)).dp, shape = RoundedCornerShape(12.dp))
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(coverColor.copy(alpha = 0.9f)),
+                                    .clip(RoundedCornerShape(100.dp))
+                                    .background(Color(0xFF282828))
+                                    .clickable { }
+                                    .padding(horizontal = 12.dp, vertical = 7.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (!coverUrl.isNullOrBlank()) {
-                                    SpotifyArtworkImage(
-                                        imageUrl = coverUrl,
-                                        contentDescription = showTitle,
-                                        modifier = Modifier.fillMaxSize(),
-                                        cornerRadius = 12.dp
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "All episodes • Newest",
+                                        style = SpotifyTheme.typography.bodySmallBold.copy(
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
                                     )
-                                } else {
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Icon(
-                                        painter = painterResource(id = R.drawable.encore_icon_album_24),
-                                        contentDescription = null,
+                                        painter = painterResource(id = R.drawable.encore_icon_chevron_down_24),
+                                        contentDescription = "Filter",
                                         tint = Color.White,
-                                        modifier = Modifier.size(64.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Show Title (Bold 24sp)
-                        Text(
-                            text = showTitle,
-                            style = SpotifyTheme.typography.headlineLarge.copy(
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            ),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
+                    // Episodes List
+                    items(episodes, key = { it.id }) { episode ->
+                        val isCurrentEpisode = episode.id == currentEpisodeId
+                        PodcastEpisodeRow(
+                            episode = episode,
+                            isPlaying = isCurrentEpisode && isPlaying,
+                            onClick = { onEpisodeSelect(episode) },
+                            onOptionsClick = { onEpisodeOptionsClick(episode) }
+                        )
+                        HorizontalDivider(
+                            color = Color.White.copy(alpha = 0.08f),
+                            thickness = 0.5.dp,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Publisher Name
-                        Text(
-                            text = publisherName,
-                            style = SpotifyTheme.typography.bodyMedium.copy(
-                                color = EncoreColors.TextPrimary,
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Rating & Category
-                        Text(
-                            text = "★ $rating • $category",
-                            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Action Controls Row
-                        Row(
+                    }
+                }
+                1 -> {
+                    // About Tab
+                    item {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                                .onGloballyPositioned { coords ->
-                                    actionRowYInRoot = coords.positionInRoot().y
-                                },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(16.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // Follow Pill Button
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(EncoreCornerRadii.FollowPill))
-                                        .border(1.dp, followBorderColor, RoundedCornerShape(EncoreCornerRadii.FollowPill))
-                                        .clickable { isFollowing = !isFollowing }
-                                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = if (isFollowing) "Following" else "Follow",
-                                        style = SpotifyTheme.typography.bodySmallBold.copy(color = followTextColor)
-                                    )
-                                }
+                            Text(
+                                text = "About",
+                                style = SpotifyTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 18.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Figuring Out with Raj Shamani is India's top podcast where business, mental resilience, personal finance, and high-impact life journeys collide with world-class founders, authors, scientists, and creators.",
+                                style = SpotifyTheme.typography.bodySmall.copy(
+                                    color = EncoreColors.TextSecondary,
+                                    lineHeight = 20.sp,
+                                    fontSize = 14.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(20.dp))
 
-                                // Bell / Notification Button
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .clickable { hasNotifications = !hasNotifications },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (hasNotifications) R.drawable.encore_icon_notifications_active_24 else R.drawable.encore_icon_notification_new_24
-                                        ),
-                                        contentDescription = "Notifications",
-                                        tint = if (hasNotifications) EncoreColors.Green else EncoreColors.TextSecondary,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
+                            Text(
+                                text = "Ratings & Reviews",
+                                style = SpotifyTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 16.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "★ $rating • $category",
+                                style = SpotifyTheme.typography.bodyMedium.copy(
+                                    color = EncoreColors.TextSecondary,
+                                    fontSize = 13.sp
+                                )
+                            )
+                        }
+                    }
+                }
+                2 -> {
+                    // More like this Tab
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = "More Like This",
+                                style = SpotifyTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 18.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
 
-                                // 3-Dots Show Options Button
-                                Box(
+                            listOf(
+                                "The Ranveer Show" to "BeerBiceps",
+                                "WTF is with Nikhil Kamath" to "Nikhil Kamath",
+                                "The Joe Rogan Experience" to "Joe Rogan"
+                            ).forEach { (title, host) ->
+                                Row(
                                     modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .clickable(onClick = onShowOptionsClick),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .clickable { }
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.encore_icon_more_android_24),
-                                        contentDescription = "Show options",
-                                        tint = EncoreColors.TextSecondary,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                            }
-
-                            // Play Button Slot: rendered directly in the Action Controls row
-                            Box(
-                                modifier = Modifier
-                                    .size(playButtonSize)
-                                    .onGloballyPositioned { coords ->
-                                        isPlayButtonSlotMeasured = true
-                                        playButtonSlotYInRoot = coords.positionInRoot().y
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                // Visible directly in the row whenever below the top bar
-                                if (!isPlayButtonSlotMeasured || playButtonSlotYInRoot > toolbarBottomPx) {
-                                    EncorePlayButton(
-                                        isPlaying = isPlaying,
-                                        onClick = onPlayPauseClick,
-                                        size = playButtonSize,
-                                        iconSize = 24.dp,
-                                        showShuffleBadge = false
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFF242424)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.encore_icon_podcasts_24),
+                                            contentDescription = null,
+                                            tint = Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = title,
+                                            style = SpotifyTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                        )
+                                        Text(
+                                            text = "Podcast • $host",
+                                            style = SpotifyTheme.typography.bodySmall.copy(
+                                                color = EncoreColors.TextSecondary
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(14.dp))
                     }
                 }
-            }
-
-            // Reserved slot for the pinned filter chips bar
-            item {
-                Spacer(modifier = Modifier.height(chipsHeight))
-            }
-
-            // Episodes List Header
-            item {
-                Text(
-                    text = "All Episodes",
-                    style = SpotifyTheme.typography.titleLarge.copy(
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    ),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                )
-            }
-
-            // Episode Rows
-            items(episodes, key = { it.id }) { episode ->
-                val isCurrentEpisode = episode.id == currentEpisodeId
-                PodcastEpisodeRow(
-                    episode = episode,
-                    isPlaying = isCurrentEpisode && isPlaying,
-                    onClick = { onEpisodeSelect(episode) },
-                    onOptionsClick = { onEpisodeOptionsClick(episode) }
-                )
-                HorizontalDivider(
-                    color = Color.White.copy(alpha = 0.08f),
-                    thickness = 0.5.dp,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-        }
-
-        // Pinned Filter Chips Bar
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .padding(top = pinnedChipsYDp)
-                .background(Color(0xFF121212))
-                .zIndex(9f)
-                .padding(vertical = 8.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Spacer(modifier = Modifier.width(16.dp))
-
-                listOf("All episodes", "Unplayed", "Downloaded").forEach { chip ->
-                    val isSelected = selectedFilter == chip
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(100.dp))
-                            .background(if (isSelected) EncoreColors.Green else Color(0xFF2A2A2A))
-                            .clickable { selectedFilter = chip }
-                            .padding(horizontal = 14.dp, vertical = 7.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = chip,
-                            style = SpotifyTheme.typography.bodySmallBold.copy(
-                                color = if (isSelected) Color.Black else Color.White,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(100.dp))
-                        .background(Color(0xFF2A2A2A))
-                        .clickable { }
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.encore_icon_sort_24),
-                            contentDescription = "Sort",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Sort",
-                            style = SpotifyTheme.typography.bodySmallBold.copy(
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(72.dp))
             }
         }
 
@@ -558,55 +670,20 @@ fun SpotifyPodcastScreen(
                 }
             }
 
-            // 3-Dots Button
-            Box(
-                modifier = Modifier.size(38.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (topBarThreeDotsAlpha > 0.01f) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = circleBtnAlpha * topBarThreeDotsAlpha))
-                            .clickable(onClick = onShowOptionsClick)
-                            .graphicsLayer { alpha = topBarThreeDotsAlpha },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.encore_icon_more_android_24),
-                            contentDescription = "Show options",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Pinned Play Button (matching Spotify ComposePlayButtonBehavior):
-        // Floats above top bar at zIndex(20f) as soon as it reaches toolbar, docking at pinnedTopPx
-        if (isPlayButtonSlotMeasured && (playButtonSlotYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
-            val targetY = if (isHeaderOffScreen || playButtonSlotYInRoot < pinnedTopPx) {
-                pinnedTopPx
-            } else {
-                playButtonSlotYInRoot
-            }
+            // 3-Dots Show Options Button
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 16.dp)
-                    .graphicsLayer {
-                        translationY = targetY
-                    }
-                    .zIndex(20f)
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = circleBtnAlpha))
+                    .clickable(onClick = onShowOptionsClick),
+                contentAlignment = Alignment.Center
             ) {
-                EncorePlayButton(
-                    isPlaying = isPlaying,
-                    onClick = onPlayPauseClick,
-                    size = playButtonSize,
-                    iconSize = 24.dp,
-                    showShuffleBadge = false
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_more_android_24),
+                    contentDescription = "Show options",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -614,12 +691,13 @@ fun SpotifyPodcastScreen(
 }
 
 /**
- * Spotify Podcast Episode Row:
- * - Thumbnail image
- * - Date & duration
- * - Title (bold)
- * - Description (2 lines max)
- * - Action controls: Play pill, Add to your episodes, Download, Share, 3-dots
+ * Spotify Podcast Episode Row matching official mobile APK hierarchy:
+ * - Top: 16:9 widescreen artwork (114x64dp, 6dp radius) + Title (15sp bold, maxLines = 3)
+ * - Description: 2-line snippet (13sp textSecondary)
+ * - Metadata line: Day • Duration • Status (e.g. "Tue • 1h 15m" or "Sat • 1h 50m left • Finished")
+ * - Footer:
+ *     - Left: Add (+), Download (↓), Share, More (...)
+ *     - Right: 32dp solid white circle with pure black play triangle
  */
 @Composable
 private fun PodcastEpisodeRow(
@@ -630,6 +708,7 @@ private fun PodcastEpisodeRow(
     modifier: Modifier = Modifier
 ) {
     var isEpisodeDownloaded by remember { mutableStateOf(false) }
+    var isEpisodeAdded by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -637,109 +716,143 @@ private fun PodcastEpisodeRow(
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
+        // Top Row: 16:9 Widescreen Artwork + Title
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
-            // Episode Thumbnail
+            // 16:9 Widescreen Thumbnail (114dp x 64dp)
             Box(
                 modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .size(width = 114.dp, height = 64.dp)
+                    .clip(RoundedCornerShape(6.dp))
                     .background(Color(0xFF242424)),
                 contentAlignment = Alignment.Center
             ) {
-                if (episode.imageUrl != null) {
+                if (!episode.imageUrl.isNullOrBlank()) {
                     SpotifyArtworkImage(
                         imageUrl = episode.imageUrl,
                         contentDescription = episode.title,
                         modifier = Modifier.fillMaxSize(),
-                        cornerRadius = 8.dp
+                        cornerRadius = 6.dp
                     )
                 } else {
                     Icon(
-                        painter = painterResource(id = R.drawable.encore_icon_album_24),
+                        painter = painterResource(id = R.drawable.encore_icon_podcasts_24),
                         contentDescription = null,
                         tint = Color.White.copy(alpha = 0.6f),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                // Title
-                Text(
-                    text = episode.title,
-                    style = SpotifyTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = if (isPlaying) EncoreColors.Green else Color.White,
-                        fontSize = 15.sp
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Description
-                Text(
-                    text = episode.description,
-                    style = SpotifyTheme.typography.bodySmall.copy(
-                        color = EncoreColors.TextSecondary,
-                        fontSize = 13.sp,
-                        lineHeight = 17.sp
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            // Title
+            Text(
+                text = episode.title,
+                style = SpotifyTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = if (isPlaying) EncoreColors.Green else Color.White,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp
+                ),
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Date & duration + Action Controls Row
+        // Body Description Snippet (maxLines = 2)
+        Text(
+            text = episode.description,
+            style = SpotifyTheme.typography.bodySmall.copy(
+                color = EncoreColors.TextSecondary,
+                fontSize = 13.sp,
+                lineHeight = 17.sp
+            ),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Episode Metadata: Day • Duration • Status (e.g. "Tue • 1h 15m" or "Sat • 1h 50m left • Finished")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (episode.isExplicit) {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 6.dp)
+                        .size(13.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White.copy(alpha = 0.6f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "E",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            }
+
+            val metaText = buildString {
+                append(episode.releaseDate)
+                append(" • ")
+                append(episode.duration)
+                if (!episode.statusText.isNullOrBlank()) {
+                    append(" • ")
+                    append(episode.statusText)
+                }
+            }
+
+            Text(
+                text = metaText,
+                style = SpotifyTheme.typography.marginal.copy(
+                    color = EncoreColors.TextSecondary,
+                    fontSize = 12.sp
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Action Footer Row: [+] [↓] [Share] [...] on left, (▶) 32dp white play button on right
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Date & Duration
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (episode.isExplicit) {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 6.dp)
-                            .size(13.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color.White.copy(alpha = 0.6f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "E",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                    }
-                }
-
-                Text(
-                    text = "${episode.releaseDate} • ${episode.duration}",
-                    style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
-                )
-            }
-
-            // Actions: Download, Share, 3-dots, Play Pill
+            // Left Action Icons
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                // Add to Your Episodes
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable { isEpisodeAdded = !isEpisodeAdded },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            id = if (isEpisodeAdded) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24
+                        ),
+                        contentDescription = "Add episode",
+                        tint = if (isEpisodeAdded) EncoreColors.Green else EncoreColors.TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
                 // Download Button
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
                         .clickable { isEpisodeDownloaded = !isEpisodeDownloaded },
                     contentAlignment = Alignment.Center
@@ -757,7 +870,7 @@ private fun PodcastEpisodeRow(
                 // Share Button
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
                         .clickable { },
                     contentAlignment = Alignment.Center
@@ -773,7 +886,7 @@ private fun PodcastEpisodeRow(
                 // 3-Dots Button
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
                         .clickable(onClick = onOptionsClick),
                     contentAlignment = Alignment.Center
@@ -785,25 +898,25 @@ private fun PodcastEpisodeRow(
                         modifier = Modifier.size(18.dp)
                     )
                 }
+            }
 
-                // Play Pill
-                Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .clickable(onClick = onClick)
-                        .padding(6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            id = if (isPlaying) R.drawable.encore_icon_pause_24 else R.drawable.encore_icon_play_24
-                        ),
-                        contentDescription = "Play",
-                        tint = Color.Black,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
+            // Right: Primary Play Button (32dp solid white circle with pure black play triangle)
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(
+                        id = if (isPlaying) R.drawable.encore_icon_pause_24 else R.drawable.encore_icon_play_24
+                    ),
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = Color.Black,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }
@@ -813,28 +926,6 @@ private fun PodcastEpisodeRow(
 @Composable
 fun PreviewSpotifyPodcastScreen() {
     SpotifyEncoreTheme {
-        SpotifyPodcastScreen(
-            showTitle = "The Joe Rogan Experience",
-            publisherName = "Joe Rogan",
-            rating = "4.9 (1.2M)",
-            category = "Comedy & Interviews",
-            coverColor = Color(0xFF1E3A8A),
-            episodes = listOf(
-                PodcastEpisode(
-                    id = "1",
-                    title = "#2210 - Brian Simpson",
-                    description = "Brian Simpson is a stand-up comedian and host of the 'BS with Brian Simpson' podcast. His special 'Live from the Mothership' is streaming on Netflix.",
-                    releaseDate = "Yesterday",
-                    duration = "2 hr 46 min"
-                ),
-                PodcastEpisode(
-                    id = "2",
-                    title = "#2209 - Lex Fridman",
-                    description = "Lex Fridman is an AI researcher at MIT and host of the Lex Fridman Podcast.",
-                    releaseDate = "3 days ago",
-                    duration = "3 hr 12 min"
-                )
-            )
-        )
+        SpotifyPodcastScreen()
     }
 }

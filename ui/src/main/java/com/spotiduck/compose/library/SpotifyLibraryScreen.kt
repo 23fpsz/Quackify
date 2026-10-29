@@ -87,6 +87,7 @@ fun SpotifyLibraryScreen(
     onItemClick: (String, String) -> Unit,
     items: List<LibraryItem>? = null,
     onAlbumClick: (String, String) -> Unit = { _, _ -> },
+    onPodcastClick: (String, String) -> Unit = { _, _ -> },
     onArtistClick: (String) -> Unit = {},
     onProfileClick: () -> Unit = {},
     onPlusClick: () -> Unit = {},
@@ -461,6 +462,7 @@ fun SpotifyLibraryScreen(
                             .clickable {
                                 when (item.type) {
                                     LibraryItemType.ALBUM -> onAlbumClick(item.title, "")
+                                    LibraryItemType.PODCAST -> onPodcastClick(item.title, item.subtitle)
                                     LibraryItemType.ARTIST -> onArtistClick(item.title)
                                     else -> onItemClick(item.title, item.uri)
                                 }
@@ -531,6 +533,7 @@ fun SpotifyLibraryScreen(
                             .clickable {
                                 when (item.type) {
                                     LibraryItemType.ALBUM -> onAlbumClick(item.title, "")
+                                    LibraryItemType.PODCAST -> onPodcastClick(item.title, item.subtitle)
                                     LibraryItemType.ARTIST -> onArtistClick(item.title)
                                     else -> onItemClick(item.title, item.uri)
                                 }
