@@ -315,8 +315,6 @@ fun SpotifyNowPlayingScreen(
                         .aspectRatio(1.0f)
                         .graphicsLayer {
                             translationX = artworkOffsetX.value
-                            rotationZ = (artworkOffsetX.value / 60f).coerceIn(-6f, 6f)
-                            alpha = 1f - (artworkOffsetX.value.absoluteValue / 1200f).coerceIn(0f, 0.4f)
                         }
                         .shadow(elevation = 20.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
                         .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
