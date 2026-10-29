@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -325,11 +326,12 @@ fun SpotifyNowPlayingScreen(
             }
             val hasSubtitle = albumOrPlaylistContext.isNotBlank() && !albumOrPlaylistContext.equals("Recommended for you", ignoreCase = true)
 
+            val isScrollEnabled = !effectiveIsLoading && effectiveLyricsVisible
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .verticalScroll(scrollState),
+                    .verticalScroll(state = scrollState, enabled = isScrollEnabled),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Top Navigation Bar (Collapse Chevron, Context Header, More Options)
@@ -824,6 +826,7 @@ fun SpotifyNowPlayingScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
+                        .defaultMinSize(minHeight = 360.dp) // Ensures only the lyrics card peeks through; other tabs remain below the fold!
                         .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
                         .background(dominantColor.copy(alpha = 0.65f))
                         .clickable { isLyricsFullscreen = true }
@@ -876,98 +879,99 @@ fun SpotifyNowPlayingScreen(
                 }
             }
 
+            // Other cards (e.g. About the Artist) only appear once loaded and accessible upon scrolling down
+            if (isScrollEnabled) {
+                Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
+                // "About the Artist" Card (16dp rounded corner, horizontal margin 16dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
+                        .background(EncoreColors.Card)
+                        .padding(EncoreSpacers.Looser)
+                ) {
+                    Column {
+                        // Header: Artist photo banner placeholder + Avatar
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFE8115B)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = artist.firstOrNull()?.uppercase() ?: "A",
+                                        style = SpotifyTheme.typography.titleMedium.copy(color = Color.White)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(EncoreSpacers.Tighter))
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = artist,
+                                            style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                        )
+                                        Spacer(modifier = Modifier.width(EncoreSpacers.Tighter4))
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.encore_icon_verified_check_active_24),
+                                            contentDescription = "Verified Artist",
+                                            tint = EncoreColors.Green,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = monthlyListeners,
+                                        style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                                    )
+                                }
+                            }
 
-            Spacer(modifier = Modifier.height(EncoreSpacers.Base))
-
-            // "About the Artist" Card (16dp rounded corner, horizontal margin 16dp)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
-                    .background(EncoreColors.Card)
-                    .padding(EncoreSpacers.Looser)
-            ) {
-                Column {
-                    // Header: Artist photo banner placeholder + Avatar
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Follow Button (Encore 999dp pill)
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFE8115B)),
+                                    .clip(RoundedCornerShape(EncoreCornerRadii.FollowPill))
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isFollowingArtist) EncoreColors.Green else EncoreColors.TextSecondary,
+                                        shape = RoundedCornerShape(EncoreCornerRadii.FollowPill)
+                                    )
+                                    .clickable { isFollowingArtist = !isFollowingArtist }
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = artist.firstOrNull()?.uppercase() ?: "A",
-                                    style = SpotifyTheme.typography.titleMedium.copy(color = Color.White)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(EncoreSpacers.Tighter))
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = artist,
-                                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                    text = if (isFollowingArtist) "Following" else "Follow",
+                                    style = SpotifyTheme.typography.bodySmallBold.copy(
+                                        color = if (isFollowingArtist) EncoreColors.Green else EncoreColors.TextPrimary
                                     )
-                                    Spacer(modifier = Modifier.width(EncoreSpacers.Tighter4))
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.encore_icon_verified_check_active_24),
-                                        contentDescription = "Verified Artist",
-                                        tint = EncoreColors.Green,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Text(
-                                    text = monthlyListeners,
-                                    style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                                 )
                             }
                         }
 
-                        // Follow Button (Encore 999dp pill)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(EncoreCornerRadii.FollowPill))
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isFollowingArtist) EncoreColors.Green else EncoreColors.TextSecondary,
-                                    shape = RoundedCornerShape(EncoreCornerRadii.FollowPill)
-                                )
-                                .clickable { isFollowingArtist = !isFollowingArtist }
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (isFollowingArtist) "Following" else "Follow",
-                                style = SpotifyTheme.typography.bodySmallBold.copy(
-                                    color = if (isFollowingArtist) EncoreColors.Green else EncoreColors.TextPrimary
-                                )
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Text(
+                            text = artistBio,
+                            style = SpotifyTheme.typography.bodySmall.copy(
+                                color = EncoreColors.TextSecondary,
+                                lineHeight = 18.sp
+                            ),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Text(
-                        text = artistBio,
-                        style = SpotifyTheme.typography.bodySmall.copy(
-                            color = EncoreColors.TextSecondary,
-                            lineHeight = 18.sp
-                        ),
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(48.dp))
+            }
         }
         }
 
