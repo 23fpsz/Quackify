@@ -1,8 +1,16 @@
 package com.spotiduck.compose.player
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -30,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -55,16 +64,35 @@ fun SpotifySeekBar(
     modifier: Modifier = Modifier,
     activeColor: Color = Color.White,
     inactiveColor: Color = Color.White.copy(alpha = 0.30f),
-    bufferProgress: Float = 0f
+    bufferProgress: Float = 0f,
+    isLoading: Boolean = false
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragProgress by remember(progress) { mutableFloatStateOf(progress) }
 
-    val displayProgress = if (isDragging) dragProgress else progress.coerceIn(0f, 1f)
+    // Smooth continuous progress interpolation between periodic player ticks (120fps / 60fps)
+    val smoothProgress by animateFloatAsState(
+        targetValue = if (isDragging) dragProgress else progress.coerceIn(0f, 1f),
+        animationSpec = if (isDragging) snap() else tween(durationMillis = 250, easing = LinearEasing),
+        label = "smoothProgress"
+    )
+    val displayProgress = if (isDragging) dragProgress else smoothProgress
 
-    // Thumb size: 4dp resting, 12dp when user is scrubbing
+    // Infinite pulse transition for song loading wave travelling from progress thumb towards the right
+    val infiniteTransition = rememberInfiniteTransition(label = "seekbarLoadingTransition")
+    val pulsePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulsePhase"
+    )
+
+    // Thumb size: 8dp resting (crisp and visible matching Spotify), 12dp when user is scrubbing
     val thumbDotSize by animateDpAsState(
-        targetValue = if (isDragging) 12.dp else 4.dp,
+        targetValue = if (isDragging) 12.dp else 8.dp,
         animationSpec = spring(stiffness = 600f),
         label = "thumbDotSize"
     )
@@ -72,17 +100,18 @@ fun SpotifySeekBar(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(32.dp), // 32dp touch area matching seekbar_thumb_default.xml
+            .height(24.dp), // 24dp touch area ensuring 10dp vertical alignment to timestamps
         contentAlignment = Alignment.CenterStart
     ) {
         val density = LocalDensity.current
         val widthPx = constraints.maxWidth.toFloat()
+        val thumbOffsetPx = (displayProgress * widthPx).coerceIn(0f, widthPx)
 
         // Drag & Tap Pointer Input
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(32.dp)
+                .height(24.dp)
                 .pointerInput(widthPx) {
                     detectTapGestures(
                         onPress = { offset ->
@@ -117,32 +146,57 @@ fun SpotifySeekBar(
                 },
             contentAlignment = Alignment.CenterStart
         ) {
-            // Track Background (3dp height, 1.5dp corner radius, 30% opacity white)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(1.5.dp))
-                    .background(inactiveColor)
-            )
+            // Track Background (4dp height, 2dp corner radius, 30% opacity white)
+            // When isLoading is true, an animated light pulse sweeps outward from the thumb across the track
+            if (isLoading) {
+                val remainingTrack = (widthPx - thumbOffsetPx).coerceAtLeast(1f)
+                val waveLengthPx = (remainingTrack * 0.40f).coerceIn(60f, 240f)
+                val waveCenterPx = thumbOffsetPx + (remainingTrack + waveLengthPx) * pulsePhase - (waveLengthPx / 2f)
+
+                val pulseBrush = Brush.horizontalGradient(
+                    colorStops = arrayOf(
+                        0.0f to inactiveColor,
+                        ((waveCenterPx - waveLengthPx) / widthPx).coerceIn(0f, 1f) to inactiveColor,
+                        (waveCenterPx / widthPx).coerceIn(0f, 1f) to Color.White.copy(alpha = 0.95f),
+                        ((waveCenterPx + waveLengthPx) / widthPx).coerceIn(0f, 1f) to inactiveColor,
+                        1.0f to inactiveColor
+                    )
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(pulseBrush)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(inactiveColor)
+                )
+            }
 
             // Buffer Progress (if any, 50% opacity white)
             if (bufferProgress > 0f) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(bufferProgress.coerceIn(0f, 1f))
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(1.5.dp))
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
                         .background(Color.White.copy(alpha = 0.50f))
                 )
             }
 
-            // Active Track Progress (100% solid white, 3dp height)
+            // Active Track Progress (100% solid white, 4dp height)
             Box(
                 modifier = Modifier
                     .fillMaxWidth(displayProgress)
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(1.5.dp))
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
                     .background(if (isDragging) EncoreColors.Green else activeColor)
             )
 

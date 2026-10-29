@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,7 +66,8 @@ fun EncorePlayButton(
     iconSize: Dp = 26.dp,
     backgroundColor: Color = EncoreColors.Green,
     iconColor: Color = EncoreColors.PureBlack,
-    showShuffleBadge: Boolean = false
+    showShuffleBadge: Boolean = false,
+    isLoading: Boolean = false
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -91,18 +94,27 @@ fun EncorePlayButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        val iconRes = if (isPlaying) R.drawable.encore_icon_pause_24 else R.drawable.encore_icon_play_24
-        Crossfade(
-            targetState = iconRes,
-            animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
-            label = "playPauseCrossfade"
-        ) { targetIcon ->
-            Icon(
-                painter = painterResource(id = targetIcon),
-                contentDescription = if (isPlaying) "Pause" else "Play",
-                tint = iconColor,
-                modifier = Modifier.size(iconSize)
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(iconSize),
+                color = iconColor,
+                strokeWidth = 2.5.dp,
+                strokeCap = StrokeCap.Round
             )
+        } else {
+            val iconRes = if (isPlaying) R.drawable.encore_icon_pause_24 else R.drawable.encore_icon_play_24
+            Crossfade(
+                targetState = iconRes,
+                animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                label = "playPauseCrossfade"
+            ) { targetIcon ->
+                Icon(
+                    painter = painterResource(id = targetIcon),
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = iconColor,
+                    modifier = Modifier.size(iconSize)
+                )
+            }
         }
 
         // Shuffle badge at bottom-right corner (matches encore_play_button_badge_size 11dp)
