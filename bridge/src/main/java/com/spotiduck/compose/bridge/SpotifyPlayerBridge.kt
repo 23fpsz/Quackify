@@ -162,7 +162,11 @@ class SpotifyPlayerBridge(
             libraryResult.onSuccess { entities ->
                 if (entities.isNotEmpty()) {
                     // 1. Map to Library Items
-                    _libraryItems.value = entities.map { it.toLibraryItem() }
+                    val items = entities.map { it.toLibraryItem() }.toMutableList()
+                    if (items.none { it.type == LibraryItemType.PODCAST }) {
+                        items.add(LibraryItem("Figuring Out with Raj Shamani", "Podcast • Raj Shamani", LibraryItemType.PODCAST, imageUrl = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552"))
+                    }
+                    _libraryItems.value = items
 
                     // 2. Map top items to Quick Access tiles
                     _quickAccessItems.value = entities.take(8).mapIndexed { index, entity ->

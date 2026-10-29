@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
     private val sampleLibraryItems = listOf(
         LibraryItem("Liked Songs", "Playlist • 1,234 songs", LibraryItemType.PLAYLIST, isPinned = true),
+        LibraryItem("Figuring Out with Raj Shamani", "Podcast • Raj Shamani", LibraryItemType.PODCAST, imageUrl = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552"),
         LibraryItem("Jab We Met", "Album • Pritam", LibraryItemType.ALBUM, imageUrl = "https://i.scdn.co/image/ab67616d0000b27352fe6875028c892308ffc2f7"),
         LibraryItem("The Weeknd", "Artist", LibraryItemType.ARTIST, imageUrl = "https://i.scdn.co/image/ab6761610000e5eb968a3770e060cf56306e9f1a"),
         LibraryItem("After Hours", "Album • The Weeknd", LibraryItemType.ALBUM, imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),

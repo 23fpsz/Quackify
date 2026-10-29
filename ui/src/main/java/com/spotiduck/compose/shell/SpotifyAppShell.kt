@@ -65,6 +65,7 @@ import com.spotiduck.compose.screens.NotificationsScreen
 import com.spotiduck.compose.screens.PopularTrack
 import com.spotiduck.compose.screens.SettingsScreen
 import com.spotiduck.compose.screens.SpotifyAlbumScreen
+import com.spotiduck.compose.screens.SpotifyPodcastScreen
 import com.spotiduck.compose.screens.SpotifyArtistScreen
 import com.spotiduck.compose.screens.SpotifyCategoryScreen
 import com.spotiduck.compose.screens.getCategoryColor
@@ -96,7 +97,8 @@ enum class ShellScreen {
     CATEGORY,
     SETTINGS,
     NOTIFICATIONS,
-    HISTORY
+    HISTORY,
+    PODCAST
 }
 
 data class NavItem(
@@ -115,7 +117,10 @@ data class BackStackItem(
     val albumArtist: String = "",
     val albumCoverUrl: String? = null,
     val artistName: String = "",
-    val artistAvatarUrl: String? = null
+    val artistAvatarUrl: String? = null,
+    val podcastTitle: String = "",
+    val podcastCreator: String = "",
+    val podcastCoverUrl: String? = null
 )
 
 data class ComposePlaybackState(
@@ -197,6 +202,9 @@ fun SpotifyAppShell(
     var activeArtistAvatarUrl by remember { mutableStateOf<String?>("https://i.scdn.co/image/ab6761610000e5eb968a3770e060cf56306e9f1a") }
     var activeCategoryTitle by remember { mutableStateOf("Pop") }
     var activeCategoryColor by remember { mutableStateOf(Color(0xFF148A08)) }
+    var activePodcastTitle by remember { mutableStateOf("Figuring Out with Raj Shamani") }
+    var activePodcastCreator by remember { mutableStateOf("Raj Shamani") }
+    var activePodcastCoverUrl by remember { mutableStateOf<String?>("https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552") }
 
     // Bottom Sheet States
     var isProfileDrawerOpen by remember { mutableStateOf(false) }
@@ -233,7 +241,10 @@ fun SpotifyAppShell(
                 albumArtist = activeAlbumArtist,
                 albumCoverUrl = activeAlbumCoverUrl,
                 artistName = activeArtistName,
-                artistAvatarUrl = activeArtistAvatarUrl
+                artistAvatarUrl = activeArtistAvatarUrl,
+                podcastTitle = activePodcastTitle,
+                podcastCreator = activePodcastCreator,
+                podcastCoverUrl = activePodcastCoverUrl
             )
         )
     }
@@ -255,6 +266,11 @@ fun SpotifyAppShell(
                 activeAlbumTitle = previous.albumTitle
                 activeAlbumArtist = previous.albumArtist
                 if (previous.albumCoverUrl != null) activeAlbumCoverUrl = previous.albumCoverUrl
+            }
+            if (previous.podcastTitle.isNotEmpty()) {
+                activePodcastTitle = previous.podcastTitle
+                activePodcastCreator = previous.podcastCreator
+                if (previous.podcastCoverUrl != null) activePodcastCoverUrl = previous.podcastCoverUrl
             }
             if (previous.artistName.isNotEmpty()) {
                 activeArtistName = previous.artistName
@@ -437,6 +453,14 @@ fun SpotifyAppShell(
 
         pushCurrentState()
         currentScreen = ShellScreen.ALBUM
+    }
+
+    val openPodcast: (String, String, String?) -> Unit = { title, creator, coverUrl ->
+        pushCurrentState()
+        activePodcastTitle = title
+        activePodcastCreator = creator
+        if (coverUrl != null) activePodcastCoverUrl = coverUrl
+        currentScreen = ShellScreen.PODCAST
     }
 
     val openArtist: (String, String?) -> Unit = { artist, imageUrl ->
@@ -659,6 +683,10 @@ fun SpotifyAppShell(
                         }
                     },
                     onAlbumClick = { title, artist -> openAlbum(title, artist) },
+                    onPodcastClick = { title, creator ->
+                        val foundItem = libraryItems?.find { it.title == title }
+                        openPodcast(title, creator.removePrefix("Podcast • "), foundItem?.imageUrl)
+                    },
                     onArtistClick = { artist -> openArtist(artist, null) },
                     items = libraryItems,
                     userDisplayName = userDisplayName,
@@ -929,6 +957,28 @@ fun SpotifyAppShell(
                         isTrackOptionsOpen = true
                     },
                     currentTrackTitle = currentTrackTitle,
+                    isPlaying = isPlaying
+                )
+            }
+            ShellScreen.PODCAST -> {
+                SpotifyPodcastScreen(
+                    showTitle = activePodcastTitle.ifEmpty { "Figuring Out with Raj Shamani" },
+                    publisherName = activePodcastCreator.ifEmpty { "Raj Shamani" },
+                    coverUrl = activePodcastCoverUrl ?: "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552",
+                    onBackClick = handleBack,
+                    onPlayPauseClick = {
+                        if (playerListener != null) playerListener.onPlayPause() else localIsPlaying = !localIsPlaying
+                    },
+                    onEpisodeSelect = { ep ->
+                        if (playerListener != null) {
+                            playerListener.onTrackSelect(ep.title, activePodcastCreator.ifEmpty { "Raj Shamani" })
+                        } else {
+                            localTrackTitle = ep.title
+                            localArtist = activePodcastCreator.ifEmpty { "Raj Shamani" }
+                            localIsPlaying = true
+                        }
+                    },
+                    currentEpisodeId = "",
                     isPlaying = isPlaying
                 )
             }
