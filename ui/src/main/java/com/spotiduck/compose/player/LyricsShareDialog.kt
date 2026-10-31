@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -96,6 +99,9 @@ fun LyricsShareDialog(
         else -> TextAlign.End
     }
 
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -147,240 +153,360 @@ fun LyricsShareDialog(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Card Preview Area (Instagram Stories format 9:16 aspect or compact rounded card)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .shadow(elevation = 16.dp, shape = RoundedCornerShape(16.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                selectedColor,
-                                selectedColor.copy(alpha = 0.85f),
-                                Color(0xFF101010)
-                            )
-                        )
-                    )
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = when (textAlignIndex) {
-                        0 -> Alignment.Start
-                        1 -> Alignment.CenterHorizontally
-                        else -> Alignment.End
-                    }
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
                 ) {
-                    // Selected Lyric Lines
-                    if (selectedIndices.isEmpty()) {
-                        Text(
-                            text = "Tap up to 5 lines below to share",
-                            style = SpotifyTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.6f)),
-                            textAlign = textAlign
-                        )
-                    } else {
-                        selectedIndices.sorted().forEach { idx ->
-                            Text(
-                                text = lyrics[idx].text,
-                                style = SpotifyTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 20.sp,
-                                    lineHeight = 28.sp,
-                                    color = Color.White
-                                ),
-                                textAlign = textAlign,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            )
-                        }
-                    }
+                    ShareCardPreview(
+                        title = title,
+                        artist = artist,
+                        lyrics = lyrics,
+                        selectedIndices = selectedIndices,
+                        selectedColor = selectedColor,
+                        textAlign = textAlign,
+                        textAlignIndex = textAlignIndex,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    )
 
-                    Spacer(modifier = Modifier.height(28.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
 
-                    // Song Info + Spotify Watermark Footer
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .width(300.dp)
+                            .fillMaxHeight()
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = title,
-                                style = SpotifyTheme.typography.bodySmallBold.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = artist,
-                                style = SpotifyTheme.typography.marginal.copy(
-                                    color = Color.White.copy(alpha = 0.7f)
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                        ShareFormatControls(
+                            textAlignIndex = textAlignIndex,
+                            onCycleAlignment = { textAlignIndex = (textAlignIndex + 1) % 3 },
+                            palette = palette,
+                            selectedColor = selectedColor,
+                            onSelectColor = { selectedColor = it },
+                            selectedCount = selectedIndices.size
+                        )
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(EncoreColors.PureBlack),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "♫",
-                                    fontSize = 11.sp,
-                                    color = EncoreColors.Green,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Spotify",
-                                style = SpotifyTheme.typography.bodySmallBold.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp,
-                                    color = Color.White
-                                )
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        ShareLineSelector(
+                            lyrics = lyrics,
+                            selectedIndices = selectedIndices,
+                            selectedColor = selectedColor,
+                            onToggleLine = { idx ->
+                                if (selectedIndices.contains(idx)) {
+                                    selectedIndices.remove(idx)
+                                } else if (selectedIndices.size < 5) {
+                                    selectedIndices.add(idx)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        )
                     }
+                }
+            } else {
+                ShareCardPreview(
+                    title = title,
+                    artist = artist,
+                    lyrics = lyrics,
+                    selectedIndices = selectedIndices,
+                    selectedColor = selectedColor,
+                    textAlign = textAlign,
+                    textAlignIndex = textAlignIndex,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                ShareFormatControls(
+                    textAlignIndex = textAlignIndex,
+                    onCycleAlignment = { textAlignIndex = (textAlignIndex + 1) % 3 },
+                    palette = palette,
+                    selectedColor = selectedColor,
+                    onSelectColor = { selectedColor = it },
+                    selectedCount = selectedIndices.size
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                ShareLineSelector(
+                    lyrics = lyrics,
+                    selectedIndices = selectedIndices,
+                    selectedColor = selectedColor,
+                    onToggleLine = { idx ->
+                        if (selectedIndices.contains(idx)) {
+                            selectedIndices.remove(idx)
+                        } else if (selectedIndices.size < 5) {
+                            selectedIndices.add(idx)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShareCardPreview(
+    title: String,
+    artist: String,
+    lyrics: List<TimeSyncedLyric>,
+    selectedIndices: List<Int>,
+    selectedColor: Color,
+    textAlign: TextAlign,
+    textAlignIndex: Int,
+    modifier: Modifier = Modifier
+) {
+    // Card Preview Area (Instagram Stories format 9:16 aspect or compact rounded card)
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .shadow(elevation = 16.dp, shape = RoundedCornerShape(16.dp))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        selectedColor,
+                        selectedColor.copy(alpha = 0.85f),
+                        Color(0xFF101010)
+                    )
+                )
+            )
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = when (textAlignIndex) {
+                0 -> Alignment.Start
+                1 -> Alignment.CenterHorizontally
+                else -> Alignment.End
+            }
+        ) {
+            // Selected Lyric Lines
+            if (selectedIndices.isEmpty()) {
+                Text(
+                    text = "Tap up to 5 lines to share",
+                    style = SpotifyTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.6f)),
+                    textAlign = textAlign
+                )
+            } else {
+                selectedIndices.sorted().forEach { idx ->
+                    Text(
+                        text = lyrics[idx].text,
+                        style = SpotifyTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 20.sp,
+                            lineHeight = 28.sp,
+                            color = Color.White
+                        ),
+                        textAlign = textAlign,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
-            // Formatting Controls (Alignment toggle + Color Palette)
+            // Song Info + Spotify Watermark Footer
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Text Alignment Toggle Button
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF282828))
-                        .clickable { textAlignIndex = (textAlignIndex + 1) % 3 }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = when (textAlignIndex) {
-                            0 -> "Align: Left"
-                            1 -> "Align: Center"
-                            else -> "Align: Right"
-                        },
+                        text = title,
+                        style = SpotifyTheme.typography.bodySmallBold.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = artist,
                         style = SpotifyTheme.typography.marginal.copy(
-                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White.copy(alpha = 0.7f)
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(EncoreColors.PureBlack),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "♫",
+                            fontSize = 11.sp,
+                            color = EncoreColors.Green,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Spotify",
+                        style = SpotifyTheme.typography.bodySmallBold.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
                             color = Color.White
                         )
                     )
                 }
+            }
+        }
+    }
+}
 
-                // Color Swatches
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    palette.forEach { color ->
-                        val isSelected = color == selectedColor
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .border(
-                                    width = if (isSelected) 2.dp else 0.dp,
-                                    color = Color.White,
-                                    shape = CircleShape
-                                )
-                                .clickable { selectedColor = color }
-                        )
-                    }
-                }
+@Composable
+private fun ShareFormatControls(
+    textAlignIndex: Int,
+    onCycleAlignment: () -> Unit,
+    palette: List<Color>,
+    selectedColor: Color,
+    onSelectColor: (Color) -> Unit,
+    selectedCount: Int
+) {
+    Column {
+        // Formatting Controls (Alignment toggle + Color Palette)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Text Alignment Toggle Button
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF282828))
+                    .clickable(onClick = onCycleAlignment)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = when (textAlignIndex) {
+                        0 -> "Align: Left"
+                        1 -> "Align: Center"
+                        else -> "Align: Right"
+                    },
+                    style = SpotifyTheme.typography.marginal.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // Color Swatches
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                palette.forEach { color ->
+                    val isSelected = color == selectedColor
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .border(
+                                width = if (isSelected) 2.dp else 0.dp,
+                                color = Color.White,
+                                shape = CircleShape
+                            )
+                            .clickable { onSelectColor(color) }
+                    )
+                }
+            }
+        }
 
-            // Line selector hint
-            Text(
-                text = "Select up to 5 lines (${selectedIndices.size}/5)",
-                style = SpotifyTheme.typography.marginal.copy(
-                    fontWeight = FontWeight.Medium,
-                    color = EncoreColors.TextSecondary
-                ),
-                modifier = Modifier.padding(bottom = 6.dp)
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Line selector hint
+        Text(
+            text = "Select up to 5 lines ($selectedCount/5)",
+            style = SpotifyTheme.typography.marginal.copy(
+                fontWeight = FontWeight.Medium,
+                color = EncoreColors.TextSecondary
             )
+        )
+    }
+}
 
-            // Selectable Lyrics List
-            LazyColumn(
+@Composable
+private fun ShareLineSelector(
+    lyrics: List<TimeSyncedLyric>,
+    selectedIndices: List<Int>,
+    selectedColor: Color,
+    onToggleLine: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Selectable Lyrics List
+    LazyColumn(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF1E1E1E))
+            .padding(8.dp)
+    ) {
+        itemsIndexed(lyrics) { idx, line ->
+            val isChecked = selectedIndices.contains(idx)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1E1E1E))
-                    .padding(8.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isChecked) selectedColor.copy(alpha = 0.35f) else Color.Transparent)
+                    .clickable { onToggleLine(idx) }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                itemsIndexed(lyrics) { idx, line ->
-                    val isChecked = selectedIndices.contains(idx)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (isChecked) selectedColor.copy(alpha = 0.35f) else Color.Transparent)
-                            .clickable {
-                                if (isChecked) {
-                                    selectedIndices.remove(idx)
-                                } else if (selectedIndices.size < 5) {
-                                    selectedIndices.add(idx)
-                                }
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clip(CircleShape)
-                                .border(
-                                    width = 1.5.dp,
-                                    color = if (isChecked) selectedColor else Color.Gray,
-                                    shape = CircleShape
-                                )
-                                .background(if (isChecked) selectedColor else Color.Transparent),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isChecked) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.encore_icon_check_24),
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Text(
-                            text = line.text,
-                            style = SpotifyTheme.typography.bodySmall.copy(
-                                fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isChecked) Color.White else Color.White.copy(alpha = 0.7f)
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .border(
+                            width = 1.5.dp,
+                            color = if (isChecked) selectedColor else Color.Gray,
+                            shape = CircleShape
+                        )
+                        .background(if (isChecked) selectedColor else Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isChecked) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_check_24),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Text(
+                    text = line.text,
+                    style = SpotifyTheme.typography.bodySmall.copy(
+                        fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isChecked) Color.White else Color.White.copy(alpha = 0.7f)
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
