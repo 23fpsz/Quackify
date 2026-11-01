@@ -1,5 +1,6 @@
 package com.spotiduck.compose.player
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -45,8 +47,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.spotiduck.compose.R
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.theme.EncoreColors
@@ -67,7 +67,8 @@ fun LyricsShareDialog(
     lyrics: List<TimeSyncedLyric>,
     initialDominantColor: Color,
     onDismiss: () -> Unit,
-    onShareConfirm: (List<String>, Color, TextAlign) -> Unit
+    onShareConfirm: (List<String>, Color, TextAlign) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     // Selectable lines (max 5 lines matching Spotify)
     val selectedIndices = remember {
@@ -102,112 +103,62 @@ fun LyricsShareDialog(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    BackHandler(onBack = onDismiss)
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFF121212))
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF121212))
-                .statusBarsPadding()
-                .padding(16.dp)
+        // Header Bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Header Bar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                EncoreIconButton(
-                    iconRes = R.drawable.encore_icon_x_24,
-                    contentDescription = "Close",
-                    onClick = onDismiss,
-                    tint = Color.White
-                )
+            EncoreIconButton(
+                iconRes = R.drawable.encore_icon_x_24,
+                contentDescription = "Close",
+                onClick = onDismiss,
+                tint = Color.White
+            )
 
-                Text(
-                    text = "Share lyrics",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                )
+            Text(
+                text = "Share lyrics",
+                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+            )
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(EncoreColors.Green)
-                        .clickable {
-                            val selectedLines = selectedIndices.sorted().map { lyrics[it].text }
-                            onShareConfirm(selectedLines, selectedColor, textAlign)
-                        }
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "Share",
-                        style = SpotifyTheme.typography.bodySmallBold.copy(
-                            color = EncoreColors.PureBlack,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (isLandscape) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    ShareCardPreview(
-                        title = title,
-                        artist = artist,
-                        lyrics = lyrics,
-                        selectedIndices = selectedIndices,
-                        selectedColor = selectedColor,
-                        textAlign = textAlign,
-                        textAlignIndex = textAlignIndex,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    )
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(
-                        modifier = Modifier
-                            .width(300.dp)
-                            .fillMaxHeight()
-                    ) {
-                        ShareFormatControls(
-                            textAlignIndex = textAlignIndex,
-                            onCycleAlignment = { textAlignIndex = (textAlignIndex + 1) % 3 },
-                            palette = palette,
-                            selectedColor = selectedColor,
-                            onSelectColor = { selectedColor = it },
-                            selectedCount = selectedIndices.size
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        ShareLineSelector(
-                            lyrics = lyrics,
-                            selectedIndices = selectedIndices,
-                            selectedColor = selectedColor,
-                            onToggleLine = { idx ->
-                                if (selectedIndices.contains(idx)) {
-                                    selectedIndices.remove(idx)
-                                } else if (selectedIndices.size < 5) {
-                                    selectedIndices.add(idx)
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                        )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(EncoreColors.Green)
+                    .clickable {
+                        val selectedLines = selectedIndices.sorted().map { lyrics[it].text }
+                        onShareConfirm(selectedLines, selectedColor, textAlign)
                     }
-                }
-            } else {
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Share",
+                    style = SpotifyTheme.typography.bodySmallBold.copy(
+                        color = EncoreColors.PureBlack,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
                 ShareCardPreview(
                     title = title,
                     artist = artist,
@@ -217,39 +168,87 @@ fun LyricsShareDialog(
                     textAlign = textAlign,
                     textAlignIndex = textAlignIndex,
                     modifier = Modifier
-                        .fillMaxWidth()
                         .weight(1f)
+                        .fillMaxHeight()
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
-                ShareFormatControls(
-                    textAlignIndex = textAlignIndex,
-                    onCycleAlignment = { textAlignIndex = (textAlignIndex + 1) % 3 },
-                    palette = palette,
-                    selectedColor = selectedColor,
-                    onSelectColor = { selectedColor = it },
-                    selectedCount = selectedIndices.size
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                ShareLineSelector(
-                    lyrics = lyrics,
-                    selectedIndices = selectedIndices,
-                    selectedColor = selectedColor,
-                    onToggleLine = { idx ->
-                        if (selectedIndices.contains(idx)) {
-                            selectedIndices.remove(idx)
-                        } else if (selectedIndices.size < 5) {
-                            selectedIndices.add(idx)
-                        }
-                    },
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                )
+                        .width(300.dp)
+                        .fillMaxHeight()
+                ) {
+                    ShareFormatControls(
+                        textAlignIndex = textAlignIndex,
+                        onCycleAlignment = { textAlignIndex = (textAlignIndex + 1) % 3 },
+                        palette = palette,
+                        selectedColor = selectedColor,
+                        onSelectColor = { selectedColor = it },
+                        selectedCount = selectedIndices.size
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    ShareLineSelector(
+                        lyrics = lyrics,
+                        selectedIndices = selectedIndices,
+                        selectedColor = selectedColor,
+                        onToggleLine = { idx ->
+                            if (selectedIndices.contains(idx)) {
+                                selectedIndices.remove(idx)
+                            } else if (selectedIndices.size < 5) {
+                                selectedIndices.add(idx)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    )
+                }
             }
+        } else {
+            ShareCardPreview(
+                title = title,
+                artist = artist,
+                lyrics = lyrics,
+                selectedIndices = selectedIndices,
+                selectedColor = selectedColor,
+                textAlign = textAlign,
+                textAlignIndex = textAlignIndex,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            ShareFormatControls(
+                textAlignIndex = textAlignIndex,
+                onCycleAlignment = { textAlignIndex = (textAlignIndex + 1) % 3 },
+                palette = palette,
+                selectedColor = selectedColor,
+                onSelectColor = { selectedColor = it },
+                selectedCount = selectedIndices.size
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ShareLineSelector(
+                lyrics = lyrics,
+                selectedIndices = selectedIndices,
+                selectedColor = selectedColor,
+                onToggleLine = { idx ->
+                    if (selectedIndices.contains(idx)) {
+                        selectedIndices.remove(idx)
+                    } else if (selectedIndices.size < 5) {
+                        selectedIndices.add(idx)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+            )
         }
     }
 }
