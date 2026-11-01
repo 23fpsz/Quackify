@@ -554,7 +554,17 @@ fun SpotifyNowPlayingScreen(
         }
 
         // Lyrics Share Card Modal
-        if (isLyricsShareOpen) {
+        AnimatedVisibility(
+            visible = isLyricsShareOpen,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(durationMillis = 280)
+            ),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(durationMillis = 220)
+            )
+        ) {
             LyricsShareDialog(
                 title = title,
                 artist = artist,
