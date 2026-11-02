@@ -10,16 +10,20 @@ The project is structured into fully decoupled modules adhering to strict separa
 
 ```text
 SpotiDuck-Compose/
-├── ui/       # Pure Jetpack Compose UI library (Encore design system, screens, theme, zero audio/networking dependencies)
-├── engine/   # Headless Spotify DRM & streaming playback engine (WebSocket dealer, Pathfinder, ExoPlayer Widevine DRM)
-├── bridge/   # Reactive StateFlow adapter binding :engine state to :ui composables
-└── sample/   # Complete runnable Android application integrating all modules
+├── ui/             # Pure Jetpack Compose UI library (Encore design system, screens, theme)
+├── app/            # Runnable Android application, wires the shell to the backend
+├── krespot-model/  # Shared data models
+├── krespot-core/   # net/, auth/, webview/, log/
+├── krespot-api/    # Stateless per-call surfaces
+├── krespot-library/ # Home, search, library, playlist, album, artist, podcasts
+├── krespot-connect/ # Dealer, registration, cluster, commands, state reports
+└── krespot-player/ # The engine: fMP4, CENC, Widevine, focus, seek
 ```
 
-- **`:ui`**: Pure Compose presentation layer. Implements Spotify's Encore design tokens, typography, and interactive components. Can be used as a standalone UI library in any project.
-- **`:engine`**: Headless backend client. Manages authentication, Spotify Connect dealer WebSocket session (`cast_audio` registration), Pathfinder GraphQL metadata queries, Akamai/Fastly CDN storage resolution, and Media3 ExoPlayer Widevine hardware decoding.
-- **`:bridge`**: Clean reactive glue layer. Maps native playback states, queue management, and playlist metadata into observable StateFlows consumed by `:ui`.
-- **`:sample`**: Example application demonstrating end-to-end integration and playback on physical Android devices.
+- **`:ui`**: Pure Compose presentation layer. Implements Spotify's Encore design tokens, typography, and interactive components. Reaches the data layer only through `Krespot`.
+- **`:app`**: The application. Owns `PlaybackBridge`, which reconciles the Connect cluster, the server commands and the engine into one `ComposePlaybackState`.
+- **`:krespot-connect`**: The Connect plane. Manages the dealer WebSocket, device registration, the cluster, the command family and the state reports.
+- **`:krespot-player`**: The playback plane. Owns the fMP4 parser, `MediaCodec`, Widevine and the audio sink. No Media3.
 
 ---
 
@@ -49,10 +53,10 @@ SpotiDuck-Compose/
   - **Mini Player**: 56dp floating bottom bar with track thumbnail, title, artist, Spotify Native Widevine indicator, and play/pause controls
   - **Full Now Playing Screen**: Swipe/tap to expand, ambient gradient backdrop, smooth seeking scrubber, repeat/shuffle controls, device picker, and time-synced lyrics card
 
-### 🎧 Native Audio Engine (`:engine`)
-- **Widevine L3/L1 Hardware DRM**: Streams encrypted MP4 AAC audio directly from Spotify's Akamai/Fastly CDN and decrypts via Google Media3 ExoPlayer and Spotify's Widevine license server.
-- **Spotify Connect Handshake**: Seamlessly connects to `wss://dealer.spotify.com`, registers device endpoints, and extracts internal file manifests for arbitrary library tracks.
-- **Continuous Queue Playback**: Automatic track advancement upon song completion and full skip forward/backward navigation.
+### 🎧 Native Audio Engine (`:krespot-player`)
+- **Widevine L1 Hardware DRM**: Streams encrypted fMP4 AAC audio directly from Spotify's CDN and decrypts through `MediaDrm` and `MediaCodec`. One session per pssh, no Media3.
+- **Spotify Connect Handshake**: Connects to the dealer WebSocket, registers the device on both services, and reads the cluster for the real queue and the device roster.
+- **Continuous Queue Playback**: Automatic track advancement on the server's new state machine, with forward and backward skip.
 
 ---
 
@@ -64,8 +68,8 @@ git clone https://github.com/23fpsz/SpotiDuck-Compose.git
 cd SpotiDuck-Compose
 ```
 
-### 2. Configure Authentication (Optional for authentic library & playback)
-Create `sample/src/main/assets/sp_dc.txt` and insert your Spotify `sp_dc` cookie value. (This file is ignored by `.gitignore` to prevent credential leaks).
+### 2. Configure Authentication
+The session comes from the login WebView. No asset file is needed.
 
 ### 3. Build & Run
 ```bash
@@ -76,7 +80,7 @@ Create `sample/src/main/assets/sp_dc.txt` and insert your Spotify `sp_dc` cookie
 ./gradlew installDebug
 ```
 
-Or open the root folder in **Android Studio**, select the `sample` configuration, and hit **Run** (`Shift + F10`).
+Or open the root folder in **Android Studio**, select the `app` configuration, and hit **Run** (`Shift + F10`).
 
 ---
 

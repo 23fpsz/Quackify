@@ -50,7 +50,10 @@ data class SpotifyNotification(
     val title: String,
     val subtitle: String,
     val timestamp: String,
-    val isMusic: Boolean = true
+    val isMusic: Boolean = true,
+    val id: String = "",
+    val isNew: Boolean = false,
+    val imageUrl: String = ""
 )
 
 /**
@@ -60,52 +63,20 @@ data class SpotifyNotification(
 fun NotificationsScreen(
     onBackClick: () -> Unit,
     onPlayClick: (String) -> Unit = {},
+    notifications: List<SpotifyNotification> = emptyList(),
+    loading: Boolean = false,
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedFilterIndex by remember { mutableIntStateOf(0) }
     val filters = listOf("All", "Music", "Podcasts & Shows")
     val bottomPadding = rememberBottomPadding()
 
-    val allNotifications = remember {
-        listOf(
-            SpotifyNotification(
-                title = "New Single: Dancing In The Flames",
-                subtitle = "The Weeknd • New release",
-                timestamp = "2h ago",
-                isMusic = true
-            ),
-            SpotifyNotification(
-                title = "Random Access Memories (10th Anniv.)",
-                subtitle = "Daft Punk • Album update",
-                timestamp = "1d ago",
-                isMusic = true
-            ),
-            SpotifyNotification(
-                title = "#2210 - Lex Fridman",
-                subtitle = "The Joe Rogan Experience • New episode",
-                timestamp = "2d ago",
-                isMusic = false
-            ),
-            SpotifyNotification(
-                title = "Your Release Radar has been updated",
-                subtitle = "30 new tracks from your followed artists",
-                timestamp = "3d ago",
-                isMusic = true
-            ),
-            SpotifyNotification(
-                title = "New Episode: Building Next-Gen Audio",
-                subtitle = "The Vergecast • 52 min",
-                timestamp = "4d ago",
-                isMusic = false
-            )
-        )
-    }
-
-    val filtered = remember(selectedFilterIndex) {
+    val filtered = remember(selectedFilterIndex, notifications) {
         when (selectedFilterIndex) {
-            1 -> allNotifications.filter { it.isMusic }
-            2 -> allNotifications.filter { !it.isMusic }
-            else -> allNotifications
+            1 -> notifications.filter { it.isMusic }
+            2 -> notifications.filter { !it.isMusic }
+            else -> notifications
         }
     }
 
