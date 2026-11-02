@@ -41,27 +41,13 @@ fun HistoryScreen(
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     currentTrackTitle: String = "",
+    currentTrackUri: String = "",
     isPlaying: Boolean = false,
+    todayTracks: List<TrackItem> = emptyList(),
+    yesterdayTracks: List<TrackItem> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val bottomPadding = rememberBottomPadding()
-    val todayTracks = remember {
-        listOf(
-            TrackItem("Starboy", "The Weeknd, Daft Punk", true),
-            TrackItem("Blinding Lights", "The Weeknd"),
-            TrackItem("Save Your Tears", "The Weeknd"),
-            TrackItem("Get Lucky", "Daft Punk, Pharrell Williams")
-        )
-    }
-
-    val yesterdayTracks = remember {
-        listOf(
-            TrackItem("Harder, Better, Faster, Stronger", "Daft Punk"),
-            TrackItem("Around the World", "Daft Punk"),
-            TrackItem("Die For You", "The Weeknd"),
-            TrackItem("One Of The Girls", "The Weeknd, JENNIE, Lily-Rose Depp", true)
-        )
-    }
 
     Column(
         modifier = modifier

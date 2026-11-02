@@ -150,10 +150,10 @@ fun SpotifyNowPlayingScreen(
     dominantColor: Color = Color(0xFF432371),
     coverUrl: String? = null,
     isLoading: Boolean = false,
-    monthlyListeners: String = "98,421,114 monthly listeners",
-    artistBio: String = "The Weeknd is a Canadian singer, songwriter, and record producer known for his sonic versatility and dark lyricism.",
-    lyricsSnippet: String = "I'm tryna put you in the worst mood, ah\nP1 cleaner than your church shoes, ah\nMilli point two just to hurt you, ah\nAll red Lamb' leanin' on you, ah",
-    lyrics: List<TimeSyncedLyric> = defaultLyricsList
+    monthlyListeners: String = "",
+    artistBio: String = "",
+    lyricsSnippet: String = "",
+    lyrics: List<TimeSyncedLyric> = emptyList()
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }

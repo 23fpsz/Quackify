@@ -106,77 +106,7 @@ fun SpotifyLibraryScreen(
     // Authentic Spotify Library filters (matching @string/your_library_content_filter_*)
     val filters = listOf("Playlists", "Podcasts", "Albums", "Artists", "Downloaded")
 
-    val allLibraryItems = remember(items) {
-        if (!items.isNullOrEmpty()) {
-            items
-        } else {
-            listOf(
-                LibraryItem(
-                    title = "Liked Songs",
-                    subtitle = "Playlist • 248 songs",
-                    type = LibraryItemType.PLAYLIST,
-                    isPinned = true,
-                    isDownloaded = true,
-                    uri = "spotify:collection:tracks",
-                    coverGradient = listOf(Color(0xFF450AF5), Color(0xFF8E8EE5), Color(0xFFC4EFD9))
-                ),
-            LibraryItem(
-                title = "Your Episodes",
-                subtitle = "Saved & downloaded episodes",
-                type = LibraryItemType.PODCAST,
-                isPinned = true,
-                isDownloaded = true,
-                coverGradient = listOf(Color(0xFF006450), Color(0xFF1DB954))
-            ),
-            LibraryItem(
-                title = "This Is The Weeknd",
-                subtitle = "Playlist • Spotify",
-                type = LibraryItemType.PLAYLIST,
-                isDownloaded = true,
-                coverGradient = listOf(Color(0xFFE8115B), Color(0xFF8D67AB))
-            ),
-            LibraryItem(
-                title = "Daily Mix 1",
-                subtitle = "Playlist • Made For You",
-                type = LibraryItemType.PLAYLIST,
-                coverGradient = listOf(Color(0xFF8D67AB), Color(0xFF1E3264))
-            ),
-            LibraryItem(
-                title = "Daft Punk",
-                subtitle = "Artist",
-                type = LibraryItemType.ARTIST,
-                coverGradient = listOf(Color(0xFF509BF5), Color(0xFF1E3264))
-            ),
-            LibraryItem(
-                title = "After Hours",
-                subtitle = "Album • The Weeknd",
-                type = LibraryItemType.ALBUM,
-                isDownloaded = true,
-                coverGradient = listOf(Color(0xFF901A1E), Color(0xFF121212))
-            ),
-            LibraryItem(
-                title = "The Joe Rogan Experience",
-                subtitle = "Podcast • Joe Rogan",
-                type = LibraryItemType.PODCAST,
-                coverGradient = listOf(Color(0xFFBA5D07), Color(0xFF121212))
-            ),
-            LibraryItem(
-                title = "Discover Weekly",
-                subtitle = "Playlist • Spotify",
-                type = LibraryItemType.PLAYLIST,
-                coverGradient = listOf(Color(0xFF1E3264), Color(0xFF2E77D0))
-            ),
-            LibraryItem(
-                title = "Rock Classics",
-                subtitle = "Playlist • Spotify",
-                type = LibraryItemType.PLAYLIST,
-                coverGradient = listOf(Color(0xFFBA5D07), Color(0xFFE91429))
-            )
-        )
-    }
-}
-
-    // Filter items based on selected chip and in-library search text
+    val allLibraryItems = remember(items) { items.orEmpty() }
     val filteredItems = remember(selectedFilter, searchFilterText, currentSort) {
         var result = allLibraryItems.filter { item ->
             val matchesFilter = when (selectedFilter) {

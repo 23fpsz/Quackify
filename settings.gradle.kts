@@ -19,11 +19,16 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven("https://jitpack.io")
     }
 }
 
 rootProject.name = "SpotiDuck-Compose"
 include(":ui")
-include(":engine")
-include(":bridge")
-include(":sample")
+include(":app")
+include(":krespot-model")
+include(":krespot-core")
+include(":krespot-api")
+include(":krespot-library")
+include(":krespot-connect")
+include(":krespot-player")

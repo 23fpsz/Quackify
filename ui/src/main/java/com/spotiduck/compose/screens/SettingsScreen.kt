@@ -19,52 +19,75 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.pm.PackageInfoCompat
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.spotiduck.compose.R
+import com.spotiduck.backend.core.auth.SpotifyAuth
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
 import com.spotiduck.compose.theme.SpotifyTheme
 import com.spotiduck.compose.theme.rememberBottomPadding
 
-/**
- * Spotify Settings and Privacy Screen matching Spotify's native preferences.
- */
+data class SettingsSwitches(
+    val musicVideos: Boolean = true,
+    val canvas: Boolean = true,
+    val otherVideos: Boolean = true,
+    val showFollows: Boolean = true,
+    val showPlaylists: Boolean = true,
+)
+
+data class SettingsLocks(
+    val musicVideos: Boolean = false,
+    val canvas: Boolean = false,
+    val otherVideos: Boolean = false,
+)
+
+// The switches this screen draws are the ones the server actually stores. Streaming quality, the
+// equalizer, compact library and the now-playing panel were removed: the first two are never
+// persisted by the web player, and the last two were only ever stored in the browser's localStorage,
+// so there is nothing behind them in this app.
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isComposeUiEnabled: Boolean = true,
-    onToggleComposeUi: (Boolean) -> Unit = {},
-    onOpenSpotiDuckSettings: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    switches: SettingsSwitches = SettingsSwitches(),
+    locks: SettingsLocks = SettingsLocks(),
+    product: String = "",
+    country: String = "",
+    loading: Boolean = false,
+    onToggleMusicVideos: (Boolean) -> Unit = {},
+    onToggleCanvas: (Boolean) -> Unit = {},
+    onToggleOtherVideos: (Boolean) -> Unit = {},
+    onToggleShowFollows: (Boolean) -> Unit = {},
+    onToggleShowPlaylists: (Boolean) -> Unit = {},
 ) {
-    var isDataSaver by remember { mutableStateOf(false) }
-    var isGapless by remember { mutableStateOf(true) }
-    var isAutomix by remember { mutableStateOf(true) }
-    var isCanvas by remember { mutableStateOf(true) }
-    var isNormalizeVolume by remember { mutableStateOf(true) }
-    var crossfadeSeconds by remember { mutableFloatStateOf(0f) }
     val bottomPadding = rememberBottomPadding()
+    val context = LocalContext.current
+    val account = remember { SpotifyAuth.account(context) }
+    val version = remember {
+        runCatching {
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            "${info.versionName.orEmpty()} (${PackageInfoCompat.getLongVersionCode(info)})"
+        }.getOrDefault("")
+    }
 
     Column(
         modifier = modifier
@@ -72,7 +95,6 @@ fun SettingsScreen(
             .background(EncoreColors.Background)
             .statusBarsPadding()
     ) {
-        // Sticky Header with Back Button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -96,56 +118,8 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomPadding)
         ) {
-            // Profile Summary Card
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE91429)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "D",
-                            style = SpotifyTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Duck User",
-                            style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Text(
-                            text = "View profile",
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(EncoreColors.Green.copy(alpha = 0.2f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "SpotiDuck Engine Active",
-                            style = SpotifyTheme.typography.bodySmallBold.copy(
-                                color = EncoreColors.Green,
-                                fontSize = 11.sp
-                            )
-                        )
-                    }
-                }
-
+                ProfileSummary(account)
                 HorizontalDivider(
                     color = EncoreColors.Card,
                     thickness = 1.dp,
@@ -153,171 +127,132 @@ fun SettingsScreen(
                 )
             }
 
-            // Section: Interface Mode
             item {
-                SettingsSectionHeader(title = "Interface Mode")
+                SettingsSectionHeader(title = "Videos and Canvas")
+                Text(
+                    text = "It may take some time for your experience to update.",
+                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
                 SettingsToggleRow(
-                    title = "Native Spotify Compose UI",
-                    subtitle = "Toggle off to switch to the Classic Web Player",
-                    isChecked = isComposeUiEnabled,
-                    onCheckedChange = { onToggleComposeUi(it) }
+                    title = "Music videos",
+                    subtitle = "When off, music videos and live performances play as audio-only.",
+                    isChecked = switches.musicVideos,
+                    enabled = !locks.musicVideos && !loading,
+                    onCheckedChange = onToggleMusicVideos
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenSpotiDuckSettings() }
-                        .padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "SpotiDuck Engine Settings",
-                            style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
-                        )
-                        Text(
-                            text = "Adblocker, Multi-account, Proxies & Auto-sleep",
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-                        )
-                    }
-                    Icon(
-                        painter = painterResource(id = R.drawable.encore_icon_chevron_right_24),
-                        contentDescription = null,
-                        tint = EncoreColors.TextSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                HorizontalDivider(
-                    color = EncoreColors.Card,
-                    thickness = 1.dp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-
-            // Section: Playback
-            item {
-                SettingsSectionHeader(title = "Playback")
-
-                // Crossfade
-                Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Crossfade",
-                            style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
-                        )
-                        Text(
-                            text = if (crossfadeSeconds == 0f) "Off" else "${crossfadeSeconds.toInt()}s",
-                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.Green)
-                        )
-                    }
-                    Slider(
-                        value = crossfadeSeconds,
-                        onValueChange = { crossfadeSeconds = it },
-                        valueRange = 0f..12f,
-                        steps = 11,
-                        colors = SliderDefaults.colors(
-                            thumbColor = EncoreColors.Green,
-                            activeTrackColor = EncoreColors.Green,
-                            inactiveTrackColor = EncoreColors.Card
-                        )
-                    )
-                }
-
-                // Gapless Playback
-                SettingsToggleRow(
-                    title = "Gapless playback",
-                    subtitle = "Allows seamless playback from track to track",
-                    isChecked = isGapless,
-                    onCheckedChange = { isGapless = it }
-                )
-
-                // Automix
-                SettingsToggleRow(
-                    title = "Automix",
-                    subtitle = "Allows smooth transitions between songs in a playlist",
-                    isChecked = isAutomix,
-                    onCheckedChange = { isAutomix = it }
-                )
-
-                // Canvas
                 SettingsToggleRow(
                     title = "Canvas",
-                    subtitle = "Displays short, looping visuals on tracks",
-                    isChecked = isCanvas,
-                    onCheckedChange = { isCanvas = it }
+                    subtitle = "Short, looping visuals when a song is playing.",
+                    isChecked = switches.canvas,
+                    enabled = !locks.canvas && !loading,
+                    onCheckedChange = onToggleCanvas
                 )
-            }
-
-            // Section: Audio Quality
-            item {
-                SettingsSectionHeader(title = "Audio quality")
-
-                SettingsInfoRow(
-                    title = "WiFi streaming",
-                    value = "Very high"
-                )
-
-                SettingsInfoRow(
-                    title = "Cellular streaming",
-                    value = "High"
-                )
-
                 SettingsToggleRow(
-                    title = "Normalize volume",
-                    subtitle = "Set the same volume level for all tracks",
-                    isChecked = isNormalizeVolume,
-                    onCheckedChange = { isNormalizeVolume = it }
+                    title = "Other videos",
+                    subtitle = "Video podcasts and videos from creators. Video ads can't be turned off.",
+                    isChecked = switches.otherVideos,
+                    enabled = !locks.otherVideos && !loading,
+                    onCheckedChange = onToggleOtherVideos
                 )
             }
 
-            // Section: Storage
             item {
-                SettingsSectionHeader(title = "Storage")
+                SettingsSectionHeader(title = "What others can see on your profile")
+                SettingsToggleRow(
+                    title = "Followers and following",
+                    subtitle = "On your profile, people can see who's following you and who you're following.",
+                    isChecked = switches.showFollows,
+                    enabled = !loading,
+                    onCheckedChange = onToggleShowFollows
+                )
+                SettingsToggleRow(
+                    title = "Public playlists",
+                    subtitle = "People can see the playlists you've added to your profile.",
+                    isChecked = switches.showPlaylists,
+                    enabled = !loading,
+                    onCheckedChange = onToggleShowPlaylists
+                )
+            }
 
-                Row(
+            item {
+                SettingsSectionHeader(title = "Account")
+                val detail = listOfNotNull(
+                    product.takeIf { it.isNotBlank() },
+                    country.takeIf { it.isNotBlank() },
+                ).joinToString(" · ")
+                if (detail.isNotBlank()) {
+                    SettingsInfoRow(title = "Plan", value = detail)
+                }
+                Text(
+                    text = "Log out",
+                    style = SpotifyTheme.typography.bodyMediumBold.copy(color = EncoreColors.Error),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Cache",
-                            style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
-                        )
-                        Text(
-                            text = "142 MB",
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(EncoreColors.Card)
-                            .clickable { /* Clear cache */ }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "Clear cache",
-                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
-                        )
-                    }
-                }
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onLogout() }
+                        .padding(vertical = 12.dp)
+                )
             }
 
-            // Section: About
             item {
                 SettingsSectionHeader(title = "About")
-
-                SettingsInfoRow(title = "Version", value = "1.2.2 (Build 23)")
-                SettingsInfoRow(title = "Third-party software", value = "Open-source notices")
-
+                SettingsInfoRow(title = "Version", value = version)
                 Spacer(modifier = Modifier.height(120.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileSummary(account: SpotifyAuth.Account?) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(EncoreColors.Card),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = account?.name?.trim()?.firstOrNull()?.uppercase() ?: "?",
+                style = SpotifyTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = EncoreColors.TextPrimary
+                )
+            )
+            val avatar = account?.imageUrl.orEmpty()
+            if (avatar.isNotBlank()) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(avatar)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = account?.name?.takeIf { it.isNotBlank() } ?: "Not signed in",
+                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+            )
+            val detail = account?.email?.takeIf { it.isNotBlank() }
+                ?: account?.product?.replaceFirstChar { it.uppercase() }.orEmpty()
+            if (detail.isNotBlank()) {
+                Text(
+                    text = detail,
+                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                )
             }
         }
     }
@@ -340,6 +275,7 @@ private fun SettingsToggleRow(
     title: String,
     subtitle: String,
     isChecked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
@@ -352,16 +288,22 @@ private fun SettingsToggleRow(
         Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text(
                 text = title,
-                style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                style = SpotifyTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium,
+                    color = if (enabled) EncoreColors.TextPrimary else EncoreColors.TextSecondary
+                )
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-            )
+            if (subtitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                )
+            }
         }
         Switch(
             checked = isChecked,
+            enabled = enabled,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
@@ -381,7 +323,6 @@ private fun SettingsInfoRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {}
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
