@@ -1,1 +1,0 @@
-# Bridge consumer proguard rules

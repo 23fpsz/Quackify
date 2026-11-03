@@ -115,11 +115,7 @@ val DefaultPodcastEpisodes = listOf(
     )
 )
 
-private val RelatedPodcastShows = listOf(
-    "The Ranveer Show" to "BeerBiceps",
-    "WTF is with Nikhil Kamath" to "Nikhil Kamath",
-    "The Joe Rogan Experience" to "Joe Rogan"
-)
+private val RelatedPodcastShows = emptyList<Pair<String, String>>()
 
 /**
  * 1:1 Pixel-Perfect Spotify Podcast / Creator Webpage (CWP) Screen:

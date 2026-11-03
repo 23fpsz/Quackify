@@ -49,6 +49,7 @@ fun ProfileDrawerSheet(
     onWhatsNewClick: () -> Unit,
     onListeningHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onLogoutClick: (() -> Unit)? = null,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
     modifier: Modifier = Modifier
@@ -159,6 +160,17 @@ fun ProfileDrawerSheet(
                     onSettingsClick()
                 }
             )
+
+            if (onLogoutClick != null) {
+                ProfileDrawerItem(
+                    title = "Log out",
+                    iconRes = R.drawable.encore_icon_arrow_left_24,
+                    onClick = {
+                        onDismiss()
+                        onLogoutClick()
+                    }
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
         }
