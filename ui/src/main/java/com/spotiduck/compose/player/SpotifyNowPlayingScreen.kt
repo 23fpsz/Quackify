@@ -98,6 +98,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import com.spotiduck.compose.theme.SpotifyTheme
+import com.spotiduck.compose.util.rememberDominantColor
 
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
@@ -153,7 +154,7 @@ fun SpotifyNowPlayingScreen(
     monthlyListeners: String = "",
     artistBio: String = "",
     lyricsSnippet: String = "",
-    lyrics: List<TimeSyncedLyric> = emptyList()
+    lyrics: List<TimeSyncedLyric> = defaultLyricsList
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
@@ -170,23 +171,18 @@ fun SpotifyNowPlayingScreen(
     }
     val activeLyricLine = lyrics.getOrNull(activeLyricIndex)?.text.orEmpty()
 
-    // Realistic state: track loading animation and async lyrics availability
-    var isSimulatedLoading by remember(title, artist) { mutableStateOf(true) }
-    var isLyricsAvailable by remember(title, artist, lyrics) { mutableStateOf(false) }
-
-    LaunchedEffect(title, artist, lyrics) {
-        isSimulatedLoading = true
-        isLyricsAvailable = false
-        kotlinx.coroutines.delay(800)
-        isSimulatedLoading = false
-        if (lyrics.isNotEmpty()) {
-            kotlinx.coroutines.delay(350)
-            isLyricsAvailable = true
-        }
+    val effectiveLyricsSnippet = lyricsSnippet.ifBlank {
+        if (lyrics.isNotEmpty()) lyrics.take(4).joinToString("\n") { it.text } else ""
+    }
+    val effectiveMonthlyListeners = monthlyListeners.ifBlank {
+        if (artist.isNotBlank()) "64,281,910 monthly listeners" else ""
+    }
+    val effectiveArtistBio = artistBio.ifBlank {
+        if (artist.isNotBlank()) "Listen to $artist on Spotify. Discover top songs and upcoming releases." else ""
     }
 
-    val effectiveIsLoading = isLoading || isSimulatedLoading
-    val effectiveLyricsVisible = isLyricsAvailable && lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
+    val effectiveIsLoading = isLoading
+    val effectiveLyricsVisible = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
 
     // When lyrics become available, the album art smoothly glides UPWARD
     // to accommodate the 1-line lyrics while the player controls remain at their exact vertical positions!
@@ -261,8 +257,14 @@ fun SpotifyNowPlayingScreen(
                 translationY = playerOffsetY.value.coerceAtLeast(0f)
             }
     ) {
+        val dynamicArtworkColor by rememberDominantColor(
+            imageUrl = coverUrl,
+            fallbackSeed = title + artist,
+            defaultColor = dominantColor
+        )
+
         val animatedDominantColor by animateColorAsState(
-            targetValue = dominantColor,
+            targetValue = dynamicArtworkColor,
             animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
             label = "npvDominantColorTransition"
         )
@@ -292,7 +294,8 @@ fun SpotifyNowPlayingScreen(
             }
             val hasSubtitle = albumOrPlaylistContext.isNotBlank() && !albumOrPlaylistContext.equals("Recommended for you", ignoreCase = true)
 
-            val isScrollEnabled = !effectiveIsLoading && effectiveLyricsVisible
+            val hasSecondaryContent = effectiveLyricsVisible || lyrics.isNotEmpty() || artist.isNotBlank()
+            val isScrollEnabled = !effectiveIsLoading && hasSecondaryContent
 
             if (isLandscape) {
                 Row(
@@ -311,7 +314,7 @@ fun SpotifyNowPlayingScreen(
                         NowPlayingArtworkCard(
                             title = title,
                             coverUrl = coverUrl,
-                            dominantColor = dominantColor,
+                            dominantColor = dynamicArtworkColor,
                             backgroundColor = animatedDominantColor,
                             isCanvasVisualizerEnabled = isCanvasVisualizerEnabled,
                             onCanvasToggle = { isCanvasVisualizerEnabled = !isCanvasVisualizerEnabled },
@@ -390,21 +393,21 @@ fun SpotifyNowPlayingScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         NowPlayingLyricsPeekCard(
-                            visible = effectiveLyricsVisible,
-                            lyricsSnippet = lyricsSnippet,
-                            dominantColor = dominantColor,
+                            visible = effectiveLyricsVisible || lyrics.isNotEmpty(),
+                            lyricsSnippet = effectiveLyricsSnippet,
+                            dominantColor = dynamicArtworkColor,
                             minHeight = LANDSCAPE_LYRICS_PEEK_MIN_HEIGHT,
                             onOpenLyrics = { isLyricsFullscreen = true },
                             onShareLyrics = { isLyricsShareOpen = true }
                         )
 
-                        if (!effectiveIsLoading) {
+                        if (!effectiveIsLoading && artist.isNotBlank()) {
                             Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
                             NowPlayingAboutArtistCard(
                                 artist = artist,
-                                monthlyListeners = monthlyListeners,
-                                artistBio = artistBio,
+                                monthlyListeners = effectiveMonthlyListeners,
+                                artistBio = effectiveArtistBio,
                                 isFollowingArtist = isFollowingArtist,
                                 onFollowToggle = { isFollowingArtist = !isFollowingArtist }
                             )
@@ -437,7 +440,7 @@ fun SpotifyNowPlayingScreen(
                     NowPlayingArtworkCard(
                         title = title,
                         coverUrl = coverUrl,
-                        dominantColor = dominantColor,
+                        dominantColor = dynamicArtworkColor,
                         backgroundColor = animatedDominantColor,
                         isCanvasVisualizerEnabled = isCanvasVisualizerEnabled,
                         onCanvasToggle = { isCanvasVisualizerEnabled = !isCanvasVisualizerEnabled },
@@ -504,21 +507,21 @@ fun SpotifyNowPlayingScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     NowPlayingLyricsPeekCard(
-                        visible = effectiveLyricsVisible,
-                        lyricsSnippet = lyricsSnippet,
-                        dominantColor = dominantColor,
+                        visible = effectiveLyricsVisible || lyrics.isNotEmpty(),
+                        lyricsSnippet = effectiveLyricsSnippet,
+                        dominantColor = dynamicArtworkColor,
                         onOpenLyrics = { isLyricsFullscreen = true },
                         onShareLyrics = { isLyricsShareOpen = true }
                     )
 
                     // Other cards (e.g. About the Artist) only appear once loaded and accessible upon scrolling down
-                    if (isScrollEnabled) {
+                    if (isScrollEnabled && artist.isNotBlank()) {
                         Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
                         NowPlayingAboutArtistCard(
                             artist = artist,
-                            monthlyListeners = monthlyListeners,
-                            artistBio = artistBio,
+                            monthlyListeners = effectiveMonthlyListeners,
+                            artistBio = effectiveArtistBio,
                             isFollowingArtist = isFollowingArtist,
                             onFollowToggle = { isFollowingArtist = !isFollowingArtist }
                         )

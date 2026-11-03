@@ -58,6 +58,8 @@ import com.spotiduck.compose.screens.SpotifyBrowseScreen
 import com.spotiduck.compose.screens.SpotifyEpisodeScreen
 import com.spotiduck.compose.screens.SpotifyShowScreen
 import com.spotiduck.compose.screens.SpotifyNotification
+import com.spotiduck.compose.player.defaultLyricsList
+import com.spotiduck.compose.util.rememberDominantColor
 import com.spotiduck.compose.format.parseHexColor
 import com.spotiduck.compose.home.HomeShelf
 
@@ -637,6 +639,12 @@ fun SpotifyAppShell(
                     } else {
                         playlistTracks ?: emptyList()
                     }
+                    val resolvedPlaylistCover = activePlaylistCoverUrl ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl
+                    val playlistDominantColor by rememberDominantColor(
+                        imageUrl = resolvedPlaylistCover,
+                        fallbackSeed = activePlaylistTitle,
+                        defaultColor = Color(0xFF144D3F)
+                    )
                     SpotifyPlaylistScreen(
                         title = activePlaylistTitle,
                         description = if (activePlaylistTitle.contains("This Is")) "This is $activePlaylistTitle. The essential tracks, all in one place." else "",
@@ -645,8 +653,8 @@ fun SpotifyAppShell(
                         tracks = effectivePlaylistTracks,
                         currentTrackTitle = currentTrackTitle,
                         isPlaying = isPlaying,
-                        headerColor = Color(0xFF144D3F),
-                        coverUrl = activePlaylistCoverUrl ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl,
+                        headerColor = playlistDominantColor,
+                        coverUrl = resolvedPlaylistCover,
                         onBackClick = handleBack,
                         onPlayPauseClick = {
                             if (playerListener != null) {
@@ -685,12 +693,17 @@ fun SpotifyAppShell(
             ShellScreen.ALBUM -> {
                 androidx.compose.runtime.key(activeAlbumTitle, activeAlbumArtist) {
                     val effectiveAlbumTracks = if (!albumTracks.isNullOrEmpty()) albumTracks else activeAlbumTracks
+                    val albumDominantColor by rememberDominantColor(
+                        imageUrl = activeAlbumCoverUrl,
+                        fallbackSeed = activeAlbumTitle,
+                        defaultColor = activeAlbumColor
+                    )
                     SpotifyAlbumScreen(
                         albumTitle = activeAlbumTitle,
                         artistName = activeAlbumArtist,
                         releaseYear = activeAlbumYear,
                         releaseDate = activeAlbumReleaseDate,
-                        coverColor = activeAlbumColor,
+                        coverColor = albumDominantColor,
                         tracks = effectiveAlbumTracks,
                         currentTrackTitle = currentTrackTitle,
                         isPlaying = isPlaying,
@@ -1016,6 +1029,11 @@ fun SpotifyAppShell(
             ShellScreen.ARTIST -> "Playing from artist" to activeArtistName
             else -> "Playing from playlist" to activePlaylistTitle
         }
+        val nowPlayingDominantColor by rememberDominantColor(
+            imageUrl = currentCoverUrl,
+            fallbackSeed = currentTrackTitle + currentArtist,
+            defaultColor = Color(0xFF432371)
+        )
         ShellNowPlaying(
             visible = isPlayerExpanded,
             title = currentTrackTitle,
@@ -1026,7 +1044,7 @@ fun SpotifyAppShell(
             progress = currentProgress,
             durationMs = durationMs,
             positionMs = currentPositionMs,
-            dominantColor = EncoreColors.Card,
+            dominantColor = nowPlayingDominantColor,
             isLiked = isLiked,
             isExplicit = playbackState?.explicit ?: false,
             shuffleMode = currentShuffleMode,
@@ -1043,7 +1061,10 @@ fun SpotifyAppShell(
             onSeek = { p -> if (playerListener != null) playerListener.onSeek((p * durationMs).toLong()) else { localProgress = p; localPositionMs = (p * durationMs).toLong() } },
             onMore = { selectedTrackForOptions = TrackItem(currentTrackTitle, currentArtist, isLiked); isTrackOptionsOpen = true },
             onQueue = { isQueueSheetOpen = true },
-            onDevice = { isDeviceSheetOpen = true }
+            onDevice = { isDeviceSheetOpen = true },
+            lyrics = defaultLyricsList,
+            monthlyListeners = "64,281,910 monthly listeners",
+            artistBio = if (currentArtist.isNotBlank()) "Listen to $currentArtist on Spotify." else ""
         )
 
         ShellSheets(
