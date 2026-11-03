@@ -164,13 +164,13 @@ fun SpotifySearchScreen(
 
     val categories = remember {
         listOf(
-            CategoryCard("Podcasts", Color(0xFFE13300), "https://i.scdn.co/image/ab6765630000ba8a75e3be538dd3383a48e71c66"),
-            CategoryCard("Live Events", Color(0xFF7358FF), "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
-            CategoryCard("Made For You", Color(0xFF1E3264), "https://i.scdn.co/image/ab67706f000000026e515187c071e45918e9f8de"),
-            CategoryCard("New Releases", Color(0xFFE8115B), "https://i.scdn.co/image/ab67706f000000021c3fa36c4b92b67f40192e44"),
-            CategoryCard("Pop", Color(0xFF148A08), "https://i.scdn.co/image/ab67706f000000021c3fa36c4b92b67f40192e44"),
-            CategoryCard("Hip-Hop", Color(0xFFBC5900), "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
-            CategoryCard("Rock", Color(0xFFE91429), "https://i.scdn.co/image/ab67706f000000024479ed3a5fcc1da7bf24c8b2"),
+            CategoryCard("Podcasts", Color(0xFFE13300)),
+            CategoryCard("Live Events", Color(0xFF7358FF)),
+            CategoryCard("Made For You", Color(0xFF1E3264)),
+            CategoryCard("New Releases", Color(0xFFE8115B)),
+            CategoryCard("Pop", Color(0xFF148A08)),
+            CategoryCard("Hip-Hop", Color(0xFFBC5900)),
+            CategoryCard("Rock", Color(0xFFE91429)),
             CategoryCard("Latin", Color(0xFFE1118C)),
             CategoryCard("Dance/Electronic", Color(0xFFD84000)),
             CategoryCard("Discover", Color(0xFF8D67AB)),

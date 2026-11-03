@@ -265,16 +265,16 @@ fun SpotifyAppShell(
     var currentScreen by remember { mutableStateOf(ShellScreen.HOME) }
     var selectedNavIndex by remember { mutableIntStateOf(0) }
     var isPlayerExpanded by remember { mutableStateOf(false) }
-    var activePlaylistTitle by remember { mutableStateOf("This Is The Weeknd") }
+    var activePlaylistTitle by remember { mutableStateOf("") }
     var activePlaylistUri by remember { mutableStateOf("") }
-    var activePlaylistCoverUrl by remember { mutableStateOf<String?>("https://i.scdn.co/image/ab67706f000000021c3fa36c4b92b67f40192e44") }
-    var activeAlbumCoverUrl by remember { mutableStateOf<String?>("https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36") }
-    var activeArtistAvatarUrl by remember { mutableStateOf<String?>("https://i.scdn.co/image/ab6761610000e5eb968a3770e060cf56306e9f1a") }
-    var activeCategoryTitle by remember { mutableStateOf("Pop") }
+    var activePlaylistCoverUrl by remember { mutableStateOf<String?>(null) }
+    var activeAlbumCoverUrl by remember { mutableStateOf<String?>(null) }
+    var activeArtistAvatarUrl by remember { mutableStateOf<String?>(null) }
+    var activeCategoryTitle by remember { mutableStateOf("") }
     var activeCategoryColor by remember { mutableStateOf(Color(0xFF148A08)) }
-    var activePodcastTitle by remember { mutableStateOf("Figuring Out with Raj Shamani") }
-    var activePodcastCreator by remember { mutableStateOf("Raj Shamani") }
-    var activePodcastCoverUrl by remember { mutableStateOf<String?>("https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552") }
+    var activePodcastTitle by remember { mutableStateOf("") }
+    var activePodcastCreator by remember { mutableStateOf("") }
+    var activePodcastCoverUrl by remember { mutableStateOf<String?>(null) }
     var activeShowUri by remember { mutableStateOf("") }
     var activeFolderUri by remember { mutableStateOf("") }
     var activeFolderTitle by remember { mutableStateOf("") }
@@ -296,8 +296,8 @@ fun SpotifyAppShell(
     var activeArtistName by remember { mutableStateOf("") }
     var activeAlbumTitle by remember { mutableStateOf("") }
     var activeAlbumArtist by remember { mutableStateOf("") }
-    var activeAlbumYear by remember { mutableStateOf("2020") }
-    var activeAlbumReleaseDate by remember { mutableStateOf("March 20, 2020") }
+    var activeAlbumYear by remember { mutableStateOf("") }
+    var activeAlbumReleaseDate by remember { mutableStateOf("") }
     var activeAlbumColor by remember { mutableStateOf(Color(0xFF901A1E)) }
 
     val navBackStack = remember { mutableStateListOf<BackStackItem>() }
@@ -424,27 +424,10 @@ fun SpotifyAppShell(
     val openArtist: (String, String?) -> Unit = { artist, imageUrl ->
         activeArtistName = artist
         val foundEntity = libraryItems?.find { it.title.equals(artist, ignoreCase = true) }
-        val resolvedUrl = imageUrl
-            ?: foundEntity?.imageUrl
-            ?: when {
-                artist.contains("Honey Singh", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb2a921d72545592fc624c43ee"
-                artist.contains("Weeknd", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb968a3770e060cf56306e9f1a"
-                artist.contains("Arijit", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb0261696c5df3be99da6ed3f3"
-                artist.contains("Drake", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb4293385d324db8558179afd9"
-                artist.contains("Taylor Swift", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0"
-                artist.contains("Stephen Sanchez", ignoreCase = true) -> "https://i.scdn.co/image/ab6761610000e5ebb08d4b38bfd2c0b71e191cf0"
-                else -> activeArtistAvatarUrl ?: "https://i.scdn.co/image/ab6761610000e5eb2a921d72545592fc624c43ee"
-            }
+        val resolvedUrl = imageUrl ?: foundEntity?.imageUrl ?: activeArtistAvatarUrl
         activeArtistAvatarUrl = resolvedUrl
 
-        val artistUriToLoad = foundEntity?.uri?.takeIf { it.startsWith("spotify:artist:") }
-            ?: when {
-                artist.contains("Honey Singh", ignoreCase = true) -> "spotify:artist:7uIbLdzzRuQIngLFcu8mgr"
-                artist.contains("Weeknd", ignoreCase = true) -> "spotify:artist:1Xyo4u8uXC1ZmMpatF05PJ"
-                artist.contains("Arijit", ignoreCase = true) -> "spotify:artist:4YRxDV8wJFPHPTeXepOstw"
-                artist.contains("Stephen Sanchez", ignoreCase = true) -> "spotify:artist:1NZsSd7h4SZ8cuUtwi0GQZ"
-                else -> ""
-            }
+        val artistUriToLoad = foundEntity?.uri?.takeIf { it.startsWith("spotify:artist:") }.orEmpty()
         if (onLoadArtist != null) onLoadArtist?.invoke(artistUriToLoad, artist) else playerListener?.onLoadArtist(artistUriToLoad, artist)
 
         pushCurrentState()
@@ -656,9 +639,9 @@ fun SpotifyAppShell(
                     }
                     SpotifyPlaylistScreen(
                         title = activePlaylistTitle,
-                        description = "This is $activePlaylistTitle. The essential tracks, all in one place.",
-                        creator = if (activePlaylistTitle.contains("This Is") || activePlaylistTitle.contains("Today's")) "Spotify" else (userDisplayName ?: "中 • OV32LO2D • 中"),
-                        saveCount = "6,482,109 saves",
+                        description = if (activePlaylistTitle.contains("This Is")) "This is $activePlaylistTitle. The essential tracks, all in one place." else "",
+                        creator = if (activePlaylistTitle.contains("This Is") || activePlaylistTitle.contains("Today's")) "Spotify" else userDisplayName,
+                        saveCount = "",
                         tracks = effectivePlaylistTracks,
                         currentTrackTitle = currentTrackTitle,
                         isPlaying = isPlaying,
@@ -872,19 +855,19 @@ fun SpotifyAppShell(
             }
             ShellScreen.PODCAST -> {
                 SpotifyPodcastScreen(
-                    showTitle = activePodcastTitle.ifEmpty { "Figuring Out with Raj Shamani" },
-                    publisherName = activePodcastCreator.ifEmpty { "Raj Shamani" },
-                    coverUrl = activePodcastCoverUrl ?: "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552",
+                    showTitle = activePodcastTitle,
+                    publisherName = activePodcastCreator,
+                    coverUrl = activePodcastCoverUrl,
                     onBackClick = handleBack,
                     onPlayPauseClick = {
                         if (playerListener != null) playerListener.onPlayPause() else localIsPlaying = !localIsPlaying
                     },
                     onEpisodeSelect = { ep ->
                         if (playerListener != null) {
-                            playerListener.onTrackSelect(ep.title, activePodcastCreator.ifEmpty { "Raj Shamani" })
+                            playerListener.onTrackSelect(ep.title, activePodcastCreator)
                         } else {
                             localTrackTitle = ep.title
-                            localArtist = activePodcastCreator.ifEmpty { "Raj Shamani" }
+                            localArtist = activePodcastCreator
                             localIsPlaying = true
                         }
                     },
@@ -1114,8 +1097,8 @@ fun SpotifyAppShell(
             onSleepTimerClick = { isSleepTimerOpen = true },
             onGoToArtist = { artist -> openArtist(artist, null) },
             onSortSelected = { selected -> currentSortOption = selected },
-            onCreatePlaylist = { pushCurrentState(); activePlaylistTitle = "My Playlist #1"; currentScreen = ShellScreen.PLAYLIST },
-            onCreateBlend = { pushCurrentState(); activePlaylistTitle = "Duck + Friend Blend"; currentScreen = ShellScreen.PLAYLIST },
+            onCreatePlaylist = { pushCurrentState(); activePlaylistTitle = "New Playlist"; currentScreen = ShellScreen.PLAYLIST },
+            onCreateBlend = { pushCurrentState(); activePlaylistTitle = "Blend"; currentScreen = ShellScreen.PLAYLIST },
             onSelectDevice = { id -> localDevice = id; isDeviceSheetOpen = false; playerListener?.onSelectDevice(id) },
             onDeviceVisible = { visible -> playerListener?.onDeviceSheetVisible(visible) },
             onVolumeChange = { id, level -> playerListener?.onVolumeChange(id, level) },

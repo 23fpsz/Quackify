@@ -106,7 +106,8 @@ fun SpotifyArtistScreen(
     onArtistOptionsClick: () -> Unit = {},
     onReleaseClick: (ArtistRelease) -> Unit = {},
     modifier: Modifier = Modifier,
-    headerImageUrl: String? = null
+    headerImageUrl: String? = null,
+    biography: String? = null
 ) {
     val density = LocalDensity.current
     var isFollowing by remember { mutableStateOf(false) }
@@ -555,41 +556,49 @@ fun SpotifyArtistScreen(
             }
 
             // About Section (Bio Card)
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "About",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
-                    modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
-                )
+            if (monthlyListeners.isNotBlank() || !biography.isNullOrBlank()) {
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "About",
+                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                        modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
+                    )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = EncoreSpacers.Base, vertical = 8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF242424))
-                        .clickable { }
-                        .padding(16.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = "$monthlyListeners monthly listeners",
-                            style = SpotifyTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "$artistName is an acclaimed artist with millions of listeners worldwide.",
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = EncoreSpacers.Base, vertical = 8.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF242424))
+                            .clickable { }
+                            .padding(16.dp)
+                    ) {
+                        Column {
+                            if (monthlyListeners.isNotBlank()) {
+                                Text(
+                                    text = "$monthlyListeners monthly listeners",
+                                    style = SpotifyTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                )
+                            }
+                            if (!biography.isNullOrBlank()) {
+                                if (monthlyListeners.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                                Text(
+                                    text = biography,
+                                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
 
