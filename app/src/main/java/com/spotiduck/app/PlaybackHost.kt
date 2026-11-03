@@ -1,0 +1,69 @@
+package com.spotiduck.app
+
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
+import com.spotiduck.backend.core.log.Logs
+
+object PlaybackHost {
+
+    private val log = Logs.of(Logs.Module.HOST)
+
+    @Volatile
+    private var instance: PlaybackBridge? = null
+
+    @Volatile
+    private var foreground = false
+
+    val started: Boolean get() = instance != null
+
+    fun ensure(context: Context): PlaybackBridge {
+        instance?.let { return it }
+        return synchronized(this) {
+            instance ?: PlaybackBridge(context.applicationContext).also { bridge ->
+                bridge.start()
+                log.i("bridge created device=${bridge.deviceId}")
+                instance = bridge
+            }
+        }
+    }
+
+    fun startService(context: Context) {
+        val intent = Intent(context, PlaybackService::class.java)
+        runCatching { ContextCompat.startForegroundService(context, intent) }
+            .onFailure { log.e("service start failed ${it.javaClass.simpleName}: ${it.message}") }
+    }
+
+    fun markForeground() {
+        foreground = true
+    }
+
+    fun teardown(context: Context) {
+        val bridge = instance
+        instance = null
+        foreground = false
+        if (bridge != null) {
+            runCatching { bridge.handOff() }
+                .onFailure { log.w("hand off failed ${it.javaClass.simpleName}: ${it.message}") }
+            bridge.stop()
+        }
+        runCatching { context.stopService(Intent(context, PlaybackService::class.java)) }
+            .onFailure { log.w("service stop failed ${it.javaClass.simpleName}") }
+        log.i("playback torn down, the process holds nothing")
+    }
+
+    fun reset(context: Context) {
+        instance?.reset()
+        instance = null
+        foreground = false
+        runCatching { context.stopService(Intent(context, PlaybackService::class.java)) }
+        log.i("bridge reset, next start mints a new device")
+    }
+
+    fun release() {
+        instance?.stop()
+        instance = null
+        foreground = false
+        log.i("bridge released")
+    }
+}

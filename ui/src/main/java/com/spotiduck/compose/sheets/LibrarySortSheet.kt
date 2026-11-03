@@ -32,11 +32,16 @@ import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
 import com.spotiduck.compose.theme.SpotifyTheme
 
-enum class LibrarySortOption(val displayName: String) {
-    RECENTS("Recents"),
-    RECENTLY_ADDED("Recently added"),
-    ALPHABETICAL("Alphabetical"),
-    CREATOR("Creator")
+enum class LibrarySortOption(val displayName: String, val apiId: String) {
+    RECENTS("Recents", "Recents"),
+    RECENTLY_ADDED("Recently added", "Recently Added"),
+    ALPHABETICAL("Alphabetical", "Alphabetical"),
+    CREATOR("Creator", "Creator");
+
+    companion object {
+        fun fromApiId(id: String?): LibrarySortOption? =
+            values().firstOrNull { it.apiId.equals(id, ignoreCase = true) }
+    }
 }
 
 /**

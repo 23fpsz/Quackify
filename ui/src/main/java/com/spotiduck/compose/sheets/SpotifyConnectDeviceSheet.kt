@@ -40,6 +40,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
+import com.spotiduck.backend.model.ConnectDevice
+import com.spotiduck.backend.model.DeviceKind
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.components.EncorePlayIndicator
 import com.spotiduck.compose.theme.EncoreColors
@@ -76,11 +78,13 @@ fun SpotifyConnectDeviceSheet(
     onDismissRequest: () -> Unit,
     currentDeviceName: String,
     onSelectDevice: (SpotifyDevice) -> Unit,
-    devices: List<SpotifyDevice> = defaultDeviceList(),
+    devices: List<SpotifyDevice> = emptyList(),
+    initialVolume: Float = 0.7f,
+    onVolumeChange: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var volume by remember { mutableFloatStateOf(0.70f) }
+    var volume by remember { mutableFloatStateOf(initialVolume.coerceIn(0f, 1f)) }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -192,6 +196,12 @@ fun SpotifyConnectDeviceSheet(
                         Slider(
                             value = volume,
                             onValueChange = { volume = it },
+                            onValueChangeFinished = {
+                                val target = devices.firstOrNull { it.isCurrent }
+                                if (target != null) {
+                                    onVolumeChange(target.id, (volume * 65535f).toInt())
+                                }
+                            },
                             modifier = Modifier.weight(1f),
                             colors = SliderDefaults.colors(
                                 thumbColor = EncoreColors.TextPrimary,
@@ -278,6 +288,22 @@ private fun defaultDeviceList(): List<SpotifyDevice> = listOf(
     SpotifyDevice("3", "MacBook Pro", DeviceType.COMPUTER, protocol = "Spotify Connect"),
     SpotifyDevice("4", "Kitchen Echo", DeviceType.SPEAKER, protocol = "Spotify Connect"),
     SpotifyDevice("5", "Tesla Model 3", DeviceType.CAR, protocol = "Bluetooth")
+)
+
+fun ConnectDevice.toSpotifyDevice(): SpotifyDevice = SpotifyDevice(
+    id = id,
+    name = name.ifBlank { "Unknown device" },
+    type = when (kind) {
+        DeviceKind.PHONE, DeviceKind.TABLET -> DeviceType.PHONE
+        DeviceKind.COMPUTER -> DeviceType.COMPUTER
+        DeviceKind.SPEAKER, DeviceKind.RECEIVER, DeviceKind.STICK,
+        DeviceKind.DONGLE, DeviceKind.CONSOLE, DeviceKind.TV -> DeviceType.SPEAKER
+        DeviceKind.CAR -> DeviceType.CAR
+        DeviceKind.CAST -> DeviceType.CAST
+        DeviceKind.UNKNOWN -> DeviceType.COMPUTER
+    },
+    isCurrent = local || active,
+    protocol = if (brand.isBlank()) "Spotify Connect" else brand
 )
 
 @Preview

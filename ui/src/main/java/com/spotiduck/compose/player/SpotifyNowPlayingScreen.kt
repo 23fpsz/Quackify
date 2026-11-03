@@ -99,13 +99,9 @@ import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import com.spotiduck.compose.theme.SpotifyTheme
 
-// Landscape two-pane layout: weight split between the artwork/canvas pane
-// and the scrollable controls & lyrics pane
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
 
-// The landscape right pane is shorter than a portrait screen, so the lyrics
-// peek card uses a reduced minimum height instead of the portrait 360dp
 private val LANDSCAPE_LYRICS_PEEK_MIN_HEIGHT = 200.dp
 
 /**
@@ -154,10 +150,10 @@ fun SpotifyNowPlayingScreen(
     dominantColor: Color = Color(0xFF432371),
     coverUrl: String? = null,
     isLoading: Boolean = false,
-    monthlyListeners: String = "98,421,114 monthly listeners",
-    artistBio: String = "The Weeknd is a Canadian singer, songwriter, and record producer known for his sonic versatility and dark lyricism.",
-    lyricsSnippet: String = "I'm tryna put you in the worst mood, ah\nP1 cleaner than your church shoes, ah\nMilli point two just to hurt you, ah\nAll red Lamb' leanin' on you, ah",
-    lyrics: List<TimeSyncedLyric> = defaultLyricsList
+    monthlyListeners: String = "",
+    artistBio: String = "",
+    lyricsSnippet: String = "",
+    lyrics: List<TimeSyncedLyric> = emptyList()
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
@@ -205,8 +201,6 @@ fun SpotifyNowPlayingScreen(
 
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
-    // Landscape: side-by-side layout so the artwork never crowds out the
-    // controls on short (phone) landscape viewports
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = screenHeightPx * 0.5f
@@ -241,7 +235,6 @@ fun SpotifyNowPlayingScreen(
         }
     }
 
-    // Shared drag-to-dismiss gesture applied to the context header
     val headerDragModifier = Modifier.npvDismissDragGesture(
         coroutineScope = coroutineScope,
         playerOffsetY = playerOffsetY,
@@ -250,7 +243,6 @@ fun SpotifyNowPlayingScreen(
         onSnapBack = snapBackPlayer
     )
 
-    // Artwork gestures: horizontal swipe-to-skip + vertical drag-to-dismiss
     val artworkGestureModifier = Modifier.npvArtworkGesture(
         coroutineScope = coroutineScope,
         playerOffsetY = playerOffsetY,
@@ -303,16 +295,12 @@ fun SpotifyNowPlayingScreen(
             val isScrollEnabled = !effectiveIsLoading && effectiveLyricsVisible
 
             if (isLandscape) {
-                // Landscape: two panes — artwork/canvas on the left,
-                // scrollable controls, lyrics & artist info on the right
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
                         .statusBarsPadding()
                         .navigationBarsPadding()
                 ) {
-                    // Left pane: 1:1 artwork/canvas constrained by the pane height
-                    // so it can never overflow the short landscape viewport
                     Box(
                         modifier = Modifier
                             .weight(LANDSCAPE_ARTWORK_PANE_WEIGHT)
@@ -334,8 +322,6 @@ fun SpotifyNowPlayingScreen(
                         )
                     }
 
-                    // Right pane: always scrollable so every control stays
-                    // reachable even on the shortest landscape screens
                     Column(
                         modifier = Modifier
                             .weight(LANDSCAPE_CONTROLS_PANE_WEIGHT)
@@ -412,7 +398,6 @@ fun SpotifyNowPlayingScreen(
                             onShareLyrics = { isLyricsShareOpen = true }
                         )
 
-                        // About-the-artist card stays reachable via the scrollable pane
                         if (!effectiveIsLoading) {
                             Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
@@ -429,7 +414,6 @@ fun SpotifyNowPlayingScreen(
                     }
                 }
             } else {
-                // Portrait: single scrollable column
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -570,7 +554,17 @@ fun SpotifyNowPlayingScreen(
         }
 
         // Lyrics Share Card Modal
-        if (isLyricsShareOpen) {
+        AnimatedVisibility(
+            visible = isLyricsShareOpen,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(durationMillis = 280)
+            ),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(durationMillis = 220)
+            )
+        ) {
             LyricsShareDialog(
                 title = title,
                 artist = artist,

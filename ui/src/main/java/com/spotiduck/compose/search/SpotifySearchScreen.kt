@@ -140,6 +140,11 @@ fun SpotifySearchScreen(
     onPlaylistClick: (String, String) -> Unit = { _, _ -> },
     searchResults: List<TrackItem>? = null,
     onSearchQueryChange: (String) -> Unit = {},
+    recentSearches: List<SearchHistoryItem> = emptyList(),
+    suggestions: List<TrackItem> = emptyList(),
+    loading: Boolean = false,
+    onToggleSaved: (String) -> Unit = {},
+    onClearRecent: () -> Unit = {},
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
     currentTrackTitle: String = "",
@@ -153,13 +158,8 @@ fun SpotifySearchScreen(
     val focusManager = LocalFocusManager.current
     val bottomPadding = rememberBottomPadding()
 
-    val recentSearches = remember {
-        mutableStateListOf(
-            SearchHistoryItem("Starboy", "Song • The Weeknd, Daft Punk", isArtist = false, Color(0xFF4F46E5)),
-            SearchHistoryItem("The Weeknd", "Artist", isArtist = true, Color(0xFFE91429)),
-            SearchHistoryItem("Daft Punk", "Artist", isArtist = true, Color(0xFF509BF5)),
-            SearchHistoryItem("Today's Top Hits", "Playlist • Spotify", isArtist = false, Color(0xFFE8115B))
-        )
+    val recentSearches = remember(recentSearches) {
+        mutableStateListOf<SearchHistoryItem>().apply { addAll(recentSearches) }
     }
 
     val categories = remember {
@@ -182,89 +182,22 @@ fun SpotifySearchScreen(
             CategoryCard("Gaming", Color(0xFFE8115B))
         )
     }
+    val allSearchableTracks = remember { emptyList<TrackItem>() }
+    val allSearchableArtists = remember { emptyList<SearchArtistItem>() }
+    val allSearchableAlbums = remember { emptyList<SearchAlbumItem>() }
+    val allSearchablePlaylists = remember { emptyList<SearchPlaylistItem>() }
 
-    val allSearchableTracks = remember {
-        listOf(
-            TrackItem("Starboy", "The Weeknd, Daft Punk", true),
-            TrackItem("Blinding Lights", "The Weeknd"),
-            TrackItem("Save Your Tears", "The Weeknd"),
-            TrackItem("Die For You", "The Weeknd"),
-            TrackItem("One Of The Girls", "The Weeknd, JENNIE, Lily-Rose Depp", true),
-            TrackItem("I Feel It Coming", "The Weeknd, Daft Punk"),
-            TrackItem("The Hills", "The Weeknd", true),
-            TrackItem("Can't Feel My Face", "The Weeknd"),
-            TrackItem("After Hours", "The Weeknd"),
-            TrackItem("Harder, Better, Faster, Stronger", "Daft Punk"),
-            TrackItem("Get Lucky", "Daft Punk, Pharrell Williams"),
-            TrackItem("Around the World", "Daft Punk"),
-            TrackItem("One More Time", "Daft Punk"),
-            TrackItem("As It Was", "Harry Styles"),
-            TrackItem("Flowers", "Miley Cyrus"),
-            TrackItem("Levitating", "Dua Lipa"),
-            TrackItem("Stay", "The Kid LAROI, Justin Bieber", true),
-            TrackItem("Bad Guy", "Billie Eilish")
-        )
-    }
+    val allSearchablePodcasts = remember { emptyList<SearchPodcastItem>() }
 
-    val allSearchableArtists = remember {
-        listOf(
-            SearchArtistItem("The Weeknd", "108,412,981 monthly listeners", Color(0xFFE91429)),
-            SearchArtistItem("Daft Punk", "22,504,812 monthly listeners", Color(0xFF509BF5)),
-            SearchArtistItem("Taylor Swift", "102,120,402 monthly listeners", Color(0xFFE8115B)),
-            SearchArtistItem("Billie Eilish", "95,302,198 monthly listeners", Color(0xFF148A08)),
-            SearchArtistItem("Harry Styles", "64,120,380 monthly listeners", Color(0xFFBC5900)),
-            SearchArtistItem("Dua Lipa", "76,892,104 monthly listeners", Color(0xFF8D67AB))
-        )
-    }
-
-    val allSearchableAlbums = remember {
-        listOf(
-            SearchAlbumItem("After Hours", "The Weeknd", "2020", Color(0xFF901A1E), "spotify:album:after_hours"),
-            SearchAlbumItem("Starboy", "The Weeknd", "2016", Color(0xFF4F46E5), "spotify:album:starboy"),
-            SearchAlbumItem("Dawn FM", "The Weeknd", "2022", Color(0xFF243B55), "spotify:album:dawn_fm"),
-            SearchAlbumItem("Random Access Memories", "Daft Punk", "2013", Color(0xFF6B7280), "spotify:album:ram"),
-            SearchAlbumItem("Discovery", "Daft Punk", "2001", Color(0xFFBA5D07), "spotify:album:discovery")
-        )
-    }
-
-    val allSearchablePlaylists = remember {
-        listOf(
-            SearchPlaylistItem("This Is The Weeknd", "Spotify", "5,812,400 saves", Color(0xFF8E0E00), "spotify:playlist:this_is_the_weeknd"),
-            SearchPlaylistItem("Today's Top Hits", "Spotify", "34,251,029 saves", Color(0xFFE8115B), "spotify:playlist:tth"),
-            SearchPlaylistItem("Daft Punk Essentials", "Spotify", "1,204,100 saves", Color(0xFF509BF5), "spotify:playlist:daft_punk_essentials"),
-            SearchPlaylistItem("Mega Hit Mix", "Spotify", "4,192,000 saves", Color(0xFF148A08), "spotify:playlist:mega_hit_mix")
-        )
-    }
-
-    val allSearchablePodcasts = remember {
-        listOf(
-            SearchPodcastItem(
-                title = "The Joe Rogan Experience",
-                publisher = "Joe Rogan",
-                color = Color(0xFF006450),
-                description = "Long-form conversations with comedians, scientists, fighters, and thinkers."
-            ),
-            SearchPodcastItem(
-                title = "Huberman Lab",
-                publisher = "Scicomm Media",
-                color = Color(0xFF1E3264),
-                description = "Science and science-based tools for everyday life."
-            ),
-            SearchPodcastItem(
-                title = "The Vergecast",
-                publisher = "The Verge",
-                color = Color(0xFF8D67AB),
-                description = "The flagship podcast of The Verge about technology and culture."
-            )
-        )
-    }
-
-    val filteredTracks = remember(searchQuery, searchResults) {
-        if (searchQuery.isBlank()) emptyList()
-        else if (!searchResults.isNullOrEmpty()) searchResults
-        else allSearchableTracks.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-            it.artist.contains(searchQuery, ignoreCase = true)
+    val filteredTracks = remember(searchQuery, searchResults, suggestions, loading) {
+        when {
+            searchQuery.isBlank() -> emptyList()
+            !searchResults.isNullOrEmpty() -> searchResults
+            !loading && suggestions.isNotEmpty() -> suggestions
+            else -> allSearchableTracks.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                it.artist.contains(searchQuery, ignoreCase = true)
+            }
         }
     }
 
@@ -584,7 +517,10 @@ fun SpotifySearchScreen(
                                         BorderStroke(1.dp, Color(0xFF727272)),
                                         RoundedCornerShape(16.dp)
                                     )
-                                    .clickable { recentSearches.clear() }
+                                    .clickable {
+                                recentSearches.clear()
+                                onClearRecent()
+                            }
                                     .padding(horizontal = 16.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -733,7 +669,8 @@ fun SpotifySearchScreen(
                                     track = track,
                                     isPlaying = isThisPlaying,
                                     onClick = { onTrackSelect(track) },
-                                    onMoreClick = { onTrackOptionsClick(track) }
+                                    onMoreClick = { onTrackOptionsClick(track) },
+                                    onLikeClick = { onToggleSaved(track.uri) }
                                 )
                             }
 
@@ -795,7 +732,8 @@ fun SpotifySearchScreen(
                                 track = track,
                                 isPlaying = isThisPlaying,
                                 onClick = { onTrackSelect(track) },
-                                onMoreClick = { onTrackOptionsClick(track) }
+                                onMoreClick = { onTrackOptionsClick(track) },
+                                onLikeClick = { onToggleSaved(track.uri) }
                             )
                         }
                     }
@@ -932,6 +870,7 @@ private fun SearchTrackRow(
     isPlaying: Boolean,
     onClick: () -> Unit,
     onMoreClick: () -> Unit,
+    onLikeClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -1021,6 +960,18 @@ private fun SearchTrackRow(
                 )
             }
         }
+
+        // Like button
+        EncoreIconButton(
+            iconRes = if (track.saved == true) R.drawable.encore_icon_heart_active_24
+            else R.drawable.encore_icon_heart_24,
+            contentDescription = if (track.saved == true) "Remove ${track.title} from Liked Songs"
+            else "Save ${track.title} to Liked Songs",
+            onClick = onLikeClick,
+            size = 36.dp,
+            iconSize = 20.dp,
+            tint = if (track.saved == true) EncoreColors.Green else EncoreColors.TextSecondary
+        )
 
         // More options button (encore_icon_more_android_24)
         EncoreIconButton(

@@ -92,7 +92,14 @@ data class TrackItem(
     val artist: String,
     val isExplicit: Boolean = false,
     val uri: String = "",
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val saved: Boolean? = null,
+    val durationMs: Long = 0L,
+    val albumUri: String = "",
+    val artistUri: String = "",
+    val discNumber: Int = 1,
+    val trackNumber: Int = 0,
+    val hasVideo: Boolean = false
 )
 
 enum class PlaylistSort(val label: String) {
