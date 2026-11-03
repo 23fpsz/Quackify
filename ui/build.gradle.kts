@@ -41,6 +41,7 @@ dependencies {
     // Asynchronous Image Loading for Album Arts and Covers
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.palette.ktx)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -9,6 +9,8 @@ import androidx.compose.ui.graphics.Color
 import com.spotiduck.compose.components.RepeatMode
 import com.spotiduck.compose.components.ShuffleMode
 import com.spotiduck.compose.player.SpotifyNowPlayingScreen
+import com.spotiduck.compose.player.TimeSyncedLyric
+import com.spotiduck.compose.player.defaultLyricsList
 import com.spotiduck.compose.theme.EncoreAnimation
 
 @Composable
@@ -40,6 +42,10 @@ internal fun ShellNowPlaying(
     onMore: () -> Unit,
     onQueue: () -> Unit,
     onDevice: () -> Unit,
+    lyrics: List<TimeSyncedLyric> = defaultLyricsList,
+    lyricsSnippet: String = "",
+    monthlyListeners: String = "",
+    artistBio: String = ""
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -84,7 +90,11 @@ internal fun ShellNowPlaying(
             onSeek = onSeek,
             onMoreClick = onMore,
             onQueueClick = onQueue,
-            onDeviceClick = onDevice
+            onDeviceClick = onDevice,
+            lyrics = lyrics,
+            lyricsSnippet = lyricsSnippet,
+            monthlyListeners = monthlyListeners,
+            artistBio = artistBio
         )
     }
 }

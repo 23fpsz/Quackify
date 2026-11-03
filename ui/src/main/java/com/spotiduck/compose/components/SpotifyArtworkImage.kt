@@ -20,6 +20,28 @@ import coil.request.ImageRequest
 import com.spotiduck.compose.theme.SpotifyTheme
 
 /**
+ * Resolves any Spotify image format (full URL, spotify:image:<id>, or raw hex image hash)
+ * into a valid HTTPS URL pointing to Spotify's image CDN.
+ */
+fun resolveSpotifyImageUrl(rawUrl: String?): String? {
+    if (rawUrl.isNullOrBlank()) return null
+    val trimmed = rawUrl.trim()
+    return when {
+        trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true) -> trimmed
+        trimmed.startsWith("file://", ignoreCase = true) || trimmed.startsWith("content://", ignoreCase = true) -> trimmed
+        trimmed.startsWith("spotify:image:", ignoreCase = true) -> {
+            val id = trimmed.substringAfter("spotify:image:")
+            "https://i.scdn.co/image/$id"
+        }
+        // Spotify image ID is typically a 40 or 32 character hex string
+        trimmed.length in 30..50 && trimmed.all { it.isDigit() || (it in 'a'..'f') || (it in 'A'..'F') } -> {
+            "https://i.scdn.co/image/$trimmed"
+        }
+        else -> trimmed
+    }
+}
+
+/**
  * Universal Spotify Album & Playlist Artwork Component.
  * Renders high-resolution remote artwork with crossfade transitions and
  * elegant fallback placeholders.
@@ -36,15 +58,16 @@ fun SpotifyArtworkImage(
 ) {
     val effectiveShape = shape ?: (if (cornerRadius != null && cornerRadius > 0.dp) RoundedCornerShape(cornerRadius) else null)
     val clipModifier = if (effectiveShape != null) modifier.clip(effectiveShape) else modifier
+    val resolvedUrl = resolveSpotifyImageUrl(imageUrl)
 
     Box(
         modifier = clipModifier.background(fallbackColor),
         contentAlignment = Alignment.Center
     ) {
-        if (!imageUrl.isNullOrBlank()) {
+        if (!resolvedUrl.isNullOrBlank()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(imageUrl)
+                    .data(resolvedUrl)
                     .crossfade(true)
                     .build(),
                 contentDescription = contentDescription,
