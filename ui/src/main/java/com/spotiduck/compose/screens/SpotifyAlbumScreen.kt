@@ -85,12 +85,12 @@ fun SpotifyAlbumScreen(
     albumTitle: String,
     artistName: String,
     releaseYear: String,
-    releaseDate: String = "March 20, 2020",
+    releaseDate: String = "",
     coverColor: Color = Color(0xFF6B1A24),
     tracks: List<TrackItem>,
     discs: List<AlbumDisc>? = null,
-    copyrightNotice: String = "© 2020 Republic Records, a division of UMG Recordings, Inc.",
-    phonographicNotice: String = "℗ 2020 Republic Records, a division of UMG Recordings, Inc.",
+    copyrightNotice: String = "",
+    phonographicNotice: String = "",
     currentTrackTitle: String = "",
     isPlaying: Boolean = false,
     moreByArtist: List<ArtistRelease>? = null,
@@ -487,40 +487,45 @@ fun SpotifyAlbumScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 20.dp)
                 ) {
-                    Text(
-                        text = releaseDate,
-                        style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
-                    )
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    val totalDuration = calculateTotalDuration(tracks.size)
-                    Text(
-                        text = "${tracks.size} songs • $totalDuration",
-                        style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = copyrightNotice,
-                        style = SpotifyTheme.typography.marginal.copy(
-                            fontSize = 10.sp,
-                            lineHeight = 14.sp,
-                            color = EncoreColors.TextSecondary
+                    if (releaseDate.isNotBlank()) {
+                        Text(
+                            text = releaseDate,
+                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
                         )
-                    )
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = phonographicNotice,
-                        style = SpotifyTheme.typography.marginal.copy(
-                            fontSize = 10.sp,
-                            lineHeight = 14.sp,
-                            color = EncoreColors.TextSecondary
+                    if (tracks.isNotEmpty()) {
+                        val totalDuration = calculateTotalDuration(tracks.size)
+                        Text(
+                            text = "${tracks.size} songs • $totalDuration",
+                            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                         )
-                    )
+                    }
+
+                    if (copyrightNotice.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = copyrightNotice,
+                            style = SpotifyTheme.typography.marginal.copy(
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp,
+                                color = EncoreColors.TextSecondary
+                            )
+                        )
+                    }
+
+                    if (phonographicNotice.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = phonographicNotice,
+                            style = SpotifyTheme.typography.marginal.copy(
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp,
+                                color = EncoreColors.TextSecondary
+                            )
+                        )
+                    }
                 }
             }
 

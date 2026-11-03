@@ -127,18 +127,6 @@ fun SpotifyHomeScreen(
         }
     }
 
-    val madeForYou = remember(recommendations) {
-        if (!recommendations.isNullOrEmpty()) {
-            recommendations
-        } else {
-            listOf(
-                RecommendationCard("Daily Mix 1", "The Weeknd, Drake, Travis Scott", Color(0xFF8D67AB), tag = "MIX"),
-                RecommendationCard("Daily Mix 2", "Daft Punk, Justice, Kavinsky", Color(0xFF1E3264), tag = "MIX"),
-                RecommendationCard("Daily Mix 3", "Coldplay, Imagine Dragons, OneRepublic", Color(0xFF432371), tag = "MIX"),
-                RecommendationCard("Discover Weekly", "Your weekly mixtape of fresh music", Color(0xFF2E77D0), tag = "PLAYLIST")
-            )
-        }
-    }
 
     val shelfSections = remember(shelves) {
         shelves.orEmpty().filter { it.cards.isNotEmpty() }

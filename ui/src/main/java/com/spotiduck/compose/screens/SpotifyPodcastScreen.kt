@@ -85,35 +85,7 @@ data class PodcastEpisode(
     val isPlayed: Boolean = false
 )
 
-val DefaultPodcastEpisodes = listOf(
-    PodcastEpisode(
-        id = "fo-580",
-        title = "How Extreme Heat Is Becoming India's \$180 Billion Problem | Arunabha Ghosh | FO580 Raj Shamani",
-        description = "Checkout Mobius: https://mobiusf.org/ Get your hand-picked playbook here: https://www.figuringout.co/pdf/fo-580 Guest Suggestion Form: https://forms.gle/bnaeY3FpoFU9ZjA47 Disclaimer: This video is intended solely for educational purposes.",
-        releaseDate = "Tue",
-        duration = "1h 15m",
-        statusText = null,
-        imageUrl = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552"
-    ),
-    PodcastEpisode(
-        id = "fo-579",
-        title = "How Osama Bin Laden Was Found, Killed & Raid Strategy | Robert J. O'Neill | FO579 Raj Shamani",
-        description = "Download Porter Here: https://porter.in/enterprise Get your hand-picked playbook here: https://www.figuringout.co/pdf/fo-579 Guest Suggestion Form: https://forms.gle/bnaeY3FpoFU9ZjA47",
-        releaseDate = "Sat",
-        duration = "1h 50m left",
-        statusText = "Finished",
-        imageUrl = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552"
-    ),
-    PodcastEpisode(
-        id = "fo-578",
-        title = "How To Build An Unbreakable Mind & Push Beyond Your Limits | Ayyoub El Osrouti | FO578 Raj Shamani",
-        description = "Checkout ASUS ExpertBook Series: https://www.flipkart.com/bbd-eb-intrigue-at-store Get your hand-picked playbook here: https://www.figuringout.co/pdf/fo-578 Guest Suggestion Form: https://forms.gle/bnaeY3FpoFU9ZjA4",
-        releaseDate = "Thu",
-        duration = "2h 50m",
-        statusText = "50K+ plays",
-        imageUrl = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552"
-    )
-)
+val DefaultPodcastEpisodes = emptyList<PodcastEpisode>()
 
 private val RelatedPodcastShows = emptyList<Pair<String, String>>()
 
@@ -128,13 +100,14 @@ private val RelatedPodcastShows = emptyList<Pair<String, String>>()
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SpotifyPodcastScreen(
-    showTitle: String = "Figuring Out with Raj Shamani",
-    publisherName: String = "Raj Shamani",
-    rankBadge: String? = "#1 in Top Podcasts",
-    rating: String = "4.6 (6.8K)",
-    category: String = "Educational",
+    showTitle: String = "",
+    publisherName: String = "",
+    rankBadge: String? = null,
+    rating: String = "",
+    category: String = "",
+    aboutDescription: String = "",
     coverColor: Color = Color(0xFF2E3A40),
-    coverUrl: String? = "https://i.scdn.co/image/ab6765630000ba8aa218ee3778a87b1cbf3bb552",
+    coverUrl: String? = null,
     episodes: List<PodcastEpisode> = DefaultPodcastEpisodes,
     currentEpisodeId: String = "",
     isPlaying: Boolean = false,
@@ -634,41 +607,49 @@ fun SpotifyPodcastScreen(
                             )
                         ) {
                             item {
-                                Text(
-                                    text = "About",
-                                    style = SpotifyTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 18.sp
+                                if (aboutDescription.isNotBlank()) {
+                                    Text(
+                                        text = "About",
+                                        style = SpotifyTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            fontSize = 18.sp
+                                        )
                                     )
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "Figuring Out with Raj Shamani is India's top podcast where business, mental resilience, personal finance, and high-impact life journeys collide with world-class founders, authors, scientists, and creators.",
-                                    style = SpotifyTheme.typography.bodySmall.copy(
-                                        color = EncoreColors.TextSecondary,
-                                        lineHeight = 20.sp,
-                                        fontSize = 14.sp
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = aboutDescription,
+                                        style = SpotifyTheme.typography.bodySmall.copy(
+                                            color = EncoreColors.TextSecondary,
+                                            lineHeight = 20.sp,
+                                            fontSize = 14.sp
+                                        )
                                     )
-                                )
-                                Spacer(modifier = Modifier.height(24.dp))
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                }
 
-                                Text(
-                                    text = "Ratings & Reviews",
-                                    style = SpotifyTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 16.sp
+                                if (rating.isNotBlank() || category.isNotBlank()) {
+                                    Text(
+                                        text = "Ratings & Reviews",
+                                        style = SpotifyTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            fontSize = 16.sp
+                                        )
                                     )
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "★ $rating • $category",
-                                    style = SpotifyTheme.typography.bodyMedium.copy(
-                                        color = EncoreColors.TextSecondary,
-                                        fontSize = 13.sp
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    val ratingCategoryText = listOfNotNull(
+                                        rating.takeIf { it.isNotBlank() }?.let { "★ $it" },
+                                        category.takeIf { it.isNotBlank() }
+                                    ).joinToString(" • ")
+                                    Text(
+                                        text = ratingCategoryText,
+                                        style = SpotifyTheme.typography.bodyMedium.copy(
+                                            color = EncoreColors.TextSecondary,
+                                            fontSize = 13.sp
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }

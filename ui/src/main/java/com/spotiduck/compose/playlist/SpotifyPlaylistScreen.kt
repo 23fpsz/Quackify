@@ -160,14 +160,7 @@ fun SpotifyPlaylistScreen(
 
     // Recommended tracks matching Spotify
     val recommendedSongs = remember {
-        mutableStateListOf(
-            TrackItem("Faasle", "Aditya Rikhari", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
-            TrackItem("Alag Aasmaan", "Anuv Jain", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
-            TrackItem("Another Love", "Tom Odell", true, imageUrl = "https://i.scdn.co/image/ab67616d0000b27320b57e4975f9ee73b64f3319"),
-            TrackItem("Tu hai kahan", "AUR", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b273b0dd6a5cd1dec96c4119c262"),
-            TrackItem("Maybe My Soulmate Died", "iamnotshane", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2734ab25200366c1b3f942d937a"),
-            TrackItem("Farq hai", "Suzonn", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b273523ec3e30f1489ecde3a9aa8")
-        )
+        mutableStateListOf<TrackItem>()
     }
 
     val displayedTracks by remember {
@@ -1018,14 +1011,6 @@ fun SpotifyPlaylistScreen(
                                     .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(999.dp))
                                     .clickable {
                                         recommendedSongs.clear()
-                                        recommendedSongs.addAll(
-                                            listOf(
-                                                TrackItem("Khaab", "Akhil", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
-                                                TrackItem("Asal Mein", "Darshan Raval", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
-                                                TrackItem("Bye", "Aditya Bhardwaj", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b27320b57e4975f9ee73b64f3319"),
-                                                TrackItem("Lamhey", "Anubha Bajaj", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b273b0dd6a5cd1dec96c4119c262")
-                                            )
-                                        )
                                     }
                                     .padding(horizontal = 24.dp, vertical = 10.dp)
                             ) {
