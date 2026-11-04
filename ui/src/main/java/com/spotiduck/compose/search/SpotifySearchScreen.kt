@@ -39,6 +39,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -87,6 +88,7 @@ import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
 import com.spotiduck.compose.theme.SpotifyTheme
 import com.spotiduck.compose.theme.rememberBottomPadding
+import com.spotiduck.compose.util.rememberIsOffline
 
 data class CategoryCard(
     val title: String,
@@ -158,6 +160,8 @@ fun SpotifySearchScreen(
     recentSearches: List<SearchHistoryItem> = emptyList(),
     suggestions: List<TrackItem> = emptyList(),
     loading: Boolean = false,
+    loadFailed: Boolean = false,
+    onRetry: () -> Unit = {},
     onToggleSaved: (String) -> Unit = {},
     onClearRecent: () -> Unit = {},
     onRemoveRecent: (SearchHistoryItem) -> Unit = {},
@@ -173,6 +177,10 @@ fun SpotifySearchScreen(
     val searchTabs = listOf("Top", "Songs", "Artists", "Playlists", "Albums", "Podcasts")
     val focusManager = LocalFocusManager.current
     val bottomPadding = rememberBottomPadding()
+
+    // The same live connectivity the shell's offline banner uses: searching
+    // with the radio off must say so instead of spinning on "Searching...".
+    val isOffline = rememberIsOffline()
 
     // Voice search: hand the query to the system speech recognizer and feed the
     // transcript straight into the search flow
@@ -646,7 +654,7 @@ fun SpotifySearchScreen(
                     filteredPlaylists.isNotEmpty() ||
                     filteredPodcasts.isNotEmpty()
 
-            if (loading) {
+            if (loading && !isOffline) {
                 // Debounce + fetch in flight: show feedback instead of a premature
                 // "Couldn't find" while the results have not landed yet
                 Box(
@@ -667,6 +675,41 @@ fun SpotifySearchScreen(
                             style = SpotifyTheme.typography.titleMedium,
                             textAlign = TextAlign.Center
                         )
+                    }
+                }
+            } else if (!hasResults && (isOffline || loadFailed)) {
+                // Nothing came back because the network is gone or the query
+                // itself failed - the same card the playlist screen shows,
+                // with a retry instead of a misleading "couldn't find"
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_cloud_off_24),
+                            contentDescription = null,
+                            tint = EncoreColors.TextSecondary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = if (isOffline) "You're offline" else "Couldn't load search results",
+                            style = SpotifyTheme.typography.titleLarge,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Check your internet connection and try again.",
+                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TextButton(onClick = onRetry) {
+                            Text(text = "Try again", color = EncoreColors.Green)
+                        }
                     }
                 }
             } else if (!hasResults) {

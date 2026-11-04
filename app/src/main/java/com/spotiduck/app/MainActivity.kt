@@ -183,6 +183,9 @@ class MainActivity : ComponentActivity() {
                         var searchData by remember { mutableStateOf<SearchResults?>(null) }
                         var searchHits by remember { mutableStateOf<List<SearchHit>>(emptyList()) }
                         var searchLoading by remember { mutableStateOf(false) }
+                        var searchFailed by remember { mutableStateOf(false) }
+                        var searchFetch by remember { mutableStateOf(0) }
+                        var searchDataFor by remember { mutableStateOf("") }
                         var recentQueries by remember { mutableStateOf(RecentQueries.all(context)) }
                         val scope = rememberCoroutineScope()
 
@@ -250,6 +253,7 @@ class MainActivity : ComponentActivity() {
                         }
                         var whatsNew by remember { mutableStateOf<List<SpotifyNotification>>(emptyList()) }
                         var whatsNewLoading by remember { mutableStateOf(false) }
+                        var whatsNewFailed by remember { mutableStateOf(false) }
                         var whatsNewFetch by remember { mutableStateOf(0) }
                         var playHistory by remember { mutableStateOf(PlayHistory.all(context)) }
 
@@ -273,6 +277,7 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(whatsNewFetch) {
                             whatsNewLoading = true
                             val feed = WhatsNew.feed(context)
+                            whatsNewFailed = feed == null
                             whatsNew = feed?.items.orEmpty().map { item ->
                                 SpotifyNotification(
                                     title = item.title,
@@ -603,22 +608,42 @@ class MainActivity : ComponentActivity() {
                             historyRows.filter { it.playedAtMs in 1 until startOfYesterday }.map { it.item }
                         }
 
-                        LaunchedEffect(searchTerm) {
+                        // Search keys itself on the live connectivity too: while
+                        // the radio is off the queries are skipped outright (and
+                        // the screen says why), and the moment it returns the
+                        // current term runs again on its own.
+                        LaunchedEffect(searchTerm, searchFetch, offlineNow) {
                             val term = searchTerm.trim()
                             if (term.isEmpty()) {
                                 searchData = null
                                 searchHits = emptyList()
                                 searchLoading = false
+                                searchFailed = false
+                                return@LaunchedEffect
+                            }
+                            if (offlineNow) {
+                                // Results for the term that produced them stay on
+                                // screen; a fresh term the radio cannot answer
+                                // drops to the no-connection card.
+                                searchLoading = false
+                                searchFailed = false
+                                if (searchDataFor != term) {
+                                    searchHits = emptyList()
+                                    searchData = null
+                                }
                                 return@LaunchedEffect
                             }
                             // flag the search as busy right away so the ui shows
                             // feedback during the debounce window too, not a
                             // premature "couldn't find"
                             searchLoading = true
+                            searchFailed = false
                             delay(280)
                             searchHits = Search.suggest(context, term)
                             val results = Search.query(context, term)
                             searchData = results?.let { decorateSearchTracks(context, it) }
+                            searchDataFor = term
+                            searchFailed = results == null
                             searchLoading = false
                             if (results != null) {
                                 withContext(Dispatchers.Default) { RecentQueries.record(context, term) }
@@ -878,6 +903,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             searchLoading = searchLoading,
+                            searchFailed = searchFailed,
+                            onRetrySearch = { searchFetch++ },
                             searchQuery = searchTerm,
                             searchData = searchData,
                             onClearRecentSearches = {
@@ -983,6 +1010,7 @@ class MainActivity : ComponentActivity() {
                             },
                             notifications = whatsNew,
                             notificationsLoading = whatsNewLoading,
+                            notificationsFailed = whatsNewFailed,
                             onRefreshWhatsNew = { whatsNewFetch++ },
                             historyToday = historyToday,
                             historyYesterday = historyYesterday,
