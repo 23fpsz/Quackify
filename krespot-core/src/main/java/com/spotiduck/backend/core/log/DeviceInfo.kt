@@ -2,13 +2,18 @@ package com.spotiduck.backend.core.log
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.res.Configuration
 import android.media.MediaDrm
 import android.net.ConnectivityManager
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Debug
 import android.os.Environment
+import android.os.Process
 import android.os.StatFs
 import android.os.SystemClock
+import android.telephony.TelephonyManager
+import android.view.WindowManager
 import android.webkit.WebView
 import com.spotiduck.backend.core.auth.SpotifyAuth
 import java.io.File
@@ -51,6 +56,12 @@ object DeviceInfo {
         line(out, "debuggable", ((app.applicationInfo?.flags ?: 0) and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0).toString())
         line(out, "dataDir", app.filesDir.parentFile?.absolutePath ?: "unknown")
         line(out, "logBuffer", "${Logs.size()}/${Logs.MAX_LINES} lines")
+        line(out, "pid", Process.myPid().toString())
+        line(out, "threads", Thread.activeCount().toString())
+        if (pack != null) {
+            line(out, "installed", stamp(pack.firstInstallTime))
+            line(out, "updated", stamp(pack.lastUpdateTime))
+        }
 
         section(out, "Session")
         line(out, "loggedIn", runCatching { SpotifyAuth.isLoggedIn(app) }.getOrDefault(false).toString())
@@ -95,6 +106,7 @@ object DeviceInfo {
         line(out, "buildId", Build.ID)
         line(out, "incremental", Build.VERSION.INCREMENTAL)
         line(out, "fingerprint", Build.FINGERPRINT)
+        line(out, "emulator", isEmulator().toString())
 
         section(out, "Android")
         line(out, "release", Build.VERSION.RELEASE.orEmpty().ifBlank { "unknown" })
@@ -104,6 +116,21 @@ object DeviceInfo {
         line(out, "locale", Locale.getDefault().toLanguageTag())
         line(out, "timezone", TimeZone.getDefault().id)
 
+        section(out, "Region")
+        val locale = Locale.getDefault()
+        line(out, "country", "${locale.country.ifBlank { "?" }} ${locale.displayCountry}")
+        runCatching {
+            val telephony = app.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+            if (telephony != null) {
+                line(out, "simCountry", telephony.simCountryIso.ifBlank { "?" })
+                line(out, "networkCountry", telephony.networkCountryIso.ifBlank { "?" })
+                line(out, "carrier", telephony.simOperatorName
+                    .ifBlank { telephony.networkOperatorName }
+                    .ifBlank { "?" }
+                )
+            }
+        }
+
         section(out, "System on chip")
         line(out, "cores", Runtime.getRuntime().availableProcessors().toString())
         line(out, "abis", Build.SUPPORTED_ABIS.joinToString(", "))
@@ -112,6 +139,14 @@ object DeviceInfo {
         }
 
         section(out, "Memory")
+        runCatching {
+            val runtime = Runtime.getRuntime()
+            line(out, "javaHeap", "max=${formatBytes(runtime.maxMemory())} " +
+                "used=${formatBytes(runtime.totalMemory() - runtime.freeMemory())} " +
+                "free=${formatBytes(runtime.freeMemory())}"
+            )
+            line(out, "nativeHeap", formatBytes(Debug.getNativeHeapAllocatedSize()))
+        }
         val activity = app.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         val memory = ActivityManager.MemoryInfo()
         activity?.getMemoryInfo(memory)
@@ -126,40 +161,65 @@ object DeviceInfo {
         section(out, "Storage")
         statFs(out, "data", Environment.getDataDirectory())
         statFs(out, "externalFiles", app.getExternalFilesDir(null) ?: app.filesDir)
+        runCatching {
+            @Suppress("DEPRECATION")
+            statFs(out, "externalRoot", Environment.getExternalStorageDirectory())
+        }
+        line(out, "filesDir", app.filesDir.absolutePath)
 
         section(out, "Display")
         val metrics = app.resources.displayMetrics
         line(out, "pixels", "${metrics.widthPixels} x ${metrics.heightPixels}")
+        line(out, "sizeDp", "${(metrics.widthPixels / metrics.density).toInt()}x" +
+            "${(metrics.heightPixels / metrics.density).toInt()}dp"
+        )
         line(out, "densityDpi", metrics.densityDpi.toString())
         line(out, "density", metrics.density.toString())
         line(out, "xdpi/ydpi", "%.1f / %.1f".format(Locale.US, metrics.xdpi, metrics.ydpi))
-        val refresh = runCatching {
-            val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) app.display else null
-            @Suppress("DEPRECATION")
-            (display ?: (app.getSystemService(Context.WINDOW_SERVICE) as? android.view.WindowManager)?.defaultDisplay)
-        }.getOrNull()
-        line(out, "refreshRateHz", refresh?.let { "%.2f".format(Locale.US, it.refreshRate) } ?: "unknown")
+        line(out, "orientation",
+            if (context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                "landscape"
+            } else {
+                "portrait"
+            }
+        )
+        line(out, "refreshRateHz", refreshHz(context))
 
         section(out, "Network")
-        val connectivity = app.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        val network = connectivity?.activeNetwork
-        val capabilities = network?.let { connectivity.getNetworkCapabilities(it) }
-        if (capabilities == null) {
-            line(out, "type", "none")
-        } else {
-            val kind = when {
-                capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
-                capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
-                capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
-                capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) -> "vpn"
-                else -> "other"
+        runCatching {
+            val connectivity = app.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val network = connectivity?.activeNetwork
+            val capabilities = network?.let { connectivity.getNetworkCapabilities(it) }
+            if (capabilities == null) {
+                line(out, "transport", "none")
+            } else {
+                val transports = ArrayList<String>(4)
+                if (capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
+                    transports.add("wifi")
+                }
+                if (capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                    transports.add("cellular")
+                }
+                if (capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                    transports.add("ethernet")
+                }
+                if (capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) {
+                    transports.add("vpn")
+                }
+                if (capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH)) {
+                    transports.add("bluetooth")
+                }
+                line(out, "transport", if (transports.isEmpty()) "other" else transports.joinToString("+"))
+                line(out, "validated",
+                    capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED).toString()
+                )
+                line(out, "metered", (connectivity?.isActiveNetworkMetered ?: true).toString())
+                line(out, "bandwidth",
+                    "down=${capabilities.linkDownstreamBandwidthKbps}kbps " +
+                        "up=${capabilities.linkUpstreamBandwidthKbps}kbps"
+                )
             }
-            line(out, "type", kind)
-            line(out, "metered", (!capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)).toString())
-            if (capabilities.linkDownstreamBandwidthKbps > 0) {
-                line(out, "downstream", "${capabilities.linkDownstreamBandwidthKbps} kbps (estimate)")
-            }
-        }
+        }.onFailure { line(out, "transport", "unavailable: ${it.message}") }
 
         section(out, "Battery")
         runCatching {
@@ -242,6 +302,38 @@ object DeviceInfo {
             line(out, "$label.total", formatBytes(stats.totalBytes))
         }.onFailure { line(out, label, "unavailable: ${it.message}") }
     }
+
+    /**
+     * The refresh rate through the context the caller handed in. A UI context
+     * answers getDisplay() from API 30; an application context throws instead
+     * of returning null, so each attempt is guarded on its own to leave the
+     * deprecated WindowManager default display as a working fallback. Reading
+     * both from the application context is what used to report "unknown".
+     */
+    private fun refreshHz(context: Context): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val direct = runCatching { context.display }.getOrNull()
+            if (direct != null && direct.refreshRate > 0f) {
+                return "%.1f".format(Locale.US, direct.refreshRate)
+            }
+        }
+        @Suppress("DEPRECATION")
+        val fallback = (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)
+            ?.defaultDisplay?.refreshRate
+        return fallback?.takeIf { it > 0f }
+            ?.let { "%.1f".format(Locale.US, it) } ?: "unknown"
+    }
+
+    private fun stamp(epochMs: Long): String =
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(epochMs))
+
+    private fun isEmulator(): Boolean =
+        Build.FINGERPRINT.startsWith("generic") ||
+            Build.FINGERPRINT.contains("vbox") ||
+            Build.FINGERPRINT.contains("emulator") ||
+            Build.MODEL.contains("Emulator") ||
+            Build.HARDWARE.contains("goldfish") ||
+            Build.HARDWARE.contains("ranchu")
 
     private fun section(out: StringBuilder, title: String) {
         out.appendLine()
