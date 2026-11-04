@@ -33,6 +33,7 @@ private const val PROGRESS_STEP_MS = 100L
 private const val CACHE_SEGMENTS = 32
 private const val SEEK_TAIL_MS = 1000L
 private const val BEAT_MS = 15000L
+private const val SEGMENT_ATTEMPTS = 3
 
 internal class PlayerEngine(
     private val source: AudioSource,
@@ -62,7 +63,13 @@ internal class PlayerEngine(
     @Volatile
     private var positionMs = 0L
 
+    // Written by the engine coroutine, read from the connect/UI threads.
+    @Volatile
     private var sink: AudioSink? = null
+
+    @Volatile
+    private var userVolumeLevel = 1f
+
     private var codec: MediaCodec? = null
     private var format: MediaFormat? = null
 
@@ -102,7 +109,12 @@ internal class PlayerEngine(
 
     fun duck(level: Float) {
         duckLevel = level.coerceIn(0f, 1f)
-        sink?.volume(duckLevel)
+        sink?.duck(duckLevel)
+    }
+
+    fun volume(level: Float) {
+        userVolumeLevel = level.coerceIn(0f, 1f)
+        sink?.volume(userVolumeLevel)
     }
 
     fun resume() {
@@ -137,11 +149,15 @@ internal class PlayerEngine(
         val crypto = try {
             openedCrypto.await()
         } catch (cancellation: CancellationException) {
-            opening.cancel()
+            // The sink build usually completes while the licence is still in
+            // flight; cancelling the deferred no-ops then and the AudioTrack
+            // would leak. The engine scope outlives this run, so it can still
+            // await and release the sink.
+            scope.launch { runCatching { opening.await().release() } }
             throw cancellation
         }
         if (crypto == null) {
-            opening.cancel()
+            runCatching { opening.await().release() }
             emit(PlayerEvent.Failed(widevine.reason.ifBlank { "no drm session" }))
             return
         }
@@ -156,7 +172,7 @@ internal class PlayerEngine(
             }
         }.getOrElse {
             log.e("decoder ${it.javaClass.simpleName}: ${it.message}")
-            opening.cancel()
+            runCatching { opening.await().release() }
             emit(PlayerEvent.Failed("decoder unavailable"))
             return
         }
@@ -164,11 +180,14 @@ internal class PlayerEngine(
         val audio = try {
             opening.await()
         } catch (cancellation: CancellationException) {
-            opening.cancel()
+            // run() itself was cancelled mid-await: the built sink is nobody's
+            // to claim any more, hand it to the engine scope for release.
+            scope.launch { runCatching { opening.await().release() } }
             throw cancellation
         }
         sink = audio
-        audio.volume(duckLevel)
+        audio.duck(duckLevel)
+        audio.volume(userVolumeLevel)
         audio.start()
         emit(PlayerEvent.Started)
 
@@ -229,8 +248,10 @@ internal class PlayerEngine(
         val preRoll = 3L * frameFrames
         val preRollSeconds = 4.0 * init.defaultDuration / init.timescale
         var startSegment = 0
+        var cumulative = 0L
         for (i in 0 until table.count) {
-            if (table.startSeconds(i) <= fromSeconds) startSegment = i else break
+            if (cumulative.toDouble() / table.timescale <= fromSeconds) startSegment = i else break
+            cumulative += table.durations[i]
         }
         if (startSegment > 0 && fromSeconds - table.startSeconds(startSegment) < preRollSeconds) {
             startSegment -= 1
@@ -267,18 +288,34 @@ internal class PlayerEngine(
             try {
                 while (isActive && index < table.count && !stopped) {
                     val size = table.sizes[index]
-                    val bytes = cache[index] ?: runCatching {
-                        Net.fetch(
-                            source.url,
-                            offset,
-                            offset + size - 1,
-                            mapOf("referer" to "https://open.spotify.com/"),
-                        )
-                    }.getOrElse {
-                        log.w("segment $index failed ${it.javaClass.simpleName}: ${it.message}")
-                        null
+                    var bytes = cache[index]
+                    if (bytes == null) {
+                        // One dropped segment used to freeze the track forever
+                        // with no event out; a mobile network blips, so retry
+                        // a couple of times before giving up on the track.
+                        for (attempt in 1..SEGMENT_ATTEMPTS) {
+                            if (attempt > 1) delay(500L * (attempt - 1))
+                            bytes = runCatching {
+                                Net.fetch(
+                                    source.url,
+                                    offset,
+                                    offset + size - 1,
+                                    mapOf("referer" to "https://open.spotify.com/"),
+                                )
+                            }.getOrElse {
+                                log.w("segment $index fetch ${it.javaClass.simpleName}: ${it.message} " +
+                                        "(attempt $attempt/$SEGMENT_ATTEMPTS)"
+                                )
+                                null
+                            }
+                            if (bytes != null) break
+                        }
                     }
-                    if (bytes == null) break
+                    if (bytes == null) {
+                        log.e("segment $index unreachable after $SEGMENT_ATTEMPTS attempts")
+                        emit(PlayerEvent.Failed("segment $index download failed"))
+                        break
+                    }
                     remember(index, bytes)
                     offset += size
                     index++

@@ -120,8 +120,8 @@ fun SpotifyCategoryScreen(
     categoryColor: Color = getCategoryColor(categoryTitle),
     onBackClick: () -> Unit = {},
     onPlaylistClick: (String, String) -> Unit = { _, _ -> },
-    onAlbumClick: (String, String) -> Unit = { _, _ -> },
-    onArtistClick: (String) -> Unit = {},
+    onAlbumClick: (String, String, String) -> Unit = { _, _, _ -> },
+    onArtistClick: (String, String) -> Unit = { _, _ -> },
     onTrackSelect: (TrackItem) -> Unit = {},
     onSubcategoryClick: (String) -> Unit = {},
     shelves: List<CategoryShelf>? = null,
@@ -238,7 +238,7 @@ fun SpotifyCategoryScreen(
                                     .width(148.dp)
                                     .clickable {
                                         if (item.isAlbum) {
-                                            onAlbumClick(item.title, item.artistName ?: "")
+                                            onAlbumClick(item.title, item.artistName ?: "", item.uri)
                                         } else {
                                             onPlaylistClick(item.title, item.uri.ifEmpty { "spotify:playlist:${item.title}" })
                                         }
@@ -272,7 +272,7 @@ fun SpotifyCategoryScreen(
                                         isPlaying = false,
                                         onClick = {
                                             if (item.isAlbum) {
-                                                onAlbumClick(item.title, item.artistName ?: "")
+                                                onAlbumClick(item.title, item.artistName ?: "", item.uri)
                                             } else {
                                                 onPlaylistClick(
                                                     item.title,

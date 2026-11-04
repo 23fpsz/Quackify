@@ -1,7 +1,9 @@
 package com.spotiduck.compose.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,7 +62,8 @@ enum class LibraryItemType {
     PLAYLIST,
     PODCAST,
     ALBUM,
-    ARTIST
+    ARTIST,
+    FOLDER
 }
 
 data class LibraryItem(
@@ -82,19 +86,24 @@ data class LibraryItem(
  * - Sort button ("Recents" etc.) & Grid vs List view toggle
  * - Dynamic List / 2-Column Grid views
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SpotifyLibraryScreen(
     onItemClick: (String, String) -> Unit,
     items: List<LibraryItem>? = null,
-    onAlbumClick: (String, String) -> Unit = { _, _ -> },
+    onAlbumClick: (String, String, String) -> Unit = { _, _, _ -> },
     onPodcastClick: (String, String) -> Unit = { _, _ -> },
-    onArtistClick: (String) -> Unit = {},
+    onArtistClick: (String, String) -> Unit = { _, _ -> },
     onProfileClick: () -> Unit = {},
     onPlusClick: () -> Unit = {},
     onSortClick: () -> Unit = {},
+    onItemLongPress: (LibraryItem) -> Unit = {},
+    onFolderClick: (LibraryItem) -> Unit = {},
     currentSort: LibrarySortOption = LibrarySortOption.RECENTS,
+    loading: Boolean = false,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
+    title: String = "Your Library",
     modifier: Modifier = Modifier
 ) {
     var selectedFilter by remember { mutableStateOf<String?>(null) }
@@ -106,11 +115,11 @@ fun SpotifyLibraryScreen(
     // Authentic Spotify Library filters (matching @string/your_library_content_filter_*)
     val filters = listOf("Playlists", "Podcasts", "Albums", "Artists", "Downloaded")
 
-    val allLibraryItems = remember(items) { items.orEmpty() }
-    val filteredItems = remember(selectedFilter, searchFilterText, currentSort) {
+    val allLibraryItems = items.orEmpty()
+    val filteredItems = remember(allLibraryItems, selectedFilter, searchFilterText, currentSort) {
         var result = allLibraryItems.filter { item ->
             val matchesFilter = when (selectedFilter) {
-                "Playlists" -> item.type == LibraryItemType.PLAYLIST
+                "Playlists" -> item.type == LibraryItemType.PLAYLIST || item.type == LibraryItemType.FOLDER
                 "Podcasts" -> item.type == LibraryItemType.PODCAST
                 "Albums" -> item.type == LibraryItemType.ALBUM
                 "Artists" -> item.type == LibraryItemType.ARTIST
@@ -231,7 +240,7 @@ fun SpotifyLibraryScreen(
                     Spacer(modifier = Modifier.width(12.dp))
 
                     Text(
-                        text = "Your Library",
+                        text = title,
                         style = SpotifyTheme.typography.titleMedium.copy(
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
@@ -343,8 +352,21 @@ fun SpotifyLibraryScreen(
             }
         }
 
-        // Library Items Content: Empty State, List View OR Grid View
-        if (filteredItems.isEmpty()) {
+        // Library Items Content: Loading State, Empty State, List View OR Grid View
+        if (loading && filteredItems.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = bottomPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = EncoreColors.Green,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+        } else if (filteredItems.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -389,14 +411,18 @@ fun SpotifyLibraryScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                when (item.type) {
-                                    LibraryItemType.ALBUM -> onAlbumClick(item.title, "")
-                                    LibraryItemType.PODCAST -> onPodcastClick(item.title, item.subtitle)
-                                    LibraryItemType.ARTIST -> onArtistClick(item.title)
-                                    else -> onItemClick(item.title, item.uri)
-                                }
-                            }
+                            .combinedClickable(
+                                onClick = {
+                                    when (item.type) {
+                                        LibraryItemType.ALBUM -> onAlbumClick(item.title, "", item.uri)
+                                        LibraryItemType.PODCAST -> onPodcastClick(item.title, item.uri)
+                                        LibraryItemType.ARTIST -> onArtistClick(item.title, item.uri)
+                                        LibraryItemType.FOLDER -> onFolderClick(item)
+                                        else -> onItemClick(item.title, item.uri)
+                                    }
+                                },
+                                onLongClick = { onItemLongPress(item) }
+                            )
                     ) {
                         Box(
                             modifier = Modifier
@@ -416,6 +442,13 @@ fun SpotifyLibraryScreen(
                             } else if (item.title == "Liked Songs") {
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_heart_active_24),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            } else if (item.type == LibraryItemType.FOLDER) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.encore_icon_folder_24),
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(36.dp)
@@ -460,14 +493,18 @@ fun SpotifyLibraryScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                when (item.type) {
-                                    LibraryItemType.ALBUM -> onAlbumClick(item.title, "")
-                                    LibraryItemType.PODCAST -> onPodcastClick(item.title, item.subtitle)
-                                    LibraryItemType.ARTIST -> onArtistClick(item.title)
-                                    else -> onItemClick(item.title, item.uri)
-                                }
-                            }
+                            .combinedClickable(
+                                onClick = {
+                                    when (item.type) {
+                                        LibraryItemType.ALBUM -> onAlbumClick(item.title, "", item.uri)
+                                        LibraryItemType.PODCAST -> onPodcastClick(item.title, item.uri)
+                                        LibraryItemType.ARTIST -> onArtistClick(item.title, item.uri)
+                                        LibraryItemType.FOLDER -> onFolderClick(item)
+                                        else -> onItemClick(item.title, item.uri)
+                                    }
+                                },
+                                onLongClick = { onItemLongPress(item) }
+                            )
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -491,6 +528,13 @@ fun SpotifyLibraryScreen(
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(24.dp)
+                                )
+                            } else if (item.type == LibraryItemType.FOLDER) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.encore_icon_folder_24),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
                                 )
                             } else {
                                 Text(

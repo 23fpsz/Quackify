@@ -71,7 +71,9 @@ fun EditPlaylistSheet(
     canRemoveCover: Boolean,
     onSave: (name: String, description: String, cover: ByteArray?, clearCover: Boolean) -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    title: String = "Edit details",
+    saveLabel: String = "Save"
 ) {
     if (!isOpen) return
 
@@ -134,7 +136,7 @@ fun EditPlaylistSheet(
                 .navigationBarsPadding()
         ) {
             Text(
-                text = "Edit details",
+                text = title,
                 style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp),
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             )
@@ -257,7 +259,7 @@ fun EditPlaylistSheet(
                         .padding(horizontal = 28.dp, vertical = 12.dp)
                 ) {
                     Text(
-                        text = "Save",
+                        text = saveLabel,
                         style = SpotifyTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,

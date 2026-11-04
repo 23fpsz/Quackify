@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,7 +72,8 @@ data class ArtistRelease(
     val year: String,
     val type: String, // "Album" or "Single"
     val color: Color = Color(0xFF333333),
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val uri: String = ""
 )
 
 data class PopularTrack(
@@ -105,8 +107,13 @@ fun SpotifyArtistScreen(
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onArtistOptionsClick: () -> Unit = {},
     onReleaseClick: (ArtistRelease) -> Unit = {},
+    onAboutClick: () -> Unit = {},
+    onDiscographyClick: () -> Unit = {},
     modifier: Modifier = Modifier,
-    headerImageUrl: String? = null
+    headerImageUrl: String? = null,
+    biography: String = "",
+    verified: Boolean = false,
+    isLoading: Boolean = false
 ) {
     val density = LocalDensity.current
     var isFollowing by remember { mutableStateOf(false) }
@@ -191,8 +198,17 @@ fun SpotifyArtistScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(heroColor)
-                )
+                        .background(heroColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = EncoreColors.Green,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
             }
 
             // Top scrim for status bar and navigation buttons contrast
@@ -259,34 +275,37 @@ fun SpotifyArtistScreen(
                         Spacer(modifier = Modifier.height(6.dp))
 
                         // Verified Artist Badge
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.encore_icon_verified_check_active_24),
-                                contentDescription = "Verified Artist",
-                                tint = Color(0xFF3D91F4),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
+                        if (verified) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.encore_icon_verified_check_active_24),
+                                    contentDescription = "Verified Artist",
+                                    tint = Color(0xFF3D91F4),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Verified Artist",
+                                    style = SpotifyTheme.typography.bodySmall.copy(
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(3.dp))
+                        }
+
+                        // Monthly Listeners
+                        if (monthlyListeners.isNotBlank()) {
                             Text(
-                                text = "Verified Artist",
+                                text = "$monthlyListeners monthly listeners",
                                 style = SpotifyTheme.typography.bodySmall.copy(
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    color = Color(0xFFB3B3B3),
+                                    fontSize = 13.sp
                                 )
                             )
                         }
-
-                        Spacer(modifier = Modifier.height(3.dp))
-
-                        // Monthly Listeners
-                        Text(
-                            text = "$monthlyListeners monthly listeners",
-                            style = SpotifyTheme.typography.bodySmall.copy(
-                                color = Color(0xFFB3B3B3),
-                                fontSize = 13.sp
-                            )
-                        )
                     }
                 }
             }
@@ -497,11 +516,26 @@ fun SpotifyArtistScreen(
             // "Popular releases" Header
             item {
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Popular releases",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
-                    modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Popular releases",
+                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
+                    )
+                    Text(
+                        text = "Discography",
+                        style = SpotifyTheme.typography.bodyMedium.copy(
+                            color = EncoreColors.TextSecondary,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        modifier = Modifier.clickable { onDiscographyClick() }
+                    )
+                }
             }
 
             // Popular Releases Carousel
@@ -555,41 +589,49 @@ fun SpotifyArtistScreen(
             }
 
             // About Section (Bio Card)
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "About",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
-                    modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
-                )
+            if (monthlyListeners.isNotBlank() || !biography.isNullOrBlank()) {
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "About",
+                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                        modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
+                    )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = EncoreSpacers.Base, vertical = 8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF242424))
-                        .clickable { }
-                        .padding(16.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = "$monthlyListeners monthly listeners",
-                            style = SpotifyTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "$artistName is an acclaimed artist with millions of listeners worldwide.",
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = EncoreSpacers.Base, vertical = 8.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF242424))
+                            .clickable { onAboutClick() }
+                            .padding(16.dp)
+                    ) {
+                        Column {
+                            if (monthlyListeners.isNotBlank()) {
+                                Text(
+                                    text = "$monthlyListeners monthly listeners",
+                                    style = SpotifyTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                )
+                            }
+                            if (biography.isNotBlank()) {
+                                if (monthlyListeners.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                                Text(
+                                    text = biography,
+                                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
 

@@ -20,8 +20,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -41,6 +43,7 @@ import com.spotiduck.compose.R
 import com.spotiduck.compose.components.EncoreChip
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.components.EncorePlayButton
+import com.spotiduck.compose.components.SpotifyArtworkImage
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
 import com.spotiduck.compose.theme.SpotifyTheme
@@ -53,7 +56,9 @@ data class SpotifyNotification(
     val isMusic: Boolean = true,
     val id: String = "",
     val isNew: Boolean = false,
-    val imageUrl: String = ""
+    val imageUrl: String = "",
+    val uri: String = "",
+    val kind: String = ""
 )
 
 /**
@@ -62,7 +67,7 @@ data class SpotifyNotification(
 @Composable
 fun NotificationsScreen(
     onBackClick: () -> Unit,
-    onPlayClick: (String) -> Unit = {},
+    onPlayClick: (SpotifyNotification) -> Unit = {},
     notifications: List<SpotifyNotification> = emptyList(),
     loading: Boolean = false,
     onRetry: () -> Unit = {},
@@ -123,70 +128,138 @@ fun NotificationsScreen(
         }
 
         // Notification List
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomPadding)
-        ) {
-            items(filtered) { item ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onPlayClick(item.title) }
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Artwork / Icon
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    if (item.isMusic) listOf(Color(0xFF8D67AB), Color(0xFF1E3264))
-                                    else listOf(Color(0xFF006450), Color(0xFF1DB954))
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (item.isMusic) "♫" else "🎙",
-                            fontSize = 24.sp,
-                            color = Color.White
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = item.title,
-                            style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = item.subtitle,
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = item.timestamp,
-                            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
-                        )
-                    }
-
-                    EncorePlayButton(
-                        isPlaying = false,
-                        onClick = { onPlayClick(item.title) },
-                        size = 36.dp,
-                        iconSize = 16.dp
+        if (loading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = bottomPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = EncoreColors.Green,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+        } else if (filtered.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 32.dp)
+                    .padding(bottom = bottomPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "You're all caught up",
+                        style = SpotifyTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "New releases from the artists and podcasts you follow will show up here.",
+                        style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TextButton(onClick = onRetry) {
+                        Text(text = "Refresh", color = EncoreColors.Green)
+                    }
                 }
             }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomPadding)
+            ) {
+                items(filtered) { item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPlayClick(item) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Artwork
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        if (item.isMusic) listOf(Color(0xFF8D67AB), Color(0xFF1E3264))
+                                        else listOf(Color(0xFF006450), Color(0xFF1DB954))
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (item.imageUrl.isNotBlank()) {
+                                SpotifyArtworkImage(
+                                    imageUrl = item.imageUrl,
+                                    contentDescription = item.title,
+                                    modifier = Modifier.fillMaxSize(),
+                                    cornerRadius = 6.dp
+                                )
+                            } else {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (item.isMusic) R.drawable.encore_icon_album_24
+                                        else R.drawable.encore_icon_podcasts_24
+                                    ),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
 
-            item {
-                Spacer(modifier = Modifier.height(120.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = item.title,
+                                style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = item.subtitle,
+                                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = relativeTime(item.timestamp),
+                                style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                            )
+                        }
+
+                        EncorePlayButton(
+                            isPlaying = false,
+                            onClick = { onPlayClick(item) },
+                            size = 36.dp,
+                            iconSize = 16.dp
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(120.dp))
+                }
             }
         }
+    }
+}
+
+private fun relativeTime(iso: String): String {
+    val at = runCatching {
+        java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.ROOT)
+            .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+            .parse(iso)?.time
+    }.getOrNull() ?: return ""
+    val minutes = (System.currentTimeMillis() - at) / 60000
+    return when {
+        minutes < 1 -> "Just now"
+        minutes < 60 -> "${minutes}m ago"
+        minutes < 60 * 24 -> "${minutes / 60}h ago"
+        else -> "${minutes / (60 * 24)}d ago"
     }
 }
 

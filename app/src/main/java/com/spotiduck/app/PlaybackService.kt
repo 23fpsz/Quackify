@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.spotiduck.backend.core.log.Logs
@@ -20,6 +21,9 @@ class PlaybackService : Service() {
     }
 
     private fun channel() {
+        // Notification channels only exist from API 26; on 24/25 the
+        // compat builder posts straight to the legacy notification path.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
         if (manager.getNotificationChannel(CHANNEL) != null) return
         manager.createNotificationChannel(

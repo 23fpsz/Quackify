@@ -12,6 +12,9 @@ object ContentType {
 private const val AD_PREFIX = "spotify:ad:"
 
 private const val REPLACE_STATE = "replace_state"
+
+private const val TRANSFER = "transfer"
+
 private const val DIRECT_FORMAT = "file_urls_external"
 
 data class AudioFile(
@@ -85,9 +88,15 @@ data class PlaybackCommand(
     val seekToMs: Long = -1L,
 ) {
     val startAtMs: Long get() = if (seekToMs >= 0L) seekToMs else (currentState?.initialPositionMs ?: 0L)
-    val isControl: Boolean get() = endpoint.isNotBlank()
 
-    val isReplaceState: Boolean get() = type == REPLACE_STATE
+    // A transfer rides in as a command too, but it carries the whole state
+    // to load, so it walks the replace_state path rather than the control
+    // one (a pause or a seek never brings a machine with it).
+    val isControl: Boolean get() = endpoint.isNotBlank() && endpoint != TRANSFER
+
+    val isTransfer: Boolean get() = endpoint == TRANSFER
+
+    val isReplaceState: Boolean get() = type == REPLACE_STATE || endpoint == TRANSFER
     val currentState: CommandState? get() = states.getOrNull(stateIndex)
 
     val currentTrack: CommandTrack? get() = currentState?.let { tracks.getOrNull(it.trackIndex) }

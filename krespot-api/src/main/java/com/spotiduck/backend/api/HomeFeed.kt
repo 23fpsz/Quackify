@@ -27,7 +27,14 @@ object HomeFeed {
             log.w("no token, cannot load the home feed")
             return emptyList()
         }
-        val variables = JSONObject(Pathfinder.variablesOf("home").ifBlank { "{}" })
+        // The tap truncates the captured variables at 400 chars; a cut string
+        // must not take the home screen down with an uncaught JSONException.
+        val captured = Pathfinder.variablesOf("home")
+        val base = runCatching { JSONObject(captured) }.getOrNull()
+        if (base == null && captured.isNotBlank()) {
+            log.w("the captured home variables do not parse, running with the defaults")
+        }
+        val variables = (base ?: JSONObject())
             .put("sp_t", Pathfinder.sessionToken())
             .toString()
         val json = Pathfinder.query(

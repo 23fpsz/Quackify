@@ -1,5 +1,9 @@
 package com.spotiduck.compose.player
 
+import android.content.ClipData
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,24 +37,33 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyTheme
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * 1:1 Spotify Lyrics Share Card Generator matching:
@@ -70,8 +83,10 @@ fun LyricsShareDialog(
     onShareConfirm: (List<String>, Color, TextAlign) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Selectable lines (max 5 lines matching Spotify)
-    val selectedIndices = remember {
+    // Selectable lines (max 5 lines matching Spotify); keyed to the lyrics so
+    // a track change under the open dialog can never leave a stale index in
+    // the list (it used to crash on lyrics[idx] with shorter new lyrics).
+    val selectedIndices = remember(lyrics) {
         mutableStateListOf<Int>().apply {
             if (lyrics.isNotEmpty()) add(0)
             if (lyrics.size > 1) add(1)
@@ -102,6 +117,11 @@ fun LyricsShareDialog(
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    // Records the card preview so the Share button can export it as an image
+    val cardLayer = rememberGraphicsLayer()
+    val context = LocalContext.current
+    val shareScope = rememberCoroutineScope()
 
     BackHandler(onBack = onDismiss)
 
@@ -137,7 +157,13 @@ fun LyricsShareDialog(
                     .background(EncoreColors.Green)
                     .clickable {
                         val selectedLines = selectedIndices.sorted().map { lyrics[it].text }
-                        onShareConfirm(selectedLines, selectedColor, textAlign)
+                        shareScope.launch {
+                            val card = runCatching {
+                                cardLayer.toImageBitmap().asAndroidBitmap()
+                            }.getOrNull()
+                            shareLyricCard(context, card, selectedLines, title, artist)
+                            onShareConfirm(selectedLines, selectedColor, textAlign)
+                        }
                     }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
@@ -170,6 +196,12 @@ fun LyricsShareDialog(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
+                        .drawWithContent {
+                            cardLayer.record(IntSize(size.width.toInt(), size.height.toInt())) {
+                                this@drawWithContent.drawContent()
+                            }
+                            drawContent()
+                        }
                 )
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -219,6 +251,12 @@ fun LyricsShareDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .drawWithContent {
+                        cardLayer.record(IntSize(size.width.toInt(), size.height.toInt())) {
+                            this@drawWithContent.drawContent()
+                        }
+                        drawContent()
+                    }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -509,4 +547,43 @@ private fun ShareLineSelector(
             }
         }
     }
+}
+
+/**
+ * Fires the Android share sheet with the lyric card as a png image (and the
+ * lyric text as a fallback for apps that only accept plain text).
+ */
+private fun shareLyricCard(
+    context: Context,
+    card: Bitmap?,
+    lines: List<String>,
+    title: String,
+    artist: String,
+) {
+    val text = buildString {
+        append(lines.joinToString("\n"))
+        append("\n\n")
+        append(title)
+        if (artist.isNotBlank()) append(" • ").append(artist)
+    }
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = if (card != null) "image/png" else "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    if (card != null) {
+        val shared = runCatching {
+            val file = File(context.cacheDir, "share/lyric_card.png")
+            file.parentFile?.mkdirs()
+            file.outputStream().use { out -> card.compress(Bitmap.CompressFormat.PNG, 100, out) }
+            FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+        }.getOrNull()
+        if (shared != null) {
+            send.putExtra(Intent.EXTRA_STREAM, shared)
+            send.clipData = ClipData.newRawUri("lyric card", shared)
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } else {
+            send.type = "text/plain"
+        }
+    }
+    runCatching { context.startActivity(Intent.createChooser(send, "Share lyrics")) }
 }

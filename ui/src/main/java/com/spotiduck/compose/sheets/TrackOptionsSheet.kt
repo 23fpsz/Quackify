@@ -69,8 +69,8 @@ fun TrackOptionsSheet(
     onLikeToggle: (Boolean) -> Unit = {},
     onAddToPlaylist: () -> Unit = {},
     onAddToQueue: () -> Unit = {},
-    onViewArtist: (String) -> Unit = {},
-    onViewAlbum: (String) -> Unit = {},
+    onViewArtist: (String, String) -> Unit = { _, _ -> },
+    onViewAlbum: (String, String) -> Unit = { _, _ -> },
     onShare: () -> Unit = {},
     onSleepTimerClick: () -> Unit = {},
     onHideSong: () -> Unit = {},
@@ -80,7 +80,7 @@ fun TrackOptionsSheet(
     if (!isOpen || track == null) return
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var isLiked by remember(track) { mutableStateOf(track.isExplicit) }
+    var isLiked by remember(track) { mutableStateOf(track.saved ?: false) }
     var isHeartPopping by remember { mutableStateOf(false) }
 
     val heartScale by animateFloatAsState(
@@ -280,7 +280,7 @@ fun TrackOptionsSheet(
                 iconRes = R.drawable.encore_icon_artist_24,
                 onClick = {
                     onDismiss()
-                    onViewArtist(track.artist)
+                    onViewArtist(track.artist, track.artistUri)
                 }
             )
 
@@ -289,7 +289,7 @@ fun TrackOptionsSheet(
                 iconRes = R.drawable.encore_icon_album_24,
                 onClick = {
                     onDismiss()
-                    onViewAlbum(track.title)
+                    onViewAlbum(track.title, track.albumUri)
                 }
             )
 

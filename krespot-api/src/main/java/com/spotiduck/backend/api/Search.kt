@@ -170,13 +170,22 @@ object Search {
         }
         val sections = topSections(json)
         val chips = chipsOf(search, sections, hits)
+        // topResultsV2 carries the whole ranking, but only its first entry
+        // comes back fully decorated: the rows further down can arrive with
+        // nothing but a name and a uri. The dedicated sections (tracksV2,
+        // artists, ...) always carry covers and artist lines, so prefer them
+        // and keep the top-results order as the fallback.
+        val sectionTracks = sectionHits(search, "tracksV2")
+        val sectionArtists = sectionHits(search, "artists")
+        val sectionAlbums = sectionHits(search, "albumsV2")
+        val sectionPlaylists = sectionHits(search, "playlists")
         return SearchResults(
             query = term,
             top = hits.firstOrNull(),
-            tracks = hits.filter { it.kind == SearchKind.TRACK },
-            artists = hits.filter { it.kind == SearchKind.ARTIST },
-            albums = hits.filter { it.kind == SearchKind.ALBUM },
-            playlists = hits.filter { it.kind == SearchKind.PLAYLIST },
+            tracks = merge(sectionTracks, hits, SearchKind.TRACK),
+            artists = merge(sectionArtists, hits, SearchKind.ARTIST),
+            albums = merge(sectionAlbums, hits, SearchKind.ALBUM),
+            playlists = merge(sectionPlaylists, hits, SearchKind.PLAYLIST),
             others = hits.filter {
                 it.kind != SearchKind.TRACK && it.kind != SearchKind.ARTIST &&
                     it.kind != SearchKind.ALBUM && it.kind != SearchKind.PLAYLIST
@@ -185,6 +194,24 @@ object Search {
             totals = totals,
             chips = chips,
         )
+    }
+
+    /** Rows of one searchV2 section, each a full entity. */
+    private fun sectionHits(search: JSONObject?, field: String): List<SearchHit> {
+        val items = search?.optJSONObject(field)?.optJSONArray("items") ?: return emptyList()
+        return (0 until items.length()).mapNotNull { hit(items.optJSONObject(it)) }
+    }
+
+    /** Section rows first, then any top-result row the section did not name. */
+    private fun merge(
+        section: List<SearchHit>,
+        hits: List<SearchHit>,
+        kind: SearchKind,
+    ): List<SearchHit> {
+        val ranked = hits.filter { it.kind == kind }
+        if (section.isEmpty()) return ranked
+        val seen = section.mapTo(HashSet()) { it.uri }
+        return section + ranked.filterNot { it.uri in seen }
     }
 
     private val COUNT_FIELDS = listOf(

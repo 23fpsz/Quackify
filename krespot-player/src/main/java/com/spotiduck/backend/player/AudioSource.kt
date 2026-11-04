@@ -173,10 +173,13 @@ internal object SourceResolver {
             return null
         }
         val segments = json.optJSONArray("segments") ?: return null
-        val sizes = (0 until segments.length()).mapNotNull {
-            segments.optJSONObject(it)?.optInt("size")?.takeIf { size -> size > 0 }
-        }
-        val durations = (0 until segments.length()).map { segments.optJSONObject(it)?.optLong("duration") ?: 0L }
+        // One pass, one filter: dropping only from `sizes` used to desync the
+        // two parallel arrays and end the track early without an event.
+        val usable = (0 until segments.length())
+            .mapNotNull { segments.optJSONObject(it) }
+            .filter { it.optInt("size", 0) > 0 }
+        val sizes = usable.map { it.optInt("size") }
+        val durations = usable.map { it.optLong("duration", 0L) }
         val pssh = json.optJSONObject("pssh")?.optString("widevine").orEmpty()
         if (sizes.isEmpty() || pssh.isBlank()) {
             log.w("seektable incomplete segs=${sizes.size} pssh=${pssh.length}B")

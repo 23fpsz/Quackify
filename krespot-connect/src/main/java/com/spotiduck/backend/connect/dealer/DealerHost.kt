@@ -19,13 +19,16 @@ private const val TTL_MS = 6 * 60 * 60 * 1000L
 
 object DealerHost {
 
+    /** dealer host, spclient host, and when the pair was resolved. */
     @Volatile
-    private var cached: Pair<String, String>? = null
+    private var cached: Triple<String, String, Long>? = null
 
     suspend fun resolve(context: Context): Pair<String, String>? {
-        cached?.let { return it }
+        cached?.takeIf { System.currentTimeMillis() - it.third <= TTL_MS }?.let {
+            return it.first to it.second
+        }
         persisted(context)?.let {
-            cached = it
+            cached = Triple(it.first, it.second, System.currentTimeMillis())
             log.i("dealer=${it.first} spclient=${it.second} cached")
             return it
         }
@@ -40,7 +43,7 @@ object DealerHost {
             return persisted(context, ignoreAge = true)
         }
         val pair = dealer to spclient
-        cached = pair
+        cached = Triple(dealer, spclient, System.currentTimeMillis())
         store(context, pair)
         log.i("dealer=$dealer spclient=$spclient")
         return pair
