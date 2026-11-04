@@ -40,14 +40,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -134,9 +135,20 @@ fun SpotifyPlaylistScreen(
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onPlaylistOptionsClick: () -> Unit = {},
+    onShareClick: () -> Unit = {},
+    isSaved: Boolean? = null,
+    onSaveToggle: () -> Unit = {},
+    recommendedTracks: List<TrackItem> = emptyList(),
+    recommendationsLoading: Boolean = false,
+    onRecommendRefresh: () -> Unit = {},
+    onAddRecommended: (TrackItem) -> Unit = {},
     modifier: Modifier = Modifier,
     headerColor: Color = Color(0xFF144D3F),
-    coverUrl: String? = null
+    coverUrl: String? = null,
+    loading: Boolean = false,
+    hasMore: Boolean = false,
+    loadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {}
 ) {
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -153,43 +165,36 @@ fun SpotifyPlaylistScreen(
         searchQuery = ""
     }
 
-    // Editable track list
-    val currentTracks = remember(tracks) {
-        mutableStateListOf<TrackItem>().apply { addAll(tracks) }
-    }
-
-    // Recommended tracks matching Spotify
-    val recommendedSongs = remember {
-        mutableStateListOf(
-            TrackItem("Faasle", "Aditya Rikhari", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
-            TrackItem("Alag Aasmaan", "Anuv Jain", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
-            TrackItem("Another Love", "Tom Odell", true, imageUrl = "https://i.scdn.co/image/ab67616d0000b27320b57e4975f9ee73b64f3319"),
-            TrackItem("Tu hai kahan", "AUR", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b273b0dd6a5cd1dec96c4119c262"),
-            TrackItem("Maybe My Soulmate Died", "iamnotshane", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2734ab25200366c1b3f942d937a"),
-            TrackItem("Farq hai", "Suzonn", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b273523ec3e30f1489ecde3a9aa8")
-        )
-    }
-
-    val displayedTracks by remember {
-        derivedStateOf {
-            var list = if (searchQuery.isBlank()) {
-                currentTracks.toList()
-            } else {
-                currentTracks.filter {
-                    it.title.contains(searchQuery, ignoreCase = true) ||
-                    it.artist.contains(searchQuery, ignoreCase = true)
-                }
+    val displayedTracks = remember(tracks, searchQuery, sortOption) {
+        val base = if (searchQuery.isBlank()) {
+            tracks
+        } else {
+            tracks.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                it.artist.contains(searchQuery, ignoreCase = true)
             }
-            when (sortOption) {
-                PlaylistSort.TITLE -> list.sortedBy { it.title }
-                PlaylistSort.ARTIST -> list.sortedBy { it.artist }
-                else -> list
-            }
+        }
+        when (sortOption) {
+            PlaylistSort.TITLE -> base.sortedBy { it.title }
+            PlaylistSort.ARTIST -> base.sortedBy { it.artist }
+            else -> base
         }
     }
 
     val listState = rememberLazyListState()
     val density = LocalDensity.current
+
+    val shouldLoadMore by remember(hasMore, loadingMore, displayedTracks.size, onLoadMore) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            hasMore && !loadingMore && displayedTracks.isNotEmpty() &&
+                lastVisible >= info.totalItemsCount - 8
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) onLoadMore()
+    }
 
     // Magnetic snapping search bar physics:
     // Tracks interactive drag in real-time, and snaps 100% open or 100% closed on release
@@ -655,19 +660,29 @@ fun SpotifyPlaylistScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             ) {
-                                // (+) Add Collaborator Circle Pill Button
+                                // (+) Save-to-library circle button next to the owner info
                                 Box(
                                     modifier = Modifier
                                         .size(26.dp)
                                         .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.12f))
-                                        .clickable { onPlaylistOptionsClick() },
+                                        .background(
+                                            when (isSaved) {
+                                                true -> EncoreColors.Green
+                                                else -> Color.White.copy(alpha = 0.12f)
+                                            }
+                                        )
+                                        .clickable(enabled = isSaved != null) { onSaveToggle() },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        painter = painterResource(id = R.drawable.encore_icon_plus_24),
-                                        contentDescription = "Add collaborators",
-                                        tint = Color.White,
+                                        painter = painterResource(
+                                            id = if (isSaved == true) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24
+                                        ),
+                                        contentDescription = when (isSaved) {
+                                            true -> "Remove from library"
+                                            else -> "Add to library"
+                                        },
+                                        tint = if (isSaved == true) Color.Black else Color.White,
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
@@ -779,13 +794,13 @@ fun SpotifyPlaylistScreen(
                                         )
                                     }
 
-                                    // Share Button (<)
+                                    // Share Button (<) — shares the playlist right away
                                     Box(
                                         modifier = Modifier
                                             .size(32.dp)
                                             .clip(CircleShape)
                                             .background(Color.Transparent)
-                                            .clickable(onClick = onPlaylistOptionsClick),
+                                            .clickable(onClick = onShareClick),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -879,6 +894,22 @@ fun SpotifyPlaylistScreen(
                 }
 
                 // Track Rows (Solid pure #121212 background, 60dp standard row height, scrolls under sticky chips)
+                if (loading && displayedTracks.isEmpty()) {
+                    item(key = "playlist_loading") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = EncoreColors.Green,
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+                    }
+                }
                 itemsIndexed(displayedTracks) { _, track ->
                     val isCurrentTrack = track.title == currentTrackTitle
                     EncoreTrackRow(
@@ -893,8 +924,25 @@ fun SpotifyPlaylistScreen(
                     )
                 }
 
+                if (loadingMore) {
+                    item(key = "playlist_loading_more") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 20.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = EncoreColors.Green,
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+
                 // "Recommended" Section (add_more_row_blend_playlist.xml)
-                if (recommendedSongs.isNotEmpty()) {
+                if (recommendedTracks.isNotEmpty() || recommendationsLoading) {
                     item {
                         Column(
                             modifier = Modifier
@@ -917,7 +965,7 @@ fun SpotifyPlaylistScreen(
                         }
                     }
 
-                    itemsIndexed(recommendedSongs) { _, recTrack ->
+                    itemsIndexed(recommendedTracks) { _, recTrack ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -988,10 +1036,7 @@ fun SpotifyPlaylistScreen(
                                     .size(34.dp)
                                     .clip(CircleShape)
                                     .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
-                                    .clickable {
-                                        currentTracks.add(recTrack)
-                                        recommendedSongs.remove(recTrack)
-                                    },
+                                    .clickable { onAddRecommended(recTrack) },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -1016,26 +1061,24 @@ fun SpotifyPlaylistScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(999.dp))
                                     .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(999.dp))
-                                    .clickable {
-                                        recommendedSongs.clear()
-                                        recommendedSongs.addAll(
-                                            listOf(
-                                                TrackItem("Khaab", "Akhil", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452"),
-                                                TrackItem("Asal Mein", "Darshan Raval", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36"),
-                                                TrackItem("Bye", "Aditya Bhardwaj", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b27320b57e4975f9ee73b64f3319"),
-                                                TrackItem("Lamhey", "Anubha Bajaj", false, imageUrl = "https://i.scdn.co/image/ab67616d0000b273b0dd6a5cd1dec96c4119c262")
-                                            )
-                                        )
-                                    }
+                                    .clickable(enabled = !recommendationsLoading, onClick = onRecommendRefresh)
                                     .padding(horizontal = 24.dp, vertical = 10.dp)
                             ) {
-                                Text(
-                                    text = "Refresh",
-                                    style = SpotifyTheme.typography.bodySmallBold.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                if (recommendationsLoading) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(16.dp)
                                     )
-                                )
+                                } else {
+                                    Text(
+                                        text = "Refresh",
+                                        style = SpotifyTheme.typography.bodySmallBold.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    )
+                                }
                             }
                         }
                     }

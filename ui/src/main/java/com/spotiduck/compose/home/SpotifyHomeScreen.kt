@@ -96,7 +96,7 @@ fun SpotifyHomeScreen(
     onNotificationsClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onArtistClick: (String) -> Unit = {},
+    onArtistClick: (String, String) -> Unit = { _, _ -> },
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
     whatsNewCount: Int = 0,
@@ -127,18 +127,6 @@ fun SpotifyHomeScreen(
         }
     }
 
-    val madeForYou = remember(recommendations) {
-        if (!recommendations.isNullOrEmpty()) {
-            recommendations
-        } else {
-            listOf(
-                RecommendationCard("Daily Mix 1", "The Weeknd, Drake, Travis Scott", Color(0xFF8D67AB), tag = "MIX"),
-                RecommendationCard("Daily Mix 2", "Daft Punk, Justice, Kavinsky", Color(0xFF1E3264), tag = "MIX"),
-                RecommendationCard("Daily Mix 3", "Coldplay, Imagine Dragons, OneRepublic", Color(0xFF432371), tag = "MIX"),
-                RecommendationCard("Discover Weekly", "Your weekly mixtape of fresh music", Color(0xFF2E77D0), tag = "PLAYLIST")
-            )
-        }
-    }
 
     val shelfSections = remember(shelves) {
         shelves.orEmpty().filter { it.cards.isNotEmpty() }
@@ -271,23 +259,6 @@ fun SpotifyHomeScreen(
                             color = EncoreColors.TextPrimary
                         )
                     )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(filters.size) { index ->
-                            EncoreChip(
-                                text = filters[index],
-                                isSelected = selectedFilterIndex == index,
-                                onClick = {
-                                    selectedFilterIndex = if (selectedFilterIndex == index) 0 else index
-                                }
-                            )
-                        }
-                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -656,7 +627,7 @@ private fun ShelfSection(
 private fun ArtistShelfSection(
     title: String,
     artists: List<ArtistCardItem>,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (String, String) -> Unit,
     subtitle: String? = null,
     onSeeAllClick: (() -> Unit)? = null
 ) {
@@ -675,7 +646,7 @@ private fun ArtistShelfSection(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .width(130.dp)
-                        .clickable { onArtistClick(artist.name) }
+                        .clickable { onArtistClick(artist.name, artist.uri) }
                 ) {
                     Box(
                         modifier = Modifier

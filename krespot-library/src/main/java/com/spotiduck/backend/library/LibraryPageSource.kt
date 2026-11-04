@@ -25,6 +25,9 @@ object LibraryPageSource {
     private const val OP_PAGE = "libraryV3"
     private const val CACHE_MS = 5 * 60_000L
 
+    /** Search keystrokes mint cache keys without limit; stale ones are dropped, live ones capped. */
+    private const val CACHE_KEYS = 16
+
     private data class Cached(val page: LibraryPage, val at: Long)
 
     private val cache = java.util.concurrent.ConcurrentHashMap<String, Cached>()
@@ -39,8 +42,8 @@ object LibraryPageSource {
         log.i("cache cleared, revision ${revisions.value}")
     }
 
-    private fun cacheKey(order: String?, textFilter: String, folderUri: String?): String =
-        "${order.orEmpty()}|$textFilter|${folderUri.orEmpty()}"
+    private fun cacheKey(order: String?, textFilter: String, folderUri: String?, flatten: Boolean): String =
+        "${order.orEmpty()}|$textFilter|${folderUri.orEmpty()}|$flatten"
 
     private val FEATURES = JSONArray()
         .put("LIKED_SONGS")
@@ -56,13 +59,24 @@ object LibraryPageSource {
         textFilter: String = "",
         folderUri: String? = null,
         offset: Int = 0,
+        flatten: Boolean = false,
     ): LibraryPage? {
-        val key = cacheKey(order, textFilter, folderUri)
+        val key = cacheKey(order, textFilter, folderUri, flatten)
         val now = System.currentTimeMillis()
         if (offset == 0) {
-            cache[key]?.takeIf { now - it.at < CACHE_MS }?.let {
-                log.i("page cache hit '$key' -> ${it.page.items.size}/${it.page.total}")
-                return it.page
+            val hit = cache[key]
+            if (hit != null) {
+                if (now - hit.at < CACHE_MS) {
+                    log.i("page cache hit '$key' -> ${hit.page.items.size}/${hit.page.total}")
+                    return hit.page
+                }
+                cache.remove(key, hit)
+            }
+            if (cache.size >= CACHE_KEYS) {
+                log.i("page cache at ${cache.size} keys, dropping the oldest ones")
+                cache.entries.sortedBy { it.value.at }
+                    .take(cache.size - CACHE_KEYS / 2)
+                    .forEach { cache.remove(it.key, it.value) }
             }
         }
         val token = SpotifyAuth.token(context)
@@ -76,7 +90,7 @@ object LibraryPageSource {
             .put("features", FEATURES)
             .put("limit", PAGE)
             .put("offset", offset)
-            .put("flatten", false)
+            .put("flatten", flatten)
             .put("expandedFolders", JSONArray())
             .put("folderUri", folderUri ?: JSONObject.NULL)
             .put("includeFoldersWhenFlattening", true)
@@ -117,9 +131,47 @@ object LibraryPageSource {
 
     suspend fun folder(context: Context, uri: String): LibraryPage? {
         if (uri.isBlank()) return null
-        val page = page(context, folderUri = uri)
-        log.i("folder $uri -> ${page?.items?.size ?: 0}/${page?.total ?: 0}")
-        return page
+        val hash = FolderSource.folderHash(uri)
+        if (hash.isBlank()) {
+            log.w("folder: no hash in '$uri'")
+            return null
+        }
+        val snap = Rootlist.snapshot(context)
+        val start = snap?.groupIndex(hash, end = false) ?: -1
+        val end = snap?.groupIndex(hash, end = true) ?: -1
+        if (snap == null || start < 0 || end <= start) {
+            log.w("folder $uri markers start=$start end=$end among ${snap?.entries?.size ?: 0} rootlist entries")
+            return null
+        }
+        val inside = snap.entries.filter { it.index > start && it.index < end }
+        val byUri = HashMap<String, ShelfItem>()
+        // Stop paging once every playlist the folder names has its row; a
+        // three-playlist folder should not read the whole library.
+        val wanted = inside.mapTo(HashSet()) { it.uri }
+        var offset = 0
+        while (offset < PAGE * 4) {
+            val flat = page(context, flatten = true, offset = offset) ?: break
+            flat.items.forEach {
+                if (it.uri.isNotBlank()) {
+                    byUri[it.uri] = it
+                    wanted.remove(it.uri)
+                }
+            }
+            if (flat.fetched <= 0 || byUri.size >= flat.total || wanted.isEmpty()) break
+            offset += flat.fetched
+        }
+        val items = inside.mapNotNull { entry -> byUri[entry.uri] }
+        log.i("folder $uri -> ${items.size} of ${inside.size} row(s) from the rootlist, " +
+                "flat page ${byUri.size} row(s), missing ${inside.size - items.size}"
+        )
+        return LibraryPage(
+            items = items,
+            filters = emptyList(),
+            sort = "",
+            total = items.size,
+            offset = 0,
+            fetched = items.size,
+        )
     }
 
     private fun shelf(node: JSONObject?): ShelfItem? {

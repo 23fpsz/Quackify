@@ -348,6 +348,16 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
         try {
             webView.removeJavascriptInterface("AndLogin")
             webView.stopLoading()
+            // Popups (SSO windows) only destroy themselves through
+            // onCloseWindow; tearing the host down with one still open used
+            // to leak its Activity and its native WebView.
+            for (index in (0 until container.childCount).reversed()) {
+                val popup = container.getChildAt(index)
+                if (popup is WebView && popup !== webView) {
+                    container.removeViewAt(index)
+                    runCatching { popup.destroy() }
+                }
+            }
             container.removeAllViews()
             webView.destroy()
         } catch (_: Exception) {

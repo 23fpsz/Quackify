@@ -14,6 +14,12 @@ object Rootlist {
 
     private const val BASE = "https://spclient.wg.spotify.com/playlist/v2/user"
 
+    /** Opening a playlist asks saved() and published() back to back; this keeps the second read free. */
+    private const val READ_CACHE_MS = 5_000L
+
+    @Volatile
+    private var lastRead: Pair<Long, JSONObject>? = null
+
     data class Entry(val uri: String, val index: Int)
 
     data class Snapshot(
@@ -92,6 +98,7 @@ object Rootlist {
             log.w("no username yet, cannot ${if (add) "add" else "remove"} $uri")
             return false
         }
+        lastRead = null
         val response = Net.postJson(
             "$BASE/$user/rootlist/changes",
             change(uri, add),
@@ -161,6 +168,7 @@ object Rootlist {
         val add = JSONObject().put("items", items)
         if (atTop) add.put("addFirst", true) else add.put("addLast", true)
         val op = JSONObject().put("kind", "ADD").put("add", add)
+        lastRead = null
         val response = Net.postJson(
             "$BASE/$user/rootlist/changes",
             body(op),
@@ -204,6 +212,7 @@ object Rootlist {
                 .put("length", length)
                 .put("items", JSONArray()),
         )
+        lastRead = null
         val response = Net.postJson(
             "$BASE/$user/rootlist/changes",
             body(op, base),
@@ -229,6 +238,7 @@ object Rootlist {
             log.w("$label: no username yet")
             return false
         }
+        lastRead = null
         val response = Net.postJson(
             "$BASE/$user/rootlist/changes",
             bodyOf(ops, revision),
@@ -302,20 +312,34 @@ object Rootlist {
         log.i("setPublished $uri -> $published ok=$ok http=${response?.code ?: -1} " +
                 response?.body?.take(160).orEmpty()
         )
-        if (ok) LibraryPageSource.invalidate()
+        if (ok) {
+            lastRead = null
+            LibraryPageSource.invalidate()
+        }
         return ok
+    }
+
+    /** The rootlist document, served from a short-lived cache when it was just read. */
+    private suspend fun read(context: Context, tag: String): JSONObject? {
+        lastRead?.takeIf { System.currentTimeMillis() - it.first < READ_CACHE_MS }?.let { return it.second }
+        val user = username(context)
+        if (user.isBlank()) {
+            log.w("$tag: no username yet")
+            return null
+        }
+        val response = Net.get(
+            "$BASE/$user/rootlist?decorate=revision,length,attributes,timestamp",
+            headers(context),
+            tag,
+        ) ?: return null
+        val json = response.json() ?: return null
+        lastRead = System.currentTimeMillis() to json
+        return json
     }
 
     suspend fun published(context: Context, uri: String): Boolean? {
         if (uri.isBlank()) return null
-        val user = username(context)
-        if (user.isBlank()) return null
-        val response = Net.get(
-            "$BASE/$user/rootlist?decorate=revision,length,attributes,timestamp",
-            headers(context),
-            "rootlist/read",
-        ) ?: return null
-        val json = response.json() ?: return null
+        val json = read(context, "rootlist/read") ?: return null
         val items = json.optJSONObject("contents")?.optJSONArray("items") ?: return null
         for (i in 0 until items.length()) {
             val node = items.optJSONObject(i) ?: continue
@@ -331,42 +355,22 @@ object Rootlist {
         return null
     }
 
-    private fun collect(node: Any?, into: MutableSet<String>) {
-        when (node) {
-            is JSONObject -> {
-                node.optString("uri").takeIf { it.startsWith("spotify:") }?.let(into::add)
-                node.keys().asSequence().forEach { key -> collect(node.opt(key), into) }
-            }
-            is JSONArray -> for (i in 0 until node.length()) collect(node.opt(i), into)
-        }
-    }
-
     suspend fun saved(context: Context, uri: String): Boolean? {
         if (uri.isBlank()) return null
-        val user = username(context)
-        if (user.isBlank()) {
-            log.w("saved: no username yet")
-            return null
+        val json = read(context, "rootlist/read") ?: return null
+        // The saved set is exactly the top-level contents.items, the same
+        // rows published() walks; no need to visit every nested node.
+        val items = json.optJSONObject("contents")?.optJSONArray("items")
+        var count = 0
+        for (i in 0 until (items?.length() ?: 0)) {
+            val node = items?.optJSONObject(i) ?: continue
+            if (node.optString("uri").isNotBlank()) count++
+            if (node.optString("uri") == uri) {
+                log.i("saved: $count+ uri(s) in the rootlist, $uri inside=true")
+                return true
+            }
         }
-        val response = Net.get(
-            "$BASE/$user/rootlist?decorate=revision,length,attributes,timestamp",
-            headers(context),
-            "rootlist/read",
-        ) ?: return null
-        val json = response.json()
-        if (json == null) {
-            log.w("saved: http=${response.code} not-json ${response.body.take(200)}")
-            return null
-        }
-        val uris = LinkedHashSet<String>()
-        collect(json, uris)
-        val inside = uri in uris
-        if (uris.isEmpty()) {
-            log.w("saved: no uri found in the rootlist, keys=${json.keys().asSequence().toList()} " +
-                    "body=${response.body.take(400)}"
-            )
-        }
-        log.i("saved: ${uris.size} uri(s) in the rootlist, $uri inside=$inside")
-        return inside
+        log.i("saved: $count uri(s) in the rootlist, $uri inside=false")
+        return false
     }
 }

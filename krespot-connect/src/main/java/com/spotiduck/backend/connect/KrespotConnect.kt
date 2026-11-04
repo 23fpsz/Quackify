@@ -3,8 +3,11 @@ package com.spotiduck.backend.connect
 import android.content.Context
 import android.os.SystemClock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -20,7 +23,6 @@ import com.spotiduck.backend.connect.cluster.ClusterTrack
 import com.spotiduck.backend.connect.cluster.Device
 import com.spotiduck.backend.connect.command.CommandClient
 import com.spotiduck.backend.connect.command.CommandParser
-import com.spotiduck.backend.connect.command.CommandTrack
 import com.spotiduck.backend.connect.command.PlaybackCommand
 import com.spotiduck.backend.connect.command.Registration
 import com.spotiduck.backend.connect.command.TrackUid
@@ -34,6 +36,7 @@ import com.spotiduck.backend.connect.state.StateReporter
 import com.spotiduck.backend.core.auth.SpotifyAuth
 import com.spotiduck.backend.core.log.Logs
 import com.spotiduck.backend.core.webview.SilentTokenRefresh
+import org.json.JSONArray
 import org.json.JSONObject
 
 private val log = Logs.of(Logs.Module.CONNECT)
@@ -41,6 +44,19 @@ private val log = Logs.of(Logs.Module.CONNECT)
 private const val TRANSFER_TRIES = 6
 
 private const val TRANSFER_RETRY_MS = 500L
+
+/** Dealer channels a player command (or a transfer itself) can arrive on. */
+private const val PLAYER_COMMAND_URI = "hm://connect-state/v1/player/command"
+
+private const val CONNECT_TRANSFER_URI = "hm://connect-state/v1/connect/transfer"
+
+/** How often the connect-state player member is re-published while polling. */
+private const val MEMBER_PUT_MS = 60_000L
+
+/** Window sizes the native clients cap their published queue at. */
+private const val PREV_TRACKS_MAX = 10
+
+private const val NEXT_TRACKS_MAX = 80
 
 class KrespotConnect(private val context: Context) {
 
@@ -61,6 +77,10 @@ class KrespotConnect(private val context: Context) {
     private val _pushes = MutableSharedFlow<PlaybackCommand>(extraBufferCapacity = 8)
     val pushes: SharedFlow<PlaybackCommand> = _pushes
 
+    /** Fires when the server hands this device the stream (another client transferred here). */
+    private val _transfers = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    val transfers: SharedFlow<Unit> = _transfers
+
     private val _connectionId = MutableStateFlow("")
     val connectionId: StateFlow<String> = _connectionId
 
@@ -75,6 +95,14 @@ class KrespotConnect(private val context: Context) {
 
     @Volatile
     var accepts: ((PlaybackCommand) -> Boolean)? = null
+
+    /**
+     * The three registration PUTs take a few round trips; running them here
+     * keeps them off the frame collector so cluster pushes and commands keep
+     * flowing while the handshake is still in flight.
+     */
+    private val registerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
 
     val playback: PlaybackCommand? get() = _command.value
 
@@ -93,6 +121,16 @@ class KrespotConnect(private val context: Context) {
             spclient = host.second
             val token = SpotifyAuth.token(context)
             log.i("device=$deviceId dealer=${host.first} token=${token.length}B")
+            // Seed the cluster before the dealer handshake: this GET answers
+            // in one round trip, so the device list and the active player are
+            // known while the websocket is still connecting (that used to be
+            // the ~5s the UI spent believing this phone was the player).
+            // Only the first pass needs it: later iterations already hold a
+            // cluster, and the dealer pushes plus the polling keep it fresh.
+            if (_cluster.value == null) {
+                runCatching { seedCluster() }
+                    .onFailure { log.w("cluster seed failed ${it.javaClass.simpleName}: ${it.message}") }
+            }
             try {
                 emitAll(dealer.open(host.first, token).onEach(::absorb))
                 log.w("dealer stream ended")
@@ -120,18 +158,30 @@ class KrespotConnect(private val context: Context) {
         return (1000L shl shift).coerceAtMost(15_000L)
     }
 
+    /** A transfer request can also ride in as the bare options body, with no endpoint field. */
+    private fun isTransferOptions(payload: String): Boolean =
+        runCatching { JSONObject(payload).has("transfer_options") }.getOrDefault(false)
+
     private suspend fun absorb(frame: DealerFrame) {
         when {
             frame.isConnection -> {
                 connected = true
                 _connectionId.value = frame.connectionId
-                log.i("connection ${frame.connectionId.take(24)} raw=${frame.connectionIdRaw.length}B"
+                log.i("connection ${frame.connectionId.take(24)}… len=${frame.connectionId.length} " +
+                        "tail='${frame.connectionId.takeLast(6)}' " +
+                        "frameHeaders=[${frame.headers.keys.joinToString(",")}]"
                 )
-                register(frame.connectionId, frame.connectionIdRaw)
+                registerScope.launch {
+                    runCatching { register(frame.connectionId) }
+                        .onFailure { log.w("register failed ${it.javaClass.simpleName}: ${it.message}") }
+                }
             }
 
             frame.uri == DealerUri.TRACK_COMMAND -> frame.payloads.forEach { payload ->
-                val parsed = CommandParser.parse(payload) ?: return@forEach
+                // Track commands are the largest payloads in the system (whole
+                // state machines with manifests); parsing them on the collector
+                // thread would jank the main thread that collects this flow.
+                val parsed = withContext(Dispatchers.Default) { CommandParser.parse(payload) } ?: return@forEach
                 if (accepts?.invoke(parsed) == false) {
                     log.w("command dropped: '${parsed.currentTrack?.name}' idx=${parsed.stateIndex} " +
                             "sm=${parsed.stateMachineId.take(10)} is not what this device is playing"
@@ -139,20 +189,20 @@ class KrespotConnect(private val context: Context) {
                     return@forEach
                 }
                 if (parsed.isControl) {
-                    _pushes.tryEmit(parsed)
+                    _pushes.emit(parsed)
                     log.i("control '${parsed.endpoint}' from the dealer")
                     return@forEach
                 }
                 if (parsed.isReplaceState) {
                     log.i("replace_state pushed, the bridge decides what to load")
                     transferLandedByPush()
-                    _pushes.tryEmit(parsed)
+                    _pushes.emit(parsed)
                     return@forEach
                 }
                 _command.value = parsed
                 TrackUid.learn(parsed)
                 reconcile(parsed)
-                _pushes.tryEmit(parsed)
+                _pushes.emit(parsed)
                 log.v("command '${parsed.contextDescription}' tracks=${parsed.tracks.size} " +
                         "state=${parsed.stateId.take(8)} track=${parsed.currentTrack?.name}" +
                         if (parsed.isAd) " AD break" else ""
@@ -177,17 +227,44 @@ class KrespotConnect(private val context: Context) {
                 }
             }
 
+            // Another client moved the account's stream onto this phone: the
+            // backend notifies the target over its dealer connection with a
+            // request on the connect-state command channel. Without this the
+            // move landed nowhere - the phone stayed silent and, once the
+            // server gave up on it, vanished from every "Listening on" list.
+            frame.uri.startsWith(PLAYER_COMMAND_URI) ||
+                    frame.uri.startsWith(CONNECT_TRANSFER_URI) ->
+                frame.payloads.forEach { payload ->
+                    val parsed = withContext(Dispatchers.Default) { CommandParser.parse(payload) }
+                    when {
+                        parsed?.isTransfer == true || isTransferOptions(payload) -> {
+                            log.i("the server moved the stream here, the bridge takes it")
+                            _transfers.tryEmit(Unit)
+                        }
+                        parsed != null ->
+                            log.i("connect-state command '${parsed.endpoint}' is not handled here yet")
+                        else ->
+                            log.v("connect-state frame ${payload.length}B did not parse")
+                    }
+                }
+
             else -> log.v("frame ${frame.uri.take(56)} ${frame.payloads.size}p")
         }
     }
 
-    private suspend fun register(connectionId: String, connectionIdRaw: String) {
+    private suspend fun register(connectionId: String) {
         if (connectionId.isBlank() || spclient.isBlank()) return
         val host = spclient
         val started = SystemClock.elapsedRealtime()
-        val player = Registration.player(context, host, deviceId, connectionIdRaw)
+        val player = Registration.player(context, host, deviceId, connectionId)
+        // The observer PUT rebinds this dealer connection to the hidden
+        // hobs_ device, which is why the full member has to be published
+        // after it: publishing first and observing second made the server
+        // drop the phone from the cluster within seconds.
         val observer = Registration.observer(context, host, deviceId, connectionId)
+        val member = Registration.connectState(context, host, deviceId, connectionId)
         val body = observer?.takeIf { it.ok }?.body.orEmpty()
+            .ifBlank { member?.takeIf { it.ok }?.body.orEmpty() }
         if (body.isNotBlank()) {
             val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(body, deviceId) }
             if (parsed != null) {
@@ -199,23 +276,259 @@ class KrespotConnect(private val context: Context) {
                 )
             }
         }
-        _registered.value = player?.ok == true
-        if (_registered.value) reporter.seed(Registration.initialSeq(player))
+        _registered.value = (player?.ok == true) || (member?.ok == true)
+        if (player?.ok == true) reporter.seed(Registration.initialSeq(player))
+        memberPutAt = SystemClock.elapsedRealtime()
         log.i("registration observer=${observer?.code ?: "-"} player=${player?.code ?: "-"} " +
-                "registered=${_registered.value} in ${SystemClock.elapsedRealtime() - started}ms"
+                "member=${member?.code ?: "-"} registered=${_registered.value} " +
+                "in ${SystemClock.elapsedRealtime() - started}ms"
+        )
+    }
+
+    @Volatile
+    private var memberPutAt = 0L
+
+    /**
+     * Keeps the connect-state player member alive. The observer poll keeps
+     * the dealer socket busy, but the member that makes this phone show up
+     * in "Listening on" needs an occasional touch of its own; while this
+     * device is the one playing, the state reports already speak for it.
+     */
+    private suspend fun refreshMember() {
+        val connection = _connectionId.value
+        if (spclient.isBlank() || connection.isBlank()) return
+        if (_cluster.value?.activeDeviceId == deviceId) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - memberPutAt < MEMBER_PUT_MS) return
+        memberPutAt = now
+        Registration.connectState(context, spclient, deviceId, connection)
+    }
+
+    /** Set by the bridge: true while the local engine holds the stream. */
+    @Volatile
+    var holdsStream: Boolean = false
+        set(value) {
+            // The moment this flips back on is a takeover: the stream starts
+            // playing here and now, and started_playing_at has to say so. The
+            // wall clock of an earlier takeover made the server keep the
+            // previous device active, so the stream never came home.
+            if (value && !field) activeSince = System.currentTimeMillis()
+            field = value
+        }
+
+    /** Wall clock of the current local takeover, published as started_playing_at. */
+    @Volatile
+    private var activeSince = 0L
+
+    /**
+     * Publishes this phone as the account's active player, librespot style:
+     * a connect-state member PUT with `is_active: true` and the full
+     * player_state nested in the device block. The server answer is the
+     * cluster, so it doubles as a refresh. While this runs there is no need
+     * for the hobs_ observer poll - publishing state is what keeps the
+     * member alive and the position current for every other client.
+     */
+    suspend fun publishLocalState(
+        track: ClusterTrack,
+        contextUri: String,
+        contextIndex: Int,
+        positionMs: Long,
+        playing: Boolean,
+        durationMs: Long,
+        reason: String = Registration.REASON_STATE_CHANGED,
+        shuffle: Boolean = false,
+        repeatContext: Boolean = false,
+        repeatTrack: Boolean = false,
+        queueRevision: String = "",
+    ): Boolean {
+        val connection = _connectionId.value
+        if (spclient.isBlank() || connection.isBlank()) {
+            log.w("publish: the dealer is not connected yet")
+            return false
+        }
+        if (track.uri.isBlank()) return false
+        if (activeSince <= 0L) activeSince = System.currentTimeMillis()
+        // Building the state re-parses the raw metadata of up to ~91 queue
+        // rows; that belongs off the caller's (main) dispatcher.
+        val state = withContext(Dispatchers.Default) {
+            localPlayerState(
+                track, contextUri, contextIndex, positionMs, playing, durationMs,
+                shuffle, repeatContext, repeatTrack, queueRevision,
+            )
+        }
+        val response = Registration.connectState(
+            context = context,
+            spclient = spclient,
+            deviceId = deviceId,
+            connectionId = connection,
+            reason = reason,
+            isActive = true,
+            playerState = state,
+            startedPlayingAt = activeSince,
+        )
+        val ok = response?.ok == true
+        if (!ok) {
+            log.w("publish: member ${response?.code ?: "no response"} " +
+                    response?.body?.take(160).orEmpty()
+            )
+            return false
+        }
+        memberPutAt = SystemClock.elapsedRealtime()
+        val parsed = withContext(Dispatchers.Default) {
+            ClusterParser.parse(response.body, deviceId)
+        }
+        if (parsed != null) {
+            _cluster.value = parsed
+            TrackUid.learn(parsed)
+        }
+        log.i("publish '${track.title.ifBlank { track.uri.takeLast(12) }}' " +
+                "pos=${positionMs}ms playing=$playing idx=$contextIndex " +
+                "ctx='${contextUri.takeLast(24)}' -> ${response?.code}"
+        )
+        return true
+    }
+
+    /** Drops this device out of the cluster, for shutdown. */
+    suspend fun unregister() {
+        if (spclient.isBlank()) return
+        Registration.unregister(context, spclient, deviceId)
+    }
+
+    private fun localPlayerState(
+        track: ClusterTrack,
+        contextUri: String,
+        contextIndex: Int,
+        positionMs: Long,
+        playing: Boolean,
+        durationMs: Long,
+        shuffle: Boolean,
+        repeatContext: Boolean,
+        repeatTrack: Boolean,
+        queueRevision: String,
+    ): JSONObject {
+        val now = System.currentTimeMillis()
+        val window = _cluster.value
+            ?.takeIf { it.contextUri == contextUri && contextUri.isNotBlank() }
+            ?.window()
+            .orEmpty()
+        val anchor = window.indexOfFirst { it.uri == track.uri }
+        val prev = if (anchor > 0) window.take(anchor).takeLast(PREV_TRACKS_MAX) else emptyList()
+        val next = if (anchor >= 0) {
+            window.drop(anchor + 1).filter { it.isVisible }.take(NEXT_TRACKS_MAX)
+        } else {
+            emptyList()
+        }
+        val metadata = runCatching { JSONObject(track.raw) }.getOrElse { JSONObject() }
+        if (metadata.length() == 0 && track.title.isNotBlank()) {
+            metadata
+                .put("title", track.title)
+                .put("artist_name", track.artistName)
+                .put("artist_uri", track.artistUri)
+                .put("album_title", track.albumTitle)
+                .put("album_uri", track.albumUri)
+                .put("image_url", track.imageUrl)
+                .put("duration", track.durationMs.toString())
+                .put("is_explicit", track.explicit.toString())
+        }
+        val current = JSONObject()
+            .put("uri", track.uri)
+            .put("uid", track.uid)
+            .put("metadata", metadata)
+            .put("provider", track.provider.ifBlank { "context" })
+        val state = JSONObject()
+            .put("session_id", "")
+            .put("is_system_initiated", true)
+            .put("playback_speed", if (playing) 1 else 0)
+            .put("position_as_of_timestamp", positionMs)
+            .put("timestamp", now)
+            .put("duration", if (durationMs > 0L) durationMs else track.durationMs)
+            // A paused player still reports is_playing=true with is_paused
+            // on top - that is how every native client publishes it.
+            .put("is_playing", true)
+            .put("is_paused", !playing)
+            .put("is_buffering", !playing)
+            .put("context_uri", contextUri)
+            .put("context_url", "context://$contextUri")
+            .put("context_restrictions", JSONObject())
+            .put(
+                "play_origin",
+                JSONObject()
+                    .put("feature_identifier", "playlist")
+                    .put("referrer_identifier", "deeplink")
+                    .put("device_identifier", deviceId),
+            )
+            .put("index", JSONObject().put("page", 0).put("track", contextIndex.coerceAtLeast(0)))
+            .put("track", current)
+            .put("prev_tracks", JSONArray().apply { prev.forEach { put(trackNode(it)) } })
+            .put("next_tracks", JSONArray().apply { next.forEach { put(trackNode(it)) } })
+            .put(
+                "options",
+                JSONObject()
+                    .put("shuffling_context", shuffle)
+                    .put("repeating_context", repeatContext)
+                    .put("repeating_track", repeatTrack),
+            )
+            .put("suppressions", JSONObject())
+            .put("queue_revision", queueRevision)
+        return state
+    }
+
+    private fun trackNode(track: ClusterTrack): JSONObject {
+        val metadata = runCatching { JSONObject(track.raw) }.getOrElse { JSONObject() }
+        return JSONObject()
+            .put("uri", track.uri)
+            .put("uid", track.uid)
+            .put("metadata", metadata)
+            .put("provider", track.provider.ifBlank { "context" })
+    }
+
+    /** Reads the cluster over plain HTTP and mirrors it, dealer or not. */
+    private suspend fun seedCluster() {
+        val host = spclient
+        if (host.isBlank()) return
+        val response = Registration.cluster(context, host)
+        val body = response?.body.orEmpty()
+        if (response?.ok != true || body.isBlank()) {
+            log.w("cluster seed: ${response?.code ?: "no response"}")
+            return
+        }
+        val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(body, deviceId) }
+        if (parsed == null) {
+            log.i("cluster seed: no player_state in ${body.length}B, nothing to mirror")
+            return
+        }
+        _cluster.value = parsed
+        TrackUid.learn(parsed)
+        log.i("cluster seed '${parsed.track.title}' active=${parsed.activeDeviceId.take(12)} " +
+                "devices=${parsed.devices.size} playing=${parsed.isPlaying}"
         )
     }
 
     suspend fun refreshCluster(): Boolean {
         val connection = _connectionId.value
-        if (spclient.isBlank() || connection.isBlank()) {
-            log.w("cluster refresh: the dealer is not connected yet")
+        if (spclient.isBlank()) {
+            log.w("cluster refresh: no spclient host yet")
             return false
         }
-        val response = Registration.observer(context, spclient, deviceId, connection)
+        if (holdsStream) {
+            // While the engine here owns the stream, the member PUT is the
+            // poll: it refreshes the cluster answer-side and keeps the
+            // active registration warm, where the hobs_ observer would only
+            // rebind the connection to the hidden device again.
+            return true
+        }
+        // The observer PUT needs a dealer connection id; before the dealer
+        // is up (or while it reconnects) the plain cluster GET still works.
+        val response = if (connection.isBlank()) {
+            runCatching { Registration.cluster(context, spclient) }.getOrNull()
+        } else {
+            Registration.observer(context, spclient, deviceId, connection)
+        }
         val body = response?.body.orEmpty()
         if (response?.ok != true || body.isBlank()) {
-            log.w("cluster refresh: observer ${response?.code ?: "no response"}")
+            log.w("cluster refresh: ${if (connection.isBlank()) "get" else "observer"} " +
+                    "${response?.code ?: "no response"}"
+            )
             return false
         }
         val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(body, deviceId) }
@@ -235,6 +548,7 @@ class KrespotConnect(private val context: Context) {
                 "idx=${parsed.contextIndex} next=${parsed.nextTracks.size} " +
                 "prev=${parsed.prevTracks.size}"
         )
+        refreshMember()
         return true
     }
 
@@ -386,16 +700,43 @@ class KrespotConnect(private val context: Context) {
         return response?.ok == true
     }
 
+    /** Turns context shuffle on/off on the target device (blank = this one). */
+    suspend fun setShuffleOn(targetDeviceId: String, value: Boolean): Boolean {
+        if (spclient.isBlank()) {
+            log.w("shuffle: the dealer is not connected yet")
+            return false
+        }
+        val target = targetDeviceId.ifBlank { deviceId }
+        val response = CommandClient.setPlayerOption(
+            context, spclient, deviceId, target, CommandClient.ENDPOINT_SHUFFLE, value,
+        )
+        return response?.ok == true
+    }
+
+    /** Sets the repeat options on the target device (blank = this one). */
+    suspend fun setRepeatOn(
+        targetDeviceId: String,
+        repeatContext: Boolean,
+        repeatTrack: Boolean,
+    ): Boolean {
+        if (spclient.isBlank()) {
+            log.w("repeat: the dealer is not connected yet")
+            return false
+        }
+        val target = targetDeviceId.ifBlank { deviceId }
+        val contextResponse = CommandClient.setPlayerOption(
+            context, spclient, deviceId, target, CommandClient.ENDPOINT_REPEAT_CONTEXT, repeatContext,
+        )
+        val trackResponse = CommandClient.setPlayerOption(
+            context, spclient, deviceId, target, CommandClient.ENDPOINT_REPEAT_TRACK, repeatTrack,
+        )
+        return (contextResponse?.ok ?: false) && (trackResponse?.ok ?: false)
+    }
+
     suspend fun setVolumeOn(targetDeviceId: String, level: Int): Boolean {
         if (spclient.isBlank()) return false
         val response = CommandClient.volume(context, spclient, deviceId, targetDeviceId, level)
         return response?.ok == true
-    }
-
-    suspend fun start(track: CommandTrack, stateId: String, positionMs: Long): Boolean {        val announced = melody.playbackStart(track, stateId, positionMs)
-        val started = melody.start(track, stateId, positionMs, paused = false)
-        if (!track.isDirect) melody.keysystem()
-        return announced && started
     }
 
     suspend fun report(snapshot: Snapshot): Boolean {
@@ -414,6 +755,8 @@ class KrespotConnect(private val context: Context) {
         reporter.reset()
         spclient = ""
         connected = false
+        holdsStream = false
+        activeSince = 0L
         Device.forget(context)
         log.i("reset, command, cluster and registration dropped")
     }

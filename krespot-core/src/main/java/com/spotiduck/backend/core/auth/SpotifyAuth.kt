@@ -7,6 +7,7 @@ import com.spotiduck.backend.core.log.Logs
 import com.spotiduck.backend.core.net.Net
 import com.spotiduck.backend.core.net.Pathfinder
 import com.spotiduck.backend.core.net.plainText
+import org.json.JSONArray
 import org.json.JSONObject
 
 private val log = Logs.of(Logs.Module.AUTH)
@@ -35,6 +36,151 @@ object SpotifyAuth {
     private const val KEY_TOKEN_EXP = "access_token_exp"
     private const val KEY_CLIENT_TOKEN = "client_token"
     private const val KEY_CLIENT_TOKEN_EXP = "client_token_exp"
+
+    // ---- multi-account store ----
+    // Every logged-in account keeps a full snapshot (session cookies + profile)
+    // under "multi.<id>.*" so the user can hop between accounts. The index
+    // preserves the order in which accounts were added, newest last.
+    private const val KEY_MULTI_INDEX = "multi.index"
+    private const val KEY_MULTI_ACTIVE = "multi.active"
+
+    /** All accounts the user has logged into on this device. */
+    fun savedAccounts(context: Context): List<Account> {
+        val p = SecurePrefs.get(context)
+        val ids = runCatching {
+            JSONArray(p.getString(KEY_MULTI_INDEX, "[]"))
+        }.getOrNull() ?: JSONArray()
+        return (0 until ids.length()).mapNotNull { i ->
+            val id = ids.optString(i)
+            if (id.isBlank()) return@mapNotNull null
+            val name = p.getString("multi.$id.name", "").orEmpty()
+            if (name.isBlank()) return@mapNotNull null
+            Account(
+                id = id,
+                name = name,
+                email = p.getString("multi.$id.email", "").orEmpty(),
+                imageUrl = p.getString("multi.$id.image", "").orEmpty(),
+                product = p.getString("multi.$id.product", "").orEmpty(),
+                country = p.getString("multi.$id.country", "").orEmpty(),
+            )
+        }
+    }
+
+    fun activeAccountId(context: Context): String =
+        SecurePrefs.get(context).getString(KEY_MULTI_ACTIVE, "").orEmpty()
+
+    /**
+     * Snapshots the currently active session + profile into the multi-account
+     * store. Call after a login completes (and the account id is known).
+     */
+    fun storeCurrentAccount(context: Context) {
+        val account = account(context) ?: return
+        if (account.id.isBlank()) {
+            log.w("storeCurrentAccount: no account id yet, skipping")
+            return
+        }
+        val p = SecurePrefs.get(context)
+        p.edit()
+            .putString("multi.${account.id}.session", p.getString(KEY_SESSION, null))
+            .putString("multi.${account.id}.name", account.name)
+            .putString("multi.${account.id}.email", account.email)
+            .putString("multi.${account.id}.image", account.imageUrl)
+            .putString("multi.${account.id}.product", account.product)
+            .putString("multi.${account.id}.country", account.country)
+            .putString(KEY_MULTI_ACTIVE, account.id)
+            .apply()
+        upsertIndex(context, account.id)
+        log.i("stored account ${account.id} (${account.name}), saved=${savedAccounts(context).size}")
+    }
+
+    private fun upsertIndex(context: Context, id: String) {
+        val p = SecurePrefs.get(context)
+        val ids = runCatching {
+            JSONArray(p.getString(KEY_MULTI_INDEX, "[]"))
+        }.getOrDefault(JSONArray())
+        val existing = (0 until ids.length()).map { ids.optString(it) }
+        if (!existing.contains(id)) {
+            ids.put(id)
+            p.edit().putString(KEY_MULTI_INDEX, ids.toString()).apply()
+        }
+    }
+
+    /**
+     * Replaces the active session with the stored snapshot of [id]: session
+     * cookies and profile move into the active keys, the cached tokens (which
+     * belong to the previous account) are dropped and the webview cookie jar
+     * is re-seeded. Returns false when the id is unknown.
+     */
+    fun switchAccount(context: Context, id: String): Boolean {
+        val p = SecurePrefs.get(context)
+        val session = p.getString("multi.$id.session", null)
+        val name = p.getString("multi.$id.name", "").orEmpty()
+        if (session.isNullOrBlank() || name.isBlank()) {
+            log.w("switchAccount: no stored snapshot for '$id'")
+            return false
+        }
+        p.edit()
+            .putString(KEY_SESSION, session)
+            .putString(KEY_NAME, name)
+            .putString(KEY_ID, id)
+            .putString(KEY_EMAIL, p.getString("multi.$id.email", "").orEmpty())
+            .putString(KEY_IMAGE, p.getString("multi.$id.image", "").orEmpty())
+            .putString(KEY_PRODUCT, p.getString("multi.$id.product", "").orEmpty())
+            .putString(KEY_COUNTRY, p.getString("multi.$id.country", "").orEmpty())
+            .putLong(KEY_SAVED_AT, System.currentTimeMillis())
+            .putString(KEY_MULTI_ACTIVE, id)
+            // the minted tokens belong to the account we are leaving
+            .remove(KEY_TOKEN)
+            .remove(KEY_TOKEN_AT)
+            .remove(KEY_TOKEN_EXP)
+            .remove(KEY_CLIENT_TOKEN)
+            .remove(KEY_CLIENT_TOKEN_EXP)
+            .apply()
+        resolvedUserId = ""
+        val manager = CookieManager.getInstance()
+        manager.removeAllCookies(null)
+        manager.flush()
+        applySession(context)
+        log.i("switchAccount: now on '$id' ($name)")
+        return true
+    }
+
+    /**
+     * Deletes the stored snapshot of [id]. Returns true when the active
+     * account was the one removed (the caller must then pick another account
+     * or log out completely).
+     */
+    fun forgetAccount(context: Context, id: String): Boolean {
+        val p = SecurePrefs.get(context)
+        val wasActive = activeAccountId(context) == id
+        p.edit()
+            .remove("multi.$id.session")
+            .remove("multi.$id.name")
+            .remove("multi.$id.email")
+            .remove("multi.$id.image")
+            .remove("multi.$id.product")
+            .remove("multi.$id.country")
+            .apply()
+        val ids = runCatching {
+            JSONArray(p.getString(KEY_MULTI_INDEX, "[]"))
+        }.getOrDefault(JSONArray())
+        val kept = (0 until ids.length()).map { ids.optString(it) }.filter { it != id }
+        p.edit().putString(KEY_MULTI_INDEX, JSONArray(kept).toString()).apply()
+        log.i("forgetAccount '$id' wasActive=$wasActive remaining=${kept.size}")
+        return wasActive
+    }
+
+    /**
+     * Prepares the cookie jar for logging into an additional account: the
+     * active session's cookies are dropped from the webview so Spotify asks
+     * for credentials. The secure session itself is untouched.
+     */
+    fun beginAddAccount(context: Context) {
+        val manager = CookieManager.getInstance()
+        manager.removeAllCookies(null)
+        manager.flush()
+        log.i("beginAddAccount: cookie jar cleared for a fresh login")
+    }
 
     fun saveToken(context: Context, token: String, expiresAtMs: Long = 0L) {
         if (token.isBlank()) return
@@ -308,6 +454,9 @@ object SpotifyAuth {
             .putString(KEY_COUNTRY, account.country)
             .putLong(KEY_SAVED_AT, System.currentTimeMillis())
             .apply()
+        // Adding an account on top of a live session must not keep serving
+        // the previous user's id to Rootlist and Collection2.
+        resolvedUserId = ""
         applySession(context)
     }
 
@@ -327,7 +476,29 @@ object SpotifyAuth {
 
     fun logout(context: Context) {
         log.i("logout")
-        SecurePrefs.get(context).edit().clear().apply()
+        val active = activeAccountId(context)
+        if (active.isNotBlank()) {
+            forgetAccount(context, active)
+        }
+        // Drop the active session, profile and tokens but keep the stored
+        // snapshots of the other accounts so the user can hop back in.
+        SecurePrefs.get(context).edit()
+            .remove(KEY_SESSION)
+            .remove(KEY_NAME)
+            .remove(KEY_ID)
+            .remove(KEY_EMAIL)
+            .remove(KEY_IMAGE)
+            .remove(KEY_PRODUCT)
+            .remove(KEY_COUNTRY)
+            .remove(KEY_SAVED_AT)
+            .remove(KEY_TOKEN)
+            .remove(KEY_TOKEN_AT)
+            .remove(KEY_TOKEN_EXP)
+            .remove(KEY_CLIENT_TOKEN)
+            .remove(KEY_CLIENT_TOKEN_EXP)
+            .remove(KEY_MULTI_ACTIVE)
+            .apply()
+        resolvedUserId = ""
         val manager = CookieManager.getInstance()
         manager.removeAllCookies(null)
         manager.flush()

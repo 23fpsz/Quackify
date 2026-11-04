@@ -174,24 +174,32 @@ object Net {
             val started = System.currentTimeMillis()
             val outcome = runCatching {
                 val conn = URL(url).openConnection() as HttpURLConnection
-                conn.requestMethod = method
-                conn.connectTimeout = 15_000
-                conn.readTimeout = 15_000
-                conn.instanceFollowRedirects = true
-                headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-                if (body != null) {
-                    conn.doOutput = true
-                    conn.setFixedLengthStreamingMode(body.size)
-                    conn.outputStream.use { it.write(body) }
+                try {
+                    conn.requestMethod = method
+                    conn.connectTimeout = 15_000
+                    conn.readTimeout = 15_000
+                    conn.instanceFollowRedirects = true
+                    headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+                    if (body != null) {
+                        conn.doOutput = true
+                        conn.setFixedLengthStreamingMode(body.size)
+                        conn.outputStream.use { it.write(body) }
+                    }
+                    val code = conn.responseCode
+                    val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                    val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    val type = conn.contentType.orEmpty()
+                    // No disconnect() here: reading the whole body puts the
+                    // socket back in the JVM keep-alive pool, so the next call
+                    // to the same host skips the TCP + TLS handshake. Only a
+                    // failure below frees the broken socket explicitly.
+                    val millis = System.currentTimeMillis() - started
+                    logResponse(label, code, millis, text, type)
+                    Response(code = code, body = text, contentType = type, millis = millis, url = url)
+                } catch (failure: Throwable) {
+                    runCatching { conn.disconnect() }
+                    throw failure
                 }
-                val code = conn.responseCode
-                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-                val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                val type = conn.contentType.orEmpty()
-                conn.disconnect()
-                val millis = System.currentTimeMillis() - started
-                logResponse(label, code, millis, text, type)
-                Response(code = code, body = text, contentType = type, millis = millis, url = url)
             }
             outcome.onFailure {
                 val millis = System.currentTimeMillis() - started
@@ -224,21 +232,26 @@ object Net {
         val started = System.currentTimeMillis()
         val outcome = runCatching {
             val conn = URL(url).openConnection() as HttpURLConnection
-            conn.requestMethod = "GET"
-            conn.connectTimeout = 20_000
-            conn.readTimeout = 30_000
-            conn.instanceFollowRedirects = true
-            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val bytes = stream?.use { it.readBytes() } ?: ByteArray(0)
-            val type = conn.contentType.orEmpty()
-            val fromServer = received(conn)
-            conn.disconnect()
-            val millis = System.currentTimeMillis() - started
-            val mark = if (code in 200..299) "←" else "✗"
-            log.i("$label $mark $code ${millis}ms ${bytes.size}B ${type.ifBlank { "?" }}")
-            Blob(code, bytes, type, millis, fromServer)
+            try {
+                conn.requestMethod = "GET"
+                conn.connectTimeout = 20_000
+                conn.readTimeout = 30_000
+                conn.instanceFollowRedirects = true
+                headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val bytes = stream?.use { it.readBytes() } ?: ByteArray(0)
+                val type = conn.contentType.orEmpty()
+                val fromServer = received(conn)
+                // Keep-alive: leave a fully read connection pooled.
+                val millis = System.currentTimeMillis() - started
+                val mark = if (code in 200..299) "←" else "✗"
+                log.i("$label $mark $code ${millis}ms ${bytes.size}B ${type.ifBlank { "?" }}")
+                Blob(code, bytes, type, millis, fromServer)
+            } catch (failure: Throwable) {
+                runCatching { conn.disconnect() }
+                throw failure
+            }
         }
         outcome.onFailure {
             log.e("$label ✗ ${it.javaClass.simpleName}: ${it.message} ${short(url)}")
@@ -284,25 +297,30 @@ object Net {
         val started = System.currentTimeMillis()
         val outcome = runCatching {
             val conn = URL(url).openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.connectTimeout = 20_000
-            conn.readTimeout = 30_000
-            conn.instanceFollowRedirects = true
-            headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-            conn.setRequestProperty("Content-Type", contentType)
-            conn.doOutput = true
-            conn.setFixedLengthStreamingMode(body.size)
-            conn.outputStream.use { it.write(body) }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val bytes = stream?.use { it.readBytes() } ?: ByteArray(0)
-            val type = conn.contentType.orEmpty()
-            val fromServer = received(conn)
-            conn.disconnect()
-            val millis = System.currentTimeMillis() - started
-            val mark = if (code in 200..299) "←" else "✗"
-            log.i("$label $mark $code ${millis}ms ${bytes.size}B ${type.ifBlank { "?" }}")
-            Blob(code, bytes, type, millis, fromServer)
+            try {
+                conn.requestMethod = "POST"
+                conn.connectTimeout = 20_000
+                conn.readTimeout = 30_000
+                conn.instanceFollowRedirects = true
+                headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+                conn.setRequestProperty("Content-Type", contentType)
+                conn.doOutput = true
+                conn.setFixedLengthStreamingMode(body.size)
+                conn.outputStream.use { it.write(body) }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val bytes = stream?.use { it.readBytes() } ?: ByteArray(0)
+                val type = conn.contentType.orEmpty()
+                val fromServer = received(conn)
+                // Keep-alive: leave a fully read connection pooled.
+                val millis = System.currentTimeMillis() - started
+                val mark = if (code in 200..299) "←" else "✗"
+                log.i("$label $mark $code ${millis}ms ${bytes.size}B ${type.ifBlank { "?" }}")
+                Blob(code, bytes, type, millis, fromServer)
+            } catch (failure: Throwable) {
+                runCatching { conn.disconnect() }
+                throw failure
+            }
         }
         outcome.onFailure {
             log.e("$label ✗ ${it.javaClass.simpleName}: ${it.message} ${short(url)}")
@@ -346,8 +364,17 @@ object Net {
 
     private fun preview(body: String): String {
         val flat = body.replace(Regex("\\s+"), " ").trim()
-        return if (flat.length <= 700) flat else flat.take(700) + "…+${flat.length - 700}"
+        // The token endpoints answer with the live bearer in the body; keep
+        // it out of the log the same way redact() keeps it out of the headers.
+        val safe = tokenValue.replace(flat) { match ->
+            "\"${match.groupValues[1]}\":\"…${match.groupValues[2].length}B\""
+        }
+        return if (safe.length <= 700) safe else safe.take(700) + "…+${safe.length - 700}"
     }
+
+    private val tokenValue = Regex(
+        "\"(accessToken|access_token|refreshToken|refresh_token|clientToken|client_token|id_token|token)\"\\s*:\\s*\"([^\"]*)\""
+    )
 
     private fun redact(name: String, value: String): String {
         val lower = name.lowercase()

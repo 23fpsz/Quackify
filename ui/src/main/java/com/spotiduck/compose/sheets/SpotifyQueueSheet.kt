@@ -31,16 +31,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.components.EncorePlayIndicator
+import com.spotiduck.compose.components.SpotifyArtworkImage
 import com.spotiduck.compose.playlist.TrackItem
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.EncoreCornerRadii
@@ -60,6 +59,7 @@ import com.spotiduck.compose.theme.SpotifyTheme
 fun SpotifyQueueSheet(
     currentTrackTitle: String,
     currentTrackArtist: String,
+    currentTrackCoverUrl: String? = null,
     queueSourceContext: String, // e.g. "Today's Top Hits"
     userQueue: List<TrackItem>,
     nextFromContext: List<TrackItem>,
@@ -139,15 +139,12 @@ fun SpotifyQueueSheet(
                             .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter2),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(EncoreCornerRadii.Base))
-                                .background(Color(0xFF5A3E85)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = "♪", color = Color.White, fontSize = 20.sp)
-                        }
+                        SpotifyArtworkImage(
+                            imageUrl = currentTrackCoverUrl,
+                            contentDescription = currentTrackTitle,
+                            modifier = Modifier.size(48.dp),
+                            cornerRadius = EncoreCornerRadii.Base
+                        )
 
                         Spacer(modifier = Modifier.width(EncoreSpacers.Tighter))
 
@@ -239,15 +236,12 @@ private fun QueueTrackRow(
             .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter2),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(EncoreCornerRadii.Base))
-                .background(Color(0xFF282828)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = "♫", color = Color.White, fontSize = 16.sp)
-        }
+        SpotifyArtworkImage(
+            imageUrl = track.imageUrl,
+            contentDescription = track.title,
+            modifier = Modifier.size(44.dp),
+            cornerRadius = EncoreCornerRadii.Base
+        )
 
         Spacer(modifier = Modifier.width(EncoreSpacers.Tighter))
 

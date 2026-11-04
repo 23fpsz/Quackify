@@ -92,6 +92,8 @@ data class ClusterState(
     val shuffle: Boolean = false,
     val repeatContext: Boolean = false,
     val repeatTrack: Boolean = false,
+    /** Server clock of the snapshot this state was taken at, in ms. */
+    val stateAtMs: Long = 0L,
 ) {
     val isAd: Boolean get() = track.isAd
 
@@ -131,6 +133,26 @@ data class ClusterState(
     }
 
     fun next(): ClusterTrack? = nextTracks.firstOrNull()
+
+    /**
+     * Where the playing device really is right now. The cluster snapshot
+     * carries the position as of its own timestamp, so a device that is
+     * still playing has moved on since; a paused one has not. Mirrors what
+     * the official clients do with position_as_of_timestamp.
+     */
+    fun positionNow(nowMs: Long = System.currentTimeMillis()): Long {
+        if (!isPlaying || stateAtMs <= 0L) return positionMs
+        val elapsed = nowMs - stateAtMs
+        if (elapsed < 0L || elapsed > STALE_STATE_MS) return positionMs
+        val at = positionMs + elapsed
+        val total = if (durationMs > 0L) durationMs else track.durationMs
+        return if (total > 0L) at.coerceIn(0L, total) else at
+    }
+
+    companion object {
+        /** A snapshot older than this says more about a dead session than the present. */
+        private const val STALE_STATE_MS = 10 * 60 * 1000L
+    }
 
     fun movedTo(uri: String): ClusterState? {
         val window = window()
@@ -206,11 +228,20 @@ object ClusterParser {
         val restrictions = player.optJSONObject("restrictions")
         val options = player.optJSONObject("options") ?: JSONObject()
         val index = player.optJSONObject("index")
+        // The PUT answers carry active_device_id at the root; the plain
+        // cluster GET nests it inside the cluster object.
         val declared = root.text("active_device_id")
+            .ifBlank { cluster.text("active_device_id") }
         val origin = player.optJSONObject("play_origin")?.text("device_identifier").orEmpty()
         val activeId = declared.ifBlank {
             if (origin == LOCAL_ORIGIN) localDeviceId else ""
         }
+        // The connect state carries two separate flags: is_playing says a
+        // playback session exists, is_paused says it is parked. A paused
+        // device still reports is_playing=true, so the UI has to look at
+        // both or it keeps showing a paused remote as playing.
+        val paused = player.optBoolean("is_paused", false)
+        val playing = if (player.has("is_playing")) player.optBoolean("is_playing", false) else !paused
         return ClusterState(
             track = track,
             nextTracks = parseTracks(player.optJSONArray("next_tracks")),
@@ -220,7 +251,7 @@ object ClusterParser {
             pageIndex = index?.optInt("page", 0) ?: 0,
             playbackId = player.text("playback_id"),
             sessionId = player.text("session_id"),
-            isPlaying = player.optBoolean("is_playing", false),
+            isPlaying = playing && !paused,
             positionMs = player.optLong("position_as_of_timestamp", 0L),
             durationMs = player.optLong("duration", 0L),
             disallowSeeking = (restrictions?.optJSONArray("disallow_seeking_reasons")?.length() ?: 0) > 0,
@@ -234,6 +265,7 @@ object ClusterParser {
             shuffle = options.bool("shuffling_context"),
             repeatContext = options.bool("repeating_context"),
             repeatTrack = options.bool("repeating_track"),
+            stateAtMs = player.optLong("timestamp", 0L),
         )
     }
 }

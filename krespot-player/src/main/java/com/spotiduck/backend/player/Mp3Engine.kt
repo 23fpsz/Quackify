@@ -66,6 +66,10 @@ internal class Mp3Engine(
     }
 
     fun duck(level: Float) {
+        sink?.duck(level)
+    }
+
+    fun volume(level: Float) {
         sink?.volume(level)
     }
 

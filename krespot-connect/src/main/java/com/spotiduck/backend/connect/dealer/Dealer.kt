@@ -12,11 +12,15 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import android.os.SystemClock
 import com.spotiduck.backend.core.log.Logs
 
 private val log = Logs.of(Logs.Module.DEALER)
 
 private const val PING_MS = 30_000L
+
+/** No server frame for this long means the socket is half dead: force a reconnect. */
+private const val SILENCE_MS = 3 * PING_MS
 
 class Dealer {
 
@@ -33,11 +37,16 @@ class Dealer {
 
         val listener = object : WebSocketListener() {
 
+            /** Elapsed-realtime clock of the last received frame, pings included. */
+            @Volatile
+            var lastReceiveAt = SystemClock.elapsedRealtime()
+
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 log.i("open ${response.code} $host")
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
+                lastReceiveAt = SystemClock.elapsedRealtime()
                 val json = runCatching { JSONObject(text) }.getOrNull() ?: return
                 when (json.optString("type")) {
                     "ping" -> {
@@ -80,6 +89,14 @@ class Dealer {
             while (true) {
                 delay(PING_MS)
                 if (!socket.send("""{"type":"ping"}""")) return@launch
+                // A buffered write can "succeed" into a half-open socket for
+                // minutes after a network switch; a silent server means the
+                // connection is gone even though nothing failed yet.
+                if (SystemClock.elapsedRealtime() - listener.lastReceiveAt > SILENCE_MS) {
+                    log.w("dealer silent for ${SILENCE_MS / 1000}s, forcing a reconnect")
+                    socket.cancel()
+                    return@launch
+                }
             }
         }
 
