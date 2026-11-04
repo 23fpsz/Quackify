@@ -299,6 +299,13 @@ class PlaybackService : Service() {
             return builder
                 .setContentTitle("SpotiDuck")
                 .setContentText("Nothing playing")
+                // The quiet placeholder carries the session token too, so it
+                // stays a media notification: the 13+ system shows those even
+                // without POST_NOTIFICATIONS, which the app no longer asks for.
+                .setStyle(
+                    MediaNotificationCompat.MediaStyle()
+                        .setMediaSession(session?.sessionToken)
+                )
                 .build()
         }
         builder
