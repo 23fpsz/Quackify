@@ -8,18 +8,21 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,12 +48,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
 import com.spotiduck.compose.components.SpotifyArtworkImage
 import com.spotiduck.compose.theme.EncoreColors
-import com.spotiduck.compose.theme.SpotifyTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,6 +64,10 @@ private const val NAME_LIMIT = 100
 private const val DESCRIPTION_LIMIT = 300
 private const val COVER_SIDE = 640
 
+/**
+ * Spotify Mobile "Name & details" Bottom Sheet Modal.
+ * Matches decompiled specs (rj11.smali) & user screenshot 1:1.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditPlaylistSheet(
@@ -71,7 +78,10 @@ fun EditPlaylistSheet(
     canRemoveCover: Boolean,
     onSave: (name: String, description: String, cover: ByteArray?, clearCover: Boolean) -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isInitiallyPrivate: Boolean = false,
+    onTogglePrivate: ((Boolean) -> Unit)? = null,
+    onDeletePlaylist: (() -> Unit)? = null
 ) {
     if (!isOpen) return
 
@@ -85,6 +95,7 @@ fun EditPlaylistSheet(
     var pickedFailed by remember { mutableStateOf(false) }
     var removeCover by remember { mutableStateOf(false) }
     var decoding by remember { mutableStateOf(false) }
+    var isPrivate by remember { mutableStateOf(isInitiallyPrivate) }
 
     val previewBitmap = remember(picked) {
         picked?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }
@@ -109,255 +120,312 @@ fun EditPlaylistSheet(
     }
 
     val hasCover = picked != null || (!removeCover && !coverUrl.isNullOrBlank())
-    val canRemove = picked != null || (canRemoveCover && !removeCover)
-    val canSave = name.isNotBlank() && !decoding
+    val hasChanges = (name.trim() != initialName.trim()) ||
+            (description.trim() != initialDescription.trim()) ||
+            (picked != null) ||
+            removeCover
+    val canSave = name.isNotBlank() && !decoding && hasChanges
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .padding(vertical = 12.dp)
-                    .size(width = 36.dp, height = 4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
-            )
-        },
+        containerColor = Color(0xFF1F1F1F),
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        dragHandle = null,
         modifier = modifier
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
         ) {
-            Text(
-                text = "Edit details",
-                style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp),
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
-            )
+            // Top Bar: Cancel (left) | Name & details (center) | Save (right)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Cancel",
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    modifier = Modifier.clickable { onDismiss() }
+                )
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Name & details",
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Text(
+                    text = "Save",
+                    style = TextStyle(
+                        color = if (canSave) EncoreColors.Green else Color(0xFF1E5230),
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    modifier = Modifier.clickable(enabled = canSave) {
+                        onSave(
+                            name.trim(),
+                            description.trim(),
+                            picked,
+                            removeCover && picked == null
+                        )
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Main Editor Row: Left Artwork with floating Pencil button | Right Fields (Name, Description)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                // Square Artwork with bottom-right circular edit pencil button overlay
                 Box(
                     modifier = Modifier
-                        .size(96.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(EncoreColors.PureBlack.copy(alpha = 0.4f))
-                        .clickable { picker.launch("image/*") },
-                    contentAlignment = Alignment.Center
+                        .size(108.dp)
                 ) {
-                    when {
-                        decoding -> CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = EncoreColors.TextSecondary,
-                            strokeWidth = 2.dp
-                        )
-                        previewBitmap != null -> Image(
-                            bitmap = previewBitmap,
-                            contentDescription = "New cover",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        hasCover && !coverUrl.isNullOrBlank() -> SpotifyArtworkImage(
-                            imageUrl = coverUrl,
-                            contentDescription = "Current cover",
-                            modifier = Modifier.fillMaxWidth(),
-                            cornerRadius = 6.dp
-                        )
-                        else -> Icon(
-                            painter = painterResource(id = R.drawable.encore_icon_playlist_24),
-                            contentDescription = null,
-                            tint = EncoreColors.TextSecondary,
-                            modifier = Modifier.size(32.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF282828))
+                            .clickable { picker.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        when {
+                            decoding -> CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = EncoreColors.TextSecondary,
+                                strokeWidth = 2.dp
+                            )
+                            previewBitmap != null -> Image(
+                                bitmap = previewBitmap,
+                                contentDescription = "New cover",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            hasCover && !coverUrl.isNullOrBlank() -> SpotifyArtworkImage(
+                                imageUrl = coverUrl,
+                                contentDescription = "Current cover",
+                                modifier = Modifier.fillMaxSize(),
+                                cornerRadius = 8.dp
+                            )
+                            else -> Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_playlist_24),
+                                contentDescription = null,
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+                    }
+
+                    // Floating circular pencil edit badge overlay
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .align(Alignment.BottomEnd)
+                            .clip(CircleShape)
+                            .background(Color(0xFF141414))
+                            .border(1.5.dp, Color(0xFF282828), CircleShape)
+                            .clickable { picker.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_edit_24),
+                            contentDescription = "Edit photo",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                // Name and Description Input Fields
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Playlist Name Input Container
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF363636))
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        BasicTextField(
+                            value = name,
+                            onValueChange = { if (it.length <= NAME_LIMIT) name = it },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            cursorBrush = SolidColor(EncoreColors.Green),
+                            modifier = Modifier.fillMaxWidth(),
+                            decorationBox = { innerTextField ->
+                                if (name.isEmpty()) {
+                                    Text(
+                                        text = "Add playlist name",
+                                        color = EncoreColors.TextSecondary,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Normal
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        )
+                    }
+
+                    // Playlist Description Input Container
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(68.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF363636))
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        BasicTextField(
+                            value = description,
+                            onValueChange = { if (it.length <= DESCRIPTION_LIMIT) description = it },
+                            singleLine = false,
+                            maxLines = 3,
+                            textStyle = TextStyle(
+                                color = Color.White,
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Normal
+                            ),
+                            cursorBrush = SolidColor(EncoreColors.Green),
+                            modifier = Modifier.fillMaxWidth(),
+                            decorationBox = { innerTextField ->
+                                if (description.isEmpty()) {
+                                    Text(
+                                        text = "Add description",
+                                        color = EncoreColors.TextSecondary,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Normal
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Action Row 1: Make private / Make public
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        isPrivate = !isPrivate
+                        onTogglePrivate?.invoke(isPrivate)
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_locked_24),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (hasCover) "Change photo" else "Choose photo",
-                        style = SpotifyTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        ),
-                        modifier = Modifier
-                            .clickable { picker.launch("image/*") }
-                            .padding(vertical = 6.dp)
+                Text(
+                    text = if (isPrivate) "Make public" else "Make private",
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
-                    if (canRemove) {
-                        Text(
-                            text = "Remove photo",
-                            style = SpotifyTheme.typography.bodySmall.copy(
-                                color = EncoreColors.TextSecondary
-                            ),
-                            modifier = Modifier
-                                .clickable {
-                                    picked = null
-                                    if (canRemoveCover) removeCover = true
-                                }
-                                .padding(vertical = 6.dp)
-                        )
-                    }
-                    if (pickedFailed) {
-                        Text(
-                            text = "That image could not be read",
-                            style = SpotifyTheme.typography.bodySmall.copy(color = Color(0xFFFF6B6B))
-                        )
-                    }
-                }
+                )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            // Action Row 2: Delete playlist
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        onDismiss()
+                        onDeletePlaylist?.invoke()
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_delete_24),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
 
-            EncoreField(
-                label = "Name",
-                value = name,
-                onValueChange = { if (it.length <= NAME_LIMIT) name = it },
-                placeholder = "Add a name",
-                singleLine = true,
-                counter = "${name.length}/$NAME_LIMIT"
-            )
+                Spacer(modifier = Modifier.width(16.dp))
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            EncoreField(
-                label = "Description",
-                value = description,
-                onValueChange = { if (it.length <= DESCRIPTION_LIMIT) description = it },
-                placeholder = "Add an optional description",
-                singleLine = false,
-                counter = "${description.length}/$DESCRIPTION_LIMIT"
-            )
+                Text(
+                    text = "Delete playlist",
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(500.dp))
-                        .background(
-                            if (canSave) EncoreColors.Green
-                            else EncoreColors.TextSecondary.copy(alpha = 0.3f)
-                        )
-                        .clickable(enabled = canSave) {
-                            onSave(
-                                name.trim(),
-                                description.trim(),
-                                picked,
-                                removeCover && picked == null
-                            )
-                        }
-                        .padding(horizontal = 28.dp, vertical = 12.dp)
-                ) {
-                    Text(
-                        text = "Save",
-                        style = SpotifyTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = if (canSave) Color.Black else EncoreColors.TextSecondary
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
 
-@Composable
-private fun EncoreField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    singleLine: Boolean,
-    counter: String
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                style = SpotifyTheme.typography.bodySmall.copy(
-                    color = EncoreColors.TextSecondary,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            Text(
-                text = counter,
-                style = SpotifyTheme.typography.marginal.copy(
-                    color = EncoreColors.TextSecondary,
-                    fontSize = 11.sp
-                )
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF282828))
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            if (value.isEmpty()) {
-                Text(
-                    text = placeholder,
-                    style = SpotifyTheme.typography.bodyMedium.copy(
-                        color = EncoreColors.TextSecondary,
-                        fontSize = 14.sp
-                    )
-                )
-            }
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = singleLine,
-                minLines = if (singleLine) 1 else 3,
-                maxLines = if (singleLine) 1 else 5,
-                cursorBrush = SolidColor(EncoreColors.Green),
-                textStyle = TextStyle(
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
+private fun squareJpeg(context: Context, uri: Uri): ByteArray? {
+    return runCatching {
+        val resolver = context.contentResolver
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        val width = bounds.outWidth
+        val height = bounds.outHeight
+        if (width <= 0 || height <= 0) return null
 
-private fun squareJpeg(context: Context, uri: Uri, side: Int = COVER_SIDE): ByteArray? = runCatching {
-    val resolver = context.contentResolver
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sample = 1
-    while (min(bounds.outWidth, bounds.outHeight) / (sample * 2) >= side) sample *= 2
-    val decoded = resolver.openInputStream(uri)?.use {
-        BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-    } ?: return null
-    val edge = min(decoded.width, decoded.height)
-    val square = Bitmap.createBitmap(
-        decoded,
-        (decoded.width - edge) / 2,
-        (decoded.height - edge) / 2,
-        edge,
-        edge
-    )
-    val scaled = Bitmap.createScaledBitmap(square, side, side, true)
-    ByteArrayOutputStream().use { out ->
-        scaled.compress(Bitmap.CompressFormat.JPEG, 90, out)
-        out.toByteArray()
-    }
-}.getOrNull()
+        val sample = maxOf(1, min(width / COVER_SIDE, height / COVER_SIDE))
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        val decoded = resolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, opts)
+        } ?: return null
+
+        val side = min(decoded.width, decoded.height)
+        val x = (decoded.width - side) / 2
+        val y = (decoded.height - side) / 2
+        val cropped = Bitmap.createBitmap(decoded, x, y, side, side)
+        val scaled = if (side > COVER_SIDE) {
+            Bitmap.createScaledBitmap(cropped, COVER_SIDE, COVER_SIDE, true)
+        } else {
+            cropped
+        }
+
+        ByteArrayOutputStream().use { out ->
+            scaled.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            out.toByteArray()
+        }
+    }.getOrNull()
+}

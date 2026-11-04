@@ -139,8 +139,11 @@ fun SpotifyPlaylistScreen(
     headerColor: Color = Color(0xFF144D3F),
     coverUrl: String? = null
 ) {
+    var currentTitle by remember(title) { mutableStateOf(title) }
+    var currentDescription by remember(description) { mutableStateOf(description) }
     var isEditMode by remember { mutableStateOf(false) }
     var isSortSheetOpen by remember { mutableStateOf(false) }
+    var isEditDetailsOpen by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var isDownloaded by remember { mutableStateOf(false) }
@@ -628,7 +631,7 @@ fun SpotifyPlaylistScreen(
                                     if (!coverUrl.isNullOrBlank()) {
                                         SpotifyArtworkImage(
                                             imageUrl = coverUrl,
-                                            contentDescription = title,
+                                            contentDescription = currentTitle,
                                             modifier = Modifier.fillMaxSize(),
                                             cornerRadius = 4.dp
                                         )
@@ -646,7 +649,7 @@ fun SpotifyPlaylistScreen(
 
                             // Playlist Title (Left-aligned, bold, 24sp)
                             Text(
-                                text = title,
+                                text = currentTitle,
                                 style = SpotifyTheme.typography.headlineLarge.copy(
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
@@ -875,16 +878,8 @@ fun SpotifyPlaylistScreen(
                                 }
                             },
                             onEditClick = { isEditMode = true; onEditModeChange(true) },
-                            onNameDetailsClick = onPlaylistOptionsClick,
-                            onSortClick = { isSortSheetOpen = true
-// 
-                                sortOption = when (sortOption) {
-                                    PlaylistSort.CUSTOM -> PlaylistSort.TITLE
-                                    PlaylistSort.TITLE -> PlaylistSort.ARTIST
-                                    PlaylistSort.ARTIST -> PlaylistSort.CUSTOM
-                                    else -> PlaylistSort.CUSTOM
-                                }
-                            }
+                            onNameDetailsClick = { isEditDetailsOpen = true },
+                            onSortClick = { isSortSheetOpen = true }
                         )
                     }
                 }
@@ -1181,16 +1176,8 @@ fun SpotifyPlaylistScreen(
                             }
                         },
                         onEditClick = { isEditMode = true; onEditModeChange(true) },
-                        onNameDetailsClick = onPlaylistOptionsClick,
-                        onSortClick = { isSortSheetOpen = true
-// 
-                            sortOption = when (sortOption) {
-                                PlaylistSort.CUSTOM -> PlaylistSort.TITLE
-                                PlaylistSort.TITLE -> PlaylistSort.ARTIST
-                                PlaylistSort.ARTIST -> PlaylistSort.CUSTOM
-                                else -> PlaylistSort.CUSTOM
-                            }
-                        }
+                        onNameDetailsClick = { isEditDetailsOpen = true },
+                        onSortClick = { isSortSheetOpen = true }
                     )
                 }
             }
@@ -1207,6 +1194,21 @@ fun SpotifyPlaylistScreen(
             isSortSheetOpen = false
         },
         onDismiss = { isSortSheetOpen = false }
+    )
+
+    // Name & Details Bottom Sheet matching edit_playlist_metadata
+    com.spotiduck.compose.sheets.EditPlaylistSheet(
+        isOpen = isEditDetailsOpen,
+        initialName = currentTitle,
+        initialDescription = currentDescription,
+        coverUrl = coverUrl,
+        canRemoveCover = !coverUrl.isNullOrBlank(),
+        onSave = { name, desc, cover, clearCover ->
+            currentTitle = name
+            currentDescription = desc
+            isEditDetailsOpen = false
+        },
+        onDismiss = { isEditDetailsOpen = false }
     )
 }
 
@@ -1238,7 +1240,7 @@ private fun PlaylistChipsRow(
         )
 
         PlaylistChip(
-            iconRes = R.drawable.encore_icon_list_view_24,
+            iconRes = R.drawable.encore_icon_sort_24,
             label = "Edit",
             onClick = onEditClick
         )
@@ -1250,7 +1252,7 @@ private fun PlaylistChipsRow(
         )
 
         PlaylistChip(
-            iconRes = R.drawable.encore_icon_sort_24,
+            iconRes = R.drawable.encore_icon_sort_by_24,
             label = "Sort",
             onClick = onSortClick
         )
@@ -1275,7 +1277,7 @@ private fun PlaylistChip(
             .clip(RoundedCornerShape(100.dp))
             .background(Color(0xFF2A2A2A))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -1286,9 +1288,9 @@ private fun PlaylistChip(
                 painter = painterResource(id = iconRes),
                 contentDescription = label,
                 tint = Color.White,
-                modifier = Modifier.size(15.dp)
+                modifier = Modifier.size(19.dp)
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(7.dp))
             Text(
                 text = label,
                 style = SpotifyTheme.typography.bodySmallBold.copy(
