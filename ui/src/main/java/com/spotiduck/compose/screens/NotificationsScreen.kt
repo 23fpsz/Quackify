@@ -70,6 +70,7 @@ fun NotificationsScreen(
     onPlayClick: (SpotifyNotification) -> Unit = {},
     notifications: List<SpotifyNotification> = emptyList(),
     loading: Boolean = false,
+    loadFailed: Boolean = false,
     onRetry: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -140,6 +141,41 @@ fun NotificationsScreen(
                     strokeWidth = 3.dp,
                     modifier = Modifier.size(36.dp)
                 )
+            }
+        } else if (loadFailed && filtered.isEmpty()) {
+            // The fetch finished with nothing: say the network is the reason
+            // and offer a retry, the same card the playlist screen shows,
+            // instead of a premature "all caught up"
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 32.dp)
+                    .padding(bottom = bottomPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_cloud_off_24),
+                        contentDescription = null,
+                        tint = EncoreColors.TextSecondary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Couldn't load What's New",
+                        style = SpotifyTheme.typography.titleLarge
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Check your internet connection and try again.",
+                        style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    TextButton(onClick = onRetry) {
+                        Text(text = "Try again", color = EncoreColors.Green)
+                    }
+                }
             }
         } else if (filtered.isEmpty()) {
             Box(

@@ -273,6 +273,8 @@ fun SpotifyAppShell(
     searchSuggestions: List<TrackItem> = emptyList(),
     searchRecent: List<SearchHistoryItem> = emptyList(),
     searchLoading: Boolean = false,
+    searchFailed: Boolean = false,
+    onRetrySearch: (() -> Unit)? = null,
     searchQuery: String = "",
     searchData: SearchResults? = null,
     onClearRecentSearches: (() -> Unit)? = null,
@@ -296,6 +298,7 @@ fun SpotifyAppShell(
     episodeLoading: Boolean = false,
     notifications: List<SpotifyNotification> = emptyList(),
     notificationsLoading: Boolean = false,
+    notificationsFailed: Boolean = false,
     onRefreshWhatsNew: (() -> Unit)? = null,
     historyToday: List<TrackItem> = emptyList(),
     historyYesterday: List<TrackItem> = emptyList(),
@@ -837,6 +840,8 @@ fun SpotifyAppShell(
                     recentSearches = searchRecent,
                     suggestions = searchSuggestions,
                     loading = searchLoading,
+                    loadFailed = searchFailed,
+                    onRetry = { onRetrySearch?.invoke() },
                     onClearRecent = { onClearRecentSearches?.invoke() },
                     onRemoveRecent = { item -> onRemoveRecentSearch?.invoke(item.title) },
                     onToggleSaved = { uri -> onToggleSaved?.invoke(uri) },
@@ -1006,6 +1011,7 @@ fun SpotifyAppShell(
                 onBackClick = handleBack,
                 notifications = notifications,
                 loading = notificationsLoading,
+                loadFailed = notificationsFailed,
                 onRetry = { onRefreshWhatsNew?.invoke() },
                 onPlay = { item ->
                     when {
@@ -1660,6 +1666,7 @@ private fun ShellNotificationsPane(
     onBackClick: () -> Unit,
     notifications: List<SpotifyNotification>,
     loading: Boolean,
+    loadFailed: Boolean,
     onRetry: () -> Unit,
     onPlay: (SpotifyNotification) -> Unit
 ) {
@@ -1667,6 +1674,7 @@ private fun ShellNotificationsPane(
         onBackClick = onBackClick,
         notifications = notifications,
         loading = loading,
+        loadFailed = loadFailed,
         onRetry = onRetry,
         onPlayClick = onPlay
     )
