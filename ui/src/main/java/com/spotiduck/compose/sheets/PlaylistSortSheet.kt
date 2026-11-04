@@ -1,0 +1,121 @@
+package com.spotiduck.compose.sheets
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.spotiduck.compose.R
+import com.spotiduck.compose.playlist.PlaylistSort
+import com.spotiduck.compose.theme.EncoreColors
+import com.spotiduck.compose.theme.SpotifyTheme
+
+/**
+ * Spotify Playlist Sort Bottom Sheet matching decompiled specs:
+ * - sort_filter_bottom_sheet_layout.xml
+ * - Options: Custom order, Title, Artist, Recently added
+ * - Active option highlighted in Encore Green with encore_icon_check_24
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlaylistSortSheet(
+    isOpen: Boolean,
+    currentSort: PlaylistSort,
+    onSortSelected: (PlaylistSort) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (!isOpen) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = EncoreColors.Card,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color(0x4DFFFFFF))
+            )
+        },
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp)
+                .navigationBarsPadding()
+        ) {
+            Text(
+                text = "Sort by",
+                style = SpotifyTheme.typography.titleMedium.copy(
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = EncoreColors.TextPrimary
+                ),
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            PlaylistSort.values().forEach { option ->
+                val isSelected = option == currentSort
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onSortSelected(option)
+                            onDismiss()
+                        }
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = option.label,
+                        style = SpotifyTheme.typography.bodyMedium.copy(
+                            fontSize = 15.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) EncoreColors.Green else EncoreColors.TextPrimary
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (isSelected) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_check_24),
+                            contentDescription = "Selected",
+                            tint = EncoreColors.Green,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

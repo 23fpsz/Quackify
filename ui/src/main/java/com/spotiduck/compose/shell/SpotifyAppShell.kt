@@ -286,6 +286,7 @@ fun SpotifyAppShell(
     var isTrackOptionsOpen by remember { mutableStateOf(false) }
     var selectedTrackForOptions by remember { mutableStateOf<TrackItem?>(null) }
     var isPlaylistOptionsOpen by remember { mutableStateOf(false) }
+    var isPlaylistEditMode by remember { mutableStateOf(false) }
     var isAlbumOptionsOpen by remember { mutableStateOf(false) }
     var isArtistOptionsOpen by remember { mutableStateOf(false) }
     var isSortSheetOpen by remember { mutableStateOf(false) }
@@ -686,7 +687,8 @@ fun SpotifyAppShell(
                             selectedTrackForOptions = track
                             isTrackOptionsOpen = true
                         },
-                        onPlaylistOptionsClick = { isPlaylistOptionsOpen = true }
+                        onPlaylistOptionsClick = { isPlaylistOptionsOpen = true },
+                        onEditModeChange = { isEditing -> isPlaylistEditMode = isEditing }
                     )
                 }
             }
@@ -995,32 +997,34 @@ fun SpotifyAppShell(
             }
         }
 
-        ShellBottomBar(
-            title = currentTrackTitle,
-            artist = currentArtist,
-            isPlaying = isPlaying,
-            progress = currentProgress,
-            isLiked = isLiked,
-            coverUrl = currentCoverUrl,
-            connectedDevice = connectedDevice,
-            navItems = navItems,
-            currentNavIndex = selectedNavIndex,
-            onNavSelect = { index ->
-                selectedNavIndex = index
-                when (index) {
-                    0 -> if (currentScreen != ShellScreen.HOME) { navBackStack.clear(); currentScreen = ShellScreen.HOME }
-                    1 -> if (currentScreen != ShellScreen.SEARCH) { navBackStack.clear(); currentScreen = ShellScreen.SEARCH }
-                    2 -> if (currentScreen != ShellScreen.LIBRARY) { navBackStack.clear(); currentScreen = ShellScreen.LIBRARY }
-                }
-            },
-            onPlayPause = { if (playerListener != null) playerListener.onPlayPause() else localIsPlaying = !localIsPlaying },
-            onLike = { if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = !localIsLiked },
-            onDeviceClick = { isDeviceSheetOpen = true },
-            onBarClick = { isPlayerExpanded = true },
-            onSkipNext = handleSkipNext,
-            onSkipPrevious = handleSkipPrevious,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
+        if (!isPlaylistEditMode) {
+            ShellBottomBar(
+                title = currentTrackTitle,
+                artist = currentArtist,
+                isPlaying = isPlaying,
+                progress = currentProgress,
+                isLiked = isLiked,
+                coverUrl = currentCoverUrl,
+                connectedDevice = connectedDevice,
+                navItems = navItems,
+                currentNavIndex = selectedNavIndex,
+                onNavSelect = { index ->
+                    selectedNavIndex = index
+                    when (index) {
+                        0 -> if (currentScreen != ShellScreen.HOME) { navBackStack.clear(); currentScreen = ShellScreen.HOME }
+                        1 -> if (currentScreen != ShellScreen.SEARCH) { navBackStack.clear(); currentScreen = ShellScreen.SEARCH }
+                        2 -> if (currentScreen != ShellScreen.LIBRARY) { navBackStack.clear(); currentScreen = ShellScreen.LIBRARY }
+                    }
+                },
+                onPlayPause = { if (playerListener != null) playerListener.onPlayPause() else localIsPlaying = !localIsPlaying },
+                onLike = { if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = !localIsLiked },
+                onDeviceClick = { isDeviceSheetOpen = true },
+                onBarClick = { isPlayerExpanded = true },
+                onSkipNext = handleSkipNext,
+                onSkipPrevious = handleSkipPrevious,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
 
         // Full Now Playing Screen
         val (contextHeader, contextSub) = when (currentScreen) {

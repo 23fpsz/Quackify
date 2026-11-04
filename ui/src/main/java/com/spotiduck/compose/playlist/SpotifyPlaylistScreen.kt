@@ -134,10 +134,13 @@ fun SpotifyPlaylistScreen(
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onPlaylistOptionsClick: () -> Unit = {},
+    onEditModeChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     headerColor: Color = Color(0xFF144D3F),
     coverUrl: String? = null
 ) {
+    var isEditMode by remember { mutableStateOf(false) }
+    var isSortSheetOpen by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var isDownloaded by remember { mutableStateOf(false) }
@@ -275,7 +278,21 @@ fun SpotifyPlaylistScreen(
             .background(Color(0xFF121212))
             .nestedScroll(nestedScrollConnection)
     ) {
-        if (isSearching) {
+        if (isEditMode) {
+            PlaylistEditModeContent(
+                initialTracks = currentTracks.toList(),
+                onSave = { updatedList ->
+                    currentTracks.clear()
+                    currentTracks.addAll(updatedList)
+                    isEditMode = false
+                    onEditModeChange(false)
+                },
+                onCancel = {
+                    isEditMode = false
+                    onEditModeChange(false)
+                }
+            )
+        } else if (isSearching) {
             // ==========================================
             // SEARCH MODE (Image 3)
             // ==========================================
@@ -857,9 +874,10 @@ fun SpotifyPlaylistScreen(
                                     listState.animateScrollToItem(displayedTracks.size + 2)
                                 }
                             },
-                            onEditClick = onPlaylistOptionsClick,
+                            onEditClick = { isEditMode = true; onEditModeChange(true) },
                             onNameDetailsClick = onPlaylistOptionsClick,
-                            onSortClick = {
+                            onSortClick = { isSortSheetOpen = true
+// 
                                 sortOption = when (sortOption) {
                                     PlaylistSort.CUSTOM -> PlaylistSort.TITLE
                                     PlaylistSort.TITLE -> PlaylistSort.ARTIST
@@ -1162,9 +1180,10 @@ fun SpotifyPlaylistScreen(
                                 listState.animateScrollToItem(displayedTracks.size + 2)
                             }
                         },
-                        onEditClick = onPlaylistOptionsClick,
+                        onEditClick = { isEditMode = true; onEditModeChange(true) },
                         onNameDetailsClick = onPlaylistOptionsClick,
-                        onSortClick = {
+                        onSortClick = { isSortSheetOpen = true
+// 
                             sortOption = when (sortOption) {
                                 PlaylistSort.CUSTOM -> PlaylistSort.TITLE
                                 PlaylistSort.TITLE -> PlaylistSort.ARTIST
@@ -1178,6 +1197,17 @@ fun SpotifyPlaylistScreen(
         }
     }
 }
+
+    // Sort Bottom Sheet matching sort_filter_bottom_sheet_layout.xml
+    com.spotiduck.compose.sheets.PlaylistSortSheet(
+        isOpen = isSortSheetOpen,
+        currentSort = sortOption,
+        onSortSelected = { selected ->
+            sortOption = selected
+            isSortSheetOpen = false
+        },
+        onDismiss = { isSortSheetOpen = false }
+    )
 }
 
 /**
