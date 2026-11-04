@@ -1,10 +1,8 @@
 package com.spotiduck.app
 
-import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -12,9 +10,7 @@ import java.util.Calendar
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,7 +18,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
 import com.spotiduck.backend.core.auth.SpotifyAuth
 import com.spotiduck.backend.api.HomeFeed
 import com.spotiduck.backend.model.HomeSection
@@ -126,22 +121,9 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 var loggedIn by remember { mutableStateOf(SpotifyAuth.isLoggedIn(context)) }
 
-                // Android 13+ hides the playback service's notification without
-                // POST_NOTIFICATIONS; ask once when the shell appears. The
-                // system quietly auto-denies repeats if the user said no.
-                val notifPermission = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission()
-                ) { granted -> log.i("post-notifications granted=$granted") }
-                LaunchedEffect(loggedIn) {
-                    if (!loggedIn) return@LaunchedEffect
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                        ContextCompat.checkSelfPermission(
-                            context, Manifest.permission.POST_NOTIFICATIONS
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
+                // No POST_NOTIFICATIONS prompt: the only notification the app
+                // posts is the playback service's media card, and media-session
+                // notifications are exempt from the 13+ runtime permission.
 
                 if (loggedIn) {
                     var capturing by remember {
