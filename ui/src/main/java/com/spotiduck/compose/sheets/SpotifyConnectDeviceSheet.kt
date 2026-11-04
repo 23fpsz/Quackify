@@ -63,7 +63,8 @@ data class SpotifyDevice(
     val name: String,
     val type: DeviceType,
     val isCurrent: Boolean = false,
-    val protocol: String = "Spotify Connect"
+    val protocol: String = "Spotify Connect",
+    val volumeFraction: Float = -1f
 )
 
 /**
@@ -302,8 +303,11 @@ fun ConnectDevice.toSpotifyDevice(): SpotifyDevice = SpotifyDevice(
         DeviceKind.CAST -> DeviceType.CAST
         DeviceKind.UNKNOWN -> DeviceType.COMPUTER
     },
-    isCurrent = local || active,
-    protocol = if (brand.isBlank()) "Spotify Connect" else brand
+    // Only the device the account is actually listening on is "current"; a
+    // local-but-inactive phone must stay pickable in "Select another device".
+    isCurrent = active,
+    protocol = if (brand.isBlank()) "Spotify Connect" else brand,
+    volumeFraction = if (volumeSteps > 0) (volume.toFloat() / volumeSteps.toFloat()).coerceIn(0f, 1f) else -1f
 )
 
 @Preview

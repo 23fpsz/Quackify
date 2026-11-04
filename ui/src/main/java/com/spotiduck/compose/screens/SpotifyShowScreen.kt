@@ -89,6 +89,7 @@ fun SpotifyShowScreen(
     modifier: Modifier = Modifier,
 ) {
     var descriptionExpanded by remember { mutableStateOf(false) }
+    var descriptionOverflows by remember { mutableStateOf(false) }
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
 
@@ -219,14 +220,17 @@ fun SpotifyShowScreen(
                             style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                             maxLines = if (descriptionExpanded) Int.MAX_VALUE else 3,
                             overflow = TextOverflow.Ellipsis,
+                            onTextLayout = { if (!descriptionExpanded) descriptionOverflows = it.hasVisualOverflow },
                         )
-                        Text(
-                            text = if (descriptionExpanded) "Show less" else "Show more",
-                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
-                            modifier = Modifier
-                                .padding(top = 6.dp)
-                                .clickable { descriptionExpanded = !descriptionExpanded },
-                        )
+                        if (descriptionOverflows || descriptionExpanded) {
+                            Text(
+                                text = if (descriptionExpanded) "Show less" else "Show more",
+                                style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
+                                modifier = Modifier
+                                    .padding(top = 6.dp)
+                                    .clickable { descriptionExpanded = !descriptionExpanded },
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))

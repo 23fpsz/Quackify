@@ -23,18 +23,30 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import android.content.Context
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.pm.PackageInfoCompat
+import android.os.SystemClock
+import android.widget.Toast
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.spotiduck.compose.R
@@ -44,6 +56,7 @@ import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
 import com.spotiduck.compose.theme.SpotifyTheme
 import com.spotiduck.compose.theme.rememberBottomPadding
+import kotlinx.coroutines.delay
 
 data class SettingsSwitches(
     val musicVideos: Boolean = true,
@@ -78,6 +91,7 @@ fun SettingsScreen(
     onToggleOtherVideos: (Boolean) -> Unit = {},
     onToggleShowFollows: (Boolean) -> Unit = {},
     onToggleShowPlaylists: (Boolean) -> Unit = {},
+    onOpenLogViewer: () -> Unit = {},
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
@@ -87,6 +101,37 @@ fun SettingsScreen(
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
             "${info.versionName.orEmpty()} (${PackageInfoCompat.getLongVersionCode(info)})"
         }.getOrDefault("")
+    }
+
+    // Local-only "Autoplay on startup" flag: stored in the app's private
+    // client prefs (the same file the playback bridge reads at start-up),
+    // so no server round trip is involved.
+    val clientPrefs = remember {
+        context.getSharedPreferences("spotiduck.client", Context.MODE_PRIVATE)
+    }
+    var autoplayOnStartup by remember {
+        mutableStateOf(clientPrefs.getBoolean("autoplayOnStartup", false))
+    }
+
+    // Hidden developer entry: five taps on the Version row open the log viewer.
+    // Like the Android build-number gesture, each tap toasts the remaining count,
+    // the counter resets itself five seconds after the last tap, and leaving
+    // Settings always starts the gesture over.
+    val haptics = LocalHapticFeedback.current
+    var versionTaps by remember { mutableIntStateOf(0) }
+    var lastVersionTapAt by remember { mutableLongStateOf(0L) }
+
+    // Five seconds without a tap puts the counter back to zero on its own.
+    LaunchedEffect(versionTaps) {
+        if (versionTaps > 0) {
+            delay(5_000L)
+            versionTaps = 0
+        }
+    }
+
+    // Leaving Settings (back, log viewer, anything else) forgets the progress.
+    DisposableEffect(Unit) {
+        onDispose { versionTaps = 0 }
     }
 
     Column(
@@ -176,6 +221,20 @@ fun SettingsScreen(
             }
 
             item {
+                SettingsSectionHeader(title = "Playback")
+                SettingsToggleRow(
+                    title = "Autoplay on startup",
+                    subtitle = "When you open the app, the loaded track starts playing right away.",
+                    isChecked = autoplayOnStartup,
+                    enabled = true,
+                    onCheckedChange = { on ->
+                        autoplayOnStartup = on
+                        clientPrefs.edit().putBoolean("autoplayOnStartup", on).apply()
+                    }
+                )
+            }
+
+            item {
                 SettingsSectionHeader(title = "Account")
                 val detail = listOfNotNull(
                     product.takeIf { it.isNotBlank() },
@@ -197,7 +256,27 @@ fun SettingsScreen(
 
             item {
                 SettingsSectionHeader(title = "About")
-                SettingsInfoRow(title = "Version", value = version)
+                SettingsInfoRow(
+                    title = "Version",
+                    value = version,
+                    modifier = Modifier.clickable {
+                        val now = SystemClock.elapsedRealtime()
+                        versionTaps = if (now - lastVersionTapAt < 5_000L) versionTaps + 1 else 1
+                        lastVersionTapAt = now
+                        if (versionTaps >= 5) {
+                            versionTaps = 0
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onOpenLogViewer()
+                        } else {
+                            val remaining = 5 - versionTaps
+                            Toast.makeText(
+                                context,
+                                "$remaining more tap${if (remaining == 1) "" else "s"} to open the log viewer",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                )
                 Spacer(modifier = Modifier.height(120.dp))
             }
         }
@@ -318,10 +397,11 @@ private fun SettingsToggleRow(
 @Composable
 private fun SettingsInfoRow(
     title: String,
-    value: String
+    value: String,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,

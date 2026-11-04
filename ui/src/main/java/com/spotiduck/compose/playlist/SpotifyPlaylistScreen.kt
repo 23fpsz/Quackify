@@ -40,10 +40,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -135,9 +138,22 @@ fun SpotifyPlaylistScreen(
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onPlaylistOptionsClick: () -> Unit = {},
     onEditModeChange: (Boolean) -> Unit = {},
+    onShareClick: () -> Unit = {},
+    isSaved: Boolean? = null,
+    onSaveToggle: () -> Unit = {},
+    recommendedTracks: List<TrackItem> = emptyList(),
+    recommendationsLoading: Boolean = false,
+    onRecommendRefresh: () -> Unit = {},
+    onAddRecommended: (TrackItem) -> Unit = {},
     modifier: Modifier = Modifier,
     headerColor: Color = Color(0xFF144D3F),
-    coverUrl: String? = null
+    coverUrl: String? = null,
+    loading: Boolean = false,
+    hasMore: Boolean = false,
+    loadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
+    loadFailed: Boolean = false,
+    onRetry: () -> Unit = {}
 ) {
     var currentTitle by remember(title) { mutableStateOf(title) }
     var currentDescription by remember(description) { mutableStateOf(description) }
@@ -164,31 +180,36 @@ fun SpotifyPlaylistScreen(
         mutableStateListOf<TrackItem>().apply { addAll(tracks) }
     }
 
-    // Recommended tracks matching Spotify
-    val recommendedSongs = remember {
-        mutableStateListOf<TrackItem>()
-    }
-
-    val displayedTracks by remember {
-        derivedStateOf {
-            var list = if (searchQuery.isBlank()) {
-                currentTracks.toList()
-            } else {
-                currentTracks.filter {
-                    it.title.contains(searchQuery, ignoreCase = true) ||
-                    it.artist.contains(searchQuery, ignoreCase = true)
-                }
+    val displayedTracks = remember(tracks, currentTracks, searchQuery, sortOption) {
+        val base = if (searchQuery.isBlank()) {
+            currentTracks.toList()
+        } else {
+            currentTracks.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                it.artist.contains(searchQuery, ignoreCase = true)
             }
-            when (sortOption) {
-                PlaylistSort.TITLE -> list.sortedBy { it.title }
-                PlaylistSort.ARTIST -> list.sortedBy { it.artist }
-                else -> list
-            }
+        }
+        when (sortOption) {
+            PlaylistSort.TITLE -> base.sortedBy { it.title }
+            PlaylistSort.ARTIST -> base.sortedBy { it.artist }
+            else -> base
         }
     }
 
     val listState = rememberLazyListState()
     val density = LocalDensity.current
+
+    val shouldLoadMore by remember(hasMore, loadingMore, displayedTracks.size, onLoadMore) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            hasMore && !loadingMore && displayedTracks.isNotEmpty() &&
+                lastVisible >= info.totalItemsCount - 8
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) onLoadMore()
+    }
 
     // Magnetic snapping search bar physics:
     // Tracks interactive drag in real-time, and snaps 100% open or 100% closed on release
@@ -668,19 +689,29 @@ fun SpotifyPlaylistScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             ) {
-                                // (+) Add Collaborator Circle Pill Button
+                                // (+) Save-to-library circle button next to the owner info
                                 Box(
                                     modifier = Modifier
                                         .size(26.dp)
                                         .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.12f))
-                                        .clickable { onPlaylistOptionsClick() },
+                                        .background(
+                                            when (isSaved) {
+                                                true -> EncoreColors.Green
+                                                else -> Color.White.copy(alpha = 0.12f)
+                                            }
+                                        )
+                                        .clickable(enabled = isSaved != null) { onSaveToggle() },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        painter = painterResource(id = R.drawable.encore_icon_plus_24),
-                                        contentDescription = "Add collaborators",
-                                        tint = Color.White,
+                                        painter = painterResource(
+                                            id = if (isSaved == true) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24
+                                        ),
+                                        contentDescription = when (isSaved) {
+                                            true -> "Remove from library"
+                                            else -> "Add to library"
+                                        },
+                                        tint = if (isSaved == true) Color.Black else Color.White,
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
@@ -792,13 +823,13 @@ fun SpotifyPlaylistScreen(
                                         )
                                     }
 
-                                    // Share Button (<)
+                                    // Share Button (<) — shares the playlist right away
                                     Box(
                                         modifier = Modifier
                                             .size(32.dp)
                                             .clip(CircleShape)
                                             .background(Color.Transparent)
-                                            .clickable(onClick = onPlaylistOptionsClick),
+                                            .clickable(onClick = onShareClick),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -885,6 +916,50 @@ fun SpotifyPlaylistScreen(
                 }
 
                 // Track Rows (Solid pure #121212 background, 60dp standard row height, scrolls under sticky chips)
+                if (loading && displayedTracks.isEmpty()) {
+                    item(key = "playlist_loading") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = EncoreColors.Green,
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+                    }
+                }
+                if (!loading && loadFailed && displayedTracks.isEmpty()) {
+                    item(key = "playlist_load_failed") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 32.dp, vertical = 48.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Couldn't load this playlist",
+                                style = SpotifyTheme.typography.titleMedium.copy(
+                                    color = EncoreColors.TextPrimary
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Check your internet connection and try again.",
+                                style = SpotifyTheme.typography.bodySmall.copy(
+                                    color = EncoreColors.TextSecondary
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            TextButton(onClick = onRetry) {
+                                Text(text = "Try again", color = EncoreColors.Green)
+                            }
+                        }
+                    }
+                }
                 itemsIndexed(displayedTracks) { _, track ->
                     val isCurrentTrack = track.title == currentTrackTitle
                     EncoreTrackRow(
@@ -899,8 +974,25 @@ fun SpotifyPlaylistScreen(
                     )
                 }
 
+                if (loadingMore) {
+                    item(key = "playlist_loading_more") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 20.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = EncoreColors.Green,
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+
                 // "Recommended" Section (add_more_row_blend_playlist.xml)
-                if (recommendedSongs.isNotEmpty()) {
+                if (recommendedTracks.isNotEmpty() || recommendationsLoading) {
                     item {
                         Column(
                             modifier = Modifier
@@ -923,7 +1015,7 @@ fun SpotifyPlaylistScreen(
                         }
                     }
 
-                    itemsIndexed(recommendedSongs) { _, recTrack ->
+                    itemsIndexed(recommendedTracks) { _, recTrack ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -994,10 +1086,7 @@ fun SpotifyPlaylistScreen(
                                     .size(34.dp)
                                     .clip(CircleShape)
                                     .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
-                                    .clickable {
-                                        currentTracks.add(recTrack)
-                                        recommendedSongs.remove(recTrack)
-                                    },
+                                    .clickable { onAddRecommended(recTrack) },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -1022,18 +1111,24 @@ fun SpotifyPlaylistScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(999.dp))
                                     .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(999.dp))
-                                    .clickable {
-                                        recommendedSongs.clear()
-                                    }
+                                    .clickable(enabled = !recommendationsLoading, onClick = onRecommendRefresh)
                                     .padding(horizontal = 24.dp, vertical = 10.dp)
                             ) {
-                                Text(
-                                    text = "Refresh",
-                                    style = SpotifyTheme.typography.bodySmallBold.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                if (recommendationsLoading) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(16.dp)
                                     )
-                                )
+                                } else {
+                                    Text(
+                                        text = "Refresh",
+                                        style = SpotifyTheme.typography.bodySmallBold.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    )
+                                }
                             }
                         }
                     }

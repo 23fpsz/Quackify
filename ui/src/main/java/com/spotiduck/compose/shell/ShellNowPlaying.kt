@@ -10,7 +10,6 @@ import com.spotiduck.compose.components.RepeatMode
 import com.spotiduck.compose.components.ShuffleMode
 import com.spotiduck.compose.player.SpotifyNowPlayingScreen
 import com.spotiduck.compose.player.TimeSyncedLyric
-import com.spotiduck.compose.player.defaultLyricsList
 import com.spotiduck.compose.theme.EncoreAnimation
 
 @Composable
@@ -27,10 +26,18 @@ internal fun ShellNowPlaying(
     dominantColor: Color,
     isLiked: Boolean,
     isExplicit: Boolean,
+    monthlyListeners: String,
+    artistBio: String,
+    artistImageUrl: String?,
     shuffleMode: ShuffleMode,
     repeatMode: RepeatMode,
     connectedDevice: String,
     coverUrl: String,
+    lyrics: List<TimeSyncedLyric> = emptyList(),
+    canvasFilePath: String? = null,
+    isCanvasAllowed: Boolean = true,
+    isCanvasEnabled: Boolean = false,
+    onCanvasToggle: (Boolean) -> Unit = {},
     onCollapse: () -> Unit,
     onPlayPause: () -> Unit,
     onSkipNext: () -> Unit,
@@ -42,10 +49,9 @@ internal fun ShellNowPlaying(
     onMore: () -> Unit,
     onQueue: () -> Unit,
     onDevice: () -> Unit,
-    lyrics: List<TimeSyncedLyric> = defaultLyricsList,
-    lyricsSnippet: String = "",
-    monthlyListeners: String = "",
-    artistBio: String = ""
+    onShare: () -> Unit = {},
+    onTitleClick: () -> Unit = {},
+    onArtistClick: () -> Unit = {},
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -76,10 +82,18 @@ internal fun ShellNowPlaying(
             dominantColor = dominantColor,
             isLiked = isLiked,
             isExplicit = isExplicit,
+            monthlyListeners = monthlyListeners,
+            artistBio = artistBio,
+            artistImageUrl = artistImageUrl,
             shuffleMode = shuffleMode,
             repeatMode = repeatMode,
             connectedDeviceName = connectedDevice,
             coverUrl = coverUrl,
+            lyrics = lyrics,
+            canvasFilePath = canvasFilePath,
+            isCanvasAllowed = isCanvasAllowed,
+            isCanvasEnabled = isCanvasEnabled,
+            onCanvasToggle = onCanvasToggle,
             onCollapseClick = onCollapse,
             onPlayPauseClick = onPlayPause,
             onSkipNextClick = onSkipNext,
@@ -91,10 +105,9 @@ internal fun ShellNowPlaying(
             onMoreClick = onMore,
             onQueueClick = onQueue,
             onDeviceClick = onDevice,
-            lyrics = lyrics,
-            lyricsSnippet = lyricsSnippet,
-            monthlyListeners = monthlyListeners,
-            artistBio = artistBio
+            onShareClick = onShare,
+            onTitleClick = onTitleClick,
+            onArtistClick = onArtistClick
         )
     }
 }

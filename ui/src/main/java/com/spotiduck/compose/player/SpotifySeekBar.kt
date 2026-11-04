@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -68,7 +69,13 @@ fun SpotifySeekBar(
     isLoading: Boolean = false
 ) {
     var isDragging by remember { mutableStateOf(false) }
-    var dragProgress by remember(progress) { mutableFloatStateOf(progress) }
+    var dragProgress by remember { mutableFloatStateOf(progress) }
+
+    // The player position keeps ticking while the finger is down; sync only
+    // when idle so a tick never snaps the thumb away mid-gesture.
+    LaunchedEffect(progress) {
+        if (!isDragging) dragProgress = progress
+    }
 
     // Smooth continuous progress interpolation between periodic player ticks (120fps / 60fps)
     val smoothProgress by animateFloatAsState(
@@ -77,18 +84,6 @@ fun SpotifySeekBar(
         label = "smoothProgress"
     )
     val displayProgress = if (isDragging) dragProgress else smoothProgress
-
-    // Infinite pulse transition for song loading wave travelling from progress thumb towards the right
-    val infiniteTransition = rememberInfiniteTransition(label = "seekbarLoadingTransition")
-    val pulsePhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulsePhase"
-    )
 
     // Thumb size: 8dp resting (crisp and visible matching Spotify), 12dp when user is scrubbing
     val thumbDotSize by animateDpAsState(
@@ -118,9 +113,12 @@ fun SpotifySeekBar(
                             val newProgress = (offset.x / widthPx).coerceIn(0f, 1f)
                             dragProgress = newProgress
                             isDragging = true
-                            tryAwaitRelease()
+                            // A scrub cancels this press: only a real release
+                            // may seek, otherwise every drag fires an extra
+                            // seek to the press point mid-gesture.
+                            val released = tryAwaitRelease()
                             isDragging = false
-                            onSeek(dragProgress)
+                            if (released) onSeek(dragProgress)
                         }
                     )
                 }
@@ -147,8 +145,20 @@ fun SpotifySeekBar(
             contentAlignment = Alignment.CenterStart
         ) {
             // Track Background (4dp height, 2dp corner radius, 30% opacity white)
-            // When isLoading is true, an animated light pulse sweeps outward from the thumb across the track
+            // When isLoading is true, an animated light pulse sweeps outward from the thumb across the track.
+            // The infinite transition lives INSIDE this branch: hoisted at the top level it kept
+            // recomposing the whole seekbar at frame rate even while nothing was loading.
             if (isLoading) {
+                val infiniteTransition = rememberInfiniteTransition(label = "seekbarLoadingTransition")
+                val pulsePhase by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 1500, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "pulsePhase"
+                )
                 val remainingTrack = (widthPx - thumbOffsetPx).coerceAtLeast(1f)
                 val waveLengthPx = (remainingTrack * 0.40f).coerceIn(60f, 240f)
                 val waveCenterPx = thumbOffsetPx + (remainingTrack + waveLengthPx) * pulsePhase - (waveLengthPx / 2f)

@@ -45,7 +45,7 @@ import com.spotiduck.compose.theme.SpotifyTheme
 fun ProfileDrawerSheet(
     isOpen: Boolean,
     onDismiss: () -> Unit,
-    onViewProfileClick: () -> Unit,
+    onAccountsClick: () -> Unit,
     onWhatsNewClick: () -> Unit,
     onListeningHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -79,13 +79,13 @@ fun ProfileDrawerSheet(
                 .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
         ) {
-            // Profile Header
+            // Profile Header: opens the account switcher
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
                         onDismiss()
-                        onViewProfileClick()
+                        onAccountsClick()
                     }
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -95,7 +95,7 @@ fun ProfileDrawerSheet(
                     avatarUrl = userAvatarUrl.ifBlank { null },
                     onClick = {
                         onDismiss()
-                        onViewProfileClick()
+                        onAccountsClick()
                     },
                     size = 54.dp
                 )
@@ -112,7 +112,7 @@ fun ProfileDrawerSheet(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "View profile",
+                        text = "Switch account",
                         style = SpotifyTheme.typography.bodySmall.copy(
                             color = EncoreColors.TextSecondary
                         )
@@ -126,7 +126,6 @@ fun ProfileDrawerSheet(
                     modifier = Modifier.size(20.dp)
                 )
             }
-
             HorizontalDivider(
                 color = EncoreColors.PureBlack.copy(alpha = 0.5f),
                 thickness = 1.dp,
@@ -216,7 +215,7 @@ fun PreviewProfileDrawerSheet() {
         ProfileDrawerSheet(
             isOpen = true,
             onDismiss = {},
-            onViewProfileClick = {},
+            onAccountsClick = {},
             onWhatsNewClick = {},
             onListeningHistoryClick = {},
             onSettingsClick = {}

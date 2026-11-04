@@ -79,6 +79,10 @@ class KrespotPlayer(private val context: Context) {
     @Volatile
     private var pendingPause = false
 
+    /** A seek that arrived while the engine was still loading, applied at run(). */
+    @Volatile
+    private var pendingSeekMs = -1L
+
     @Volatile
     private var spclient: String = ""
 
@@ -119,9 +123,13 @@ class KrespotPlayer(private val context: Context) {
 
     fun rememberFile(trackUri: String, fileId: String) {
         if (trackUri.isBlank() || fileId.length < 32) return
-        if (fileIds.put(trackUri, fileId) == null) fileIdOrder.addLast(trackUri)
-        while (fileIdOrder.size > FILE_ID_CACHE) {
-            fileIds.remove(fileIdOrder.removeFirst())
+        // prefetchAhead parks one of these per track on Dispatchers.IO while
+        // play() calls it too; the deque below is not thread-safe on its own.
+        synchronized(fileIdOrder) {
+            if (fileIds.put(trackUri, fileId) == null) fileIdOrder.addLast(trackUri)
+            while (fileIdOrder.size > FILE_ID_CACHE) {
+                fileIds.remove(fileIdOrder.removeFirst())
+            }
         }
     }
 
@@ -309,7 +317,11 @@ class KrespotPlayer(private val context: Context) {
                     log.i("play was asked to stay paused, holding it at ${fromMs}ms")
                     player.pause()
                 }
-                player.run(fromMs)
+                val startAt = if (pendingSeekMs >= 0L) pendingSeekMs.also { pendingSeekMs = -1L } else fromMs
+                if (startAt != fromMs) {
+                    log.i("a seek parked while the engine was loading, starting at ${startAt}ms")
+                }
+                player.run(startAt)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Throwable) {
@@ -344,6 +356,7 @@ class KrespotPlayer(private val context: Context) {
         }
         val id = ++generation
         pendingPause = false
+        pendingSeekMs = -1L
         _state.value = PlayerState(playing = true, trackUri = track.uri)
         log.i("play direct '${track.name.ifBlank { track.uri }}' ${file?.bitrate ?: 0}b ${url.take(72)}")
         job = scope.launch {
@@ -403,10 +416,24 @@ class KrespotPlayer(private val context: Context) {
         mp3?.duck(level)
     }
 
+    /** User volume on the local sink, kept separate from audio-focus ducking. */
+    fun setVolume(level: Float) {
+        engine?.volume(level)
+        mp3?.volume(level)
+    }
+
     fun seekTo(ms: Long) {
         val engine = engine
         if (engine == null) {
-            log.w("seek -> ${ms}ms ignored, nothing is running")
+            if (job?.isActive == true) {
+                // The manifest, the init segment and the licence all take
+                // seconds; a scrub that lands in that window used to be
+                // dropped outright.
+                pendingSeekMs = ms
+                log.i("seek -> ${ms}ms parked, the engine is still loading")
+            } else {
+                log.w("seek -> ${ms}ms ignored, nothing is running")
+            }
             return
         }
         log.i("seek -> ${ms}ms")
@@ -416,6 +443,11 @@ class KrespotPlayer(private val context: Context) {
     fun stop() {
         generation++
         pendingPause = false
+        pendingSeekMs = -1L
+        // A licence-gated retry must not survive the user moving on: without
+        // this a late gate-open would stop whatever is playing (or wake a
+        // released player) to restart a track nobody asked for.
+        refused = null
         engine?.stop()
         engine = null
         mp3?.stop()
@@ -445,7 +477,15 @@ class KrespotPlayer(private val context: Context) {
             when (event) {
                 is PlayerEvent.Progress -> current.copy(positionMs = event.positionMs, durationMs = event.durationMs)
                 is PlayerEvent.Seeked -> current.copy(positionMs = event.positionMs)
-                PlayerEvent.Started -> current.copy(playing = true, paused = false, durationMs = durationMs)
+                // The engine reports Started once its pipeline is up, even
+                // when the load was asked to stay paused (taking over a
+                // paused stream): keep the hold, or the button and the
+                // published state say playing while the engine sits silent.
+                PlayerEvent.Started -> if (current.paused) {
+                    current.copy(durationMs = durationMs)
+                } else {
+                    current.copy(playing = true, paused = false, durationMs = durationMs)
+                }
                 PlayerEvent.Ended -> current.copy(playing = false, positionMs = durationMs)
                 is PlayerEvent.Failed -> current.copy(playing = false, trackUri = "")
             }

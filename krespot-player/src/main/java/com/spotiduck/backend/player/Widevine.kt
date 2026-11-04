@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.util.Base64
 import java.net.URLEncoder
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.spotiduck.backend.core.auth.SpotifyAuth
@@ -111,6 +112,10 @@ internal class Widevine(
     }
 
     suspend fun refresh(): MediaCrypto? = gate.withLock {
+        // A successful refresh clears the license gate, which would also kill
+        // the pending retry of a track the gate refused; while it is closed,
+        // keep playing on the session that is already working.
+        if (LicenseGate.remainingMs() > 0L) return@withLock null
         val slot = current ?: return@withLock null
         val instance = drm ?: return@withLock null
         val fresh = license(instance, slot.pssh) ?: return@withLock null
@@ -279,7 +284,13 @@ internal class Widevine(
             log.i("the cdm asked for a service certificate before a licence " +
                     "(${request.data.size}B), answering it locally"
             )
-            if (certify(instance)) {
+            val certified = try {
+                certify(instance)
+            } catch (cancellation: CancellationException) {
+                runCatching { instance.closeSession(session) }
+                throw cancellation
+            }
+            if (certified) {
                 runCatching { instance.closeSession(session) }
                 session = openSession(instance) ?: return null
                 log.i("drm session level=${sessionLevel(instance, session)} after the certificate")
@@ -302,7 +313,14 @@ internal class Widevine(
                 "kids=${countKids(pssh)} gap=${gap}s " +
                 "fields=${topLevel(request.data)}"
         )
-        val response = postLicense(request.data)
+        val response = try {
+            postLicense(request.data)
+        } catch (cancellation: CancellationException) {
+            // A skip cancels the play job mid-POST; without this the session
+            // opened above stays open and untracked until the CDM fills up.
+            runCatching { instance.closeSession(session) }
+            throw cancellation
+        }
         if (response != null && response.ok) {
             val slot = provided(instance, session, pssh, response.bytes)
             if (slot != null) return slot

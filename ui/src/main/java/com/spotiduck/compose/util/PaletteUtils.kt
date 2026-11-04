@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.toBitmap
 import androidx.palette.graphics.Palette
-import coil.ImageLoader
+import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.spotiduck.compose.components.resolveSpotifyImageUrl
@@ -85,7 +85,10 @@ fun rememberDominantColor(
 ): State<Color> {
     val context = LocalContext.current
     val fallback = defaultColor ?: spotifyColorForSeed(fallbackSeed ?: imageUrl)
-    val colorState = remember(imageUrl, fallbackSeed) { mutableStateOf(fallback) }
+    // Keyed to the url alone: a track change that keeps the same cover must
+    // not throw away the extracted color, and the effect below re-extracts
+    // exactly when the url changes anyway.
+    val colorState = remember(imageUrl) { mutableStateOf(fallback) }
 
     LaunchedEffect(imageUrl) {
         val resolved = resolveSpotifyImageUrl(imageUrl)
@@ -96,12 +99,15 @@ fun rememberDominantColor(
 
         withContext(Dispatchers.IO) {
             try {
-                val loader = ImageLoader(context)
+                // The shared singleton loader reuses the memory/disk caches and
+                // the socket pool: a private ImageLoader per call re-downloaded
+                // every cover it was asked to extract a color from.
                 val request = ImageRequest.Builder(context)
                     .data(resolved)
+                    .size(128) // a 128px decode is plenty for Palette
                     .allowHardware(false) // Required for Palette software bitmap access
                     .build()
-                val result = loader.execute(request)
+                val result = context.imageLoader.execute(request)
                 if (result is SuccessResult) {
                     val bitmap = result.drawable.toBitmap()
                     val extracted = extractDominantColor(bitmap)

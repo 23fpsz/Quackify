@@ -53,6 +53,8 @@ fun EntityOptionsSheet(
     onEditPlaylist: () -> Unit = {},
     isSaved: Boolean? = null,
     onSaveToggle: () -> Unit = {},
+    canMoveToFolder: Boolean = false,
+    onMoveToFolder: () -> Unit = {},
     onAddToPlaylist: (() -> Unit)? = null,
     onAddToQueue: (() -> Unit)? = null,
     canGoToRadio: Boolean = false,
@@ -148,10 +150,25 @@ fun EntityOptionsSheet(
                         isSaved -> "Remove from Your Library"
                         else -> "Add to Your Library"
                     },
-                    iconRes = if (isSaved) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24,
+                    // a removal must read as destructive, never as a checkmark
+                    iconRes = when {
+                        isSaved -> R.drawable.encore_icon_trash_24
+                        else -> R.drawable.encore_icon_plus_24
+                    },
                     onClick = {
                         onDismiss()
                         onSaveToggle()
+                    }
+                )
+            }
+
+            if (canMoveToFolder) {
+                EntityRow(
+                    title = "Move to folder",
+                    iconRes = R.drawable.encore_icon_folder_24,
+                    onClick = {
+                        onDismiss()
+                        onMoveToFolder()
                     }
                 )
             }
