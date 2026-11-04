@@ -81,7 +81,9 @@ fun EditPlaylistSheet(
     modifier: Modifier = Modifier,
     isInitiallyPrivate: Boolean = false,
     onTogglePrivate: ((Boolean) -> Unit)? = null,
-    onDeletePlaylist: (() -> Unit)? = null
+    onDeletePlaylist: (() -> Unit)? = null,
+    title: String = "Name & details",
+    saveLabel: String = "Save" 
 ) {
     if (!isOpen) return
 
@@ -157,7 +159,7 @@ fun EditPlaylistSheet(
                 )
 
                 Text(
-                    text = "Name & details",
+                    text = title,
                     style = TextStyle(
                         color = Color.White,
                         fontSize = 16.sp,
@@ -168,7 +170,7 @@ fun EditPlaylistSheet(
                 )
 
                 Text(
-                    text = "Save",
+                    text = saveLabel,
                     style = TextStyle(
                         color = if (canSave) EncoreColors.Green else Color(0xFF1E5230),
                         fontSize = 14.5.sp,
@@ -394,6 +396,7 @@ fun EditPlaylistSheet(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+
         }
     }
 }

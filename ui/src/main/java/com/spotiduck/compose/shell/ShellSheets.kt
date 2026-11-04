@@ -1,14 +1,18 @@
 package com.spotiduck.compose.shell
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import com.spotiduck.backend.model.ConnectDevice
 import com.spotiduck.compose.playlist.TrackItem
+import com.spotiduck.backend.core.auth.SpotifyAuth
+import com.spotiduck.compose.sheets.AccountsSheet
 import com.spotiduck.compose.sheets.AlbumOptionsSheet
 import com.spotiduck.compose.sheets.ArtistOptionsSheet
+import com.spotiduck.compose.sheets.EntityOptions
+import com.spotiduck.compose.sheets.EntityOptionsSheet
 import com.spotiduck.compose.sheets.LibraryCreateSheet
 import com.spotiduck.compose.sheets.LibrarySortOption
 import com.spotiduck.compose.sheets.LibrarySortSheet
-import com.spotiduck.compose.sheets.PlaylistOptionsSheet
 import com.spotiduck.compose.sheets.ProfileDrawerSheet
 import com.spotiduck.compose.sheets.SleepTimerOption
 import com.spotiduck.compose.sheets.SleepTimerSheet
@@ -19,6 +23,7 @@ import com.spotiduck.compose.sheets.toSpotifyDevice
 
 internal data class SheetFlags(
     val profileDrawer: Boolean = false,
+    val accounts: Boolean = false,
     val trackOptions: Boolean = false,
     val playlistOptions: Boolean = false,
     val albumOptions: Boolean = false,
@@ -36,11 +41,17 @@ internal fun ShellSheets(
     selectedTrack: TrackItem?,
     devices: List<ConnectDevice>,
     connectedDevice: String,
+    userQueue: List<TrackItem>,
     queueFromContext: List<TrackItem>,
+    queueSourceContext: String,
     currentTrackTitle: String,
     currentTrackArtist: String,
-    playlistTitle: String,
-    playlistCoverUrl: String?,
+    currentTrackUri: String,
+    currentTrackCoverUrl: String?,
+    playlistEntity: EntityOptions?,
+    playlistEditable: Boolean,
+    playlistSaved: Boolean?,
+    playlistPublished: Boolean?,
     albumTitle: String,
     albumArtist: String,
     albumCoverUrl: String?,
@@ -50,7 +61,13 @@ internal fun ShellSheets(
     sleepTimer: SleepTimerOption?,
     userDisplayName: String,
     userAvatarUrl: String,
+    savedAccounts: List<SpotifyAuth.Account>,
+    activeAccountId: String,
     onDismissProfile: () -> Unit,
+    onDismissAccounts: () -> Unit,
+    onSwitchAccount: (String) -> Unit,
+    onAddAccount: () -> Unit,
+    onRemoveAccount: (String) -> Unit,
     onDismissTrackOptions: () -> Unit,
     onDismissPlaylistOptions: () -> Unit,
     onDismissAlbumOptions: () -> Unit,
@@ -60,19 +77,30 @@ internal fun ShellSheets(
     onDismissDevice: () -> Unit,
     onDismissQueue: () -> Unit,
     onDismissSleepTimer: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onShowCredits: () -> Unit,
+    onEditPlaylist: () -> Unit,
+    onTogglePlaylistSaved: () -> Unit,
+    onTogglePlaylistPublished: () -> Unit,
+    onDeletePlaylist: () -> Unit,
+    onCopyLink: (String) -> Unit,
+    onShare: (String) -> Unit,
+    onOpenInBrowser: (String) -> Unit,
     onWhatsNew: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
     onLogout: () -> Unit,
+    onOpenAccounts: () -> Unit,
     onLikeToggle: (Boolean) -> Unit,
     onAddToQueue: (TrackItem) -> Unit,
-    onViewArtist: (String) -> Unit,
-    onViewAlbum: (String) -> Unit,
+    onViewArtist: (String, String) -> Unit,
+    onViewAlbum: (String, String) -> Unit,
     onSleepTimerClick: () -> Unit,
     onGoToArtist: (String) -> Unit,
     onSortSelected: (LibrarySortOption) -> Unit,
     onCreatePlaylist: () -> Unit,
     onCreateBlend: () -> Unit,
+    onCreateFolder: () -> Unit = {},
     onSelectDevice: (String) -> Unit,
     onDeviceVisible: (Boolean) -> Unit,
     onVolumeChange: (String, Int) -> Unit,
@@ -84,7 +112,7 @@ internal fun ShellSheets(
     ProfileDrawerSheet(
         isOpen = flags.profileDrawer,
         onDismiss = onDismissProfile,
-        onViewProfileClick = {},
+        onAccountsClick = onOpenAccounts,
         onWhatsNewClick = onWhatsNew,
         onListeningHistoryClick = onHistory,
         onSettingsClick = onSettings,
@@ -93,25 +121,46 @@ internal fun ShellSheets(
         userAvatarUrl = userAvatarUrl
     )
 
+    AccountsSheet(
+        isOpen = flags.accounts,
+        onDismiss = onDismissAccounts,
+        accounts = savedAccounts,
+        activeAccountId = activeAccountId,
+        onSwitchAccount = onSwitchAccount,
+        onAddAccount = onAddAccount,
+        onRemoveAccount = onRemoveAccount
+    )
+
     TrackOptionsSheet(
         track = selectedTrack,
         isOpen = flags.trackOptions,
         onDismiss = onDismissTrackOptions,
         onLikeToggle = onLikeToggle,
-        onAddToPlaylist = {},
+        onAddToPlaylist = onAddToPlaylist,
         onAddToQueue = { selectedTrack?.let(onAddToQueue) },
         onViewArtist = onViewArtist,
         onViewAlbum = onViewAlbum,
-        onShare = {},
-        onSleepTimerClick = onSleepTimerClick
+        onShare = { selectedTrack?.uri?.takeIf { it.isNotBlank() }?.let(onShare) },
+        onSleepTimerClick = onSleepTimerClick,
+        onShowCredits = onShowCredits
     )
 
-    PlaylistOptionsSheet(
-        title = playlistTitle,
-        creator = "Spotify",
-        coverUrl = playlistCoverUrl,
+    EntityOptionsSheet(
+        entity = playlistEntity,
         isOpen = flags.playlistOptions,
-        onDismiss = onDismissPlaylistOptions
+        onDismiss = onDismissPlaylistOptions,
+        canEditPlaylist = playlistEditable,
+        onEditPlaylist = onEditPlaylist,
+        isSaved = playlistSaved,
+        onSaveToggle = onTogglePlaylistSaved,
+        canDeletePlaylist = playlistEditable,
+        onDeletePlaylist = onDeletePlaylist,
+        isPublished = playlistPublished,
+        canPublish = playlistEditable,
+        onPublishToggle = onTogglePlaylistPublished,
+        onCopyLink = { playlistEntity?.uri?.let(onCopyLink) },
+        onShare = { playlistEntity?.uri?.let(onShare) },
+        onOpenInBrowser = { playlistEntity?.uri?.let(onOpenInBrowser) }
     )
 
     AlbumOptionsSheet(
@@ -141,17 +190,24 @@ internal fun ShellSheets(
         isOpen = flags.create,
         onCreatePlaylist = onCreatePlaylist,
         onCreateBlend = onCreateBlend,
+        onCreateFolder = onCreateFolder,
         onDismiss = onDismissCreate
     )
 
     if (flags.device) {
+        // The bridge only refreshes the cluster the moment the sheet opens
+        // (and polls fast while it is open) when it hears about it.
+        LaunchedEffect(Unit) { onDeviceVisible(true) }
+        val mapped = devices.map { it.toSpotifyDevice() }
+        val current = mapped.firstOrNull { it.isCurrent }
         SpotifyConnectDeviceSheet(
             onDismissRequest = {
                 onDismissDevice()
                 onDeviceVisible(false)
             },
             currentDeviceName = connectedDevice,
-            devices = devices.map { it.toSpotifyDevice() },
+            devices = mapped,
+            initialVolume = current?.volumeFraction?.takeIf { it >= 0f } ?: 0.7f,
             onVolumeChange = onVolumeChange,
             onSelectDevice = { device -> onSelectDevice(device.id) }
         )
@@ -161,9 +217,10 @@ internal fun ShellSheets(
         SpotifyQueueSheet(
             currentTrackTitle = currentTrackTitle,
             currentTrackArtist = currentTrackArtist,
-            queueSourceContext = playlistTitle,
-            userQueue = emptyList(),
-            nextFromContext = queueFromContext.filter { it.title != currentTrackTitle },
+            currentTrackCoverUrl = currentTrackCoverUrl,
+            queueSourceContext = queueSourceContext,
+            userQueue = userQueue,
+            nextFromContext = queueFromContext.filter { it.uri != currentTrackUri },
             onDismissRequest = onDismissQueue,
             onTrackSelect = onQueueTrackSelect,
             onRemoveFromQueue = onRemoveFromQueue,

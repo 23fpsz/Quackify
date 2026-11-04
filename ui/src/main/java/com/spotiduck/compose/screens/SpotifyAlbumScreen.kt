@@ -100,7 +100,7 @@ fun SpotifyAlbumScreen(
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onAlbumOptionsClick: () -> Unit = {},
     onArtistClick: (String) -> Unit = {},
-    onAlbumClick: (String) -> Unit = {},
+    onAlbumClick: (ArtistRelease) -> Unit = {},
     modifier: Modifier = Modifier,
     coverUrl: String? = null
 ) {
@@ -546,7 +546,7 @@ fun SpotifyAlbumScreen(
                             Column(
                                 modifier = Modifier
                                     .width(140.dp)
-                                    .clickable { onAlbumClick(release.title) }
+                                    .clickable { onAlbumClick(release) }
                             ) {
                                 Box(
                                     modifier = Modifier

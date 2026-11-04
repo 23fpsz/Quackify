@@ -12,13 +12,22 @@ internal class AudioSink(
     private val channels: Int,
 ) {
 
+    // Written by the decode thread in rebuild(), read from main through
+    // pause()/resume()/duck() - every other cross-thread field here is
+    // @Volatile and this one has to be too.
+    @Volatile
     private var track: AudioTrack = build()
 
     @Volatile
     private var held = false
 
+    /** Audio-focus ducking factor, combined with [userLevel] on the track. */
     @Volatile
-    private var volume = 1f
+    private var duckLevel = 1f
+
+    /** User volume factor, combined with [duckLevel] on the track. */
+    @Volatile
+    private var userLevel = 1f
 
     private fun build(): AudioTrack {
         val channelMask = if (channels == 1) AudioFormat.CHANNEL_OUT_MONO else AudioFormat.CHANNEL_OUT_STEREO
@@ -47,7 +56,7 @@ internal class AudioSink(
 
     fun start() {
         held = false
-        runCatching { track.setVolume(volume) }
+        applyVolume()
         val played = runCatching { track.play() }
         val failure = played.exceptionOrNull()
         if (failure == null) {
@@ -67,9 +76,18 @@ internal class AudioSink(
         runCatching { track.play() }
     }
 
+    fun duck(level: Float) {
+        duckLevel = level.coerceIn(0f, 1f)
+        applyVolume()
+    }
+
     fun volume(level: Float) {
-        volume = level.coerceIn(0f, 1f)
-        runCatching { track.setVolume(volume) }
+        userLevel = level.coerceIn(0f, 1f)
+        applyVolume()
+    }
+
+    private fun applyVolume() {
+        runCatching { track.setVolume(duckLevel * userLevel) }
     }
 
     fun flush() {
@@ -96,7 +114,7 @@ internal class AudioSink(
             track.release()
         }
         track = build()
-        runCatching { track.setVolume(volume) }
+        applyVolume()
         if (!held) runCatching { track.play() }
         log.i("sink rebuilt state=${track.state} play=${track.playState}")
     }

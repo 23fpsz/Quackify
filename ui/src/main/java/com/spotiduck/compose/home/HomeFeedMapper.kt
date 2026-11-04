@@ -104,4 +104,5 @@ fun ShelfItem.toArtistRelease(): ArtistRelease = ArtistRelease(
     type = subtitle.substringAfter(" \u2022 ", "Album").trim(),
     color = parseHexColor(colorHex) ?: Color(0xFF333333),
     imageUrl = imageUrl.takeIf { it.isNotBlank() },
+    uri = uri
 )

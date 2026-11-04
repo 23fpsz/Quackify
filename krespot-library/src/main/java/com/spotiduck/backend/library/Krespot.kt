@@ -17,4 +17,6 @@ object Krespot {
     val rootlist = Rootlist
 
     val tracks = TrackSource
+
+    val lyrics = LyricsSource
 }

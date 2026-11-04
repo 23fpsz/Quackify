@@ -1,5 +1,9 @@
 package com.spotiduck.compose.search
 
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,8 +36,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -56,6 +62,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -73,10 +80,15 @@ import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.components.EncorePlayButton
 import com.spotiduck.compose.components.EncorePlayIndicator
 import com.spotiduck.compose.playlist.TrackItem
+import com.spotiduck.compose.format.parseHexColor
+import com.spotiduck.backend.model.SearchHit
+import com.spotiduck.backend.model.SearchKind
+import com.spotiduck.backend.model.SearchResults
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
 import com.spotiduck.compose.theme.SpotifyTheme
 import com.spotiduck.compose.theme.rememberBottomPadding
+import com.spotiduck.compose.util.rememberIsOffline
 
 data class CategoryCard(
     val title: String,
@@ -87,7 +99,8 @@ data class CategoryCard(
 data class SearchArtistItem(
     val name: String,
     val monthlyListeners: String,
-    val color: Color
+    val color: Color,
+    val uri: String = ""
 )
 
 data class SearchAlbumItem(
@@ -110,13 +123,15 @@ data class SearchPodcastItem(
     val title: String,
     val publisher: String,
     val color: Color,
-    val description: String
+    val description: String,
+    val uri: String = ""
 )
 
 data class SearchHistoryItem(
     val title: String,
     val subtitle: String,
     val isArtist: Boolean = false,
+    val isQuery: Boolean = false,
     val color: Color = Color(0xFF1E3264)
 )
 
@@ -135,16 +150,21 @@ fun SpotifySearchScreen(
     onTrackSelect: (TrackItem) -> Unit = {},
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onProfileClick: () -> Unit = {},
-    onAlbumClick: (String, String) -> Unit = { _, _ -> },
-    onArtistClick: (String) -> Unit = {},
+    onAlbumClick: (String, String, String) -> Unit = { _, _, _ -> },
+    onArtistClick: (String, String) -> Unit = { _, _ -> },
+    onPodcastClick: (String, String) -> Unit = { _, _ -> },
+    searchData: SearchResults? = null,
     onPlaylistClick: (String, String) -> Unit = { _, _ -> },
     searchResults: List<TrackItem>? = null,
     onSearchQueryChange: (String) -> Unit = {},
     recentSearches: List<SearchHistoryItem> = emptyList(),
     suggestions: List<TrackItem> = emptyList(),
     loading: Boolean = false,
+    loadFailed: Boolean = false,
+    onRetry: () -> Unit = {},
     onToggleSaved: (String) -> Unit = {},
     onClearRecent: () -> Unit = {},
+    onRemoveRecent: (SearchHistoryItem) -> Unit = {},
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
     currentTrackTitle: String = "",
@@ -157,6 +177,34 @@ fun SpotifySearchScreen(
     val searchTabs = listOf("Top", "Songs", "Artists", "Playlists", "Albums", "Podcasts")
     val focusManager = LocalFocusManager.current
     val bottomPadding = rememberBottomPadding()
+
+    // The same live connectivity the shell's offline banner uses: searching
+    // with the radio off must say so instead of spinning on "Searching...".
+    val isOffline = rememberIsOffline()
+
+    // Voice search: hand the query to the system speech recognizer and feed the
+    // transcript straight into the search flow
+    val appContext = LocalContext.current
+    val speechIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "What do you want to listen to?")
+        }
+    }
+    val canVoiceSearch = remember {
+        appContext.packageManager.queryIntentActivities(speechIntent, 0).isNotEmpty()
+    }
+    val voiceSearchLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val heard = result.data
+            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull().orEmpty()
+        if (heard.isNotBlank()) {
+            searchQuery = heard
+            onSearchQueryChange(heard)
+        }
+    }
 
     val recentSearches = remember(recentSearches) {
         mutableStateListOf<SearchHistoryItem>().apply { addAll(recentSearches) }
@@ -182,16 +230,63 @@ fun SpotifySearchScreen(
             CategoryCard("Gaming", Color(0xFFE8115B))
         )
     }
-    val allSearchableTracks = remember { emptyList<TrackItem>() }
-    val allSearchableArtists = remember { emptyList<SearchArtistItem>() }
-    val allSearchableAlbums = remember { emptyList<SearchAlbumItem>() }
-    val allSearchablePlaylists = remember { emptyList<SearchPlaylistItem>() }
+    val allSearchableTracks = remember(searchData) {
+        searchData?.tracks.orEmpty().map { it.toTrackItem() }
+    }
+    val allSearchableArtists = remember(searchData) {
+        searchData?.artists.orEmpty().map { hit ->
+            SearchArtistItem(
+                name = hit.title,
+                monthlyListeners = "",
+                color = parseHexColor(hit.colorHex) ?: Color(0xFF1E3264),
+                uri = hit.uri
+            )
+        }
+    }
+    val allSearchableAlbums = remember(searchData) {
+        searchData?.albums.orEmpty().map { hit ->
+            SearchAlbumItem(
+                title = hit.title,
+                artist = hit.subtitle,
+                year = "",
+                color = parseHexColor(hit.colorHex) ?: Color(0xFF1E3264),
+                uri = hit.uri
+            )
+        }
+    }
+    val allSearchablePlaylists = remember(searchData) {
+        searchData?.playlists.orEmpty().map { hit ->
+            SearchPlaylistItem(
+                title = hit.title,
+                creator = hit.subtitle,
+                followerCount = "",
+                color = parseHexColor(hit.colorHex) ?: Color(0xFF1E3264),
+                uri = hit.uri
+            )
+        }
+    }
 
-    val allSearchablePodcasts = remember { emptyList<SearchPodcastItem>() }
+    val allSearchablePodcasts = remember(searchData) {
+        searchData?.others.orEmpty()
+            .filter { it.kind == SearchKind.SHOW || it.kind == SearchKind.EPISODE }
+            .map { hit ->
+                SearchPodcastItem(
+                    title = hit.title,
+                    publisher = hit.subtitle,
+                    color = parseHexColor(hit.colorHex) ?: Color(0xFF1E3264),
+                    description = "",
+                    uri = hit.uri
+                )
+            }
+    }
 
-    val filteredTracks = remember(searchQuery, searchResults, suggestions, loading) {
+    val filteredTracks = remember(searchQuery, searchResults, suggestions, loading, searchData) {
         when {
             searchQuery.isBlank() -> emptyList()
+            // The full search knows the covers and artist lines; the
+            // as-you-type suggestions only carry names, so once the real
+            // results land they take over the list.
+            !searchData?.tracks.isNullOrEmpty() -> searchData!!.tracks.map { it.toTrackItem() }
             !searchResults.isNullOrEmpty() -> searchResults
             !loading && suggestions.isNotEmpty() -> suggestions
             else -> allSearchableTracks.filter {
@@ -201,14 +296,14 @@ fun SpotifySearchScreen(
         }
     }
 
-    val filteredArtists = remember(searchQuery) {
+    val filteredArtists = remember(searchData, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
         else allSearchableArtists.filter {
             it.name.contains(searchQuery, ignoreCase = true)
         }
     }
 
-    val filteredAlbums = remember(searchQuery) {
+    val filteredAlbums = remember(searchData, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
         else allSearchableAlbums.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
@@ -216,7 +311,7 @@ fun SpotifySearchScreen(
         }
     }
 
-    val filteredPlaylists = remember(searchQuery) {
+    val filteredPlaylists = remember(searchData, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
         else allSearchablePlaylists.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
@@ -224,7 +319,7 @@ fun SpotifySearchScreen(
         }
     }
 
-    val filteredPodcasts = remember(searchQuery) {
+    val filteredPodcasts = remember(searchData, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
         else allSearchablePodcasts.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
@@ -363,13 +458,17 @@ fun SpotifySearchScreen(
                                             focusManager.clearFocus()
                                         }
                                 )
-                            } else if (isSearchBarFocused) {
+                            } else if (isSearchBarFocused && canVoiceSearch) {
                                 // Voice search mic — only visible when search bar is focused (active state)
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_mic_24),
                                     contentDescription = "Voice search",
                                     tint = EncoreColors.TextSecondary,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .clickable {
+                                            runCatching { voiceSearchLauncher.launch(speechIntent) }
+                                        }
                                 )
                             }
                             // Idle state: no icon on right side of pill (avoids duplicate mic confusion)
@@ -449,11 +548,20 @@ fun SpotifySearchScreen(
                                 .background(searchItem.color),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = if (searchItem.isArtist) "★" else "♫",
-                                fontSize = 20.sp,
-                                color = Color.White
-                            )
+                            if (searchItem.isQuery) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.encore_icon_search_24),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = if (searchItem.isArtist) "★" else "♫",
+                                    fontSize = 20.sp,
+                                    color = Color.White
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(12.dp))
@@ -486,7 +594,10 @@ fun SpotifySearchScreen(
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
-                                .clickable { recentSearches.remove(searchItem) },
+                                .clickable {
+                                    recentSearches.remove(searchItem)
+                                    onRemoveRecent(searchItem)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -543,7 +654,65 @@ fun SpotifySearchScreen(
                     filteredPlaylists.isNotEmpty() ||
                     filteredPodcasts.isNotEmpty()
 
-            if (!hasResults) {
+            if (loading && !isOffline) {
+                // Debounce + fetch in flight: show feedback instead of a premature
+                // "Couldn't find" while the results have not landed yet
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            color = EncoreColors.Green,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Searching \"$searchQuery\"...",
+                            style = SpotifyTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else if (!hasResults && (isOffline || loadFailed)) {
+                // Nothing came back because the network is gone or the query
+                // itself failed - the same card the playlist screen shows,
+                // with a retry instead of a misleading "couldn't find"
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_cloud_off_24),
+                            contentDescription = null,
+                            tint = EncoreColors.TextSecondary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = if (isOffline) "You're offline" else "Couldn't load search results",
+                            style = SpotifyTheme.typography.titleLarge,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Check your internet connection and try again.",
+                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TextButton(onClick = onRetry) {
+                            Text(text = "Try again", color = EncoreColors.Green)
+                        }
+                    }
+                }
+            } else if (!hasResults) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -572,9 +741,26 @@ fun SpotifySearchScreen(
                     // TAB 0: "Top" (Composite: Top Result + Songs + Artists + Albums + Playlists)
                     if (selectedSearchTab == 0) {
                         // Top Result Card
-                        if (filteredTracks.isNotEmpty()) {
+                        val topHit = searchData?.top
+                        val topTrack = if (topHit == null) filteredTracks.firstOrNull() else null
+                        if (topHit != null || topTrack != null) {
                             item {
-                                val top = filteredTracks.first()
+                                val top = topHit?.toTrackItem() ?: topTrack!!
+                                val topLabel = topHit?.kind?.sectionLabel() ?: "Song"
+                                val openTopResult = {
+                                    val hit = topHit
+                                    if (hit == null) {
+                                        onTrackSelect(top)
+                                    } else {
+                                        when (hit.kind) {
+                                            SearchKind.ARTIST -> onArtistClick(hit.title, hit.uri)
+                                            SearchKind.ALBUM -> onAlbumClick(hit.title, hit.subtitle, hit.uri)
+                                            SearchKind.PLAYLIST -> onPlaylistClick(hit.title, hit.uri)
+                                            SearchKind.SHOW, SearchKind.EPISODE -> onPodcastClick(hit.title, hit.uri)
+                                            else -> onTrackSelect(hit.toTrackItem())
+                                        }
+                                    }
+                                }
                                 val isThisPlaying = isPlaying && top.title == currentTrackTitle
 
                                 Text(
@@ -588,7 +774,7 @@ fun SpotifySearchScreen(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(EncoreColors.Card)
-                                        .clickable { onTrackSelect(top) }
+                                        .clickable { openTopResult() }
                                         .padding(16.dp)
                                 ) {
                                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -628,7 +814,7 @@ fun SpotifySearchScreen(
 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = "Song",
+                                                text = topLabel,
                                                 style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary)
                                             )
                                             Text(
@@ -642,7 +828,7 @@ fun SpotifySearchScreen(
 
                                     EncorePlayButton(
                                         isPlaying = isThisPlaying,
-                                        onClick = { onTrackSelect(top) },
+                                        onClick = { openTopResult() },
                                         size = 48.dp,
                                         iconSize = 22.dp,
                                         modifier = Modifier.align(Alignment.BottomEnd)
@@ -692,7 +878,7 @@ fun SpotifySearchScreen(
                             items(filteredArtists.take(2)) { artist ->
                                 ArtistRow(
                                     artist = artist,
-                                    onArtistClick = { onArtistClick(artist.name) }
+                                    onArtistClick = { onArtistClick(artist.name, artist.uri) }
                                 )
                             }
 
@@ -714,7 +900,7 @@ fun SpotifySearchScreen(
                             items(filteredAlbums.take(2)) { album ->
                                 AlbumRow(
                                     album = album,
-                                    onClick = { onAlbumClick(album.title, album.artist) }
+                                    onClick = { onAlbumClick(album.title, album.artist, album.uri) }
                                 )
                             }
 
@@ -743,7 +929,7 @@ fun SpotifySearchScreen(
                         items(filteredArtists) { artist ->
                             ArtistRow(
                                 artist = artist,
-                                onArtistClick = { onArtistClick(artist.name) }
+                                onArtistClick = { onArtistClick(artist.name, artist.uri) }
                             )
                         }
                     }
@@ -763,7 +949,7 @@ fun SpotifySearchScreen(
                         items(filteredAlbums) { album ->
                             AlbumRow(
                                 album = album,
-                                onClick = { onAlbumClick(album.title, album.artist) }
+                                onClick = { onAlbumClick(album.title, album.artist, album.uri) }
                             )
                         }
                     }
@@ -773,7 +959,7 @@ fun SpotifySearchScreen(
                         items(filteredPodcasts) { podcast ->
                             PodcastRow(
                                 podcast = podcast,
-                                onClick = { onCategoryClick(podcast.title) }
+                                onClick = { onPodcastClick(podcast.title, podcast.uri) }
                             )
                         }
                     }
@@ -1120,6 +1306,26 @@ private fun PlaylistRow(
         }
     }
 }
+
+private fun SearchKind.sectionLabel(): String = when (this) {
+    SearchKind.TRACK -> "Song"
+    SearchKind.ARTIST -> "Artist"
+    SearchKind.ALBUM -> "Album"
+    SearchKind.PLAYLIST -> "Playlist"
+    SearchKind.SHOW, SearchKind.EPISODE -> "Podcast"
+    else -> "Result"
+}
+
+private fun SearchHit.toTrackItem(): TrackItem = TrackItem(
+    title = title,
+    artist = subtitle,
+    isExplicit = explicit,
+    uri = uri,
+    imageUrl = imageUrl.takeIf { it.isNotBlank() },
+    saved = saved,
+    durationMs = durationMs,
+    hasVideo = video
+)
 
 @Composable
 private fun PodcastRow(

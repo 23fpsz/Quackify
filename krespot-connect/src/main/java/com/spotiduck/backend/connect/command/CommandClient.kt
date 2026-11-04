@@ -203,6 +203,34 @@ object CommandClient {
         return response
     }
 
+    /**
+     * Flips one of the player options on the target device: shuffling_context,
+     * repeating_context or repeating_track. Sent as a player command so the
+     * cluster state (and every listener) follows.
+     */
+    suspend fun setPlayerOption(
+        context: Context,
+        spclient: String,
+        localDeviceId: String,
+        targetDeviceId: String,
+        endpoint: String,
+        value: Boolean,
+    ): Net.Response? {
+        val command = JSONObject()
+            .put("value", value)
+            .put("logging_params", JSONObject().put("command_id", commandId()))
+            .put("endpoint", endpoint)
+        val url = "https://$spclient/connect-state/v1/player/command/from/$localDeviceId/to/$targetDeviceId"
+        val body = JSONObject().put("command", command).toString()
+        val response = Net.postJson(url, body, ConnectHeaders.of(context), tag = endpoint)
+        log.i("$endpoint=$value on ${targetDeviceId.take(8)} -> ${response?.code ?: "no response"}")
+        return response
+    }
+
+    const val ENDPOINT_SHUFFLE = "set_shuffling_context"
+    const val ENDPOINT_REPEAT_CONTEXT = "set_repeating_context"
+    const val ENDPOINT_REPEAT_TRACK = "set_repeating_track"
+
     const val RESTORE = "restore"
     const val VOLUME_MAX = 65535
 

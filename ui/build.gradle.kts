@@ -43,5 +43,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.palette.ktx)
 
+    // Canvas video playback in the Now Playing artwork slot
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -5,11 +5,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.spotiduck.compose.playlist.TrackItem
+import com.spotiduck.compose.components.RepeatMode
+import com.spotiduck.compose.components.ShuffleMode
 import com.spotiduck.compose.shell.ComposePlaybackState
 import com.spotiduck.compose.shell.ComposePlayerListener
 import com.spotiduck.backend.connect.KrespotConnect
 import com.spotiduck.backend.connect.cluster.ClusterState
 import com.spotiduck.backend.connect.cluster.ClusterTrack
+import com.spotiduck.backend.model.ConnectDevice
+import com.spotiduck.backend.model.DeviceKind
 import com.spotiduck.backend.connect.command.CommandTrack
 import com.spotiduck.backend.connect.command.ContentType
 import com.spotiduck.backend.connect.command.PlaybackCommand
@@ -25,12 +29,24 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.filter
+import androidx.compose.runtime.snapshotFlow
 import com.spotiduck.backend.core.log.Logs
 import com.spotiduck.backend.library.TrackSource
+import com.spotiduck.backend.api.Library
+import android.os.SystemClock
 
 private val log = Logs.of(Logs.Module.BRIDGE)
+
+/** Shared local prefs file the client keeps its UI flags in. */
+const val CLIENT_PREFS = "spotiduck.client"
+
+/** Settings toggle: start playback as soon as the session's track loads. */
+const val AUTOPLAY_ON_STARTUP_PREF = "autoplayOnStartup"
 
 class PlaybackBridge(private val context: Context) {
 
@@ -48,6 +64,16 @@ class PlaybackBridge(private val context: Context) {
 
     @Volatile
     var deviceSheetOpen: Boolean = false
+
+    /** Settings "Autoplay on startup": read from the local prefs at start(). */
+    private var autoplayOnStartup: Boolean = false
+    private var autoplayPending: Boolean = false
+    private var autoplayArmedAt: Long = 0L
+
+    /** Canvas loop enabled by the user; rides along every playback state report as is_video_on. */
+    @Volatile
+    var canvasOn: Boolean = false
+        private set
 
     private var mirrors: Job? = null
 
@@ -88,6 +114,32 @@ class PlaybackBridge(private val context: Context) {
 
     @Volatile
     private var queuedTail: List<TrackItem> = emptyList()
+
+    // Shuffle/repeat the user just asked for: shown immediately and applied
+    // to local advancement until the cluster push confirms (or the override
+    // expires because the server refused).
+    @Volatile
+    private var pendingShuffle: Boolean? = null
+
+    @Volatile
+    private var pendingRepeatContext: Boolean? = null
+
+    @Volatile
+    private var pendingRepeatTrack: Boolean? = null
+
+    @Volatile
+    private var pendingModeAt = 0L
+
+    private val decorated = java.util.concurrent.ConcurrentHashMap<String, TrackItem>()
+
+    private val undecoratable = java.util.Collections.newSetFromMap(
+        java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    )
+
+    private var decorateJob: Job? = null
+
+    @Volatile
+    private var decoratePending: List<String> = emptyList()
 
     @Volatile
     private var resumeRow = -1
@@ -181,6 +233,14 @@ class PlaybackBridge(private val context: Context) {
             scope.launch { player.seekTo(target) }
         }
 
+        override fun onShuffleToggle() {
+            scope.launch { toggleShuffle() }
+        }
+
+        override fun onRepeatToggle() {
+            scope.launch { toggleRepeat() }
+        }
+
         override fun onPlayUri(uri: String) {
             captureChain("")
             scope.launch {
@@ -229,6 +289,7 @@ class PlaybackBridge(private val context: Context) {
         override fun onSelectDevice(targetId: String) {
             scope.launch {
                 val target = connect.cluster.value?.devices?.firstOrNull { it.id == targetId }
+                    ?: if (targetId == deviceId) localDeviceRow(active = false) else null
                 if (target == null) {
                     log.w("device select: '" + targetId + "' is not in the cluster any more")
                     return@launch
@@ -238,15 +299,18 @@ class PlaybackBridge(private val context: Context) {
                     return@launch
                 }
                 val backHome = target.id == deviceId
-                log.i("device select '" + target.name + "' -> transfer" +
-                        if (backHome) ", taking the stream back here" else ""
+                log.i("device select '" + target.name + "' -> " +
+                        if (backHome) "taking the stream back here" else "transfer"
                 )
+                if (backHome) {
+                    takeBackHere()
+                    return@launch
+                }
                 val ok = connect.transferTo(target.id)
                 if (!ok) {
                     log.w("device select: the transfer to '" + target.name + "' was refused")
                     return@launch
                 }
-                if (backHome) startLocalAfterTransfer()
             }
         }
 
@@ -254,11 +318,34 @@ class PlaybackBridge(private val context: Context) {
             scope.launch {
                 val target = connect.cluster.value?.devices?.firstOrNull { it.id == deviceId }
                 if (target == null) return@launch
+                if (target.local) {
+                    // our own device: apply the volume natively and let the
+                    // server know so other clients can see the new level
+                    player.setVolume(level / 65535f)
+                    log.i("volume: local sink -> ${level.coerceIn(0, 65535)}/65535")
+                    connect.setVolumeOn(target.id, level)
+                    return@launch
+                }
                 if (!target.canControlVolume) {
                     log.w("volume: '" + target.name + "' does not take a volume command")
                     return@launch
                 }
                 connect.setVolumeOn(target.id, level)
+            }
+        }
+
+        override fun onLikeToggle() {
+            val uri = state.trackUri
+            if (!uri.startsWith("spotify:track:")) {
+                log.w("like ignored, the state has no track uri")
+                return
+            }
+            val next = !state.isLiked
+            state = state.copy(isLiked = next)
+            scope.launch {
+                val ok = Library.setSaved(context, listOf(uri), next)
+                log.i("like '${uri.takeLast(12)}' -> $next ok=$ok")
+                if (!ok) state = state.copy(isLiked = !next)
             }
         }
 
@@ -301,6 +388,11 @@ class PlaybackBridge(private val context: Context) {
     fun start() {
         if (dealer != null) return
         log.i("start device=" + deviceId)
+        autoplayOnStartup = context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+            .getBoolean(AUTOPLAY_ON_STARTUP_PREF, false)
+        autoplayPending = true
+        autoplayArmedAt = SystemClock.elapsedRealtime()
+        if (autoplayOnStartup) log.i("autoplay on startup is armed")
         player.onFocusPause = { scope.launch { reportPaused() } }
         player.onFocusResume = { scope.launch { reportResumed() } }
         player.onFocusDuck = { ducked ->
@@ -308,10 +400,39 @@ class PlaybackBridge(private val context: Context) {
                 log.i("the other app is done, the volume is back")
         }
         player.warm()
+        connect.holdsStream = false
         deviceWatch = scope.launch {
             while (true) {
                 delay(if (deviceSheetOpen || state.controllingRemote) DEVICE_WATCH_MS else DEVICE_POLL_MS)
-                connect.refreshCluster()
+                when {
+                    // Someone else owns the stream: watch the cluster the
+                    // ordinary observer way.
+                    player.hasSource && remoteTarget().isNotBlank() -> {
+                        connect.holdsStream = false
+                        connect.refreshCluster()
+                    }
+                    // This phone owns the stream: publishing its state is the
+                    // poll, the cluster comes back with the answer. While the
+                    // engine sits paused on an old source and the cluster
+                    // names another active device, re-claiming the lead here
+                    // is exactly what made "Listening on" flip-flop between
+                    // devices - watch instead until playback starts again.
+                    player.hasSource -> {
+                        val other = connect.cluster.value?.activeDeviceId
+                            ?.takeIf { it.isNotBlank() && it != deviceId }
+                        if (other != null && !player.isPlaying) {
+                            connect.holdsStream = false
+                            connect.refreshCluster()
+                        } else {
+                            connect.holdsStream = true
+                            publishLocalFromEngine()
+                        }
+                    }
+                    else -> {
+                        connect.holdsStream = false
+                        connect.refreshCluster()
+                    }
+                }
             }
         }
         remoteTick = scope.launch {
@@ -328,6 +449,13 @@ class PlaybackBridge(private val context: Context) {
             launch { connect.cluster.collect(::mirror) }
             launch { connect.command.collect(::mirrorState) }
             launch { connect.pushes.collect(::smokeReport) }
+            launch {
+                connect.transfers.collect {
+                    log.i("a transfer landed here, taking the stream back")
+                    connect.refreshCluster()
+                    takeBackHere()
+                }
+            }
             launch { connect.registered.collect { log.i("registered=$it") } }
             launch {
                 connect.connectionId.collect {
@@ -335,6 +463,16 @@ class PlaybackBridge(private val context: Context) {
                 }
             }
             launch { player.events.collect(::onPlayerEvent) }
+            launch {
+                snapshotFlow { state.trackUri }
+                    .filter { it.startsWith("spotify:track:") }
+                    .collect { uri ->
+                        val saved = Library.saved(context, listOf(uri))
+                        if (state.trackUri == uri) {
+                            state = state.copy(isLiked = uri in saved)
+                        }
+                    }
+            }
             launch {
                 player.state.collect { playing ->
                     if (state.controllingRemote) return@collect
@@ -348,16 +486,34 @@ class PlaybackBridge(private val context: Context) {
                     } else {
                         state.durationMs
                     }
-                    state = state.copy(
+                    val next = state.copy(
                         title = if (local && waiting != null) waiting.name else state.title,
                         artist = if (local && waiting != null) waiting.artists else state.artist,
                         coverUrl = if (local && waiting != null) waiting.imageUrl else state.coverUrl,
                         trackUri = if (engineOwns) engineUri else state.trackUri,
+                        artistUri = if (engineOwns && engineUri != state.trackUri) artistUriOf(engineUri)
+                        else state.artistUri,
+                        albumUri = if (engineOwns && engineUri != state.trackUri) albumUriOf(engineUri)
+                        else state.albumUri,
                         isPlaying = if (engineOwns) playing.playing else state.isPlaying,
                         positionMs = position,
                         durationMs = duration,
                         progress = progressOf(position, duration),
                     )
+                    // The engine ticks every 100ms, but nothing on screen can
+                    // show a sub-half-second crawl: only write the position when
+                    // it actually moved that far or the identity changed, so the
+                    // whole shell stops recomposing at 10Hz while playing.
+                    val identityChanged = next.trackUri != state.trackUri ||
+                        next.title != state.title || next.artist != state.artist ||
+                        next.coverUrl != state.coverUrl || next.artistUri != state.artistUri ||
+                        next.albumUri != state.albumUri || next.isPlaying != state.isPlaying ||
+                        next.durationMs != state.durationMs
+                    if (!identityChanged && kotlin.math.abs(next.positionMs - state.positionMs) < 400L) {
+                        threshold(playing)
+                        return@collect
+                    }
+                    state = next
                     if (local && waiting != null) {
                         held = null
                         log.i("held '${waiting.name}' took the engine")
@@ -378,6 +534,10 @@ class PlaybackBridge(private val context: Context) {
 
     fun stop() {
         pauseRemoteOnExit()
+        connect.holdsStream = false
+        runCatching {
+            runBlocking { withTimeoutOrNull(2_000L) { connect.unregister() } }
+        }.onFailure { log.w("unregister on stop failed ${it.javaClass.simpleName}") }
         dealer?.cancel()
         dealer = null
         deviceWatch?.cancel()
@@ -394,6 +554,8 @@ class PlaybackBridge(private val context: Context) {
         chainRows = emptyList()
         chainContext = ""
         queuedTail = emptyList()
+        decorated.clear()
+        undecoratable.clear()
         resumeRow = -1
         advancing = false
         clusterSeen = ""
@@ -402,6 +564,7 @@ class PlaybackBridge(private val context: Context) {
         cluster = null
         state = ComposePlaybackState()
         scope.cancel()
+        hydrateTried.clear()
         log.i("bridge stopped, every collector and the socket are gone")
     }
 
@@ -409,6 +572,13 @@ class PlaybackBridge(private val context: Context) {
         log.i("reset, dropping the device state of the previous session")
         dealer?.cancel()
         dealer = null
+        // stop() cancels these two; reset() used to leave both loops and the
+        // whole bridge graph they retain alive across every logout and
+        // account switch.
+        deviceWatch?.cancel()
+        deviceWatch = null
+        remoteTick?.cancel()
+        remoteTick = null
         mirrors?.cancel()
         mirrors = null
         player.reset()
@@ -419,6 +589,8 @@ class PlaybackBridge(private val context: Context) {
         chainRows = emptyList()
         chainContext = ""
         queuedTail = emptyList()
+        decorated.clear()
+        undecoratable.clear()
         resumeRow = -1
         advancing = false
         clusterSeen = ""
@@ -475,6 +647,99 @@ class PlaybackBridge(private val context: Context) {
         return ok
     }
 
+    private fun modeOverrideFresh(): Boolean =
+        System.currentTimeMillis() - pendingModeAt < MODE_OVERRIDE_MS
+
+    private fun shuffleOn(cluster: ClusterState?): Boolean {
+        if (modeOverrideFresh()) pendingShuffle?.let { return it }
+        return cluster?.shuffle == true
+    }
+
+    private fun repeatContextOn(cluster: ClusterState?): Boolean {
+        if (modeOverrideFresh()) pendingRepeatContext?.let { return it }
+        return cluster?.repeatContext == true
+    }
+
+    private fun repeatTrackOn(cluster: ClusterState?): Boolean {
+        if (modeOverrideFresh()) pendingRepeatTrack?.let { return it }
+        return cluster?.repeatTrack == true
+    }
+
+    private fun rememberModes(shuffle: Boolean?, repeatContext: Boolean?, repeatTrack: Boolean?) {
+        pendingShuffle = shuffle
+        pendingRepeatContext = repeatContext
+        pendingRepeatTrack = repeatTrack
+        pendingModeAt = if (shuffle != null || repeatContext != null || repeatTrack != null) {
+            System.currentTimeMillis()
+        } else {
+            0L
+        }
+    }
+
+    private fun publishModes() {
+        val cluster = connect.cluster.value
+        val shuffle = shuffleOn(cluster)
+        val repeatContext = repeatContextOn(cluster)
+        val repeatTrack = repeatTrackOn(cluster)
+        val shuffleMode = if (shuffle) ShuffleMode.SHUFFLE else ShuffleMode.OFF
+        val repeatMode = when {
+            repeatTrack -> RepeatMode.REPEAT_ONE
+            repeatContext -> RepeatMode.REPEAT_ALL
+            else -> RepeatMode.OFF
+        }
+        if (state.shuffleMode != shuffleMode || state.repeatMode != repeatMode) {
+            state = state.copy(shuffleMode = shuffleMode, repeatMode = repeatMode)
+        }
+    }
+
+    private suspend fun toggleShuffle() {
+        val cluster = connect.cluster.value
+        val target = cluster?.activeDevice?.id?.takeIf { it.isNotBlank() } ?: deviceId
+        val next = !shuffleOn(cluster)
+        log.i("shuffle toggle on '${target.take(8)}' -> $next")
+        if (!connect.setShuffleOn(target, next)) {
+            log.w("shuffle: '${target.take(8)}' refused the option, applying it locally anyway")
+        }
+        rememberModes(shuffle = next, repeatContext = null, repeatTrack = null)
+        publishModes()
+        // Give the dealer push a moment, then fall back to the cluster truth.
+        delay(MODE_SETTLE_MS)
+        runCatching { connect.refreshCluster() }
+        publishModes()
+    }
+
+    private suspend fun toggleRepeat() {
+        val cluster = connect.cluster.value
+        val target = cluster?.activeDevice?.id?.takeIf { it.isNotBlank() } ?: deviceId
+        val nowContext = repeatContextOn(cluster)
+        val nowTrack = repeatTrackOn(cluster)
+        val nextContext: Boolean
+        val nextTrack: Boolean
+        when {
+            !nowContext && !nowTrack -> {
+                nextContext = true
+                nextTrack = false
+            }
+            nowContext -> {
+                nextContext = false
+                nextTrack = true
+            }
+            else -> {
+                nextContext = false
+                nextTrack = false
+            }
+        }
+        log.i("repeat toggle on '${target.take(8)}' -> context=$nextContext track=$nextTrack")
+        if (!connect.setRepeatOn(target, nextContext, nextTrack)) {
+            log.w("repeat: '${target.take(8)}' refused the option, applying it locally anyway")
+        }
+        rememberModes(shuffle = null, repeatContext = nextContext, repeatTrack = nextTrack)
+        publishModes()
+        delay(MODE_SETTLE_MS)
+        runCatching { connect.refreshCluster() }
+        publishModes()
+    }
+
     private suspend fun toggle() {
         val cluster = connect.cluster.value
         val active = cluster?.activeDevice
@@ -484,7 +749,7 @@ class PlaybackBridge(private val context: Context) {
         }
         val command = connect.playback
         if (command == null) {
-            resumeFromCluster()
+            toggleLocal()
             return
         }
         if (!player.hasSource) {
@@ -511,6 +776,7 @@ class PlaybackBridge(private val context: Context) {
             positionMs = player.positionMs,
             speed = if (wasPlaying) 0.0 else 1.0,
             paused = wasPlaying,
+            videoOn = canvasOn,
         )
         if (snapshot == null) {
             log.w("toggle: no snapshot")
@@ -532,15 +798,49 @@ class PlaybackBridge(private val context: Context) {
             log.w("toggle: '" + active.name + "' refused the command")
             return
         }
+        // Remember what we just asked for: some clients are slow to publish
+        // their paused state (or never do), and the next cluster read would
+        // flip the play button straight back to playing.
+        rememberRemoteIntent(!playing)
         state = state.copy(isPlaying = !playing)
         delay(SKIP_SETTLE_MS)
         connect.refreshCluster()
     }
 
+    /** Toggle the canvas loop and push it into the next playback state report. */
+    fun setCanvas(on: Boolean) {
+        canvasOn = on
+        log.i("canvas $on")
+        scope.launch {
+            val command = connect.playback ?: return@launch
+            if (!player.hasSource) {
+                log.i("canvas $on noted, this device is not the one playing")
+                return@launch
+            }
+            val at = player.positionMs
+            val snapshot = Snapshot.of(
+                command,
+                DebugSource.SEEK,
+                positionMs = at,
+                previousPositionMs = at,
+                speed = if (player.isPlaying) 1.0 else 0.0,
+                paused = !player.isPlaying,
+                videoOn = on,
+            ) ?: return@launch
+            val accepted = connect.report(snapshot)
+            log.i("canvas $on reported accepted=$accepted")
+        }
+    }
+
     private suspend fun reportPaused() {
         val command = connect.playback
         if (command == null) {
-            log.i("focus pause: no command, nothing to report")
+            if (player.hasSource && remoteTarget().isBlank()) {
+                log.i("focus pause: no command, publishing the local state")
+                publishLocalFromEngine(playing = false)
+            } else {
+                log.i("focus pause: no command, nothing to report")
+            }
             return
         }
         val snapshot = Snapshot.of(
@@ -549,6 +849,7 @@ class PlaybackBridge(private val context: Context) {
             positionMs = player.positionMs,
             speed = 0.0,
             paused = true,
+            videoOn = canvasOn,
         )
         if (snapshot == null) {
             log.w("focus pause: no snapshot")
@@ -561,7 +862,12 @@ class PlaybackBridge(private val context: Context) {
     private suspend fun reportResumed() {
         val command = connect.playback
         if (command == null) {
-            log.i("focus resume: no command, nothing to report")
+            if (player.hasSource && remoteTarget().isBlank()) {
+                log.i("focus resume: no command, publishing the local state")
+                publishLocalFromEngine(playing = true)
+            } else {
+                log.i("focus resume: no command, nothing to report")
+            }
             return
         }
         val snapshot = Snapshot.of(
@@ -570,6 +876,7 @@ class PlaybackBridge(private val context: Context) {
             positionMs = player.positionMs,
             speed = 1.0,
             paused = false,
+            videoOn = canvasOn,
         )
         if (snapshot == null) {
             log.w("focus resume: no snapshot")
@@ -579,43 +886,164 @@ class PlaybackBridge(private val context: Context) {
         log.i("focus resume reported accepted=$accepted pos=${player.positionMs}")
     }
 
-    private suspend fun resumeFromCluster() {
-        val cluster = connect.cluster.value
-        if (cluster == null) {
-            log.w("toggle: no command and no cluster, nothing to resume")
+    /** What we last told a remote device to do, so a stale cluster read cannot undo it. */
+    @Volatile
+    private var remoteIntentPlaying: Boolean? = null
+
+    @Volatile
+    private var remoteIntentAt = 0L
+
+    private fun rememberRemoteIntent(playing: Boolean) {
+        remoteIntentPlaying = playing
+        remoteIntentAt = System.currentTimeMillis()
+    }
+
+    private fun remoteIntent(): Boolean? =
+        if (System.currentTimeMillis() - remoteIntentAt < REMOTE_INTENT_MS) remoteIntentPlaying else null
+
+    /**
+     * No server state machine, no remote target: this phone just plays. The
+     * cluster and the engine between them carry everything needed - the
+     * track, the queue around it and where to come in - and publishing the
+     * member state makes the server side follow instead of the other way
+     * around.
+     */
+    private suspend fun toggleLocal() {
+        if (player.hasSource) {
+            if (player.isPlaying) {
+                log.i("toggle: pausing the engine here")
+                player.pause()
+                publishLocalFromEngine(playing = false)
+            } else {
+                log.i("toggle: resuming the engine here")
+                player.resume()
+                publishLocalFromEngine(playing = true)
+            }
             return
         }
-        if (player.hasSource) {
-            log.i("toggle: no command but a source is loaded, resuming it")
-            player.resume()
+        val cluster = connect.cluster.value
+        if (cluster == null) {
+            log.w("toggle: no command and no cluster, nothing to play")
             return
         }
         val track = cluster.track
         if (track.uri.isBlank()) {
-            log.w("toggle: the cluster has no track, nothing to resume")
+            log.w("toggle: the cluster has no track, nothing to play")
             return
         }
-        val active = cluster.activeDevice
-        val to = if (active != null && active.id != deviceId) active.id else ""
-        if (to.isNotBlank()) {
-            log.i("toggle: resuming on the remote device '" + active!!.name + "'")
-            if (connect.play(cluster.contextUri, track.uri, track.uid, cluster.contextIndex, targetDeviceId = to)) {
-                delay(SKIP_SETTLE_MS)
-                connect.refreshCluster()
-                return
+        val at = cluster.positionNow()
+        log.i("toggle: starting '${track.title}' here at ${at}ms, this phone takes the stream")
+        startLocal(track, cluster.contextUri, cluster.contextIndex, at, playing = true)
+    }
+
+    /**
+     * Starts the engine on a track and claims the account's stream: the UI
+     * moves first so the screen answers instantly, the engine follows and
+     * the published member state makes every other client follow too.
+     */
+    private suspend fun startLocal(
+        track: ClusterTrack,
+        contextUri: String,
+        contextIndex: Int,
+        positionMs: Long,
+        playing: Boolean,
+    ) {
+        var row = track
+        if (row.title.isBlank() && row.uri.startsWith("spotify:track:")) {
+            runCatching { TrackSource.decorate(context, listOf(row.uri))[row.uri] }.getOrNull()?.let { found ->
+                row = row.copy(
+                    title = found.title,
+                    artistName = found.artists,
+                    artistUri = found.artistUri,
+                    imageUrl = found.imageUrl.orEmpty(),
+                    albumUri = found.albumUri,
+                    durationMs = if (found.durationMs > 0L) found.durationMs else row.durationMs,
+                )
+                decorated[row.uri] = TrackItem(
+                    title = found.title,
+                    artist = found.artists,
+                    uri = row.uri,
+                    imageUrl = found.imageUrl.takeIf { it.isNotBlank() },
+                    durationMs = found.durationMs,
+                    isExplicit = found.explicit,
+                    albumUri = found.albumUri,
+                    artistUri = found.artistUri,
+                )
             }
-            log.w("toggle: '" + active.name + "' refused to resume")
-            return
         }
-        resumeUri = track.uri
-        resumeAt = cluster.positionMs
-        log.i("toggle: no command, resuming '${track.title}' at ${resumeAt}ms " +
-                "idx=${cluster.contextIndex} '${cluster.contextUri}'"
+        val duration = row.durationMs.takeIf { it > 0L } ?: state.durationMs
+        state = state.copy(
+            title = row.title,
+            artist = row.artistName,
+            coverUrl = row.imageUrl,
+            trackUri = row.uri,
+            artistUri = row.artistUri.ifBlank { state.artistUri.takeIf { state.trackUri == row.uri }.orEmpty() },
+            albumUri = row.albumUri.ifBlank { state.albumUri.takeIf { state.trackUri == row.uri }.orEmpty() },
+            isPlaying = playing,
+            positionMs = positionMs,
+            durationMs = duration,
+            progress = progressOf(positionMs, duration),
+            contextUri = contextUri,
+            controllingRemote = false,
         )
-        if (connect.play(cluster.contextUri, track.uri, track.uid, cluster.contextIndex, targetDeviceId = remoteTarget())) return
-        resumeUri = ""
-        resumeAt = 0L
-        log.w("toggle: the server refused to resume '${track.title}'")
+        player.play(row.asCommandTrack(), connect.spclientHost, positionMs)
+        if (!playing) player.pause()
+        connect.holdsStream = true
+        publishLocalFromEngine(positionMs, playing)
+        publishQueue(connect.cluster.value)
+    }
+
+    /** The cluster row for what the engine plays, thin when nothing knows it yet. */
+    private fun localTrackRow(): ClusterTrack? {
+        val uri = player.state.value.trackUri.takeIf { it.isNotBlank() } ?: return null
+        connect.cluster.value?.window()?.firstOrNull { it.uri == uri }?.let { return it }
+        return clusterTrackFor(uri)
+    }
+
+    private fun clusterTrackFor(uri: String): ClusterTrack {
+        val shown = decorated[uri]
+        val sameShown = state.trackUri == uri
+        return ClusterTrack(
+            uri = uri,
+            uid = TrackUid.get(uri),
+            title = shown?.title?.takeIf { it.isNotBlank() }
+                ?: state.title.takeIf { it.isNotBlank() && sameShown }.orEmpty(),
+            artistName = shown?.artist?.takeIf { it.isNotBlank() }
+                ?: state.artist.takeIf { it.isNotBlank() && sameShown }.orEmpty(),
+            artistUri = shown?.artistUri?.takeIf { it.isNotBlank() }
+                ?: state.artistUri.takeIf { sameShown }.orEmpty(),
+            imageUrl = shown?.imageUrl?.takeIf { it.isNotBlank() }
+                ?: state.coverUrl.takeIf { sameShown }.orEmpty(),
+            albumTitle = "",
+            albumUri = shown?.albumUri?.takeIf { it.isNotBlank() }.orEmpty(),
+            durationMs = shown?.durationMs?.takeIf { it > 0L }
+                ?: state.durationMs.takeIf { it > 0L } ?: 0L,
+            explicit = shown?.isExplicit ?: false,
+            creativeId = "",
+        )
+    }
+
+    /** Publishes the engine's current state as this phone's player state. */
+    private suspend fun publishLocalFromEngine(positionMs: Long = -1L, playing: Boolean? = null) {
+        val track = localTrackRow() ?: return
+        val at = connect.cluster.value
+        val uri = track.uri
+        val index = at?.takeIf { it.track.uri == uri }?.contextIndex
+            ?: rowOf(chainFor(), uri).takeIf { it >= 0 }
+            ?: at?.window()?.indexOfFirst { it.uri == uri }?.takeIf { it >= 0 }?.let { at.indexOf(it) }
+            ?: 0
+        connect.publishLocalState(
+            track = track,
+            contextUri = at?.contextUri?.takeIf { it.isNotBlank() } ?: chainContext,
+            contextIndex = index,
+            positionMs = if (positionMs >= 0L) positionMs else player.positionMs,
+            playing = playing ?: player.isPlaying,
+            durationMs = player.durationMs.takeIf { it > 0L } ?: track.durationMs,
+            shuffle = shuffleOn(at),
+            repeatContext = repeatContextOn(at),
+            repeatTrack = repeatTrackOn(at),
+            queueRevision = at?.queueRevision.orEmpty(),
+        )
     }
 
     private fun resumePositionFor(uri: String): Long? {
@@ -646,7 +1074,18 @@ class PlaybackBridge(private val context: Context) {
 
     private fun applyReplaceState(command: PlaybackCommand) {
         val track = command.currentTrack ?: run {
-            log.w("replace_state: it names no track")
+            if (command.isTransfer) {
+                // A transfer with no state machine behind it only says "the
+                // stream is yours now": take it over from the cluster the way
+                // the device picker would, instead of dropping the move.
+                log.i("transfer pushed with no machine, taking the stream from the cluster")
+                scope.launch {
+                    connect.refreshCluster()
+                    takeBackHere()
+                }
+            } else {
+                log.w("replace_state: it names no track")
+            }
             return
         }
         log.i("replace_state: '${track.name}' idx=${command.stateIndex} " +
@@ -657,11 +1096,15 @@ class PlaybackBridge(private val context: Context) {
         val loaded = player.state.value.trackUri
         val moved = command.seekToMs >= 0L
         val position = if (moved) command.seekToMs else state.positionMs
+        val nextArtistUri = if (track.uri != state.trackUri) artistUriOf(track.uri) else state.artistUri
+        val nextAlbumUri = if (track.uri != state.trackUri) albumUriOf(track.uri) else state.albumUri
         state = state.copy(
             title = track.name,
             artist = track.artists,
             coverUrl = track.imageUrl,
             trackUri = track.uri,
+            artistUri = nextArtistUri,
+            albumUri = nextAlbumUri,
             isPlaying = if (loaded == track.uri && player.hasSource) player.isPlaying
             else !command.paused,
             controllingRemote = false,
@@ -732,56 +1175,90 @@ class PlaybackBridge(private val context: Context) {
         var cursor = at + step
         while (cursor in window.indices && !window[cursor].isVisible) cursor += step
         if (cursor !in window.indices) {
-            log.w("skip: there is no ${if (forward) "next" else "previous"} row to move to")
-            return
+            // Manual skip past the edge: wrap around while the context repeats.
+            if (repeatContextOn(cluster)) {
+                cursor = if (forward) {
+                    window.indexOfFirst { it.isVisible }
+                } else {
+                    window.indexOfLast { it.isVisible }
+                }
+            }
+            if (cursor !in window.indices) {
+                log.w("skip: there is no ${if (forward) "next" else "previous"} row to move to")
+                return
+            }
+        }
+        if (forward && shuffleOn(cluster)) {
+            val pool = window.indices.filter { i ->
+                window[i].isVisible && window[i].uri != here
+            }
+            if (pool.isNotEmpty()) cursor = pool.random()
         }
         val row = window[cursor]
         val index = if (row.isQueued) -1 else cluster.indexOf(cursor)
         log.i("skip ${if (forward) "next" else "previous"} here: '${row.title}' idx=$index")
         markPending(row.uri, index, cluster.contextUri)
-        if (!connect.play(cluster.contextUri, row.uri, row.uid, index)) {
-            clearPending()
-            log.w("skip: the server refused '${row.title}'")
-            return
-        }
-        state = state.copy(
-            title = row.title,
-            artist = row.artistName,
-            coverUrl = row.imageUrl,
-            trackUri = row.uri,
-            positionMs = 0L,
-            progress = 0f,
-        )
-    }
-
-    private suspend fun startLocalAfterTransfer() {
-        val at = connect.cluster.value
-        if (at == null) {
-            log.w("back home: no cluster to start from")
-            return
-        }
-        val track = at.track
-        if (track.uri.isBlank()) {
-            log.w("back home: the cluster names no track")
-            return
-        }
-        if (player.hasSource) {
-            log.i("back home: the engine already runs '${player.state.value.trackUri.takeLast(12)}', " +
-                    "leaving it be"
+        if (connect.playback != null && connect.play(cluster.contextUri, row.uri, row.uid, index)) {
+            state = state.copy(
+                title = row.title,
+                artist = row.artistName,
+                coverUrl = row.imageUrl,
+                trackUri = row.uri,
+                artistUri = row.artistUri,
+                albumUri = row.albumUri,
+                positionMs = 0L,
+                progress = 0f,
             )
             return
         }
-        val command = connect.playback
-        val named = command?.currentTrack?.uri.orEmpty()
-        if (named.isNotBlank() && named != track.uri) {
-            log.w("back home: the command names '${named.takeLast(12)}', waiting for the push")
+        log.i("skip: the server has no say here, starting '${row.title}' on this phone")
+        startLocal(row, cluster.contextUri, index, 0L, playing = true)
+        clearPending()
+    }
+
+    /**
+     * The user picked this phone in "Listening on": take the stream back
+     * without asking the server for permission - becoming the active member
+     * is what transfer means for the device that ends up with the audio.
+     */
+    private suspend fun takeBackHere() {
+        val at = connect.cluster.value
+        val track = at?.track
+        if (at == null || track == null || track.uri.isBlank()) {
+            if (player.hasSource) {
+                log.i("back home: nothing to take over, claiming the engine's stream")
+                connect.holdsStream = true
+                publishLocalFromEngine()
+            } else {
+                log.w("back home: nothing to take over yet")
+            }
             return
         }
-        log.i("back home: starting '${track.uri.takeLast(12)}' at ${at.positionMs}ms " +
-                "paused=${!at.isPlaying} command=${named.isNotBlank()}"
+        val old = at.activeDevice?.takeIf { it.id != deviceId }
+        if (old != null && at.isPlaying) {
+            log.i("back home: pausing '${old.name}' before the move")
+            connect.setPausedOn(old.id, playing = true)
+            rememberRemoteIntent(false)
+        }
+        if (player.hasSource && player.state.value.trackUri == track.uri) {
+            log.i("back home: the engine already holds '${track.title}', claiming the stream")
+            connect.holdsStream = true
+            val where = at.positionNow()
+            val playing = at.isPlaying
+            // Take the session over where the other device left it: come in
+            // at its position in its play state, the way a fresh load would.
+            // The engine used to keep its own idea of both while the claimed
+            // state described the remote one.
+            if (kotlin.math.abs(player.positionMs - where) > RESYNC_MS) player.seekTo(where)
+            if (playing && !player.isPlaying) player.resume()
+            if (!playing && player.isPlaying) player.pause()
+            publishLocalFromEngine(where, playing)
+            return
+        }
+        log.i("back home: taking the stream at ${at.positionNow()}ms of '${track.title}' " +
+                "paused=${!at.isPlaying}"
         )
-        player.play(track.asCommandTrack(), connect.spclientHost, at.positionMs)
-        if (!at.isPlaying) player.pause()
+        startLocal(track, at.contextUri, at.contextIndex, at.positionNow(), playing = at.isPlaying)
     }
 
     private suspend fun settleSkip(remoteId: String) {
@@ -873,9 +1350,28 @@ class PlaybackBridge(private val context: Context) {
         if (uri.startsWith("spotify:track:") || uri.startsWith("spotify:episode:")) {
             player.prefetch(uri, connect.spclientHost)
         }
+        val remote = remoteTarget()
+        if (remote.isNotBlank()) {
+            markPending(uri, index, context)
+            if (!connect.play(context, uri, uid, index, targetDeviceId = remote)) {
+                clearPending()
+                log.w("playFromCluster: the server refused '${uri.takeLast(12)}', dropping the wait")
+            }
+            return
+        }
+        // This phone is the intended player. The command round trip is only
+        // worth it while the server runs a playback session for this
+        // device; with no session behind it the command can only come back
+        // refused (410 COMMAND_FAILED, then 404 once the member expires),
+        // which used to leave the play button dead.
+        if (connect.playback == null) {
+            startLocalConfirmed(context, uri, index)
+            return
+        }
         markPending(uri, index, context)
-        if (!connect.play(context, uri, uid, index, targetDeviceId = remoteTarget())) {
+        if (!connect.play(context, uri, uid, index, targetDeviceId = "")) {
             clearPending()
+            startLocalConfirmed(context, uri, index)
             return
         }
         val confirmed = awaitTrack(uri, context, CONFIRM_MS)
@@ -913,6 +1409,7 @@ class PlaybackBridge(private val context: Context) {
                 awaitTrack(uri, context, CONFIRM_MS)
             } else {
                 clearPending()
+                startLocalConfirmed(context, uri, index)
             }
             return
         }
@@ -925,6 +1422,18 @@ class PlaybackBridge(private val context: Context) {
             settled.indexOf(at),
             targetDeviceId = remoteTarget(),
         )
+    }
+
+    /** Starts a row on this phone when the server cannot be asked to do it. */
+    private suspend fun startLocalConfirmed(context: String, uri: String, index: Int) {
+        val cluster = connect.cluster.value
+        val row = cluster?.window()?.firstOrNull { it.uri == uri && it.isVisible }
+            ?: cluster?.takeIf { it.track.uri == uri }?.track
+            ?: clusterTrackFor(uri)
+        val resume = resumePositionFor(uri) ?: 0L
+        log.i("play '$uri': starting it here at ${resume}ms ctxIdx=$index ctx='${context.takeLast(24)}'")
+        startLocal(row, context, index, resume, playing = true)
+        clearPending()
     }
 
     private suspend fun correctRow(context: String, uri: String, index: Int): Boolean {
@@ -1035,8 +1544,12 @@ class PlaybackBridge(private val context: Context) {
         }
         log.i("leaving, pausing '${active.name}'")
         runCatching {
-            runBlocking { connect.setPausedOn(active.id, playing = true) }
+            runBlocking { withTimeoutOrNull(2_000L) { connect.setPausedOn(active.id, playing = true) } }
         }.onFailure { log.w("pause on exit failed ${it.javaClass.simpleName}") }
+        // teardown runs handOff() and then stop(); without this flip the
+        // second pauseRemoteOnExit() sends the very same pause again and
+        // blocks the main thread for another round trip.
+        state = state.copy(isPlaying = false)
     }
 
     private fun advanceRemote() {
@@ -1054,6 +1567,32 @@ class PlaybackBridge(private val context: Context) {
 
     private fun progressOf(position: Long, duration: Long): Float =
         if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+
+    /**
+     * Settings "Autoplay on startup": the first track the cluster names after
+     * the app opens starts playing here right away — exactly what pressing
+     * play on the loaded track does. It never steals the stream another
+     * device is holding, skips ads, and only waits a short window before
+     * giving up so a late cluster never surprises anyone.
+     */
+    private fun maybeAutoplayStartup(cluster: ClusterState) {
+        if (!autoplayPending) return
+        autoplayPending = false
+        if (!autoplayOnStartup) return
+        if (SystemClock.elapsedRealtime() - autoplayArmedAt > AUTOPLAY_WINDOW_MS) {
+            log.i("autoplay: the session track came too late, staying quiet")
+            return
+        }
+        if (cluster.track.uri.startsWith(AD_PREFIX)) return
+        if (player.hasSource) return
+        val remote = remoteTarget()
+        if (remote.isNotBlank()) {
+            log.i("autoplay: '${remote.take(12)}' owns the stream, not taking it")
+            return
+        }
+        log.i("autoplay: the loaded track is here, starting playback")
+        scope.launch { toggleLocal() }
+    }
 
     private fun hydrateCurrent(cluster: ClusterState) {
         val uri = cluster.track.uri
@@ -1083,17 +1622,55 @@ class PlaybackBridge(private val context: Context) {
             val at = connect.cluster.value ?: return@launch
             if (at.track.uri != uri) return@launch
             log.i("hydrate: '${uri.takeLast(12)}' is '${row.title}' by '${row.artists}'")
+            decorated[uri] = TrackItem(
+                title = row.title,
+                artist = row.artists,
+                uri = uri,
+                imageUrl = row.imageUrl.takeIf { it.isNotBlank() },
+                durationMs = row.durationMs,
+                isExplicit = row.explicit,
+                albumUri = row.albumUri,
+                artistUri = row.artistUri,
+            )
             state = state.copy(
                 title = row.title,
                 artist = row.artists,
                 coverUrl = row.imageUrl.orEmpty(),
                 trackUri = uri,
+                artistUri = row.artistUri.ifBlank { state.artistUri.takeIf { state.trackUri == uri }.orEmpty() },
             )
         }
     }
 
+    private fun artistUriOf(uri: String): String {
+        if (uri.isBlank()) return ""
+        val at = cluster
+        if (at != null) {
+            if (at.track.uri == uri && at.track.artistUri.isNotBlank()) return at.track.artistUri
+            at.window().firstOrNull { it.uri == uri && it.artistUri.isNotBlank() }?.let { return it.artistUri }
+        }
+        decorated[uri]?.let { if (it.artistUri.isNotBlank()) return it.artistUri }
+        (state.queue + state.queueFromContext).firstOrNull { it.uri == uri && it.artistUri.isNotBlank() }
+            ?.let { return it.artistUri }
+        return ""
+    }
+
+    private fun albumUriOf(uri: String): String {
+        if (uri.isBlank()) return ""
+        val at = cluster
+        if (at != null) {
+            if (at.track.uri == uri && at.track.albumUri.isNotBlank()) return at.track.albumUri
+            at.window().firstOrNull { it.uri == uri && it.albumUri.isNotBlank() }?.let { return it.albumUri }
+        }
+        decorated[uri]?.let { if (it.albumUri.isNotBlank()) return it.albumUri }
+        (state.queue + state.queueFromContext).firstOrNull { it.uri == uri && it.albumUri.isNotBlank() }
+            ?.let { return it.albumUri }
+        return ""
+    }
+
     private fun mirror(cluster: ClusterState?) {
         if (cluster == null) return
+        watchForIncomingTransfer(cluster)
         if (cluster.track.uri.isBlank()) {
             blankSeen = ""
             this.cluster = cluster
@@ -1101,6 +1678,7 @@ class PlaybackBridge(private val context: Context) {
             publishQueue(cluster)
             return
         }
+        maybeAutoplayStartup(cluster)
         if (cluster.track.title.isBlank() && cluster.track.artistName.isBlank()) {
             if (blankSeen != BLANK) {
                 blankSeen = BLANK
@@ -1118,15 +1696,18 @@ class PlaybackBridge(private val context: Context) {
             if (remoteNow) {
                 val duration = cluster.durationMs.takeIf { it > 0L } ?: state.durationMs
                 val changed = cluster.track.uri != state.trackUri
-                val resync = changed ||
-                        kotlin.math.abs(cluster.positionMs - state.positionMs) > RESYNC_MS
-                val position = if (resync) cluster.positionMs else state.positionMs
+                val intent = remoteIntent()
+                val effPlaying = intent ?: cluster.isPlaying
+                val live = if (intent == false) cluster.positionMs else cluster.positionNow()
+                val resync = changed || state.isPlaying != effPlaying ||
+                        kotlin.math.abs(live - state.positionMs) > RESYNC_MS
+                val position = if (resync) live else state.positionMs
                 state = state.copy(
                     title = if (changed) "" else state.title,
                     artist = if (changed) "" else state.artist,
                     coverUrl = if (changed) "" else state.coverUrl,
                     trackUri = cluster.track.uri,
-                    isPlaying = cluster.isPlaying,
+                    isPlaying = effPlaying,
                     positionMs = position,
                     durationMs = duration,
                     progress = progressOf(position, duration),
@@ -1181,33 +1762,135 @@ class PlaybackBridge(private val context: Context) {
             )
         }
         publishQueue(cluster)
+        publishModes()
+        val clusterArtist = cluster.track.artistUri
+        if (cluster.track.uri == state.trackUri && clusterArtist.isNotBlank() && state.artistUri != clusterArtist) {
+            state = state.copy(artistUri = clusterArtist)
+        }
         val remoteActive = cluster.activeDevice?.let { it.id != deviceId } == true
-        if (connect.playback != null && !remoteActive) return
+        // A cluster with no active device at all still describes the last
+        // session; while nothing is loaded here this screen keeps following
+        // it instead of freezing on a stale play state. Once the engine owns
+        // the stream the phone IS the player, so a stale read must not drag
+        // the UI back to the dead session.
+        val nothingActive = cluster.activeDeviceId.isBlank() && cluster.devices.isNotEmpty() &&
+                cluster.activeDevice == null && !player.hasSource
+        val following = remoteActive || nothingActive
+        if (connect.playback != null && !following) return
         if (remoteActive) hydrateCurrent(cluster)
-        if (!remoteActive && player.hasSource) return
-        val local = player.hasSource && !remoteActive
-        val position = if (local) state.positionMs else cluster.positionMs
+        if (!following && player.hasSource) return
+        val local = player.hasSource && !following
+        val intent = remoteIntent()
+        val position = if (local) state.positionMs else cluster.positionNow()
         val duration = cluster.durationMs.takeIf { it > 0L } ?: cluster.track.durationMs
+        // A remote device often echoes the playing track with a thinner
+        // metadata block (artist_name is the first field to disappear), which
+        // used to blank the artist line and the artist card in the NPV. Keep
+        // what this screen already resolved for the same track instead.
+        val sameTrack = cluster.track.uri == state.trackUri
         state = state.copy(
-            title = cluster.track.title,
-            artist = cluster.track.artistName,
-            coverUrl = cluster.track.imageUrl,
+            title = cluster.track.title.ifBlank { if (sameTrack) state.title else "" },
+            artist = cluster.track.artistName.ifBlank { if (sameTrack) state.artist else "" },
+            coverUrl = cluster.track.imageUrl.ifBlank { if (sameTrack) state.coverUrl else "" },
             trackUri = cluster.track.uri,
-            isPlaying = if (local) player.isPlaying else remoteActive && cluster.isPlaying,
+            artistUri = cluster.track.artistUri
+                .ifBlank { if (sameTrack) state.artistUri else "" }
+                .ifBlank { artistUriOf(cluster.track.uri) },
+            isPlaying = if (local) player.isPlaying else (intent ?: cluster.isPlaying),
             positionMs = position,
             durationMs = duration,
             progress = progressOf(position, duration),
-            explicit = cluster.track.explicit,
+            explicit = if (sameTrack) state.explicit else cluster.track.explicit,
             contextUri = cluster.contextUri,
             contextLabel = contextLabelOf(cluster),
         )
+        watchForVanishedActive(cluster)
     }
 
     private fun contextLabelOf(cluster: ClusterState): String {
         if (cluster.fromContext.isNotEmpty() && cluster.fromContext.all { it.isAutoplay }) return ""
-        val label = cluster.contextDescription.trim()
-        if (label.isNotEmpty()) return label
-        return ""
+        return cluster.contextDescription.trim()
+    }
+
+    /** Consecutive cluster reads that no longer name the device that held the stream. */
+    @Volatile
+    private var goneReads = 0
+
+    /** The context+track the last takeover was fired for, to avoid repeats. */
+    @Volatile
+    private var takeOverTried = ""
+
+    /**
+     * Watches for the device that held the stream dropping out of the
+     * cluster: once it is gone from the device list and nothing became
+     * active in its place, this phone brings the session home instead of
+     * leaving "Listening on" without a current device. A single blank read
+     * is not enough - the server briefly unsets the active device while a
+     * remote re-publishes its state - so it takes two in a row, and the
+     * device has to really be missing, not just idle.
+     */
+    private fun watchForVanishedActive(cluster: ClusterState) {
+        val holder = activeSeen
+        val gone = holder.isNotBlank() &&
+                cluster.activeDeviceId.isBlank() &&
+                cluster.devices.isNotEmpty() &&
+                cluster.devices.none { it.id == holder }
+        if (!gone || player.hasSource || pendingActive()) {
+            goneReads = 0
+            return
+        }
+        val track = cluster.track
+        if (track.uri.isBlank() || track.isAd) {
+            goneReads = 0
+            return
+        }
+        goneReads++
+        if (goneReads < GONE_READS) return
+        goneReads = 0
+        val stamp = "${cluster.contextUri}|${track.uid.ifBlank { track.uri }}"
+        if (stamp == takeOverTried) return
+        takeOverTried = stamp
+        scope.launch { takeOverFromGoneDevice(cluster) }
+    }
+
+    private suspend fun takeOverFromGoneDevice(cluster: ClusterState) {
+        val track = cluster.track
+        val at = cluster.positionNow()
+        log.i("the device that held the stream left the cluster, " +
+                "taking it back here at ${at}ms of '${track.title}' " +
+                "paused=${!cluster.isPlaying}"
+        )
+        resumeUri = ""
+        resumeAt = 0L
+        startLocal(track, cluster.contextUri, cluster.contextIndex, at, playing = cluster.isPlaying)
+    }
+
+    /**
+     * Another client moved the account's stream onto this phone from its own
+     * device picker: the cluster flips the active device to this one long
+     * before any command lands here. If nothing picks the stream up the phone
+     * sits silent while the server waits for it, and once it gives up the
+     * phone vanishes from every "Listening on" list. Watch for that flip
+     * while nothing is loaded here and take the stream over.
+     */
+    private fun watchForIncomingTransfer(cluster: ClusterState) {
+        if (cluster.activeDeviceId != deviceId) return
+        // Only a handover we saw happen: a cluster that still names this phone
+        // from a previous life (a cold start after the app died while it
+        // played) must not come back to life on its own.
+        if (activeSeen.isBlank() || activeSeen == deviceId) return
+        if (player.hasSource || pendingActive()) return
+        val track = cluster.track
+        if (track.uri.isBlank() || track.isAd) return
+        val age = System.currentTimeMillis() - cluster.stateAtMs
+        if (cluster.stateAtMs <= 0L || age > TRANSFER_FRESH_MS) return
+        val stamp = "${cluster.contextUri}|${track.uid.ifBlank { track.uri }}"
+        if (stamp == takeOverTried) return
+        takeOverTried = stamp
+        log.i("the stream was moved here, taking it at ${cluster.positionNow()}ms " +
+                "of '${track.title}' paused=${!cluster.isPlaying}"
+        )
+        scope.launch { takeBackHere() }
     }
 
     private fun publishDevices(cluster: ClusterState) {
@@ -1215,16 +1898,22 @@ class PlaybackBridge(private val context: Context) {
         val mine = active != null && active.id == deviceId
         val label = active?.name.orEmpty()
         val remote = cluster.remote.map { it.name }
-        if (state.devices != cluster.devices || state.activeDeviceName != label ||
+        val devices = withLocalDevice(cluster)
+        if (state.devices != devices || state.activeDeviceName != label ||
             state.controllingRemote != !mine
         ) {
-            log.i("devices=${cluster.devices.size} active='$label' ours=$mine " +
+            log.i("devices=${devices.size} active='$label' ours=$mine " +
+                    "injected=${cluster.devices.none { it.id == deviceId }} " +
                     "inferred=${cluster.activeInferred} remote=${remote.joinToString("|")}"
             )
         }
-        val remoteActive = !mine && active != null && !player.hasSource
+        // With no active device left in the cluster this screen keeps
+        // following the session instead of pretending the phone took over;
+        // the takeover path makes it ours for real.
+        val noneActive = active == null && !player.hasSource
+        val remoteActive = (!mine || noneActive) && !player.hasSource
         state = state.copy(
-            devices = cluster.devices,
+            devices = devices,
             activeDeviceName = label,
             activeDeviceId = active?.id.orEmpty(),
             controllingRemote = remoteActive,
@@ -1232,7 +1921,9 @@ class PlaybackBridge(private val context: Context) {
             remoteCanSkipPrev = !remoteActive || !cluster.licenseRestricted,
             remoteCanShuffle = !remoteActive || !cluster.licenseRestricted,
             remoteCanRepeat = !remoteActive || !cluster.licenseRestricted,
-            connectedDevice = label,
+            connectedDevice = label.ifBlank {
+                if (mine || player.hasSource || noneActive) "SpotiDuck" else ""
+            },
         )
         if (active != null && !mine && player.hasSource && player.isPlaying) {
             log.i("the stream moved to '$label', stopping this device")
@@ -1240,15 +1931,52 @@ class PlaybackBridge(private val context: Context) {
         }
     }
 
+    /**
+     * The account's device list only names devices the server knows about, so
+     * while the player registration has not landed (or failed) this phone is
+     * invisible in "Listening on". Synthesize the local row so it can always
+     * be picked; the server row replaces it once the registration answers.
+     */
+    private fun withLocalDevice(cluster: ClusterState): List<ConnectDevice> {
+        val fromServer = cluster.devices
+        if (fromServer.any { it.id == deviceId }) return fromServer
+        return fromServer + localDeviceRow(active = cluster.activeDeviceId == deviceId)
+    }
+
+    private fun localDeviceRow(active: Boolean): ConnectDevice = ConnectDevice(
+        id = deviceId,
+        name = "SpotiDuck",
+        kind = DeviceKind.COMPUTER,
+        canPlay = true,
+        volume = 0,
+        volumeSteps = 64,
+        isControllable = true,
+        disableVolume = false,
+        supportsTransfer = true,
+        supportsLogout = false,
+        supportsCommandRequest = false,
+        supportsSleepTimer = false,
+        isObservable = true,
+        audioQuality = "",
+        brand = "spotify",
+        model = "web_player",
+        softwareVersion = "",
+        license = "",
+        active = active,
+        local = true,
+    )
+
     private fun publishQueue(cluster: ClusterState?) {
         val loaded = player.state.value.trackUri
-        val anchor = (if (pendingActive()) pendingTrack else "").ifBlank { loaded }
+        val anchor = (if (pendingActive()) pendingTrack else "")
+            .ifBlank { loaded }
+            .ifBlank { cluster?.track?.uri.orEmpty() }
         if (anchor.isNotBlank() && queuedTail.any { it.uri == anchor }) {
             queuedTail = queuedTail.filterNot { it.uri == anchor }
         }
         val server = cluster != null
         val live = connect.playback?.currentTrack?.contextUri.orEmpty()
-        val upcoming = if (server) cluster!!.fromContext.map(::row) else emptyList()
+        val serverRows = if (server) cluster!!.fromContext.map(::row) else emptyList()
         val context = live.ifBlank { if (server) cluster!!.contextUri else "" }
         val radio = server && cluster!!.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
         val label = if (server && !radio) cluster!!.contextDescription else ""
@@ -1259,6 +1987,30 @@ class PlaybackBridge(private val context: Context) {
         } else {
             queuedTail
         }
+        val queuedUris = buildSet {
+            if (server) cluster!!.queued.forEach { add(it.uri) }
+            queued.forEach { add(it.uri) }
+        }
+        val chain = chainFor()
+        val chainTail = if (anchor.isNotBlank() && chain.isNotEmpty()) {
+            val at = chain.indexOf(anchor)
+            if (at >= 0) {
+                chain.drop(at + 1).filterNot { it in queuedUris }.take(20)
+            } else {
+                emptyList()
+            }
+        } else {
+            emptyList()
+        }
+        val knownUpcoming = serverRows.mapTo(HashSet()) { it.uri }
+        val sparse = serverRows.filter { it.title.isBlank() }.map { it.uri }
+        val missing = (sparse + chainTail.filterNot { it in knownUpcoming })
+            .filterNot { decorated.containsKey(it) || it in undecoratable }
+            .distinct()
+        if (missing.isNotEmpty()) scheduleDecorate(missing)
+        val upcoming = (serverRows.map { if (it.title.isBlank()) decorated[it.uri] ?: it else it } +
+                chainTail.mapNotNull { decorated[it] })
+            .filterNot { it.uri == anchor }
         if (queued == state.queue && upcoming == state.queueFromContext &&
             context == state.queueContext && label == state.queueContextLabel
         ) {
@@ -1276,7 +2028,43 @@ class PlaybackBridge(private val context: Context) {
         )
     }
 
+    private fun scheduleDecorate(uris: List<String>) {
+        if (uris.isEmpty()) return
+        if (uris == decoratePending && decorateJob?.isActive == true) return
+        decoratePending = uris
+        decorateJob?.cancel()
+        decorateJob = scope.launch {
+            val rows = runCatching { TrackSource.decorate(context, uris) }.getOrDefault(emptyMap())
+            decoratePending = emptyList()
+            if (!isActive) return@launch
+            uris.forEach { uri -> if (rows[uri] == null) undecoratable += uri }
+            rows.forEach { (uri, track) ->
+                decorated[uri] = TrackItem(
+                    title = track.title,
+                    artist = track.artists,
+                    uri = track.uri,
+                    imageUrl = track.imageUrl.takeIf { it.isNotBlank() },
+                    durationMs = track.durationMs,
+                    isExplicit = track.explicit,
+                    albumUri = track.albumUri,
+                    artistUri = track.artistUri,
+                )
+            }
+            log.i("decorated ${rows.size} of ${uris.size} upcoming row(s)")
+            publishQueue(connect.cluster.value)
+        }
+    }
+
     private fun captureChain(contextUri: String) {
+        if (contextUri.isBlank()) {
+            if (chainRows.isNotEmpty() || chainContext.isNotBlank()) {
+                chainRows = emptyList()
+                chainContext = ""
+                resumeRow = -1
+                log.i("chain: reset, this play carries no context")
+            }
+            return
+        }
         val rows = screen
         if (rows.size < 2) {
             log.w("chain: the list on screen has ${rows.size} rows, nothing to follow")
@@ -1338,11 +2126,15 @@ class PlaybackBridge(private val context: Context) {
                 ?: state.positionMs
         }
         val duration = track.durationMs.takeIf { it > 0L } ?: state.durationMs
+        val nextArtistUri = if (track.uri != state.trackUri) artistUriOf(track.uri) else state.artistUri
+        val nextAlbumUri = if (track.uri != state.trackUri) albumUriOf(track.uri) else state.albumUri
         state = state.copy(
             title = track.name,
             artist = track.artists,
             coverUrl = track.imageUrl,
             trackUri = track.uri,
+            artistUri = nextArtistUri,
+            albumUri = nextAlbumUri,
             isPlaying = if (local) player.isPlaying else !command.paused,
             positionMs = position,
             durationMs = duration,
@@ -1414,7 +2206,23 @@ class PlaybackBridge(private val context: Context) {
     }
 
     private fun onPlayerEvent(event: PlayerEvent) {
-        val command = connect.playback ?: return
+        val command = connect.playback
+        if (command == null) {
+            // No server playback session behind the engine: the local state
+            // publish is the report, and advancement walks the queue here.
+            when (event) {
+                PlayerEvent.Started -> scope.launch { publishLocalFromEngine() }
+                is PlayerEvent.Seeked -> scope.launch { publishLocalFromEngine(event.positionMs) }
+                PlayerEvent.Ended -> {
+                    val ended = player.state.value.trackUri
+                    log.i("player ended '$ended' with no command, advancing on this phone")
+                    scope.launch { advance(ended) }
+                }
+                is PlayerEvent.Failed -> flushHeld()
+                is PlayerEvent.Progress -> Unit
+            }
+            return
+        }
         val track = command.currentTrack
         val ad = command.isAd
         val raw = if (ad) AD_THRESHOLD_MS else player.positionMs
@@ -1429,11 +2237,13 @@ class PlaybackBridge(private val context: Context) {
                         DebugSource.STARTED_PLAYING,
                         positionMs = position,
                         previousPositionMs = 0L,
-                        speed = 1.0,
+                        speed = if (player.isPlaying) 1.0 else 0.0,
+                        paused = !player.isPlaying,
                         durationMs = duration,
                         format = player.format.takeIf { it > 0 }?.toString().orEmpty(),
                         bitrate = player.bitrate,
                         quality = player.quality,
+                        videoOn = canvasOn,
                     )
                     if (snapshot == null) {
                         log.w("started: no snapshot")
@@ -1456,6 +2266,7 @@ class PlaybackBridge(private val context: Context) {
                         positionMs = event.positionMs,
                         previousPositionMs = event.positionMs,
                         speed = 1.0,
+                        videoOn = canvasOn,
                     )
                     snapshot?.let { connect.report(it) }
                 }
@@ -1473,6 +2284,7 @@ class PlaybackBridge(private val context: Context) {
                                 previousPositionMs = AD_THRESHOLD_MS,
                                 speed = 1.0,
                                 durationMs = AD_THRESHOLD_MS,
+                                videoOn = canvasOn,
                             )
                         }
                         val accepted = thresholdSnapshot?.let { connect.report(it) }
@@ -1486,6 +2298,7 @@ class PlaybackBridge(private val context: Context) {
                             previousPositionMs = position,
                             speed = 1.0,
                             durationMs = duration,
+                            videoOn = canvasOn,
                         )
                     }
                     if (finalized == null) {
@@ -1494,7 +2307,7 @@ class PlaybackBridge(private val context: Context) {
                         val accepted = connect.report(finalized)
                         log.i("report track_data_finalized accepted=$accepted ad=$ad pos=$position")
                     }
-                    advance(command)
+                    advance(command.currentTrack?.uri.orEmpty().ifBlank { player.state.value.trackUri })
                 }
             }
 
@@ -1573,28 +2386,34 @@ class PlaybackBridge(private val context: Context) {
         return rows.indexOfFirst { it == uri }
     }
 
-    private suspend fun advance(played: PlaybackCommand) {
+    private suspend fun advance(ended: String) {
         if (advancing) {
             log.w("advance: already running for the track that just ended, not chaining a second time")
             return
         }
         advancing = true
         try {
-            runAdvance(played)
+            runAdvance(ended)
         } finally {
             advancing = false
         }
     }
 
-    private suspend fun runAdvance(played: PlaybackCommand) {
-        val ended = played.currentTrack?.uri.orEmpty()
+    private suspend fun runAdvance(endedIn: String) {
+        val ended = endedIn
         val rows = chainFor()
         val at = rowOf(rows, ended)
         resumeRow = if (at >= 0) at + 1 else -1
         val server = connect.cluster.value
         val serverQueued = server?.queued.orEmpty()
         val queued = queuedTail.firstOrNull()
-        val next = if (queued != null || serverQueued.isNotEmpty()) awaitServerNext(ended) else serverNext(ended)
+        // With no playback session behind the engine there is no server next
+        // to wait for; asking would only stall the gap between tracks.
+        val next = when {
+            connect.playback == null -> null
+            queued != null || serverQueued.isNotEmpty() -> awaitServerNext(ended)
+            else -> serverNext(ended)
+        }
         val moved = next?.currentTrack
         val engine = player.state.value.trackUri
         val engineOnEnded = engine.isBlank() || engine == ended ||
@@ -1624,6 +2443,30 @@ class PlaybackBridge(private val context: Context) {
             playTrack(queued.uri, queued.uri, -1)
             return
         }
+        if (repeatTrackOn(server) && ended.isNotBlank() && !ended.startsWith(AD_PREFIX)) {
+            log.i("advance -> repeating '${ended.takeLast(12)}' (repeat one)")
+            playTrack(
+                ended,
+                chainContext.ifBlank { server?.contextUri.orEmpty() },
+                if (at >= 0) at else -1,
+            )
+            return
+        }
+        if (shuffleOn(server) && !ended.startsWith(AD_PREFIX)) {
+            val pool = rows.ifEmpty {
+                server?.window()?.filter { it.isVisible }?.map { it.uri }.orEmpty()
+            }.filter { it.isNotBlank() && it != ended }
+            if (pool.isNotEmpty()) {
+                val pick = pool.random()
+                log.i("advance -> '${pick.takeLast(12)}' shuffled out of ${pool.size} rows")
+                playTrack(
+                    pick,
+                    chainContext.ifBlank { server?.contextUri.orEmpty() },
+                    rows.indexOf(pick),
+                )
+                return
+            }
+        }
         if (resumeRow in rows.indices) {
             val row = rows[resumeRow]
             log.i("advance -> '$row' from the list that started it, row $resumeRow of ${rows.size} " +
@@ -1636,11 +2479,13 @@ class PlaybackBridge(private val context: Context) {
             startFromServer(next, moved)
             return
         }
-        val command = connect.playback ?: return
-        log.i("advance: no transition, state=${command.stateId.take(8)} " +
-                "idx=${command.stateIndex}/${command.states.size} adv=${command.currentState?.advanceIndex} " +
-                "track=${command.currentTrack?.uri?.takeLast(12)}"
-        )
+        val command = connect.playback
+        if (command != null) {
+            log.i("advance: no transition, state=${command.stateId.take(8)} " +
+                    "idx=${command.stateIndex}/${command.states.size} adv=${command.currentState?.advanceIndex} " +
+                    "track=${command.currentTrack?.uri?.takeLast(12)}"
+            )
+        }
         val cluster = connect.cluster.value ?: return
         if (cluster.window().none { it.uri == ended }) {
             log.w("advance: '$ended' is not in the cluster window, not guessing")
@@ -1648,11 +2493,24 @@ class PlaybackBridge(private val context: Context) {
         }
         val target = targetFrom(cluster, 0)
         if (target == null || target.track.uri == ended) {
-            log.w("advance: end of the context at '${command.currentTrack?.name}'")
+            if (repeatContextOn(cluster) && !ended.startsWith(AD_PREFIX)) {
+                val firstRow = rows.firstOrNull { it.isNotBlank() && it != ended }
+                    ?: cluster.window().firstOrNull { it.isVisible && it.uri != ended }?.uri
+                if (firstRow != null) {
+                    log.i("advance -> wrapping to '${firstRow.takeLast(12)}' (repeat all)")
+                    playTrack(
+                        firstRow,
+                        chainContext.ifBlank { cluster.contextUri },
+                        rows.indexOf(firstRow),
+                    )
+                    return
+                }
+            }
+            log.w("advance: end of the context at '${command?.currentTrack?.name ?: ended.takeLast(12)}'")
             return
         }
-        log.w("advance: server kept '${command.currentTrack?.name}', asking for '${target.track.title}'")
-        connect.play(cluster.contextUri, target.track.uri, target.track.uid, target.index, targetDeviceId = remoteTarget())
+        log.i("advance -> '${target.track.title}' from the cluster row")
+        playTrack(target.track.uri, cluster.contextUri, target.index)
     }
 
     private fun serverNext(ended: String): PlaybackCommand? {
@@ -1739,6 +2597,12 @@ class PlaybackBridge(private val context: Context) {
         const val RESTART_MS = 3000L
         const val PENDING_MS = 10_000L
         const val ADVANCE_WAIT_MS = 900L
+        const val MODE_SETTLE_MS = 1200L
+        const val MODE_OVERRIDE_MS = 8000L
+        const val REMOTE_INTENT_MS = 10_000L
         const val BLANK = "blank"
+        const val AUTOPLAY_WINDOW_MS = 30_000L
+        const val GONE_READS = 2
+        const val TRANSFER_FRESH_MS = 120_000L
     }
 }

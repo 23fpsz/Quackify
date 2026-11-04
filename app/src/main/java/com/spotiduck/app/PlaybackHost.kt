@@ -17,6 +17,9 @@ object PlaybackHost {
 
     val started: Boolean get() = instance != null
 
+    /** The live bridge behind the service's notification, if one is running. */
+    val bridge: PlaybackBridge? get() = instance
+
     fun ensure(context: Context): PlaybackBridge {
         instance?.let { return it }
         return synchronized(this) {

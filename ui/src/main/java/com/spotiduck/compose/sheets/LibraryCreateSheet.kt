@@ -41,6 +41,7 @@ fun LibraryCreateSheet(
     isOpen: Boolean,
     onCreatePlaylist: () -> Unit,
     onCreateBlend: () -> Unit,
+    onCreateFolder: () -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -82,6 +83,16 @@ fun LibraryCreateSheet(
                 onClick = {
                     onDismiss()
                     onCreatePlaylist()
+                }
+            )
+
+            CreateOptionItem(
+                title = "Folder",
+                subtitle = "Organize and group your playlists",
+                iconRes = R.drawable.encore_icon_folder_24,
+                onClick = {
+                    onDismiss()
+                    onCreateFolder()
                 }
             )
 
@@ -147,6 +158,7 @@ fun PreviewLibraryCreateSheet() {
             isOpen = true,
             onCreatePlaylist = {},
             onCreateBlend = {},
+            onCreateFolder = {},
             onDismiss = {}
         )
     }

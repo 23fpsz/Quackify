@@ -1,5 +1,6 @@
 package com.spotiduck.compose.player
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -25,7 +26,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -65,6 +65,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -81,14 +83,15 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spotiduck.compose.R
+import com.spotiduck.compose.components.CanvasVideoPlayer
 import com.spotiduck.compose.components.EncoreHeartButton
 import com.spotiduck.compose.components.EncoreIconButton
 import com.spotiduck.compose.components.EncorePlayButton
 import com.spotiduck.compose.components.EncoreRepeatButton
 import com.spotiduck.compose.components.EncoreSmartShuffleButton
-import com.spotiduck.compose.components.JellyfishCanvas
 import com.spotiduck.compose.components.RepeatMode
 import com.spotiduck.compose.components.ShuffleMode
+import com.spotiduck.compose.components.SpotifyArtworkImage
 import com.spotiduck.compose.theme.EncoreAnimation
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.EncoreCornerRadii
@@ -103,7 +106,18 @@ import com.spotiduck.compose.util.rememberDominantColor
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
 
-private val LANDSCAPE_LYRICS_PEEK_MIN_HEIGHT = 200.dp
+private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
+
+/** Spotify's dark ink, for lyrics that sit on light artwork. */
+private val LyricsInkDark = Color(0xFF191414)
+
+/**
+ * The lyrics panels sit straight on the album's dominant color, so white text
+ * disappears on light covers (and dark text on dark ones). Pick the ink from
+ * the background's luminance.
+ */
+private fun lyricsInk(background: Color): Color =
+    if (background.luminance() > 0.4f) LyricsInkDark else Color.White
 
 /**
  * Full-screen Now Playing Player Screen matching Spotify APK (NPV):
@@ -142,6 +156,13 @@ fun SpotifyNowPlayingScreen(
     onMoreClick: () -> Unit,
     onQueueClick: () -> Unit,
     onDeviceClick: () -> Unit,
+    onShareClick: () -> Unit = {},
+    onTitleClick: () -> Unit = {},
+    onArtistClick: () -> Unit = {},
+    canvasFilePath: String? = null,
+    isCanvasAllowed: Boolean = true,
+    isCanvasEnabled: Boolean = false,
+    onCanvasToggle: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     onBanClick: (() -> Unit)? = null,
     contextHeaderTitle: String? = null,
@@ -153,13 +174,20 @@ fun SpotifyNowPlayingScreen(
     isLoading: Boolean = false,
     monthlyListeners: String = "",
     artistBio: String = "",
-    lyricsSnippet: String = "",
-    lyrics: List<TimeSyncedLyric> = defaultLyricsList
+    artistImageUrl: String? = null,
+    lyrics: List<TimeSyncedLyric> = emptyList()
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
     var isFollowingArtist by remember { mutableStateOf(false) }
-    var isCanvasVisualizerEnabled by remember { mutableStateOf(false) }
+
+    // Back while the fullscreen lyrics overlay is up closes the overlay
+    // first; without this the shell's handler collapses the whole player.
+    BackHandler(enabled = isLyricsFullscreen) { isLyricsFullscreen = false }
+
+    // Canvas loop: the Settings toggle gates the whole feature, the pill state
+    // is a quick per-user switch that only matters while the gate is open
+    val canvasActive = isCanvasAllowed && isCanvasEnabled && canvasFilePath != null
 
     val coroutineScope = rememberCoroutineScope()
     val playerOffsetY = remember { Animatable(0f) }
@@ -171,12 +199,7 @@ fun SpotifyNowPlayingScreen(
     }
     val activeLyricLine = lyrics.getOrNull(activeLyricIndex)?.text.orEmpty()
 
-    val effectiveLyricsSnippet = lyricsSnippet.ifBlank {
-        if (lyrics.isNotEmpty()) lyrics.take(4).joinToString("\n") { it.text } else ""
-    }
-    val effectiveMonthlyListeners = monthlyListeners.ifBlank {
-        if (artist.isNotBlank()) "64,281,910 monthly listeners" else ""
-    }
+    val effectiveMonthlyListeners = monthlyListeners
     val effectiveArtistBio = artistBio.ifBlank {
         if (artist.isNotBlank()) "Listen to $artist on Spotify. Discover top songs and upcoming releases." else ""
     }
@@ -270,15 +293,15 @@ fun SpotifyNowPlayingScreen(
         )
 
         // Authentic album-art-extracted vertical gradient matching Spotify nowplaying_overlay_gradient.xml
-        // 100% solid, fully opaque colors — zero transparency
+        // Vivid artwork color on top easing into base black across most of the screen
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         0.0f to animatedDominantColor,
-                        0.35f to animatedDominantColor,
-                        0.70f to Color(0xFF181818),
+                        0.45f to lerp(animatedDominantColor, Color(0xFF121212), 0.35f),
+                        0.80f to lerp(animatedDominantColor, Color(0xFF121212), 0.75f),
                         1.0f to Color(0xFF121212)
                     )
                 )
@@ -294,8 +317,7 @@ fun SpotifyNowPlayingScreen(
             }
             val hasSubtitle = albumOrPlaylistContext.isNotBlank() && !albumOrPlaylistContext.equals("Recommended for you", ignoreCase = true)
 
-            val hasSecondaryContent = effectiveLyricsVisible || lyrics.isNotEmpty() || artist.isNotBlank()
-            val isScrollEnabled = !effectiveIsLoading && hasSecondaryContent
+            val isScrollEnabled = !effectiveIsLoading
 
             if (isLandscape) {
                 Row(
@@ -316,8 +338,10 @@ fun SpotifyNowPlayingScreen(
                             coverUrl = coverUrl,
                             dominantColor = dynamicArtworkColor,
                             backgroundColor = animatedDominantColor,
-                            isCanvasVisualizerEnabled = isCanvasVisualizerEnabled,
-                            onCanvasToggle = { isCanvasVisualizerEnabled = !isCanvasVisualizerEnabled },
+                            canvasFilePath = canvasFilePath,
+                            isCanvasAllowed = isCanvasAllowed,
+                            isCanvasEnabled = canvasActive,
+                            onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) },
                             gestureModifier = artworkGestureModifier,
                             modifier = Modifier
                                 .aspectRatio(1.0f)
@@ -354,6 +378,8 @@ fun SpotifyNowPlayingScreen(
                             artist = artist,
                             isExplicit = isExplicit,
                             isLiked = isLiked,
+                            onTitleClick = onTitleClick,
+                            onArtistClick = onArtistClick,
                             onLikeClick = onLikeClick,
                             onBanClick = onBanClick
                         )
@@ -387,16 +413,18 @@ fun SpotifyNowPlayingScreen(
                         NowPlayingFooterRow(
                             connectedDeviceName = connectedDeviceName,
                             onDeviceClick = onDeviceClick,
-                            onQueueClick = onQueueClick
+                            onQueueClick = onQueueClick,
+                            onShareClick = onShareClick
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
                         NowPlayingLyricsPeekCard(
-                            visible = effectiveLyricsVisible || lyrics.isNotEmpty(),
-                            lyricsSnippet = effectiveLyricsSnippet,
+                            visible = effectiveLyricsVisible,
+                            lyrics = lyrics,
+                            activeIndex = activeLyricIndex,
                             dominantColor = dynamicArtworkColor,
-                            minHeight = LANDSCAPE_LYRICS_PEEK_MIN_HEIGHT,
+                            peekHeight = LANDSCAPE_LYRICS_PEEK_HEIGHT,
                             onOpenLyrics = { isLyricsFullscreen = true },
                             onShareLyrics = { isLyricsShareOpen = true }
                         )
@@ -408,8 +436,10 @@ fun SpotifyNowPlayingScreen(
                                 artist = artist,
                                 monthlyListeners = effectiveMonthlyListeners,
                                 artistBio = effectiveArtistBio,
+                                artistImageUrl = artistImageUrl,
                                 isFollowingArtist = isFollowingArtist,
-                                onFollowToggle = { isFollowingArtist = !isFollowingArtist }
+                                onFollowToggle = { isFollowingArtist = !isFollowingArtist },
+                                onArtistClick = onArtistClick
                             )
 
                             Spacer(modifier = Modifier.height(EncoreSpacers.Looser3))
@@ -442,8 +472,10 @@ fun SpotifyNowPlayingScreen(
                         coverUrl = coverUrl,
                         dominantColor = dynamicArtworkColor,
                         backgroundColor = animatedDominantColor,
-                        isCanvasVisualizerEnabled = isCanvasVisualizerEnabled,
-                        onCanvasToggle = { isCanvasVisualizerEnabled = !isCanvasVisualizerEnabled },
+                        canvasFilePath = canvasFilePath,
+                        isCanvasAllowed = isCanvasAllowed,
+                        isCanvasEnabled = canvasActive,
+                        onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) },
                         gestureModifier = artworkGestureModifier,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -468,6 +500,8 @@ fun SpotifyNowPlayingScreen(
                         artist = artist,
                         isExplicit = isExplicit,
                         isLiked = isLiked,
+                        onTitleClick = onTitleClick,
+                        onArtistClick = onArtistClick,
                         onLikeClick = onLikeClick,
                         onBanClick = onBanClick
                     )
@@ -501,29 +535,33 @@ fun SpotifyNowPlayingScreen(
                     NowPlayingFooterRow(
                         connectedDeviceName = connectedDeviceName,
                         onDeviceClick = onDeviceClick,
-                        onQueueClick = onQueueClick
+                        onQueueClick = onQueueClick,
+                        onShareClick = onShareClick
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     NowPlayingLyricsPeekCard(
-                        visible = effectiveLyricsVisible || lyrics.isNotEmpty(),
-                        lyricsSnippet = effectiveLyricsSnippet,
+                        visible = effectiveLyricsVisible,
+                        lyrics = lyrics,
+                        activeIndex = activeLyricIndex,
                         dominantColor = dynamicArtworkColor,
                         onOpenLyrics = { isLyricsFullscreen = true },
                         onShareLyrics = { isLyricsShareOpen = true }
                     )
 
                     // Other cards (e.g. About the Artist) only appear once loaded and accessible upon scrolling down
-                    if (isScrollEnabled && artist.isNotBlank()) {
+                    if (!effectiveIsLoading && artist.isNotBlank()) {
                         Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
                         NowPlayingAboutArtistCard(
                             artist = artist,
                             monthlyListeners = effectiveMonthlyListeners,
                             artistBio = effectiveArtistBio,
+                            artistImageUrl = artistImageUrl,
                             isFollowingArtist = isFollowingArtist,
-                            onFollowToggle = { isFollowingArtist = !isFollowingArtist }
+                            onFollowToggle = { isFollowingArtist = !isFollowingArtist },
+                            onArtistClick = onArtistClick
                         )
 
                         Spacer(modifier = Modifier.height(48.dp))
@@ -550,7 +588,7 @@ fun SpotifyNowPlayingScreen(
                 currentPositionMs = currentPositionMs,
                 dominantColor = dominantColor,
                 lyrics = lyrics,
-                onSeekMs = { targetMs -> onSeek(targetMs.toFloat() / durationMs.toFloat()) },
+                onSeekMs = { targetMs -> if (durationMs > 0L) onSeek(targetMs.toFloat() / durationMs.toFloat()) },
                 onShareClick = { isLyricsShareOpen = true },
                 onClose = { isLyricsFullscreen = false }
             )
@@ -799,8 +837,8 @@ private fun NowPlayingHeaderRow(
 }
 
 /**
- * Large 1:1 Album Artwork with 8dp rounded corners, the Jellyfish canvas
- * visualizer (when enabled) and the CANVAS toggle pill.
+ * Large 1:1 Album Artwork with 8dp rounded corners, the real looping canvas
+ * video (when the track has one) and the CANVAS toggle pill.
  * Reference: revised_template_page_layout.xml (@id/track_carousel) -> bounds [63,308][1017,1262] (24dp margins)
  */
 @Composable
@@ -809,7 +847,9 @@ private fun NowPlayingArtworkCard(
     coverUrl: String?,
     dominantColor: Color,
     backgroundColor: Color,
-    isCanvasVisualizerEnabled: Boolean,
+    canvasFilePath: String?,
+    isCanvasAllowed: Boolean,
+    isCanvasEnabled: Boolean,
     onCanvasToggle: () -> Unit,
     gestureModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
@@ -822,9 +862,9 @@ private fun NowPlayingArtworkCard(
             .then(gestureModifier),
         contentAlignment = Alignment.Center
     ) {
-        if (isCanvasVisualizerEnabled) {
-            JellyfishCanvas(
-                dominantColor = dominantColor,
+        if (isCanvasEnabled && canvasFilePath != null) {
+            CanvasVideoPlayer(
+                filePath = canvasFilePath,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -836,25 +876,28 @@ private fun NowPlayingArtworkCard(
             )
         }
 
-        // Canvas Mode Toggle Pill (matches Spotify Canvas on/off toggle badge)
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(12.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.Black.copy(alpha = 0.6f))
-                .clickable(onClick = onCanvasToggle)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (isCanvasVisualizerEnabled) "CANVAS ON" else "CANVAS",
-                style = SpotifyTheme.typography.marginal.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 10.sp,
-                    color = if (isCanvasVisualizerEnabled) EncoreColors.Green else Color.White.copy(alpha = 0.7f)
+        // Canvas Mode Toggle Pill (matches the Spotify "Canvas on/off" badge);
+        // only offered while the Canvas setting is enabled and the track has one
+        if (isCanvasAllowed && canvasFilePath != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .clickable(onClick = onCanvasToggle)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (isCanvasEnabled) "Canvas on" else "Canvas off",
+                    style = SpotifyTheme.typography.marginal.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        color = if (isCanvasEnabled) EncoreColors.Green else Color.White.copy(alpha = 0.7f)
+                    )
                 )
-            )
+            }
         }
     }
 }
@@ -911,6 +954,7 @@ private fun NowPlayingSyncedLyricLine(
 
 /**
  * Track Title, Artist & Feedback Buttons Row.
+ * Tapping the title opens the album, tapping the artist opens the artist page.
  * Reference: track_info_nowplaying_view.xml & revised_template_overlay.xml (@id/track_info_feedback_container)
  * Live dump: track_info_view_title [63, 1598], feedback_buttons_container [765, 1596][1038, 1722]
  */
@@ -920,6 +964,8 @@ private fun NowPlayingTrackInfoRow(
     artist: String,
     isExplicit: Boolean,
     isLiked: Boolean,
+    onTitleClick: () -> Unit,
+    onArtistClick: () -> Unit,
     onLikeClick: () -> Unit,
     onBanClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -939,7 +985,8 @@ private fun NowPlayingTrackInfoRow(
                     color = Color.White
                 ),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable(onClick = onTitleClick)
             )
             Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -967,7 +1014,8 @@ private fun NowPlayingTrackInfoRow(
                     text = artist,
                     style = SpotifyTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.70f)),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable(onClick = onArtistClick)
                 )
             }
         }
@@ -1126,6 +1174,7 @@ private fun NowPlayingFooterRow(
     connectedDeviceName: String,
     onDeviceClick: () -> Unit,
     onQueueClick: () -> Unit,
+    onShareClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -1161,7 +1210,7 @@ private fun NowPlayingFooterRow(
             EncoreIconButton(
                 iconRes = R.drawable.encore_icon_share_android_24,
                 contentDescription = "Share",
-                onClick = {},
+                onClick = onShareClick,
                 tint = Color.White.copy(alpha = 0.70f),
                 size = 40.dp,
                 iconSize = 20.dp
@@ -1180,18 +1229,22 @@ private fun NowPlayingFooterRow(
 
 /**
  * Lyrics Peek Card (16dp rounded corner, dominant color background, horizontal margin 16dp).
+ * Fixed peek height: the card keeps its layout size while the synced lyrics fill it
+ * and scroll inside, auto-following the active line.
  * Reference: live dump [42, 2269][1038, 2400]
  */
 @Composable
 private fun NowPlayingLyricsPeekCard(
     visible: Boolean,
-    lyricsSnippet: String,
+    lyrics: List<TimeSyncedLyric>,
+    activeIndex: Int,
     dominantColor: Color,
     onOpenLyrics: () -> Unit,
     onShareLyrics: () -> Unit,
     modifier: Modifier = Modifier,
-    minHeight: Dp = 360.dp
+    peekHeight: Dp = 360.dp
 ) {
+    val ink = lyricsInk(dominantColor)
     AnimatedVisibility(
         visible = visible,
         enter = slideInVertically(
@@ -1208,13 +1261,13 @@ private fun NowPlayingLyricsPeekCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .defaultMinSize(minHeight = minHeight) // Ensures only the lyrics card peeks through; other tabs remain below the fold!
+                .height(peekHeight) // Fixed peek size: lyrics fill the card instead of growing it
                 .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
                 .background(dominantColor.copy(alpha = 0.65f))
                 .clickable { onOpenLyrics() }
                 .padding(EncoreSpacers.Looser)
         ) {
-            Column {
+            Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1222,14 +1275,14 @@ private fun NowPlayingLyricsPeekCard(
                 ) {
                     Text(
                         text = "Lyrics preview",
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = ink)
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         EncoreIconButton(
                             iconRes = R.drawable.encore_icon_share_android_24,
                             contentDescription = "Share lyrics",
                             onClick = onShareLyrics,
-                            tint = Color.White,
+                            tint = ink,
                             size = 32.dp,
                             iconSize = 18.dp
                         )
@@ -1237,7 +1290,7 @@ private fun NowPlayingLyricsPeekCard(
                             iconRes = R.drawable.encore_icon_fullscreen_24,
                             contentDescription = "Expand lyrics",
                             onClick = onOpenLyrics,
-                            tint = Color.White,
+                            tint = ink,
                             size = 32.dp,
                             iconSize = 18.dp
                         )
@@ -1246,17 +1299,38 @@ private fun NowPlayingLyricsPeekCard(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = lyricsSnippet,
-                    style = SpotifyTheme.typography.titleMedium.copy(
-                        fontSize = 18.sp,
-                        lineHeight = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.95f)
-                    ),
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // Lyrics fill the remaining card space and scroll inside the fixed layout
+                val lyricsListState = rememberLazyListState()
+                LaunchedEffect(activeIndex, lyrics.size) {
+                    if (lyrics.isEmpty()) return@LaunchedEffect
+                    lyricsListState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
+                }
+                LazyColumn(
+                    state = lyricsListState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    itemsIndexed(lyrics) { i, lyric ->
+                        val isActive = i == activeIndex
+                        Text(
+                            text = lyric.text,
+                            style = SpotifyTheme.typography.titleMedium.copy(
+                                fontSize = 18.sp,
+                                lineHeight = 30.sp,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
+                                color = when {
+                                    isActive -> ink.copy(alpha = 0.95f)
+                                    i < activeIndex -> ink.copy(alpha = 0.45f)
+                                    else -> ink.copy(alpha = 0.55f)
+                                }
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -1271,8 +1345,10 @@ private fun NowPlayingAboutArtistCard(
     artist: String,
     monthlyListeners: String,
     artistBio: String,
+    artistImageUrl: String?,
     isFollowingArtist: Boolean,
     onFollowToggle: () -> Unit,
+    onArtistClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -1290,25 +1366,47 @@ private fun NowPlayingAboutArtistCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(onClick = onArtistClick)
+                ) {
                     Box(
                         modifier = Modifier
                             .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE8115B)),
+                            .clip(CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = artist.firstOrNull()?.uppercase() ?: "A",
-                            style = SpotifyTheme.typography.titleMedium.copy(color = Color.White)
-                        )
+                        if (!artistImageUrl.isNullOrBlank()) {
+                            SpotifyArtworkImage(
+                                imageUrl = artistImageUrl,
+                                contentDescription = artist,
+                                modifier = Modifier.fillMaxSize(),
+                                fallbackColor = Color(0xFFE8115B)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFFE8115B)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = artist.firstOrNull()?.uppercase() ?: "A",
+                                    style = SpotifyTheme.typography.titleMedium.copy(color = Color.White)
+                                )
+                            }
+                        }
                     }
                     Spacer(modifier = Modifier.width(EncoreSpacers.Tighter))
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = artist,
-                                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.width(EncoreSpacers.Tighter4))
                             Icon(
@@ -1382,6 +1480,7 @@ private fun FullscreenLyricsView(
 ) {
     val activeIndex = lyrics.indexOfLast { currentPositionMs >= it.startTimeMs }.coerceAtLeast(0)
     val listState = rememberLazyListState()
+    val ink = lyricsInk(dominantColor)
 
     LaunchedEffect(activeIndex) {
         listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
@@ -1406,19 +1505,19 @@ private fun FullscreenLyricsView(
                 iconRes = R.drawable.encore_icon_chevron_down_24,
                 contentDescription = "Close lyrics",
                 onClick = onClose,
-                tint = Color.White
+                tint = ink
             )
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = title,
-                    style = SpotifyTheme.typography.bodySmallBold.copy(color = Color.White),
+                    style = SpotifyTheme.typography.bodySmallBold.copy(color = ink),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = artist,
-                    style = SpotifyTheme.typography.marginal.copy(color = Color.White.copy(alpha = 0.7f)),
+                    style = SpotifyTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1428,7 +1527,7 @@ private fun FullscreenLyricsView(
                 iconRes = R.drawable.encore_icon_share_android_24,
                 contentDescription = "Share",
                 onClick = onShareClick,
-                tint = Color.White
+                tint = ink
             )
         }
 
@@ -1447,7 +1546,7 @@ private fun FullscreenLyricsView(
                         fontSize = 24.sp,
                         lineHeight = 34.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isCurrentLine) Color.White else Color.White.copy(alpha = 0.35f)
+                        color = if (isCurrentLine) ink else ink.copy(alpha = 0.35f)
                     ),
                     modifier = Modifier
                         .fillMaxWidth()

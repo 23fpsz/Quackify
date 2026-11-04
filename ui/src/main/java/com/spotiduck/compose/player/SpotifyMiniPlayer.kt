@@ -75,7 +75,8 @@ fun SpotifyMiniPlayer(
     onSkipPreviousClick: () -> Unit = {},
     connectedDeviceName: String? = null,
     coverColor: Color = Color(0xFF5A3E85),
-    coverUrl: String? = null
+    coverUrl: String? = null,
+    hasTrack: Boolean = true
 ) {
     val coroutineScope = rememberCoroutineScope()
     val titleOffsetX = remember { Animatable(0f) }
@@ -237,10 +238,10 @@ fun SpotifyMiniPlayer(
                 EncoreIconButton(
                     iconRes = if (isPlaying) R.drawable.encore_icon_pause_24 else R.drawable.encore_icon_play_24,
                     contentDescription = if (isPlaying) "Pause" else "Play",
-                    onClick = onPlayPauseClick,
+                    onClick = if (hasTrack) onPlayPauseClick else ({}),
                     size = EncoreControlSizes.FloatingPlayerButtonSize,
                     iconSize = 24.dp,
-                    tint = EncoreColors.TextPrimary,
+                    tint = if (hasTrack) EncoreColors.TextPrimary else EncoreColors.TextSecondary,
                     modifier = Modifier.padding(end = 4.dp)
                 )
             }

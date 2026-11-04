@@ -45,8 +45,21 @@ private sealed interface Resolve {
     data object NotReady : Resolve
 }
 
+/**
+ * Full-screen Spotify login webview. Polls for a signed-in session, resolves
+ * the account behind it and hands it to [onLoggedIn].
+ *
+ * When signing into an *additional* account, pass [isDuplicateAccount]: the
+ * moment the resolved account matches one already saved on this device the
+ * login is refused and [onDuplicateLogin] fires instead — the same account
+ * cannot be added twice.
+ */
 @Composable
-fun LoginScreen(onLoggedIn: () -> Unit) {
+fun LoginScreen(
+    onLoggedIn: () -> Unit,
+    isDuplicateAccount: ((SpotifyAuth.Account) -> Boolean)? = null,
+    onDuplicateLogin: ((SpotifyAuth.Account) -> Unit)? = null,
+) {
 
     val context = LocalContext.current
     val host = remember { LoginWebViewHost(context) }
@@ -106,6 +119,11 @@ fun LoginScreen(onLoggedIn: () -> Unit) {
             when (result) {
                 is Resolve.Ok -> {
                     log.i("resolved '${result.account.name}' in ${SystemClock.elapsedRealtime() - started}ms")
+                    if (isDuplicateAccount != null && isDuplicateAccount(result.account)) {
+                        log.w("login refused: '${result.account.name}' (${result.account.id}) is already saved here")
+                        onDuplicateLogin?.invoke(result.account)
+                        return@LaunchedEffect
+                    }
                     SpotifyAuth.saveLogin(context, cookies!!, result.account)
                     val userId = SpotifyAuth.userId(context)
                     log.i("account id resolved='$userId'")
