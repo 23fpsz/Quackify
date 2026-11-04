@@ -2,6 +2,7 @@ package com.spotiduck.app
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
@@ -80,11 +81,21 @@ private val log = Logs.of(Logs.Module.MAIN)
 class MainActivity : ComponentActivity() {
 
     private var resumeSignal by mutableStateOf(0)
+
+    /** Bumped every time the playback notification's body is tapped; the
+     * shell watches it and slides the Now Playing view over whatever is
+     * on screen. */
+    private var openPlayerSignal by mutableStateOf(0)
     private var pausedAt = 0L
     private var sawStop = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A cold start launched by the notification carries the flag here;
+        // later taps arrive through onNewIntent instead.
+        if (intent?.getBooleanExtra(PlaybackService.EXTRA_OPEN_PLAYER, false) == true) {
+            openPlayerSignal++
+        }
         enableEdgeToEdge()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
@@ -620,6 +631,7 @@ class MainActivity : ComponentActivity() {
                                 userAvatarUrl = account?.imageUrl.orEmpty(),
                             playbackState = bridge.state,
                             playerListener = bridge.listener,
+                            expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
                                 homeQuickAccessItems = quick,
                             homeShelves = shelves,
                             libraryItems = libraryItems,
@@ -1116,6 +1128,13 @@ class MainActivity : ComponentActivity() {
         if (away > RESUME_REFRESH_AFTER_MS) {
             log.i("back after ${away / 1000}s, refreshing")
             resumeSignal++
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(PlaybackService.EXTRA_OPEN_PLAYER, false)) {
+            openPlayerSignal++
         }
     }
 
