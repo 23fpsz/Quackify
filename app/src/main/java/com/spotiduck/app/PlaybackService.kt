@@ -389,9 +389,13 @@ class PlaybackService : Service() {
     }
 
     private fun contentIntent(): PendingIntent {
-        val open = packageManager.getLaunchIntentForPackage(packageName)
-            ?: Intent(this, MainActivity::class.java)
-        open.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        // Tapping the card's body opens the app straight into the Now Playing
+        // view, the way Spotify's notification does, instead of a bare relaunch.
+        val open = Intent(this, MainActivity::class.java)
+            .setAction(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_LAUNCHER)
+            .putExtra(EXTRA_OPEN_PLAYER, true)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         return PendingIntent.getActivity(this, 0, open, pendingFlags())
     }
 
@@ -413,6 +417,7 @@ class PlaybackService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.spotiduck.app.STOP"
+        const val EXTRA_OPEN_PLAYER = "com.spotiduck.app.OPEN_PLAYER"
         private const val ACTION_TOGGLE = "com.spotiduck.app.TOGGLE"
         private const val ACTION_NEXT = "com.spotiduck.app.NEXT"
         private const val ACTION_PREVIOUS = "com.spotiduck.app.PREVIOUS"

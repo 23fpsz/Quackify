@@ -259,6 +259,7 @@ fun SpotifyAppShell(
     modifier: Modifier = Modifier,
     playbackState: ComposePlaybackState? = null,
     playerListener: ComposePlayerListener? = null,
+    expandPlayerSignal: Int = 0,
     isComposeUiEnabled: Boolean = true,
     onToggleComposeUi: (Boolean) -> Unit = {},
     onOpenSpotiDuckSettings: (() -> Unit)? = null,
@@ -372,6 +373,13 @@ fun SpotifyAppShell(
     var currentScreen by remember { mutableStateOf(ShellScreen.HOME) }
     var selectedNavIndex by remember { mutableIntStateOf(0) }
     var isPlayerExpanded by remember { mutableStateOf(false) }
+
+    // A tap on the playback notification bumps this from the activity; the
+    // full player slides up over whatever screen is showing, exactly like
+    // tapping the mini bar does.
+    LaunchedEffect(expandPlayerSignal) {
+        if (expandPlayerSignal > 0) isPlayerExpanded = true
+    }
     var activePlaylistTitle by remember { mutableStateOf("") }
     var activePlaylistUri by remember { mutableStateOf("") }
     var activePlaylistCoverUrl by remember { mutableStateOf<String?>(null) }
