@@ -317,7 +317,8 @@ fun SpotifyNowPlayingScreen(
             }
             val hasSubtitle = albumOrPlaylistContext.isNotBlank() && !albumOrPlaylistContext.equals("Recommended for you", ignoreCase = true)
 
-            val isScrollEnabled = !effectiveIsLoading
+            val hasSecondaryContent = effectiveLyricsVisible || lyrics.isNotEmpty() || artist.isNotBlank()
+            val isScrollEnabled = !effectiveIsLoading && hasSecondaryContent
 
             if (isLandscape) {
                 Row(
