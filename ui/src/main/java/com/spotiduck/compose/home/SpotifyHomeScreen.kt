@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -110,22 +111,7 @@ fun SpotifyHomeScreen(
     val filters = listOf("All", "Music", "Podcasts")
     val bottomPadding = rememberBottomPadding()
 
-    val quickItems = remember(quickAccessItems) {
-        if (!quickAccessItems.isNullOrEmpty()) {
-            quickAccessItems
-        } else {
-            listOf(
-                QuickAccessItem("Liked Songs", Color(0xFF4A154B), "spotify:collection:tracks"),
-                QuickAccessItem("Discover Weekly", Color(0xFF1E3264), "spotify:search:Discover Weekly"),
-                QuickAccessItem("The Joe Rogan Experience", Color(0xFF006450), "spotify:search:The Joe Rogan Experience", hasFreshnessBadge = true, progress = 0.65f),
-                QuickAccessItem("Daily Mix 1", Color(0xFF8D67AB), "spotify:search:Daily Mix 1", isPlaying = true),
-                QuickAccessItem("Today's Top Hits", Color(0xFFE8115B), "spotify:search:Today's Top Hits"),
-                QuickAccessItem("Release Radar", Color(0xFF509BF5), "spotify:search:Release Radar"),
-                QuickAccessItem("Rock Classics", Color(0xFFBA5D07), "spotify:search:Rock Classics"),
-                QuickAccessItem("Chill Hits", Color(0xFF432371), "spotify:search:Chill Hits")
-            )
-        }
-    }
+    val quickItems = quickAccessItems.orEmpty()
 
 
     val shelfSections = remember(shelves) {
@@ -283,6 +269,32 @@ fun SpotifyHomeScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Nothing from the feed yet: a quiet spinner while it loads, or a hint
+        // that it could not be fetched. No made-up shelves or shortcuts.
+        if (quickItems.isEmpty() && shelfSections.isEmpty() && podcastShelves.isEmpty()) {
+            item(key = "home_feed_status") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 64.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (loading) {
+                        CircularProgressIndicator(
+                            color = EncoreColors.Green,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    } else {
+                        Text(
+                            text = "Couldn't load your feed",
+                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                        )
                     }
                 }
             }

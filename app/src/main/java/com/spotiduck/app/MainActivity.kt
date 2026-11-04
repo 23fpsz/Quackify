@@ -278,6 +278,7 @@ class MainActivity : ComponentActivity() {
                         var playlistLoading by remember { mutableStateOf(false) }
                         var playlistHasMore by remember { mutableStateOf(false) }
                         var playlistLoadingMore by remember { mutableStateOf(false) }
+                        var playlistFetch by remember { mutableStateOf(0) }
                         var playlistRecommendations by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
                         var recommendationsLoading by remember { mutableStateOf(false) }
                         var recommendationsNonce by remember { mutableStateOf(0) }
@@ -320,7 +321,7 @@ class MainActivity : ComponentActivity() {
                             editableUris = Krespot.playlists.editable(context, "").map { it.uri }.toSet()
                         }
 
-                        LaunchedEffect(playlistUri) {
+                        LaunchedEffect(playlistUri, playlistFetch) {
                             if (playlistUri.isBlank()) return@LaunchedEffect
                             val uri = playlistUri
                             playlistLoading = true
@@ -500,8 +501,8 @@ class MainActivity : ComponentActivity() {
                         }
                         var canvasFile by remember { mutableStateOf<String?>(null) }
                         val canvasAllowed = settingsSwitches.canvas
-                        val canvasPrefs = remember { context.getSharedPreferences("spotiduck.client", Context.MODE_PRIVATE) }
-                        var canvasEnabled by remember { mutableStateOf(canvasPrefs.getBoolean("canvasNpvEnabled", true)) }
+                        val clientPrefs = remember { context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE) }
+                        var canvasEnabled by remember { mutableStateOf(clientPrefs.getBoolean("canvasNpvEnabled", true)) }
                         LaunchedEffect(playback.trackUri, canvasAllowed) {
                             canvasFile = null
                             if (!canvasAllowed) return@LaunchedEffect
@@ -649,7 +650,7 @@ class MainActivity : ComponentActivity() {
                             isCanvasEnabled = canvasEnabled,
                             onCanvasToggle = { on ->
                                 canvasEnabled = on
-                                canvasPrefs.edit().putBoolean("canvasNpvEnabled", on).apply()
+                                clientPrefs.edit().putBoolean("canvasNpvEnabled", on).apply()
                                 bridge.setCanvas(on)
                             },
                             artistDetail = artistDetail,
@@ -904,6 +905,12 @@ class MainActivity : ComponentActivity() {
                                     playlistSaved = null
                                     playlistPublished = null
                                 }
+                            },
+                            onRetryPlaylist = {
+                                playlistDetail = null
+                                playlistTracks = null
+                                playlistLoading = true
+                                playlistFetch++
                             },
                             onLoadAlbum = { uri, _ -> albumUri = uri },
                             onLoadArtist = { uri, _ -> artistUri = uri },

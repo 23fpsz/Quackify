@@ -38,8 +38,15 @@ import androidx.compose.runtime.snapshotFlow
 import com.spotiduck.backend.core.log.Logs
 import com.spotiduck.backend.library.TrackSource
 import com.spotiduck.backend.api.Library
+import android.os.SystemClock
 
 private val log = Logs.of(Logs.Module.BRIDGE)
+
+/** Shared local prefs file the client keeps its UI flags in. */
+const val CLIENT_PREFS = "spotiduck.client"
+
+/** Settings toggle: start playback as soon as the session's track loads. */
+const val AUTOPLAY_ON_STARTUP_PREF = "autoplayOnStartup"
 
 class PlaybackBridge(private val context: Context) {
 
@@ -57,6 +64,11 @@ class PlaybackBridge(private val context: Context) {
 
     @Volatile
     var deviceSheetOpen: Boolean = false
+
+    /** Settings "Autoplay on startup": read from the local prefs at start(). */
+    private var autoplayOnStartup: Boolean = false
+    private var autoplayPending: Boolean = false
+    private var autoplayArmedAt: Long = 0L
 
     /** Canvas loop enabled by the user; rides along every playback state report as is_video_on. */
     @Volatile
@@ -376,6 +388,11 @@ class PlaybackBridge(private val context: Context) {
     fun start() {
         if (dealer != null) return
         log.i("start device=" + deviceId)
+        autoplayOnStartup = context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+            .getBoolean(AUTOPLAY_ON_STARTUP_PREF, false)
+        autoplayPending = true
+        autoplayArmedAt = SystemClock.elapsedRealtime()
+        if (autoplayOnStartup) log.i("autoplay on startup is armed")
         player.onFocusPause = { scope.launch { reportPaused() } }
         player.onFocusResume = { scope.launch { reportResumed() } }
         player.onFocusDuck = { ducked ->
@@ -1551,6 +1568,32 @@ class PlaybackBridge(private val context: Context) {
     private fun progressOf(position: Long, duration: Long): Float =
         if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
 
+    /**
+     * Settings "Autoplay on startup": the first track the cluster names after
+     * the app opens starts playing here right away — exactly what pressing
+     * play on the loaded track does. It never steals the stream another
+     * device is holding, skips ads, and only waits a short window before
+     * giving up so a late cluster never surprises anyone.
+     */
+    private fun maybeAutoplayStartup(cluster: ClusterState) {
+        if (!autoplayPending) return
+        autoplayPending = false
+        if (!autoplayOnStartup) return
+        if (SystemClock.elapsedRealtime() - autoplayArmedAt > AUTOPLAY_WINDOW_MS) {
+            log.i("autoplay: the session track came too late, staying quiet")
+            return
+        }
+        if (cluster.track.uri.startsWith(AD_PREFIX)) return
+        if (player.hasSource) return
+        val remote = remoteTarget()
+        if (remote.isNotBlank()) {
+            log.i("autoplay: '${remote.take(12)}' owns the stream, not taking it")
+            return
+        }
+        log.i("autoplay: the loaded track is here, starting playback")
+        scope.launch { toggleLocal() }
+    }
+
     private fun hydrateCurrent(cluster: ClusterState) {
         val uri = cluster.track.uri
         if (uri.isBlank() || uri in hydrateTried) return
@@ -1635,6 +1678,7 @@ class PlaybackBridge(private val context: Context) {
             publishQueue(cluster)
             return
         }
+        maybeAutoplayStartup(cluster)
         if (cluster.track.title.isBlank() && cluster.track.artistName.isBlank()) {
             if (blankSeen != BLANK) {
                 blankSeen = BLANK
@@ -2557,6 +2601,7 @@ class PlaybackBridge(private val context: Context) {
         const val MODE_OVERRIDE_MS = 8000L
         const val REMOTE_INTENT_MS = 10_000L
         const val BLANK = "blank"
+        const val AUTOPLAY_WINDOW_MS = 30_000L
         const val GONE_READS = 2
         const val TRANSFER_FRESH_MS = 120_000L
     }
