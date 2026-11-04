@@ -44,6 +44,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -148,7 +149,9 @@ fun SpotifyPlaylistScreen(
     loading: Boolean = false,
     hasMore: Boolean = false,
     loadingMore: Boolean = false,
-    onLoadMore: () -> Unit = {}
+    onLoadMore: () -> Unit = {},
+    loadFailed: Boolean = false,
+    onRetry: () -> Unit = {}
 ) {
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -907,6 +910,34 @@ fun SpotifyPlaylistScreen(
                                 strokeWidth = 3.dp,
                                 modifier = Modifier.size(36.dp)
                             )
+                        }
+                    }
+                }
+                if (!loading && loadFailed && displayedTracks.isEmpty()) {
+                    item(key = "playlist_load_failed") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 32.dp, vertical = 48.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Couldn't load this playlist",
+                                style = SpotifyTheme.typography.titleMedium.copy(
+                                    color = EncoreColors.TextPrimary
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Check your internet connection and try again.",
+                                style = SpotifyTheme.typography.bodySmall.copy(
+                                    color = EncoreColors.TextSecondary
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            TextButton(onClick = onRetry) {
+                                Text(text = "Try again", color = EncoreColors.Green)
+                            }
                         }
                     }
                 }

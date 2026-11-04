@@ -323,6 +323,7 @@ fun SpotifyAppShell(
     playlistHasMore: Boolean = false,
     playlistLoadingMore: Boolean = false,
     onLoadMorePlaylistTracks: (() -> Unit)? = null,
+    onRetryPlaylist: (() -> Unit)? = null,
     playlistRecommendations: List<TrackItem> = emptyList(),
     recommendationsLoading: Boolean = false,
     onRefreshRecommendations: (() -> Unit)? = null,
@@ -525,6 +526,16 @@ fun SpotifyAppShell(
     val currentRepeatMode = playbackState?.repeatMode ?: localRepeatMode
     val connectedDevice = playbackState?.connectedDevice ?: localDevice
     val currentCoverUrl = playbackState?.coverUrl ?: ""
+
+    // No song has loaded yet (fresh app open): the mini player and the NPV keep
+    // an explicit "No Track" state instead of blank lines, and the transport
+    // button stands quiet, so it is obvious nothing is loaded.
+    val playerIdentity = playerIdentityOf(
+        title = currentTrackTitle,
+        artist = currentArtist,
+        trackUri = playbackState?.trackUri,
+        localTitle = localTrackTitle,
+    )
 
     // Resolved uris of the playing track, used by the player title/artist taps and the three-dot sheet
     val currentQueueRow = remember(playbackState?.trackUri, playbackState?.queue, playbackState?.queueFromContext) {
@@ -749,6 +760,10 @@ fun SpotifyAppShell(
             .background(EncoreColors.PureBlack)
     ) {
         // Active Screen Content
+        // A finished load that still has no rows at all means the fetch itself
+        // failed (an empty playlist comes back as a non-null empty list).
+        val playlistLoadFailed = !playlistLoading && playlistTracks == null
+        ShellScreenSlot {
         when (currentScreen) {
             ShellScreen.HOME -> {
                 SpotifyHomeScreen(
@@ -855,6 +870,8 @@ fun SpotifyAppShell(
                 playlistHasMore = playlistHasMore,
                 playlistLoadingMore = playlistLoadingMore,
                 onLoadMorePlaylistTracks = onLoadMorePlaylistTracks,
+                playlistLoadFailed = playlistLoadFailed,
+                onRetryPlaylist = onRetryPlaylist,
                 currentTrackTitle = currentTrackTitle,
                 isPlaying = isPlaying,
                 userDisplayName = userDisplayName,
@@ -1084,10 +1101,11 @@ fun SpotifyAppShell(
                 onProfileClick = openProfileDrawer
             )
         }
+        }
 
         ShellBottomBar(
-            title = currentTrackTitle,
-            artist = currentArtist,
+            title = playerIdentity.title,
+            artist = playerIdentity.artist,
             isPlaying = isPlaying,
             progress = currentProgress,
             isLiked = isLiked,
@@ -1109,16 +1127,18 @@ fun SpotifyAppShell(
             onBarClick = { isPlayerExpanded = true },
             onSkipNext = handleSkipNext,
             onSkipPrevious = handleSkipPrevious,
+            hasTrack = playerIdentity.trackLoaded,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
 
         // Full Now Playing Screen
-        val (contextHeader, contextSub) = when (currentScreen) {
-            ShellScreen.PLAYLIST -> "Playing from playlist" to activePlaylistTitle
-            ShellScreen.ALBUM -> "Playing from album" to activeAlbumTitle
-            ShellScreen.ARTIST -> "Playing from artist" to activeArtistName
-            else -> "Playing from playlist" to activePlaylistTitle
-        }
+        val (contextHeader, contextSub) = nowPlayingContext(
+            trackLoaded = playerIdentity.trackLoaded,
+            screen = currentScreen,
+            playlistTitle = activePlaylistTitle,
+            albumTitle = activeAlbumTitle,
+            artistName = activeArtistName,
+        )
         val nowPlayingDominantColor by rememberDominantColor(
             imageUrl = currentCoverUrl,
             fallbackSeed = currentTrackTitle + currentArtist,
@@ -1126,8 +1146,8 @@ fun SpotifyAppShell(
         )
         ShellNowPlaying(
             visible = isPlayerExpanded,
-            title = currentTrackTitle,
-            artist = currentArtist,
+            title = playerIdentity.title,
+            artist = playerIdentity.artist,
             contextHeader = contextHeader,
             contextSub = contextSub,
             isPlaying = isPlaying,
@@ -1537,6 +1557,55 @@ fun PreviewSpotifyAppShell() {
     }
 }
 
+/**
+ * Hosts the active-screen switch inside its own composable lambda: [SpotifyAppShell]
+ * sits at the JVM 64KB method limit, and lifting this block into a lambda keeps
+ * the generated shell method small while leaving the screen code exactly as is.
+ */
+@Composable
+private fun ShellScreenSlot(content: @Composable () -> Unit) {
+    content()
+}
+
+/**
+ * Explicit "No Track" identity for the mini player and the NPV while no song
+ * has loaded, so the bars never sit on blank lines after a fresh app open.
+ * Kept outside [SpotifyAppShell] to hold its generated method under the JVM limit.
+ */
+private data class PlayerIdentity(
+    val trackLoaded: Boolean,
+    val title: String,
+    val artist: String,
+)
+
+private fun playerIdentityOf(
+    title: String,
+    artist: String,
+    trackUri: String?,
+    localTitle: String,
+): PlayerIdentity = PlayerIdentity(
+    trackLoaded = title.isNotBlank() ||
+        trackUri?.isNotBlank() == true ||
+        (trackUri == null && localTitle.isNotBlank()),
+    title = title.ifBlank { "No Track" },
+    artist = artist.ifBlank { "No Artist" },
+)
+
+/** What the NPV header should say, including the explicit nothing-loaded state. */
+private fun nowPlayingContext(
+    trackLoaded: Boolean,
+    screen: ShellScreen,
+    playlistTitle: String,
+    albumTitle: String,
+    artistName: String,
+): Pair<String, String> = when {
+    !trackLoaded -> "Nothing playing" to "Pick a song to get started"
+    screen == ShellScreen.PLAYLIST -> "Playing from playlist" to playlistTitle
+    screen == ShellScreen.ALBUM -> "Playing from album" to albumTitle
+    screen == ShellScreen.ARTIST -> "Playing from artist" to artistName
+    else -> "Playing from playlist" to playlistTitle
+}
+
 /** Settings branch of the shell, extracted to keep [SpotifyAppShell] under the jvm method limit. */
 @Composable
 private fun ShellSettingsPane(
@@ -1679,6 +1748,8 @@ private fun ShellPlaylistPane(
     playlistHasMore: Boolean,
     playlistLoadingMore: Boolean,
     onLoadMorePlaylistTracks: (() -> Unit)?,
+    playlistLoadFailed: Boolean,
+    onRetryPlaylist: (() -> Unit)?,
     currentTrackTitle: String,
     isPlaying: Boolean,
     userDisplayName: String,
@@ -1718,6 +1789,8 @@ private fun ShellPlaylistPane(
             hasMore = playlistHasMore,
             loadingMore = playlistLoadingMore,
             onLoadMore = { onLoadMorePlaylistTracks?.invoke() },
+            loadFailed = playlistLoadFailed,
+            onRetry = { onRetryPlaylist?.invoke() },
             currentTrackTitle = currentTrackTitle,
             isPlaying = isPlaying,
             headerColor = playlistDetail?.colorHex?.let { parseHexColor(it) } ?: playlistDominantColor,

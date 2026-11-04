@@ -28,8 +28,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.content.Context
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,6 +101,16 @@ fun SettingsScreen(
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
             "${info.versionName.orEmpty()} (${PackageInfoCompat.getLongVersionCode(info)})"
         }.getOrDefault("")
+    }
+
+    // Local-only "Autoplay on startup" flag: stored in the app's private
+    // client prefs (the same file the playback bridge reads at start-up),
+    // so no server round trip is involved.
+    val clientPrefs = remember {
+        context.getSharedPreferences("spotiduck.client", Context.MODE_PRIVATE)
+    }
+    var autoplayOnStartup by remember {
+        mutableStateOf(clientPrefs.getBoolean("autoplayOnStartup", false))
     }
 
     // Hidden developer entry: five taps on the Version row open the log viewer.
@@ -205,6 +217,20 @@ fun SettingsScreen(
                     isChecked = switches.showPlaylists,
                     enabled = !loading,
                     onCheckedChange = onToggleShowPlaylists
+                )
+            }
+
+            item {
+                SettingsSectionHeader(title = "Playback")
+                SettingsToggleRow(
+                    title = "Autoplay on startup",
+                    subtitle = "When you open the app, the loaded track starts playing right away.",
+                    isChecked = autoplayOnStartup,
+                    enabled = true,
+                    onCheckedChange = { on ->
+                        autoplayOnStartup = on
+                        clientPrefs.edit().putBoolean("autoplayOnStartup", on).apply()
+                    }
                 )
             }
 

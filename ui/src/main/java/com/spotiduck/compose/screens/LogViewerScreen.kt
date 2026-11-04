@@ -16,6 +16,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -71,6 +72,7 @@ import com.spotiduck.compose.theme.DmMono
 import com.spotiduck.compose.theme.EncoreColors
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
 import com.spotiduck.compose.theme.SpotifyTheme
+import com.spotiduck.compose.theme.rememberBottomPadding
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -97,6 +99,7 @@ fun LogViewerScreen(
 ) {
     val context = LocalContext.current
     val revision by Logs.revision.collectAsState()
+    val bottomPadding = rememberBottomPadding()
     var levelFilter by remember { mutableStateOf<Logs.Level?>(null) }
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<Logs.Entry?>(null) }
@@ -236,7 +239,7 @@ fun LogViewerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(32.dp),
+                    .padding(start = 32.dp, top = 32.dp, end = 32.dp, bottom = bottomPadding),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -262,6 +265,7 @@ fun LogViewerScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(vertical = 4.dp),
+                contentPadding = PaddingValues(bottom = bottomPadding),
                 reverseLayout = true
             ) {
                 item(key = "footer") {
