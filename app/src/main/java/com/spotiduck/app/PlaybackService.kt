@@ -8,6 +8,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.app.NotificationCompat
@@ -16,6 +17,7 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import com.spotiduck.backend.core.log.Logs
+import com.spotiduck.compose.components.RepeatMode
 import com.spotiduck.compose.shell.ComposePlaybackState
 import java.net.HttpURLConnection
 import java.net.URL
@@ -29,10 +31,11 @@ import kotlinx.coroutines.withContext
 
 /**
  * The foreground leg of the player: a media notification the system styles
- * after the session, with play/pause/previous/next controls, the track's
- * artwork and a seekbar extrapolated from the playback state. Everything the
- * controls do is routed straight into the bridge's listener, so the
- * notification can never disagree with the on-screen player.
+ * after the session, with like / shuffle / repeat around the usual
+ * play/pause/previous/next controls, the track's artwork and a seekbar
+ * extrapolated from the playback state. Everything the controls do is routed
+ * straight into the bridge's listener, so the notification can never disagree
+ * with the on-screen player.
  *
  * While nothing is loaded the service still keeps the process alive but
  * posts a quiet placeholder instead of a media card.
@@ -83,6 +86,9 @@ class PlaybackService : Service() {
             ACTION_TOGGLE -> PlaybackHost.bridge?.listener?.onPlayPause()
             ACTION_NEXT -> PlaybackHost.bridge?.listener?.onSkipNext()
             ACTION_PREVIOUS -> PlaybackHost.bridge?.listener?.onSkipPrevious()
+            ACTION_LIKE -> PlaybackHost.bridge?.listener?.onLikeToggle()
+            ACTION_SHUFFLE -> PlaybackHost.bridge?.listener?.onShuffleToggle()
+            ACTION_REPEAT -> PlaybackHost.bridge?.listener?.onRepeatToggle()
         }
         PlaybackHost.ensure(this)
         PlaybackHost.markForeground()
@@ -145,6 +151,16 @@ class PlaybackService : Service() {
                 bridge.listener.onSeek(pos)
             }
 
+            // The like / shuffle / repeat buttons on the 13+ media card arrive
+            // here; the raw notification's buttons use the service actions.
+            override fun onCustomAction(action: String?, extras: Bundle?) {
+                when (action) {
+                    CUSTOM_LIKE -> bridge.listener.onLikeToggle()
+                    CUSTOM_SHUFFLE -> bridge.listener.onShuffleToggle()
+                    CUSTOM_REPEAT -> bridge.listener.onRepeatToggle()
+                }
+            }
+
             override fun onStop() {
                 // The user swiped the media card away while paused.
                 log.i("session stopped, leaving the foreground")
@@ -175,7 +191,8 @@ class PlaybackService : Service() {
         updatePlaybackState(session, state, hasTrack)
         val identity = "${state.trackUri}|${state.title}|${state.artist}|" +
             "${state.coverUrl}|${state.isPlaying}|" +
-            "${state.contextLabel}|${art != null}"
+            "${state.contextLabel}|${art != null}|" +
+            "${state.isLiked}|${state.shuffleMode}|${state.repeatMode}"
         if (identity == lastIdentity) return
         lastIdentity = identity
         if (hasTrack) {
@@ -210,16 +227,41 @@ class PlaybackService : Service() {
         if (state.remoteCanSeek) {
             actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
         }
-        session.setPlaybackState(
-            PlaybackStateCompat.Builder()
-                .setActions(actions)
-                .setState(
-                    if (playing) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED,
-                    state.positionMs,
-                    if (playing) 1.0f else 0.0f,
-                )
-                .build()
+        val playback = PlaybackStateCompat.Builder()
+            .setActions(actions)
+        // The 13+ system media card reads its extra buttons from the session's
+        // custom actions in Spotify's order: like first, then shuffle, then
+        // repeat. Stock shades render five slots, so like and shuffle flank the
+        // transport there; OEMs with wider cards draw all three. The icons ride
+        // the state, so a like fills the heart without re-posting anything.
+        playback.addCustomAction(
+            PlaybackStateCompat.CustomAction.Builder(
+                CUSTOM_LIKE, if (state.isLiked) "Unlike" else "Like",
+                if (state.isLiked) R.drawable.ic_notif_like_on else R.drawable.ic_notif_like
+            ).build()
         )
+        if (state.remoteCanShuffle) {
+            playback.addCustomAction(
+                PlaybackStateCompat.CustomAction.Builder(
+                    CUSTOM_SHUFFLE, "Shuffle", R.drawable.ic_notif_shuffle
+                ).build()
+            )
+        }
+        if (state.remoteCanRepeat) {
+            playback.addCustomAction(
+                PlaybackStateCompat.CustomAction.Builder(
+                    CUSTOM_REPEAT, "Repeat",
+                    if (state.repeatMode == RepeatMode.REPEAT_ONE) R.drawable.ic_notif_repeat_one
+                    else R.drawable.ic_notif_repeat
+                ).build()
+            )
+        }
+        playback.setState(
+            if (playing) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED,
+            state.positionMs,
+            if (playing) 1.0f else 0.0f,
+        )
+        session.setPlaybackState(playback.build())
     }
 
     private fun setMetadata(session: MediaSessionCompat, state: ComposePlaybackState) {
@@ -316,6 +358,11 @@ class PlaybackService : Service() {
             builder.setSubText(state.contextLabel)
         }
         builder
+            .addAction(
+                if (state.isLiked) R.drawable.ic_notif_like_on else R.drawable.ic_notif_like,
+                if (state.isLiked) "Unlike" else "Like",
+                servicePending(ACTION_LIKE),
+            )
             .addAction(R.drawable.ic_notif_previous, "Previous", servicePending(ACTION_PREVIOUS))
             .addAction(
                 if (state.isPlaying) R.drawable.ic_notif_pause else R.drawable.ic_notif_play,
@@ -323,10 +370,20 @@ class PlaybackService : Service() {
                 servicePending(ACTION_TOGGLE),
             )
             .addAction(R.drawable.ic_notif_next, "Next", servicePending(ACTION_NEXT))
+            .addAction(R.drawable.ic_notif_shuffle, "Shuffle", servicePending(ACTION_SHUFFLE))
+            .addAction(
+                if (state.repeatMode == RepeatMode.REPEAT_ONE) R.drawable.ic_notif_repeat_one
+                else R.drawable.ic_notif_repeat,
+                "Repeat",
+                servicePending(ACTION_REPEAT),
+            )
+        // Expanded MediaStyle draws the first five: like, previous, play,
+        // next, shuffle; the compact bar keeps the transport alone. Repeat
+        // rides the session's custom actions where the wider cards draw it.
         builder.setStyle(
             MediaNotificationCompat.MediaStyle()
                 .setMediaSession(session?.sessionToken)
-                .setShowActionsInCompactView(0, 1, 2)
+                .setShowActionsInCompactView(1, 2, 3)
         )
         return builder.build()
     }
@@ -359,6 +416,12 @@ class PlaybackService : Service() {
         private const val ACTION_TOGGLE = "com.spotiduck.app.TOGGLE"
         private const val ACTION_NEXT = "com.spotiduck.app.NEXT"
         private const val ACTION_PREVIOUS = "com.spotiduck.app.PREVIOUS"
+        private const val ACTION_LIKE = "com.spotiduck.app.LIKE"
+        private const val ACTION_SHUFFLE = "com.spotiduck.app.SHUFFLE"
+        private const val ACTION_REPEAT = "com.spotiduck.app.REPEAT"
+        private const val CUSTOM_LIKE = "com.spotiduck.app.custom.LIKE"
+        private const val CUSTOM_SHUFFLE = "com.spotiduck.app.custom.SHUFFLE"
+        private const val CUSTOM_REPEAT = "com.spotiduck.app.custom.REPEAT"
         const val CHANNEL = "spotiduck-playback"
         const val NOTIFICATION_ID = 1
     }
