@@ -66,6 +66,7 @@ import com.spotiduck.compose.screens.LoginScreen
 import com.spotiduck.compose.screens.PathfinderCaptureScreen
 import com.spotiduck.compose.shell.SpotifyAppShell
 import com.spotiduck.compose.theme.SpotifyEncoreTheme
+import com.spotiduck.compose.util.rememberIsOffline
 import com.spotiduck.backend.core.webview.SilentTokenRefresh
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -319,6 +320,27 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             editableUris = Krespot.playlists.editable(context, "").map { it.uri }.toSet()
+                        }
+
+                        // The loads above only run at cold start and on the
+                        // 60s-away resume refresh; when the network was gone
+                        // while they ran, Home and Library just sat empty
+                        // until the app was killed and reopened. Watch the
+                        // live connectivity the shell's offline banner already
+                        // uses and, the moment it returns, retry whatever came
+                        // back empty instead of everything.
+                        var sawOffline by remember { mutableStateOf(false) }
+                        val offlineNow = rememberIsOffline()
+                        LaunchedEffect(offlineNow) {
+                            if (offlineNow) {
+                                sawOffline = true
+                            } else if (sawOffline) {
+                                sawOffline = false
+                                log.i("network is back, retrying the screens that came back empty")
+                                if (feed.isEmpty()) resumeSignal++
+                                if (libraryItems.isNullOrEmpty()) Krespot.library.invalidate()
+                                if (whatsNew.isEmpty()) whatsNewFetch++
+                            }
                         }
 
                         LaunchedEffect(playlistUri, playlistFetch) {
