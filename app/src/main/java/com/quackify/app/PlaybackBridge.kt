@@ -36,6 +36,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.filter
 import androidx.compose.runtime.snapshotFlow
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.library.Krespot
 import com.quackify.backend.library.TrackSource
 import com.quackify.backend.api.Library
 import android.os.SystemClock
@@ -47,6 +48,9 @@ const val CLIENT_PREFS = "quackify.client"
 
 /** Settings toggle: start playback as soon as the session's track loads. */
 const val AUTOPLAY_ON_STARTUP_PREF = "autoplayOnStartup"
+
+/** Settings toggle: keep playing from a station when the context runs out. */
+const val AUTOPLAY_ON_END_PREF = "autoplayOnEnd"
 
 class PlaybackBridge(private val context: Context) {
 
@@ -2549,11 +2553,37 @@ class PlaybackBridge(private val context: Context) {
                 }
             }
             log.w("advance: end of the context at '${command?.currentTrack?.name ?: ended.takeLast(12)}'")
+            autoplayFrom(ended)
             return
         }
         log.i("advance -> '${target.track.title}' from the cluster row")
         playTrack(target.track.uri, cluster.contextUri, target.index)
     }
+
+    private suspend fun autoplayFrom(ended: String) {
+        if (ended.isBlank() || ended.startsWith(AD_PREFIX)) return
+        if (!autoplayEnabled()) {
+            log.i("autoplay: off, staying quiet at the end of the context")
+            return
+        }
+        val seed = ended.takeIf { it.startsWith("spotify:track:") }
+            ?: chainRows.lastOrNull { it.startsWith("spotify:track:") }
+            ?: return
+        val radio = runCatching { Krespot.artists.artistRadio(context, seed) }.getOrNull()
+        if (radio.isNullOrBlank()) {
+            log.w("autoplay: no station for '${seed.takeLast(12)}', staying quiet")
+            return
+        }
+        log.i("autoplay -> '$radio' from the station seeded by '${seed.takeLast(12)}'")
+        chainRows = emptyList()
+        chainContext = radio
+        resumeRow = -1
+        playTrack(radio, radio, 0)
+    }
+
+    private fun autoplayEnabled(): Boolean =
+        context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+            .getBoolean(AUTOPLAY_ON_END_PREF, true)
 
     private fun serverNext(ended: String): PlaybackCommand? {
         val command = connect.playback ?: return null
