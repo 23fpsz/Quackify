@@ -601,7 +601,24 @@ fun SpotifyAppShell(
     val handleTrackPlay: (TrackItem) -> Unit = { track ->
         if (playerListener != null) {
             if (track.uri.isNotEmpty()) {
-                playerListener.onPlayUri(track.uri)
+                val rows = when (currentScreen) {
+                    ShellScreen.ARTIST -> artistTracks.orEmpty().map { it.track.uri }
+                    ShellScreen.PLAYLIST -> playlistTracks.orEmpty().map { it.uri }
+                    ShellScreen.ALBUM -> albumTracks.orEmpty().map { it.uri }
+                    else -> emptyList()
+                }
+                val context = when (currentScreen) {
+                    ShellScreen.ARTIST -> activeArtistUri
+                    ShellScreen.PLAYLIST -> activePlaylistUri
+                    ShellScreen.ALBUM -> activeAlbumUri
+                    else -> ""
+                }
+                val index = rows.indexOfFirst { it == track.uri }
+                if (context.isNotBlank() && index >= 0) {
+                    playerListener.onPlayTrack(track.uri, context, index)
+                } else {
+                    playerListener.onPlayUri(track.uri)
+                }
             } else {
                 playerListener.onTrackSelect(track.title, track.artist)
             }
