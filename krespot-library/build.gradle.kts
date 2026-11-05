@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.spotiduck.backend.library"
+    namespace = "com.quackify.backend.library"
     compileSdk {
         version = release(37)
     }

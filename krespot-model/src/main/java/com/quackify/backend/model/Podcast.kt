@@ -1,0 +1,73 @@
+package com.quackify.backend.model
+
+data class EpisodeRow(
+    val uri: String,
+    val title: String,
+    val description: String,
+    val releaseDate: String,
+    val durationMs: Long,
+    val imageUrl: String,
+    val colorHex: String,
+    val explicit: Boolean,
+    val playable: Boolean,
+    val video: Boolean,
+    val played: Boolean,
+    val positionMs: Long,
+    val showName: String = "",
+    val showUri: String = "",
+)
+
+data class ShowCard(
+    val uri: String,
+    val name: String,
+    val publisher: String,
+    val imageUrl: String,
+)
+
+data class ShowDetail(
+    val uri: String,
+    val name: String,
+    val publisher: String,
+    val description: String,
+    val imageUrl: String,
+    val colorHex: String,
+    val rating: Double = 0.0,
+    val ratingCount: Int = 0,
+    val saved: Boolean = false,
+    val mediaType: String = "AUDIO",
+    val episodes: List<EpisodeRow> = emptyList(),
+    val total: Int = 0,
+    val offset: Int = 0,
+    val fetched: Int = 0,
+    val nextOffset: Int? = null,
+    val related: List<ShowCard> = emptyList(),
+) {
+    val hasMore: Boolean get() = nextOffset != null
+}
+
+data class EpisodePage(
+    val rows: List<EpisodeRow>,
+    val total: Int,
+    val offset: Int,
+    val fetched: Int,
+    val nextOffset: Int? = null,
+)
+
+data class EpisodeDetail(
+    val uri: String,
+    val title: String,
+    val description: String,
+    val showName: String,
+    val showUri: String,
+    val imageUrl: String,
+    val wideImageUrl: String,
+    val colorHex: String,
+    val durationMs: Long,
+    val releaseDate: String,
+    val explicit: Boolean,
+    val playable: Boolean,
+    val video: Boolean,
+    val played: Boolean,
+    val positionMs: Long,
+    val shareUrl: String,
+)
