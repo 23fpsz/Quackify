@@ -82,7 +82,6 @@ android {
             signingConfig = signingConfigs.getByName("quackify")
             optimization {
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
     }
