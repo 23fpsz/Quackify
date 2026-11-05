@@ -80,8 +80,17 @@ android {
         release {
             manifestPlaceholders["appName"] = "Quackify"
             signingConfig = signingConfigs.getByName("quackify")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             optimization {
                 enable = true
+                keepRules {
+                    ignoreFromAllExternalDependencies = false
+                }
             }
         }
     }
