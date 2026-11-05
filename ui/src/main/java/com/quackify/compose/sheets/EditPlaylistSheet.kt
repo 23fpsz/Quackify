@@ -130,6 +130,7 @@ fun EditPlaylistSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        properties = DarkSystemBarsSheet,
         sheetState = sheetState,
         containerColor = Color(0xFF1F1F1F),
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),

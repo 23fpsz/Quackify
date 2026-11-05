@@ -52,6 +52,7 @@ fun PlaylistSortSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        properties = DarkSystemBarsSheet,
         sheetState = sheetState,
         containerColor = EncoreColors.Card,
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),

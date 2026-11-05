@@ -59,6 +59,7 @@ fun AlbumOptionsSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        properties = DarkSystemBarsSheet,
         sheetState = sheetState,
         containerColor = Color(0xFF242424),
         dragHandle = {
