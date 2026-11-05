@@ -37,7 +37,7 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyTheme
 import com.quackify.compose.util.rememberIsOffline
 
-private const val NAV_BAR_ALPHA = 0.92f
+private const val NAV_BAR_ALPHA = 0.72f
 private val NAV_GAP = 8.dp
 
 @Composable
