@@ -65,6 +65,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.backend.core.log.DeviceInfo
+import com.quackify.compose.sheets.DarkSystemBarsSheet
 import com.quackify.backend.core.log.Logs
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
@@ -463,6 +464,7 @@ private fun LogDetailSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        properties = DarkSystemBarsSheet,
         sheetState = sheetState,
         containerColor = Color(0xFF101010),
         dragHandle = null
@@ -591,6 +593,7 @@ private fun DeviceInfoSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        properties = DarkSystemBarsSheet,
         sheetState = sheetState,
         containerColor = Color(0xFF101010),
         dragHandle = null

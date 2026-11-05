@@ -89,6 +89,7 @@ fun SpotifyConnectDeviceSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
+        properties = DarkSystemBarsSheet,
         sheetState = sheetState,
         containerColor = EncoreColors.Card,
         contentColor = EncoreColors.TextPrimary,

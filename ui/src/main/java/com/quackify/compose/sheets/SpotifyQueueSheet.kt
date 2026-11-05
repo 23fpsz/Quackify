@@ -73,6 +73,7 @@ fun SpotifyQueueSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
+        properties = DarkSystemBarsSheet,
         sheetState = sheetState,
         containerColor = EncoreColors.Background,
         contentColor = EncoreColors.TextPrimary,

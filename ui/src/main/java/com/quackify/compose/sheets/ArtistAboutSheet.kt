@@ -64,6 +64,7 @@ fun ArtistAboutSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        properties = DarkSystemBarsSheet,
         sheetState = sheetState,
         containerColor = EncoreColors.Card,
         dragHandle = {
