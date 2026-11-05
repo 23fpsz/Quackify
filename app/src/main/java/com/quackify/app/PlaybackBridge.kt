@@ -1995,7 +1995,10 @@ class PlaybackBridge(private val context: Context) {
         val server = cluster != null
         val live = connect.playback?.currentTrack?.contextUri.orEmpty()
         val serverRows = if (server) cluster!!.fromContext.map(::row) else emptyList()
-        val context = live.ifBlank { if (server) cluster!!.contextUri else "" }
+        val context = live.ifBlank {
+            if (server) cluster!!.contextUri else ""
+        }.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
+            ?: chainContext.ifBlank { if (server) cluster!!.contextUri else "" }
         val radio = server && cluster!!.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
         val label = if (server && !radio) cluster!!.contextDescription else ""
         val queued = if (server) {
@@ -2026,8 +2029,11 @@ class PlaybackBridge(private val context: Context) {
             .filterNot { decorated.containsKey(it) || it in undecoratable }
             .distinct()
         if (missing.isNotEmpty()) scheduleDecorate(missing)
+        val chainRowsFilled = chainTail.map { uri ->
+            decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri)
+        }
         val upcoming = (serverRows.map { if (it.title.isBlank()) decorated[it.uri] ?: it else it } +
-                chainTail.mapNotNull { decorated[it] })
+                chainRowsFilled)
             .filterNot { it.uri == anchor }
         if (queued == state.queue && upcoming == state.queueFromContext &&
             context == state.queueContext && label == state.queueContextLabel
@@ -2390,10 +2396,18 @@ class PlaybackBridge(private val context: Context) {
 
     private fun chainFor(): List<String> {
         if (chainContext.isBlank()) return emptyList()
-        val playing = connect.cluster.value?.contextUri.orEmpty()
+        val cluster = connect.cluster.value
+        val playing = cluster?.contextUri.orEmpty()
         if (playing.isNotBlank() && playing != chainContext) {
-            log.w("chain '$chainContext' is not the playing context '$playing', following the server")
-            return emptyList()
+            val single = playing.startsWith("spotify:track:") ||
+                playing.startsWith("spotify:episode:")
+            val barren = cluster == null || cluster.nextTracks.isEmpty()
+            if (!single && !barren) {
+                log.w("chain '$chainContext' is not the playing context '$playing', following the server")
+                return emptyList()
+            }
+            log.i("chain '$chainContext' kept, the server still names " +
+                    "'${playing.takeLast(12)}' with ${cluster?.nextTracks?.size ?: 0} next row(s)")
         }
         return chainRows
     }
