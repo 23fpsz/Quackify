@@ -73,7 +73,7 @@ data class RecommendationCard(
 )
 
 private const val TINT_WEIGHT = 0.55f
-private const val HEADER_TINT_ALPHA = 0.92f
+private const val HEADER_HOLD = 0.16f
 private const val SURFACE_RED = 0x12 / 255f
 private const val SURFACE_GREEN = 0x12 / 255f
 private const val SURFACE_BLUE = 0x12 / 255f
@@ -144,22 +144,15 @@ fun SpotifyHomeScreen(
         }
     }
 
-    // Top Backdrop Tint Brush
+    // One gradient behind everything, held flat for the height of the sticky
+    // header before it starts fading. The header itself paints the same flat
+    // tint, so its bottom edge lands on a colour that has not moved yet and
+    // the two never meet on a seam.
     val heroBackdropBrush = Brush.verticalGradient(
-        colors = listOf(
-            heroTint,
-            EncoreColors.Background,
-            EncoreColors.Background
-        )
-    )
-
-    // The sticky header rides the same gradient so it never cuts the tint off
-    // with a flat slab of background while the feed scrolls underneath.
-    val headerBackdropBrush = Brush.verticalGradient(
-        colors = listOf(
-            heroTint.copy(alpha = HEADER_TINT_ALPHA),
-            EncoreColors.Background.copy(alpha = HEADER_TINT_ALPHA),
-        )
+        0f to heroTint,
+        HEADER_HOLD to heroTint,
+        0.55f to EncoreColors.Background,
+        1f to EncoreColors.Background
     )
 
     Box(
@@ -176,7 +169,7 @@ fun SpotifyHomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(headerBackdropBrush)
+                    .background(heroTint)
                     .statusBarsPadding()
                     .padding(vertical = 8.dp)
             ) {
@@ -239,7 +232,9 @@ fun SpotifyHomeScreen(
                             }
                         }
 
-                        // Start edge fade gradient matching @drawable/filter_row_start_gradient (12dp width)
+                        // Start edge fade: the chips dissolve into the header
+                        // tint they sit on, not into the page background, so
+                        // no dark band shows up ahead of the first chip.
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
@@ -248,7 +243,7 @@ fun SpotifyHomeScreen(
                                 .background(
                                     Brush.horizontalGradient(
                                         colors = listOf(
-                                            EncoreColors.Background,
+                                            heroTint,
                                             Color.Transparent
                                         )
                                     )
