@@ -3,7 +3,7 @@ agp = "9.4.1"
 coreKtx = "1.19.1"
 lifecycleRuntimeKtx = "2.11.0"
 activityCompose = "1.13.0"
-kotlin = "2.3.21"
+kotlin = "2.2.10"
 composeBom = "2026.09.00"
 material3 = "1.5.0-beta02"
 navigationCompose = "2.10.2"
@@ -19,7 +19,6 @@ securityCrypto = "1.1.0"
 webkit = "1.18.0"
 okhttp = "4.12.0"
 androidxMedia = "1.7.0"
-haze = "1.7.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -48,7 +47,6 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 androidx-media = { group = "androidx.media", name = "media", version.ref = "androidxMedia" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
-haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

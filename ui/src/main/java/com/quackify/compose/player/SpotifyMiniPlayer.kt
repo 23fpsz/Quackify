@@ -55,7 +55,7 @@ import com.quackify.compose.theme.SpotifyTheme
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
-private const val MINI_PLAYER_ALPHA = 0.78f
+private const val MINI_PLAYER_ALPHA = 0.88f
 
 /**
  * Floating Mini Player Bar matching Spotify Mobile's `now_playing_bar.xml` specifications.
