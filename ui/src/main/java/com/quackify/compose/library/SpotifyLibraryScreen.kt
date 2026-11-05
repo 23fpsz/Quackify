@@ -278,27 +278,6 @@ fun SpotifyLibraryScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (selectedFilter != null) {
-                    item {
-                        // library_clear_chips_circle_size = 32dp, library_clear_chips_icon_size = 16dp
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(EncoreColors.CardElevated)
-                                .clickable { selectedFilter = null },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.encore_icon_x_24),
-                                contentDescription = "Clear filter",
-                                tint = EncoreColors.TextPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-
                 items(filters) { filter ->
                     val isSelected = selectedFilter == filter
                     EncoreChip(

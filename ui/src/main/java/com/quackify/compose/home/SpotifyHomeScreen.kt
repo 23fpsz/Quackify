@@ -200,27 +200,6 @@ fun SpotifyHomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // If a category filter is active, show dismiss "X" chip to quickly reset to "All"
-                            if (selectedFilterIndex != 0) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(EncoreColors.CardElevated)
-                                            .clickable { selectedFilterIndex = 0 },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.encore_icon_x_24),
-                                            contentDescription = "Clear filter",
-                                            tint = EncoreColors.TextPrimary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-
                             items(filters.size) { index ->
                                 EncoreChip(
                                     text = filters[index],

@@ -715,7 +715,7 @@ fun EncoreProfileAvatar(
     modifier: Modifier = Modifier,
     avatarUrl: String? = null,
     size: Dp = 36.dp,
-    backgroundColor: Color = Color(0xFFE91429)
+    backgroundColor: Color = EncoreColors.CardElevated
 ) {
     Box(
         modifier = modifier
