@@ -127,6 +127,9 @@ private const val REVEAL_CONTROLS_DELAY_MS = 160
 private const val REVEAL_REST_DELAY_MS = 220
 private const val REVEAL_RISE_FRACTION = 0.06f
 
+/** The artwork starts small and grows upward, the way the bar hands it over. */
+private const val REVEAL_ARTWORK_SCALE_FROM = 0.42f
+
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
 /** Spotify's dark ink, for lyrics that sit on light artwork. */
@@ -147,12 +150,21 @@ private fun lyricsInk(background: Color): Color =
  * the whole reveal reads as a single motion rather than four animations.
  */
 @Composable
-private fun Modifier.revealAt(progress: Float, delayFraction: Float): Modifier {
+private fun Modifier.revealAt(
+    progress: Float,
+    delayFraction: Float,
+    scaleFrom: Float = 1f
+): Modifier {
     val local = ((progress - delayFraction) / (1f - delayFraction)).coerceIn(0f, 1f)
     return this
         .graphicsLayer {
             alpha = local
             translationY = (1f - local) * size.height * REVEAL_RISE_FRACTION
+            if (scaleFrom < 1f) {
+                val scale = scaleFrom + (1f - scaleFrom) * local
+                scaleX = scale
+                scaleY = scale
+            }
         }
 }
 
@@ -523,7 +535,11 @@ fun SpotifyNowPlayingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp)
-                            .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
+                            .revealAt(
+                                reveal,
+                                REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat(),
+                                scaleFrom = REVEAL_ARTWORK_SCALE_FROM
+                            )
                     ) {
                         NowPlayingArtworkCard(
                             title = title,
