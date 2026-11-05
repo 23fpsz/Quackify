@@ -1804,7 +1804,23 @@ class PlaybackBridge(private val context: Context) {
         if (!following && player.hasSource) return
         val local = player.hasSource && !following
         val intent = remoteIntent()
-        val position = if (local) state.positionMs else cluster.positionNow()
+        // A followed cluster that says it is playing is only worth trusting
+        // while the session behind it is alive; the seed frame a fresh launch
+        // reads is the previous session's last snapshot and its clock has been
+        // extrapolated ever since, so the bar would crawl with no audio behind
+        // it. Nothing of ours has a source yet, so the play state is the
+        // cluster's and only the server can confirm it moved.
+        val followPlaying = if (nothingActive) {
+            cluster.isPlaying && cluster.stateAtMs > 0L &&
+                System.currentTimeMillis() - cluster.stateAtMs <= LIVE_STATE_MS
+        } else {
+            cluster.isPlaying
+        }
+        val position = when {
+            local -> state.positionMs
+            followPlaying -> cluster.positionNow()
+            else -> cluster.positionMs
+        }
         val duration = cluster.durationMs.takeIf { it > 0L } ?: cluster.track.durationMs
         // A remote device often echoes the playing track with a thinner
         // metadata block (artist_name is the first field to disappear), which
@@ -1819,7 +1835,7 @@ class PlaybackBridge(private val context: Context) {
             artistUri = cluster.track.artistUri
                 .ifBlank { if (sameTrack) state.artistUri else "" }
                 .ifBlank { artistUriOf(cluster.track.uri) },
-            isPlaying = if (local) player.isPlaying else (intent ?: cluster.isPlaying),
+            isPlaying = if (local) player.isPlaying else (intent ?: followPlaying),
             positionMs = position,
             durationMs = duration,
             progress = progressOf(position, duration),
@@ -2669,6 +2685,7 @@ class PlaybackBridge(private val context: Context) {
         const val RESTART_MS = 3000L
         const val PENDING_MS = 10_000L
         const val ADVANCE_WAIT_MS = 900L
+        const val LIVE_STATE_MS = 30_000L
         const val MODE_SETTLE_MS = 1200L
         const val MODE_OVERRIDE_MS = 8000L
         const val REMOTE_INTENT_MS = 10_000L
