@@ -55,6 +55,8 @@ import com.quackify.compose.theme.SpotifyTheme
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
+private const val MINI_PLAYER_ALPHA = 0.78f
+
 /**
  * Floating Mini Player Bar matching Spotify Mobile's `now_playing_bar.xml` specifications.
  * Supports swiping the track title/artist (CarouselView) to skip tracks with real-time translation and spring physics.
@@ -95,7 +97,7 @@ fun SpotifyMiniPlayer(
             .padding(bottom = EncoreControlSizes.FloatingPlayerMargin)
             .shadow(elevation = 8.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
             .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
-            .background(EncoreColors.Card)
+            .background(EncoreColors.Card.copy(alpha = MINI_PLAYER_ALPHA))
             .clickable(onClick = onBarClick)
     ) {
         Column(

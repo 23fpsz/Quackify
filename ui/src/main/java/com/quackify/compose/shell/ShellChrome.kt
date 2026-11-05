@@ -36,9 +36,16 @@ import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyTheme
 import com.quackify.compose.util.rememberIsOffline
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+
+private const val CHROME_SCRIM_ALPHA = 0.72f
+private val BLUR_RADIUS = 24.dp
 
 @Composable
 internal fun ShellBottomBar(
+    hazeState: HazeState,
     title: String,
     artist: String,
     isPlaying: Boolean,
@@ -63,15 +70,10 @@ internal fun ShellBottomBar(
         modifier = modifier
             .fillMaxWidth()
             .clickable(enabled = false) {}
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color(0xD9000000),
-                        EncoreColors.PureBlack
-                    )
-                )
-            )
+            .hazeEffect(state = hazeState) {
+                blurRadius = BLUR_RADIUS
+                backgroundColor = EncoreColors.PureBlack.copy(alpha = CHROME_SCRIM_ALPHA)
+            }
     ) {
         // Offline banner (like the Spotify app's "You're offline" bar): appears
         // above the mini player whenever the device loses its validated network.
@@ -129,7 +131,6 @@ internal fun ShellBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(EncoreColors.PureBlack)
                 .navigationBarsPadding()
                 .height(56.dp),
             verticalAlignment = Alignment.CenterVertically
