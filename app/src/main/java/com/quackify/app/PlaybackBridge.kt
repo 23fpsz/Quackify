@@ -1796,8 +1796,8 @@ class PlaybackBridge(private val context: Context) {
         // it instead of freezing on a stale play state. Once the engine owns
         // the stream the phone IS the player, so a stale read must not drag
         // the UI back to the dead session.
-        val nothingActive = cluster.activeDeviceId.isBlank() && cluster.devices.isNotEmpty() &&
-                cluster.activeDevice == null && !player.hasSource
+        val nothingActive = cluster.activeDeviceId.isBlank() && cluster.activeDevice == null &&
+                !player.hasSource
         val following = remoteActive || nothingActive
         if (connect.playback != null && !following) return
         if (remoteActive) hydrateCurrent(cluster)
@@ -1805,14 +1805,17 @@ class PlaybackBridge(private val context: Context) {
         val local = player.hasSource && !following
         val intent = remoteIntent()
         // A followed cluster that says it is playing is only worth trusting
-        // while the session behind it is alive; the seed frame a fresh launch
-        // reads is the previous session's last snapshot and its clock has been
-        // extrapolated ever since, so the bar would crawl with no audio behind
-        // it. Nothing of ours has a source yet, so the play state is the
-        // cluster's and only the server can confirm it moved.
-        val followPlaying = if (nothingActive) {
-            cluster.isPlaying && cluster.stateAtMs > 0L &&
+        // while the session behind it is alive. The frame a fresh launch reads
+        // is the previous session's last snapshot, and once this phone
+        // registers the same stale state comes back with us named active, so
+        // the clock would be extrapolated from a twelve minute old timestamp
+        // and the bar would crawl with no audio behind it. The engine is the
+        // only thing that can say "playing" for this device, so a cluster
+        // without a live snapshot never does.
+        val fresh = cluster.stateAtMs > 0L &&
                 System.currentTimeMillis() - cluster.stateAtMs <= LIVE_STATE_MS
+        val followPlaying = if (nothingActive || !player.hasSource) {
+            cluster.isPlaying && fresh
         } else {
             cluster.isPlaying
         }
