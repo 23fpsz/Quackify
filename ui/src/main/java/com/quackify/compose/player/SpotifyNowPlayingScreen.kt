@@ -15,9 +15,12 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,6 +73,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
@@ -106,6 +110,14 @@ import com.quackify.compose.util.rememberDominantColor
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
 private const val DRAG_AXIS_SLOP_PX = 8f
+private const val SKIP_THRESHOLD_PX = 160f
+private const val SKIP_TRAVEL_PX = 800f
+private const val SNAP_BACK_FLING_VELOCITY = -100f
+private const val DISMISS_FLING_VELOCITY = 1000f
+private const val AXIS_UNDECIDED = 0
+private const val AXIS_HORIZONTAL = 1
+private const val AXIS_VERTICAL = 2
+private const val AXIS_YIELD = 3
 
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
@@ -267,6 +279,8 @@ fun SpotifyNowPlayingScreen(
         coroutineScope = coroutineScope,
         playerOffsetY = playerOffsetY,
         artworkOffsetX = artworkOffsetX,
+        scrollState = scrollState,
+        scrollEnabled = !effectiveIsLoading,
         dismissThresholdPx = dismissThresholdPx,
         onSkipNext = onSkipNextClick,
         onSkipPrevious = onSkipPreviousClick,
@@ -661,118 +675,122 @@ private fun Modifier.npvDismissDragGesture(
  * Artwork gestures: horizontal drags perform the swipe-to-skip track
  * animation while vertical drags translate the whole player for
  * drag-to-dismiss.
+ *
+ * The axis is resolved manually, before any event is consumed. Vertical drags
+ * are only claimed once the page can no longer scroll in that direction, so
+ * dragging over the artwork scrolls the page like any other part of it and
+ * only turns into a dismissal once the top is reached.
  */
 private fun Modifier.npvArtworkGesture(
     coroutineScope: CoroutineScope,
     playerOffsetY: Animatable<Float, AnimationVector1D>,
     artworkOffsetX: Animatable<Float, AnimationVector1D>,
+    scrollState: ScrollState,
+    scrollEnabled: Boolean,
     dismissThresholdPx: Float,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
     onDismiss: () -> Unit,
     onSnapBack: () -> Unit
-): Modifier = pointerInput(dismissThresholdPx) {
-    var isHorizontalGesture: Boolean? = null
+): Modifier = pointerInput(dismissThresholdPx, scrollEnabled) {
+    var axis = AXIS_UNDECIDED
     var totalDragX = 0f
     var totalDragY = 0f
     val velocityTracker = VelocityTracker()
-    detectDragGestures(
-        onDragStart = {
-            isHorizontalGesture = null
-            totalDragX = 0f
-            totalDragY = 0f
-            velocityTracker.resetTracking()
-        },
-        onDragEnd = {
-            val velocity = velocityTracker.calculateVelocity()
-            coroutineScope.launch {
-                if (isHorizontalGesture == true) {
-                    val offset = artworkOffsetX.value
-                    val threshold = 160f
-                    if (offset < -threshold) {
-                        artworkOffsetX.animateTo(
-                            -800f,
-                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                        onSkipNext()
-                        artworkOffsetX.snapTo(800f)
-                        artworkOffsetX.animateTo(
-                            0f,
-                            tween(200, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                    } else if (offset > threshold) {
-                        artworkOffsetX.animateTo(
-                            800f,
-                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                        onSkipPrevious()
-                        artworkOffsetX.snapTo(-800f)
-                        artworkOffsetX.animateTo(
-                            0f,
-                            tween(200, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                    } else {
-                        artworkOffsetX.animateTo(
-                            0f,
-                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                    }
-                } else if (isHorizontalGesture == false || playerOffsetY.value > 0f) {
-                    if (velocity.y < -100f) {
-                        // Swiped UPWARD: no matter the offset, NPV always stays!
-                        onSnapBack()
-                    } else if (velocity.y > 1000f) {
-                        // Flung DOWNWARD: dismiss!
-                        onDismiss()
-                    } else if (playerOffsetY.value > dismissThresholdPx) {
-                        // Released past halfway point without upward swipe: dismiss!
-                        onDismiss()
-                    } else {
-                        // Released in upper half: stay!
-                        onSnapBack()
-                    }
-                }
-                isHorizontalGesture = null
-            }
-        },
-        onDragCancel = {
-            coroutineScope.launch {
-                artworkOffsetX.animateTo(
-                    0f,
-                    tween(150, easing = EncoreAnimation.DecelerateInterpolator)
-                )
-                onSnapBack()
-                isHorizontalGesture = null
-            }
-        },
-        onDrag = { change, dragAmount ->
-            velocityTracker.addPosition(change.uptimeMillis, change.position)
-            totalDragX += dragAmount.x
-            totalDragY += dragAmount.y
-            if (isHorizontalGesture == null) {
+
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        axis = AXIS_UNDECIDED
+        totalDragX = 0f
+        totalDragY = 0f
+        velocityTracker.resetTracking()
+        velocityTracker.addPosition(down.uptimeMillis, down.position)
+
+        while (true) {
+            val event = awaitPointerEvent()
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            if (!change.pressed) break
+
+            val delta = change.positionChange()
+            totalDragX += delta.x
+            totalDragY += delta.y
+
+            if (axis == AXIS_UNDECIDED) {
                 val absX = totalDragX.absoluteValue
                 val absY = totalDragY.absoluteValue
                 if (absX > DRAG_AXIS_SLOP_PX && absX > absY) {
-                    isHorizontalGesture = true
+                    axis = AXIS_HORIZONTAL
                 } else if (absY > DRAG_AXIS_SLOP_PX) {
-                    isHorizontalGesture = false
+                    val pageAtTop = !scrollEnabled || scrollState.value <= 0
+                    axis = if (totalDragY > 0f && pageAtTop) AXIS_VERTICAL else AXIS_YIELD
                 }
             }
-            if (isHorizontalGesture == true) {
-                change.consume()
-                coroutineScope.launch {
-                    artworkOffsetX.snapTo(artworkOffsetX.value + dragAmount.x)
-                }
-            } else if (isHorizontalGesture == false) {
-                if (dragAmount.y > 0 || playerOffsetY.value > 0) {
+
+            when (axis) {
+                AXIS_HORIZONTAL -> {
                     change.consume()
+                    velocityTracker.addPosition(change.uptimeMillis, change.position)
                     coroutineScope.launch {
-                        playerOffsetY.snapTo((playerOffsetY.value + dragAmount.y).coerceAtLeast(0f))
+                        artworkOffsetX.snapTo(artworkOffsetX.value + delta.x)
+                    }
+                }
+                AXIS_VERTICAL -> {
+                    change.consume()
+                    velocityTracker.addPosition(change.uptimeMillis, change.position)
+                    coroutineScope.launch {
+                        playerOffsetY.snapTo((playerOffsetY.value + delta.y).coerceAtLeast(0f))
+                    }
+                }
+                AXIS_YIELD -> Unit
+            }
+        }
+
+        val velocity = velocityTracker.calculateVelocity()
+        coroutineScope.launch {
+            when (axis) {
+                AXIS_HORIZONTAL -> {
+                    val offset = artworkOffsetX.value
+                    if (offset < -SKIP_THRESHOLD_PX) {
+                        artworkOffsetX.animateTo(
+                            -SKIP_TRAVEL_PX,
+                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
+                        )
+                        onSkipNext()
+                        artworkOffsetX.snapTo(SKIP_TRAVEL_PX)
+                        artworkOffsetX.animateTo(
+                            0f,
+                            tween(200, easing = EncoreAnimation.DecelerateInterpolator)
+                        )
+                    } else if (offset > SKIP_THRESHOLD_PX) {
+                        artworkOffsetX.animateTo(
+                            SKIP_TRAVEL_PX,
+                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
+                        )
+                        onSkipPrevious()
+                        artworkOffsetX.snapTo(-SKIP_TRAVEL_PX)
+                        artworkOffsetX.animateTo(
+                            0f,
+                            tween(200, easing = EncoreAnimation.DecelerateInterpolator)
+                        )
+                    } else {
+                        artworkOffsetX.animateTo(
+                            0f,
+                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
+                        )
+                    }
+                }
+                AXIS_VERTICAL -> {
+                    when {
+                        velocity.y < SNAP_BACK_FLING_VELOCITY -> onSnapBack()
+                        velocity.y > DISMISS_FLING_VELOCITY -> onDismiss()
+                        playerOffsetY.value > dismissThresholdPx -> onDismiss()
+                        else -> onSnapBack()
                     }
                 }
             }
+            axis = AXIS_UNDECIDED
         }
-    )
+    }
 }
 
 /**
