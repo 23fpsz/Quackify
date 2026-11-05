@@ -2,7 +2,7 @@ package com.quackify.compose.shell
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -11,6 +11,9 @@ import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.player.SpotifyNowPlayingScreen
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.theme.EncoreAnimation
+
+/** The screen itself only fades: the artwork carries the movement. */
+private const val NowPlayingRevealFadeMs = 160
 
 @Composable
 internal fun ShellNowPlaying(
@@ -55,12 +58,8 @@ internal fun ShellNowPlaying(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(
-            initialOffsetY = { fullHeight -> fullHeight },
-            animationSpec = tween(
-                durationMillis = EncoreAnimation.NowPlayingEnterDuration,
-                easing = EncoreAnimation.DecelerateInterpolator
-            )
+        enter = fadeIn(
+            animationSpec = tween(durationMillis = NowPlayingRevealFadeMs)
         ),
         exit = slideOutVertically(
             targetOffsetY = { fullHeight -> fullHeight },
