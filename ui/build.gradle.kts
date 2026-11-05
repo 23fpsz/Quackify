@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.spotiduck.compose"
+    namespace = "com.quackify.compose"
     compileSdk {
         version = release(37)
     }
