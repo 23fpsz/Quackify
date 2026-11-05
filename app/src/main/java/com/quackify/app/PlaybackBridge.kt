@@ -369,15 +369,33 @@ class PlaybackBridge(private val context: Context) {
                     log.w("queue set ignored, no cluster yet")
                     return@launch
                 }
-                val known = (cluster.queued + cluster.fromContext).associateBy { it.uri }
-                val tracks = uris.mapNotNull { known[it] }
+                val known = (cluster.queued + cluster.fromContext)
+                    .associateBy { it.uri }
+                val local = queuedTail.associateBy { it.uri }
+                val tracks = uris.mapNotNull { uri ->
+                    known[uri] ?: local[uri]?.let { row ->
+                        ClusterTrack(
+                            uri = uri,
+                            uid = "",
+                            title = row.title,
+                            artistName = row.artist,
+                            artistUri = row.artistUri,
+                            imageUrl = row.imageUrl.orEmpty(),
+                            albumTitle = "",
+                            albumUri = row.albumUri,
+                            durationMs = row.durationMs,
+                            explicit = row.isExplicit,
+                            creativeId = "",
+                            provider = "queue",
+                        )
+                    }
+                }
                 if (tracks.size != uris.size) {
-                    log.w("queue set: ${uris.size - tracks.size} of ${uris.size} rows are outside the window")
+                    log.w("queue set: ${uris.size - tracks.size} of ${uris.size} rows have no metadata")
                 }
                 val ok = connect.setQueue(tracks)
                 log.i("queue = ${tracks.size} rows ok=$ok")
                 if (!ok) return@launch
-                val local = queuedTail.associateBy { it.uri }
                 queuedTail = uris.map { local[it] ?: TrackItem(title = "", artist = "", uri = it) }
                 publishQueue(cluster)
                 connect.refreshCluster()
