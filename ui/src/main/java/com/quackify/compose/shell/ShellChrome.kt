@@ -60,6 +60,7 @@ internal fun ShellBottomBar(
     onSkipPrevious: () -> Unit,
     hasTrack: Boolean = true,
     modifier: Modifier = Modifier,
+    onExpandClick: () -> Unit = onBarClick,
 ) {
     val isOffline = rememberIsOffline()
     Column(
@@ -115,6 +116,7 @@ internal fun ShellBottomBar(
             onLikeClick = onLike,
             onDeviceClick = onDeviceClick,
             onBarClick = onBarClick,
+            onExpandClick = onExpandClick,
             onSkipNextClick = onSkipNext,
             onSkipPreviousClick = onSkipPrevious,
             hasTrack = hasTrack
