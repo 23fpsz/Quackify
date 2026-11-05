@@ -23,7 +23,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SpotiDuck-Compose"
+rootProject.name = "Quackify"
 include(":ui")
 include(":app")
 include(":krespot-model")
