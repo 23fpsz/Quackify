@@ -1,0 +1,8 @@
+-allowaccessmodification
+-repackageclasses ''
+-adaptclassstrings
+-overloadaggressively
+-dontusemixedcaseclassnames
+-renamesourcefileattribute Q
+-keepattributes SourceFile,LineNumberTable
+-classobfuscationdictionary dict.txt
