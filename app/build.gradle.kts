@@ -67,7 +67,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            manifestPlaceholders["appName"] = "SpotiDuck β"
+        }
         release {
+            manifestPlaceholders["appName"] = "SpotiDuck"
             val releaseSigning = signingConfigs.getByName("release")
             if (releaseSigning.storeFile != null) {
                 signingConfig = releaseSigning
@@ -87,8 +92,16 @@ android {
     }
 }
 
+val islandFlavors = mapOf(
+    "spotify" to "com.spotify.music",
+    "apple" to "com.apple.android.music"
+)
+
 androidComponents {
     onVariants { variant ->
+        islandFlavors[variant.flavorName]?.let { id ->
+            variant.applicationId.set(id)
+        }
         variant.outputs.forEach { output ->
             if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
                 val appName = "SpotiDuck"
