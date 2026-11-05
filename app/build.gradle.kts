@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -7,6 +10,12 @@ android {
     namespace = "com.spotiduck.app"
     compileSdk {
         version = release(37)
+    }
+
+    val keystoreProperties = Properties()
+    val keystorePropertiesFile = rootProject.file("local.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     }
 
     defaultConfig {
@@ -21,8 +30,48 @@ android {
         }
     }
 
+    flavorDimensions += "islandId"
+    productFlavors {
+        create("standard") {
+            dimension = "islandId"
+            applicationId = "com.spotiduck.app"
+        }
+        create("spotify") {
+            dimension = "islandId"
+            applicationId = "com.spotify.music"
+        }
+        create("apple") {
+            dimension = "islandId"
+            applicationId = "com.apple.android.music"
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            val envStoreFile = System.getenv("RELEASE_STORE_FILE")
+            if (envStoreFile != null && file(envStoreFile).exists()) {
+                storeFile = file(envStoreFile)
+                storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            } else {
+                val path = keystoreProperties["signing.storeFile"] as String?
+                if (path != null && file(path).exists()) {
+                    storeFile = file(path)
+                    storePassword = keystoreProperties["signing.storePassword"] as String?
+                    keyAlias = keystoreProperties["signing.keyAlias"] as String?
+                    keyPassword = keystoreProperties["signing.keyPassword"] as String?
+                }
+            }
+        }
+    }
+
     buildTypes {
         release {
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile != null) {
+                signingConfig = releaseSigning
+            }
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
@@ -35,6 +84,20 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
+                val appName = "SpotiDuck"
+                val versionName = android.defaultConfig.versionName ?: "1.0.0"
+                val flavor = variant.flavorName ?: "standard"
+                val type = variant.buildType ?: "debug"
+                output.outputFileName.set("$appName-v$versionName-$flavor-$type.apk")
+            }
+        }
     }
 }
 
