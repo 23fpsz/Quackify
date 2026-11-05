@@ -47,8 +47,5 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
 
-    // Real backdrop blur behind the floating chrome (bottom bar, mini player)
-    implementation(libs.haze)
-
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
