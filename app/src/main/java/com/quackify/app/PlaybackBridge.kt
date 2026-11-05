@@ -242,13 +242,14 @@ class PlaybackBridge(private val context: Context) {
         }
 
         override fun onPlayUri(uri: String) {
-            captureChain("")
+            val context = screenContext(uri)
+            captureChain(context)
             scope.launch {
                 val first = connect.cluster.value
                     ?.takeIf { it.contextUri == uri }
                     ?.window()
                     ?.firstOrNull { it.isVisible }
-                if (first != null) playTrack(first.uri, uri, 0) else playTrack(uri, "", -1)
+                if (first != null) playTrack(first.uri, uri, 0) else playTrack(uri, context, -1)
             }
         }
 
@@ -2077,6 +2078,15 @@ class PlaybackBridge(private val context: Context) {
             log.i("decorated ${rows.size} of ${uris.size} upcoming row(s)")
             publishQueue(connect.cluster.value)
         }
+    }
+
+    private fun screenContext(uri: String): String {
+        val known = connect.playback?.currentTrack?.contextUri.orEmpty()
+        if (known.isNotBlank() && !known.startsWith("spotify:track:")) return known
+        if (screen.size >= 2 && screen.any { it == uri }) {
+            return chainContext.takeIf { it.isNotBlank() && it != uri }.orEmpty()
+        }
+        return ""
     }
 
     private fun captureChain(contextUri: String) {
