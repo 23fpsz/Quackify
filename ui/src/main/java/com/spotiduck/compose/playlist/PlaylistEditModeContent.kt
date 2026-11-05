@@ -78,8 +78,17 @@ fun PlaylistEditModeContent(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val editedTracks = remember {
-        mutableStateListOf<TrackItem>().apply { addAll(initialTracks) }
+    val initialItems = remember(initialTracks) {
+        initialTracks.mapIndexed { index, track ->
+            EditableTrackItem(
+                id = "${track.uri.ifEmpty { track.title }}_${track.trackNumber}_$index",
+                track = track
+            )
+        }
+    }
+
+    val editedTracks = remember(initialItems) {
+        mutableStateListOf<EditableTrackItem>().apply { addAll(initialItems) }
     }
 
     // Undo / Redo stacks
@@ -97,7 +106,7 @@ fun PlaylistEditModeContent(
     val hasChanges by remember {
         derivedStateOf {
             editedTracks.size != initialTracks.size ||
-            editedTracks.map { it.title to it.artist } != initialTracks.map { it.title to it.artist }
+            editedTracks.map { it.track } != initialTracks
         }
     }
 
@@ -107,20 +116,27 @@ fun PlaylistEditModeContent(
     val haptic = LocalHapticFeedback.current
     val listState = rememberLazyListState()
 
+    var dragStartSnapshot by remember { mutableStateOf<List<EditableTrackItem>>(emptyList()) }
+
     val reorderState = rememberReorderableLazyListState(
         listState = listState,
         onMove = { fromIndex, toIndex ->
             if (fromIndex in editedTracks.indices && toIndex in editedTracks.indices) {
+                if (dragStartSnapshot.isEmpty()) {
+                    dragStartSnapshot = editedTracks.toList()
+                }
                 val item = editedTracks.removeAt(fromIndex)
                 editedTracks.add(toIndex, item)
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             }
         },
         onDragEnd = {
-            // Commit move action to undo stack if list order changed
-            if (editedTracks.map { it.title to it.artist } != initialTracks.map { it.title to it.artist }) {
-                undoStack.add(PlaylistEditAction.BulkOrder(initialTracks, editedTracks.toList()))
-                redoStack.clear()
+            if (dragStartSnapshot.isNotEmpty()) {
+                if (editedTracks.toList() != dragStartSnapshot) {
+                    undoStack.add(PlaylistEditAction.BulkOrder(dragStartSnapshot, editedTracks.toList()))
+                    redoStack.clear()
+                }
+                dragStartSnapshot = emptyList()
             }
         }
     )
@@ -145,7 +161,7 @@ fun PlaylistEditModeContent(
         when (lastAction) {
             is PlaylistEditAction.Remove -> {
                 val insertIndex = lastAction.index.coerceIn(0, editedTracks.size)
-                editedTracks.add(insertIndex, lastAction.track)
+                editedTracks.add(insertIndex, lastAction.item)
                 redoStack.add(lastAction)
             }
             is PlaylistEditAction.Move -> {
@@ -166,7 +182,7 @@ fun PlaylistEditModeContent(
         val nextAction = redoStack.removeAt(redoStack.lastIndex)
         when (nextAction) {
             is PlaylistEditAction.Remove -> {
-                val targetIndex = editedTracks.indexOfFirst { it.title == nextAction.track.title && it.artist == nextAction.track.artist }
+                val targetIndex = editedTracks.indexOfFirst { it.id == nextAction.item.id }
                 if (targetIndex >= 0) {
                     val removed = editedTracks.removeAt(targetIndex)
                     undoStack.add(PlaylistEditAction.Remove(targetIndex, removed))
@@ -306,7 +322,7 @@ fun PlaylistEditModeContent(
                 if (!isSelectMode) {
                     Box(
                         modifier = Modifier
-                            .clickable { onSave(editedTracks.toList()) }
+                            .clickable { onSave(editedTracks.map { it.track }) }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -336,10 +352,10 @@ fun PlaylistEditModeContent(
             ) {
                 itemsIndexed(
                     items = editedTracks,
-                    key = { _, item -> "${item.title}_${item.artist}_${item.trackNumber}" }
-                ) { index, track ->
+                    key = { _, item -> item.id }
+                ) { index, editable ->
                     val isSelected = selectedIndices.contains(index)
-                    val itemKey = "${track.title}_${track.artist}_${track.trackNumber}"
+                    val itemKey = editable.id
                     val isDragging = reorderState.draggingItemKey == itemKey
 
                     val itemModifier = if (isDragging) {
@@ -354,7 +370,7 @@ fun PlaylistEditModeContent(
                     }
 
                     EditTrackRow(
-                        track = track,
+                        track = editable.track,
                         isSelectMode = isSelectMode,
                         isSelected = isSelected,
                         itemKey = itemKey,
@@ -488,9 +504,9 @@ fun PlaylistEditModeContent(
                             .clip(CircleShape)
                             .background(Color(0xFF282828))
                             .clickable(enabled = hasSelection) {
-                                val selectedTracks = selectedIndices.sortedDescending().map { editedTracks[it] }
+                                val selectedItems = selectedIndices.sortedDescending().map { editedTracks[it] }
                                 val previousList = editedTracks.toList()
-                                editedTracks.removeAll(selectedTracks)
+                                editedTracks.removeAll(selectedItems)
                                 undoStack.add(PlaylistEditAction.BulkOrder(previousList, editedTracks.toList()))
                                 redoStack.clear()
                                 selectedIndices.clear()
@@ -544,10 +560,10 @@ fun PlaylistEditModeContent(
                             .clip(CircleShape)
                             .background(Color(0xFF282828))
                             .clickable {
-                                val selectedTracks = selectedIndices.sorted().map { editedTracks[it] }
+                                val selectedItems = selectedIndices.sorted().map { editedTracks[it] }
                                 val previousList = editedTracks.toList()
-                                editedTracks.removeAll(selectedTracks)
-                                editedTracks.addAll(0, selectedTracks)
+                                editedTracks.removeAll(selectedItems)
+                                editedTracks.addAll(0, selectedItems)
                                 undoStack.add(PlaylistEditAction.BulkOrder(previousList, editedTracks.toList()))
                                 redoStack.clear()
                                 selectedIndices.clear()
@@ -574,10 +590,10 @@ fun PlaylistEditModeContent(
                             .clip(CircleShape)
                             .background(Color(0xFF282828))
                             .clickable {
-                                val selectedTracks = selectedIndices.sorted().map { editedTracks[it] }
+                                val selectedItems = selectedIndices.sorted().map { editedTracks[it] }
                                 val previousList = editedTracks.toList()
-                                editedTracks.removeAll(selectedTracks)
-                                editedTracks.addAll(selectedTracks)
+                                editedTracks.removeAll(selectedItems)
+                                editedTracks.addAll(selectedItems)
                                 undoStack.add(PlaylistEditAction.BulkOrder(previousList, editedTracks.toList()))
                                 redoStack.clear()
                                 selectedIndices.clear()
