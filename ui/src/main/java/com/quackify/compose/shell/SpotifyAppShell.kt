@@ -97,6 +97,8 @@ import com.quackify.compose.format.formatCount
 import com.quackify.compose.home.HomeShelf
 import com.quackify.compose.home.toArtistRelease
 import kotlinx.coroutines.launch
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 enum class ShellScreen {
     HOME,
@@ -788,10 +790,12 @@ fun SpotifyAppShell(
             .fillMaxSize()
             .background(EncoreColors.PureBlack)
     ) {
+        val chromeHaze = remember { HazeState() }
         // Active Screen Content
         // A finished load that still has no rows at all means the fetch itself
         // failed (an empty playlist comes back as a non-null empty list).
         val playlistLoadFailed = !playlistLoading && playlistTracks == null
+        Box(modifier = Modifier.fillMaxSize().hazeSource(chromeHaze)) {
         ShellScreenSlot {
         when (currentScreen) {
             ShellScreen.HOME -> {
@@ -1135,9 +1139,11 @@ fun SpotifyAppShell(
             )
         }
         }
+        }
 
         if (!isPlaylistEditMode) {
             ShellBottomBar(
+                hazeState = chromeHaze,
                 title = playerIdentity.title,
                 artist = playerIdentity.artist,
                 isPlaying = isPlaying,
