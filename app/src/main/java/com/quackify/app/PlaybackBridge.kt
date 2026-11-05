@@ -52,6 +52,12 @@ const val AUTOPLAY_ON_STARTUP_PREF = "autoplayOnStartup"
 /** Settings toggle: keep playing from a station when the context runs out. */
 const val AUTOPLAY_ON_END_PREF = "autoplayOnEnd"
 
+/** Last context this phone played, so a cold start can rebuild its row list. */
+const val CHAIN_CONTEXT_PREF = "chainContext"
+
+/** The rows of that context, so the rebuild survives a cold start offline. */
+const val CHAIN_ROWS_PREF = "chainRows"
+
 class PlaybackBridge(private val context: Context) {
 
     private val connect = KrespotConnect(context)
@@ -91,6 +97,16 @@ class PlaybackBridge(private val context: Context) {
 
     @Volatile
     private var chainContext: String = ""
+
+    @Volatile
+    private var rememberedChain: String = ""
+
+    @Volatile
+    private var rememberedRows: List<String> = emptyList()
+
+    private var restoreJob: Job? = null
+
+    private val restoreTried = HashSet<String>()
 
     @Volatile
     private var held: CommandTrack? = null
@@ -576,6 +592,11 @@ class PlaybackBridge(private val context: Context) {
         clearPending()
         chainRows = emptyList()
         chainContext = ""
+        rememberedChain = ""
+        rememberedRows = emptyList()
+        restoreJob?.cancel()
+        restoreJob = null
+        restoreTried.clear()
         queuedTail = emptyList()
         decorated.clear()
         undecoratable.clear()
@@ -1187,8 +1208,20 @@ class PlaybackBridge(private val context: Context) {
             log.w("skip: no cluster to move through")
             return
         }
-        val window = cluster.window()
         val here = playingUri(cluster)
+        // A cold start comes back with the track and the context but no
+        // next_tracks, so the cluster window holds this row alone. Walk the
+        // chain rebuilt from the context instead of declaring the queue over.
+        val chain = chainFor()
+        val chainAt = rowOf(chain, here)
+        if (chainAt >= 0 && chainAt + 1 < chain.size) {
+            val row = chain[chainAt + 1]
+            log.i("skip next from the chain: row ${chainAt + 1} of ${chain.size} '${row.takeLast(12)}'")
+            resumeRow = chainAt + 1
+            playTrack(row, chainContext, chainAt + 1)
+            return
+        }
+        val window = cluster.window()
         val at = window.indexOfFirst { it.uri == here }
         if (at < 0) {
             log.w("skip: '${here.takeLast(12)}' is not in the cluster window")
@@ -1702,6 +1735,7 @@ class PlaybackBridge(private val context: Context) {
             return
         }
         maybeAutoplayStartup(cluster)
+        restoreChain(cluster)
         if (cluster.track.title.isBlank() && cluster.track.artistName.isBlank()) {
             if (blankSeen != BLANK) {
                 blankSeen = BLANK
@@ -1759,6 +1793,7 @@ class PlaybackBridge(private val context: Context) {
         ) {
             chainRows = cluster.window().filter { it.isVisible }.map { it.uri }
             chainContext = cluster.contextUri
+            rememberChain(chainContext)
             log.i("chain from the cluster: ${chainRows.size} rows in " +
                     "'${chainContext.take(32)}' at '${cluster.track.uri.takeLast(12)}' " +
                     "queued=${cluster.queued.size}"
@@ -2112,6 +2147,109 @@ class PlaybackBridge(private val context: Context) {
         return ""
     }
 
+    /**
+     * The context this phone last played is the only clue a cold start has:
+     * the cluster comes back with the track, the position and the context uri
+     * but with an empty next_tracks list, so the queue and both skips have
+     * nothing to walk through. Persisting the context lets the next launch
+     * fetch its row list from the API instead of showing an empty queue.
+     */
+    private fun rememberChain(contextUri: String) {
+        if (!usableContext(contextUri)) return
+        val rows = chainRows
+        if (contextUri == rememberedChain && rows == rememberedRows) return
+        rememberedChain = contextUri
+        rememberedRows = rows
+        context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(CHAIN_CONTEXT_PREF, contextUri)
+            .putString(CHAIN_ROWS_PREF, rows.joinToString("\n"))
+            .apply()
+    }
+
+    private fun restoredRows(): List<String> = context
+        .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+        .getString(CHAIN_ROWS_PREF, "").orEmpty()
+        .split("\n")
+        .filter { it.startsWith("spotify:") }
+
+    private fun restoreChain(cluster: ClusterState) {
+        if (chainRows.isNotEmpty() || chainContext.isNotBlank()) return
+        if (restoreJob?.isActive == true) return
+        // A session the server reduced to a single track reports that track as
+        // its own context, which is exactly the case that needs the rebuild:
+        // only a real collection uri is worth fetching.
+        val fromCluster = cluster.contextUri.takeIf { usableContext(it) }
+        val contextUri = fromCluster
+            ?: rememberedChain.takeIf { usableContext(it) }
+            ?: context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+                .getString(CHAIN_CONTEXT_PREF, "").orEmpty().takeIf { usableContext(it) }
+            ?: return
+        if (cluster.nextTracks.isNotEmpty()) return
+        val anchor = cluster.track.uri
+        if (anchor.isBlank()) return
+        if (anchor in restoreTried) return
+        restoreTried += anchor
+        val keptFor = context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+            .getString(CHAIN_CONTEXT_PREF, "").orEmpty()
+        val remembered = if (keptFor == contextUri) restoredRows() else emptyList()
+        if (remembered.isNotEmpty()) {
+            chainRows = remembered
+            chainContext = contextUri
+            val at = remembered.indexOf(anchor)
+            resumeRow = if (at >= 0) at else -1
+            log.i("restore: ${remembered.size} rows kept from the last session in " +
+                    "'${contextUri.take(32)}' row=$at"
+            )
+            publishQueue(connect.cluster.value)
+            return
+        }
+        restoreJob = scope.launch {
+            val rows = runCatching { rowsOf(contextUri) }.getOrNull().orEmpty()
+            if (rows.isEmpty()) {
+                log.w("restore: '${contextUri.take(32)}' gave no rows back")
+                return@launch
+            }
+            if (chainRows.isNotEmpty() || chainContext.isNotBlank()) return@launch
+            chainRows = rows
+            chainContext = contextUri
+            rememberChain(contextUri)
+            val at = rows.indexOf(anchor)
+            resumeRow = if (at >= 0) at else -1
+            log.i("restore: ${rows.size} rows in '${contextUri.take(32)}' at " +
+                    "'${anchor.takeLast(12)}' row=$at"
+            )
+            publishQueue(connect.cluster.value)
+        }
+    }
+
+    private fun usableContext(uri: String): Boolean =
+        uri.isNotBlank() &&
+            !uri.startsWith("spotify:track:") &&
+            !uri.startsWith("spotify:episode:") &&
+            !uri.startsWith("spotify:ad:")
+
+    private suspend fun rowsOf(contextUri: String): List<String> = when {
+        contextUri.startsWith("spotify:collection:") ||
+            contextUri.startsWith("spotify:user:") -> {
+            val detail = Krespot.collections.collection(context, contextUri) ?: return emptyList()
+            detail.tracks.map { it.uri }
+        }
+        contextUri.startsWith("spotify:album:") -> {
+            val detail = Krespot.albums.album(context, contextUri) ?: return emptyList()
+            detail.tracks.map { it.uri }
+        }
+        contextUri.startsWith("spotify:artist:") -> {
+            val detail = Krespot.artists.artist(context, contextUri) ?: return emptyList()
+            detail.topTracks.map { it.uri }
+        }
+        contextUri.startsWith("spotify:playlist:") -> {
+            val detail = Krespot.collections.collection(context, contextUri) ?: return emptyList()
+            detail.tracks.map { it.uri }
+        }
+        else -> emptyList()
+    }
+
     private fun captureChain(contextUri: String) {
         if (contextUri.isBlank()) {
             if (chainRows.isNotEmpty() || chainContext.isNotBlank()) {
@@ -2129,6 +2267,7 @@ class PlaybackBridge(private val context: Context) {
         }
         chainRows = rows
         chainContext = contextUri
+        rememberChain(contextUri)
         resumeRow = -1
         log.i("chain: ${rows.size} rows in '${chainContext.ifBlank { "one track per row" }}' " +
                 "from '${rows.first().takeLast(12)}'")
