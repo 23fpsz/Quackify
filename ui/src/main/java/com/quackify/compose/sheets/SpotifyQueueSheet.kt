@@ -202,7 +202,11 @@ fun SpotifyQueueSheet(
                 if (nextFromContext.isNotEmpty()) {
                     item {
                         Text(
-                            text = "Next from: $queueSourceContext",
+                            text = if (queueSourceContext.isBlank()) {
+                                "Next up"
+                            } else {
+                                "Next from: $queueSourceContext"
+                            },
                             style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                         )

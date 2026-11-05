@@ -1372,12 +1372,15 @@ fun SpotifyAppShell(
             },
             onRemoveFromQueue = { track ->
                 val queue = playbackState?.queue.orEmpty()
-                val at = queue.indexOfFirst { it.uri == track.uri }
-                val remaining = queue.filterIndexed { index, _ -> index != at }.map { it.uri }
-                playerListener?.onQueueSet(remaining)
+                val context = playbackState?.queueFromContext.orEmpty()
+                val remaining = queue.filterNot { it.uri == track.uri }.map { it.uri }
+                if (remaining.size != queue.size) {
+                    playerListener?.onQueueSet(remaining + context.map { it.uri })
+                }
             },
             onClearQueue = {
-                playerListener?.onQueueSet(emptyList())
+                val context = playbackState?.queueFromContext.orEmpty()
+                playerListener?.onQueueSet(context.map { it.uri })
             },
             onSleepTimerSelected = { option -> activeSleepTimer = option }
         )
@@ -1487,6 +1490,22 @@ fun SpotifyAppShell(
                     }
                 },
                 onCopyLink = { copyEntityLink(entity.uri) },
+                onAddToQueue = when {
+                    entity.uri.startsWith("spotify:episode:") -> {
+                        { playerListener?.onQueueAdd(entity.uri) }
+                    }
+                    entity.uri.startsWith("spotify:album:") -> {
+                        {
+                            val rows = albumDetail?.tracks.orEmpty()
+                            if (rows.isEmpty()) {
+                                playerListener?.onQueueAdd(entity.uri)
+                            } else {
+                                rows.forEach { row -> playerListener?.onQueueAdd(row.uri) }
+                            }
+                        }
+                    }
+                    else -> null
+                },
                 onShare = { shareEntity(entity.uri) },
                 onOpenInBrowser = { openEntityInBrowser(entity.uri) }
             )
