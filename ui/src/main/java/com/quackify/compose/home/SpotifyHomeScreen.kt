@@ -72,6 +72,12 @@ data class RecommendationCard(
     val tag: String = ""
 )
 
+private const val TINT_WEIGHT = 0.55f
+private const val HEADER_TINT_ALPHA = 0.92f
+private const val SURFACE_RED = 0x12 / 255f
+private const val SURFACE_GREEN = 0x12 / 255f
+private const val SURFACE_BLUE = 0x12 / 255f
+
 data class ArtistCardItem(
     val name: String,
     val color: Color,
@@ -122,12 +128,37 @@ fun SpotifyHomeScreen(
         shelves.orEmpty().filter { it.podcasts && it.cards.isNotEmpty() }
     }
 
+    // The tint comes from the first cover on screen, so the backdrop belongs
+    // to the artwork instead of a fixed accent. A missing or dull cover falls
+    // back to the surface, which keeps the header and the feed one colour.
+    val tintSeed = quickItems.firstOrNull()?.coverColor
+    val heroTint = remember(tintSeed) {
+        if (tintSeed == null) {
+            EncoreColors.Background
+        } else {
+            Color(
+                red = tintSeed.red * TINT_WEIGHT + SURFACE_RED * (1f - TINT_WEIGHT),
+                green = tintSeed.green * TINT_WEIGHT + SURFACE_GREEN * (1f - TINT_WEIGHT),
+                blue = tintSeed.blue * TINT_WEIGHT + SURFACE_BLUE * (1f - TINT_WEIGHT),
+            )
+        }
+    }
+
     // Top Backdrop Tint Brush
     val heroBackdropBrush = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFF38151A),
+            heroTint,
             EncoreColors.Background,
             EncoreColors.Background
+        )
+    )
+
+    // The sticky header rides the same gradient so it never cuts the tint off
+    // with a flat slab of background while the feed scrolls underneath.
+    val headerBackdropBrush = Brush.verticalGradient(
+        colors = listOf(
+            heroTint.copy(alpha = HEADER_TINT_ALPHA),
+            EncoreColors.Background.copy(alpha = HEADER_TINT_ALPHA),
         )
     )
 
@@ -145,7 +176,7 @@ fun SpotifyHomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(EncoreColors.Background)
+                    .background(headerBackdropBrush)
                     .statusBarsPadding()
                     .padding(vertical = 8.dp)
             ) {

@@ -105,6 +105,7 @@ import com.quackify.compose.util.rememberDominantColor
 
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
+private const val DRAG_AXIS_SLOP_PX = 8f
 
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
@@ -672,10 +673,14 @@ private fun Modifier.npvArtworkGesture(
     onSnapBack: () -> Unit
 ): Modifier = pointerInput(dismissThresholdPx) {
     var isHorizontalGesture: Boolean? = null
+    var totalDragX = 0f
+    var totalDragY = 0f
     val velocityTracker = VelocityTracker()
     detectDragGestures(
         onDragStart = {
             isHorizontalGesture = null
+            totalDragX = 0f
+            totalDragY = 0f
             velocityTracker.resetTracking()
         },
         onDragEnd = {
@@ -742,10 +747,14 @@ private fun Modifier.npvArtworkGesture(
         },
         onDrag = { change, dragAmount ->
             velocityTracker.addPosition(change.uptimeMillis, change.position)
+            totalDragX += dragAmount.x
+            totalDragY += dragAmount.y
             if (isHorizontalGesture == null) {
-                if (dragAmount.x.absoluteValue > dragAmount.y.absoluteValue && dragAmount.x.absoluteValue > 10f) {
+                val absX = totalDragX.absoluteValue
+                val absY = totalDragY.absoluteValue
+                if (absX > DRAG_AXIS_SLOP_PX && absX > absY) {
                     isHorizontalGesture = true
-                } else if (dragAmount.y.absoluteValue > 10f) {
+                } else if (absY > DRAG_AXIS_SLOP_PX) {
                     isHorizontalGesture = false
                 }
             }
@@ -857,9 +866,9 @@ private fun NowPlayingArtworkCard(
     Box(
         modifier = modifier
             .shadow(elevation = 16.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
+            .then(gestureModifier)
             .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
-            .background(backgroundColor)
-            .then(gestureModifier),
+            .background(backgroundColor),
         contentAlignment = Alignment.Center
     ) {
         if (isCanvasEnabled && canvasFilePath != null) {
