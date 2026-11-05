@@ -119,6 +119,14 @@ private const val AXIS_HORIZONTAL = 1
 private const val AXIS_VERTICAL = 2
 private const val AXIS_YIELD = 3
 
+/** Reveal choreography: the artwork lands first, then the rest follows. */
+private const val REVEAL_MS = 420
+private const val REVEAL_ARTWORK_DELAY_MS = 0
+private const val REVEAL_INFO_DELAY_MS = 90
+private const val REVEAL_CONTROLS_DELAY_MS = 160
+private const val REVEAL_REST_DELAY_MS = 220
+private const val REVEAL_RISE_FRACTION = 0.06f
+
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
 /** Spotify's dark ink, for lyrics that sit on light artwork. */
@@ -131,6 +139,34 @@ private val LyricsInkDark = Color(0xFF191414)
  */
 private fun lyricsInk(background: Color): Color =
     if (background.luminance() > 0.4f) LyricsInkDark else Color.White
+
+/**
+ * Staggered entrance for the player's blocks: each one rises a little and
+ * fades in, in the order the eye should follow them - artwork, track info,
+ * controls, then everything below. Driven off one shared progress value so
+ * the whole reveal reads as a single motion rather than four animations.
+ */
+@Composable
+private fun Modifier.revealAt(progress: Float, delayFraction: Float): Modifier {
+    val local = ((progress - delayFraction) / (1f - delayFraction)).coerceIn(0f, 1f)
+    return this
+        .graphicsLayer {
+            alpha = local
+            translationY = (1f - local) * size.height * REVEAL_RISE_FRACTION
+        }
+}
+
+@Composable
+private fun rememberRevealProgress(): Float {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = REVEAL_MS, easing = EncoreAnimation.DecelerateInterpolator)
+        )
+    }
+    return progress.value
+}
 
 /**
  * Full-screen Now Playing Player Screen matching Spotify APK (NPV):
@@ -206,6 +242,7 @@ fun SpotifyNowPlayingScreen(
     val playerOffsetY = remember { Animatable(0f) }
     val artworkOffsetX = remember { Animatable(0f) }
     val scrollState = rememberScrollState()
+    val reveal = rememberRevealProgress()
 
     val activeLyricIndex = remember(currentPositionMs, lyrics) {
         lyrics.indexOfLast { currentPositionMs >= it.startTimeMs }.coerceAtLeast(0)
@@ -482,104 +519,134 @@ fun SpotifyNowPlayingScreen(
 
                     // Large 1:1 Album Artwork with 8dp rounded corners and interactive swipe-to-skip gesture
                     // Reference: revised_template_page_layout.xml (@id/track_carousel) -> bounds [63,308][1017,1262] (24dp margins)
-                    NowPlayingArtworkCard(
-                        title = title,
-                        coverUrl = coverUrl,
-                        dominantColor = dynamicArtworkColor,
-                        backgroundColor = animatedDominantColor,
-                        canvasFilePath = canvasFilePath,
-                        isCanvasAllowed = isCanvasAllowed,
-                        isCanvasEnabled = canvasActive,
-                        onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) },
-                        gestureModifier = artworkGestureModifier,
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .offset(y = artworkPushUpOffset)
                             .padding(horizontal = 24.dp)
-                            .aspectRatio(1.0f)
-                            .graphicsLayer { translationX = artworkOffsetX.value }
-                    )
+                            .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
+                    ) {
+                        NowPlayingArtworkCard(
+                            title = title,
+                            coverUrl = coverUrl,
+                            dominantColor = dynamicArtworkColor,
+                            backgroundColor = animatedDominantColor,
+                            canvasFilePath = canvasFilePath,
+                            isCanvasAllowed = isCanvasAllowed,
+                            isCanvasEnabled = canvasActive,
+                            onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) },
+                            gestureModifier = artworkGestureModifier,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .offset(y = artworkPushUpOffset)
+                                .aspectRatio(1.0f)
+                                .graphicsLayer { translationX = artworkOffsetX.value }
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    NowPlayingSyncedLyricLine(
-                        lyricText = activeLyricLine,
-                        visible = effectiveLyricsVisible,
-                        onOpenLyrics = { isLyricsFullscreen = true }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .revealAt(reveal, REVEAL_INFO_DELAY_MS / REVEAL_MS.toFloat())
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            NowPlayingSyncedLyricLine(
+                                lyricText = activeLyricLine,
+                                visible = effectiveLyricsVisible,
+                                onOpenLyrics = { isLyricsFullscreen = true }
+                            )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                    NowPlayingTrackInfoRow(
-                        title = title,
-                        artist = artist,
-                        isExplicit = isExplicit,
-                        isLiked = isLiked,
-                        onTitleClick = onTitleClick,
-                        onArtistClick = onArtistClick,
-                        onLikeClick = onLikeClick,
-                        onBanClick = onBanClick
-                    )
+                            NowPlayingTrackInfoRow(
+                                title = title,
+                                artist = artist,
+                                isExplicit = isExplicit,
+                                isLiked = isLiked,
+                                onTitleClick = onTitleClick,
+                                onArtistClick = onArtistClick,
+                                onLikeClick = onLikeClick,
+                                onBanClick = onBanClick
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    NowPlayingSeekBarSection(
-                        progress = progress,
-                        durationMs = durationMs,
-                        currentPositionMs = currentPositionMs,
-                        onSeek = onSeek,
-                        isLoading = effectiveIsLoading
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .revealAt(reveal, REVEAL_CONTROLS_DELAY_MS / REVEAL_MS.toFloat())
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            NowPlayingSeekBarSection(
+                                progress = progress,
+                                durationMs = durationMs,
+                                currentPositionMs = currentPositionMs,
+                                onSeek = onSeek,
+                                isLoading = effectiveIsLoading
+                            )
 
-                    Spacer(modifier = Modifier.height(28.dp))
+                            Spacer(modifier = Modifier.height(28.dp))
 
-                    NowPlayingControlsRow(
-                        shuffleMode = shuffleMode,
-                        repeatMode = repeatMode,
-                        isPlaying = isPlaying,
-                        isLoading = effectiveIsLoading,
-                        onShuffleClick = onShuffleClick,
-                        onSkipPreviousClick = onSkipPreviousClick,
-                        onPlayPauseClick = onPlayPauseClick,
-                        onSkipNextClick = onSkipNextClick,
-                        onRepeatClick = onRepeatClick
-                    )
+                            NowPlayingControlsRow(
+                                shuffleMode = shuffleMode,
+                                repeatMode = repeatMode,
+                                isPlaying = isPlaying,
+                                isLoading = effectiveIsLoading,
+                                onShuffleClick = onShuffleClick,
+                                onSkipPreviousClick = onSkipPreviousClick,
+                                onPlayPauseClick = onPlayPauseClick,
+                                onSkipNextClick = onSkipNextClick,
+                                onRepeatClick = onRepeatClick
+                            )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(24.dp))
 
-                    NowPlayingFooterRow(
-                        connectedDeviceName = connectedDeviceName,
-                        onDeviceClick = onDeviceClick,
-                        onQueueClick = onQueueClick,
-                        onShareClick = onShareClick
-                    )
+                            NowPlayingFooterRow(
+                                connectedDeviceName = connectedDeviceName,
+                                onDeviceClick = onDeviceClick,
+                                onQueueClick = onQueueClick,
+                                onShareClick = onShareClick
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    NowPlayingLyricsPeekCard(
-                        visible = effectiveLyricsVisible,
-                        lyrics = lyrics,
-                        activeIndex = activeLyricIndex,
-                        dominantColor = dynamicArtworkColor,
-                        onOpenLyrics = { isLyricsFullscreen = true },
-                        onShareLyrics = { isLyricsShareOpen = true }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .revealAt(reveal, REVEAL_REST_DELAY_MS / REVEAL_MS.toFloat())
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            NowPlayingLyricsPeekCard(
+                                visible = effectiveLyricsVisible,
+                                lyrics = lyrics,
+                                activeIndex = activeLyricIndex,
+                                dominantColor = dynamicArtworkColor,
+                                onOpenLyrics = { isLyricsFullscreen = true },
+                                onShareLyrics = { isLyricsShareOpen = true }
+                            )
 
-                    // Other cards (e.g. About the Artist) only appear once loaded and accessible upon scrolling down
-                    if (!effectiveIsLoading && artist.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(EncoreSpacers.Base))
+                            // Other cards (e.g. About the Artist) only appear once loaded and accessible upon scrolling down
+                            if (!effectiveIsLoading && artist.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
-                        NowPlayingAboutArtistCard(
-                            artist = artist,
-                            monthlyListeners = effectiveMonthlyListeners,
-                            artistBio = effectiveArtistBio,
-                            artistImageUrl = artistImageUrl,
-                            isFollowingArtist = isFollowingArtist,
-                            onFollowToggle = { isFollowingArtist = !isFollowingArtist },
-                            onArtistClick = onArtistClick
-                        )
+                                NowPlayingAboutArtistCard(
+                                    artist = artist,
+                                    monthlyListeners = effectiveMonthlyListeners,
+                                    artistBio = effectiveArtistBio,
+                                    artistImageUrl = artistImageUrl,
+                                    isFollowingArtist = isFollowingArtist,
+                                    onFollowToggle = { isFollowingArtist = !isFollowingArtist },
+                                    onArtistClick = onArtistClick
+                                )
 
-                        Spacer(modifier = Modifier.height(48.dp))
+                                Spacer(modifier = Modifier.height(48.dp))
+                            }
+                        }
                     }
                 }
             }
