@@ -1,4 +1,4 @@
-package com.spotiduck.app
+package com.quackify.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,9 +16,9 @@ import androidx.media.app.NotificationCompat as MediaNotificationCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
-import com.spotiduck.backend.core.log.Logs
-import com.spotiduck.compose.components.RepeatMode
-import com.spotiduck.compose.shell.ComposePlaybackState
+import com.quackify.backend.core.log.Logs
+import com.quackify.compose.components.RepeatMode
+import com.quackify.compose.shell.ComposePlaybackState
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.CoroutineScope
@@ -128,7 +128,7 @@ class PlaybackService : Service() {
     }
 
     private fun setUpSession(bridge: PlaybackBridge) {
-        val session = MediaSessionCompat(this, "SpotiDuck")
+        val session = MediaSessionCompat(this, "Quackify")
         this.session = session
         session.setCallback(object : MediaSessionCompat.Callback() {
             override fun onPlay() {
@@ -339,7 +339,7 @@ class PlaybackService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         if (!hasTrack) {
             return builder
-                .setContentTitle("SpotiDuck")
+                .setContentTitle("Quackify")
                 .setContentText("Nothing playing")
                 // The quiet placeholder carries the session token too, so it
                 // stays a media notification: the 13+ system shows those even
@@ -416,18 +416,18 @@ class PlaybackService : Service() {
     }
 
     companion object {
-        const val ACTION_STOP = "com.spotiduck.app.STOP"
-        const val EXTRA_OPEN_PLAYER = "com.spotiduck.app.OPEN_PLAYER"
-        private const val ACTION_TOGGLE = "com.spotiduck.app.TOGGLE"
-        private const val ACTION_NEXT = "com.spotiduck.app.NEXT"
-        private const val ACTION_PREVIOUS = "com.spotiduck.app.PREVIOUS"
-        private const val ACTION_LIKE = "com.spotiduck.app.LIKE"
-        private const val ACTION_SHUFFLE = "com.spotiduck.app.SHUFFLE"
-        private const val ACTION_REPEAT = "com.spotiduck.app.REPEAT"
-        private const val CUSTOM_LIKE = "com.spotiduck.app.custom.LIKE"
-        private const val CUSTOM_SHUFFLE = "com.spotiduck.app.custom.SHUFFLE"
-        private const val CUSTOM_REPEAT = "com.spotiduck.app.custom.REPEAT"
-        const val CHANNEL = "spotiduck-playback"
+        const val ACTION_STOP = "com.quackify.app.STOP"
+        const val EXTRA_OPEN_PLAYER = "com.quackify.app.OPEN_PLAYER"
+        private const val ACTION_TOGGLE = "com.quackify.app.TOGGLE"
+        private const val ACTION_NEXT = "com.quackify.app.NEXT"
+        private const val ACTION_PREVIOUS = "com.quackify.app.PREVIOUS"
+        private const val ACTION_LIKE = "com.quackify.app.LIKE"
+        private const val ACTION_SHUFFLE = "com.quackify.app.SHUFFLE"
+        private const val ACTION_REPEAT = "com.quackify.app.REPEAT"
+        private const val CUSTOM_LIKE = "com.quackify.app.custom.LIKE"
+        private const val CUSTOM_SHUFFLE = "com.quackify.app.custom.SHUFFLE"
+        private const val CUSTOM_REPEAT = "com.quackify.app.custom.REPEAT"
+        const val CHANNEL = "quackify-playback"
         const val NOTIFICATION_ID = 1
     }
 }

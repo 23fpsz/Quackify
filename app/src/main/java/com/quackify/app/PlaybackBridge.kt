@@ -1,28 +1,28 @@
-package com.spotiduck.app
+package com.quackify.app
 
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.spotiduck.compose.playlist.TrackItem
-import com.spotiduck.compose.components.RepeatMode
-import com.spotiduck.compose.components.ShuffleMode
-import com.spotiduck.compose.shell.ComposePlaybackState
-import com.spotiduck.compose.shell.ComposePlayerListener
-import com.spotiduck.backend.connect.KrespotConnect
-import com.spotiduck.backend.connect.cluster.ClusterState
-import com.spotiduck.backend.connect.cluster.ClusterTrack
-import com.spotiduck.backend.model.ConnectDevice
-import com.spotiduck.backend.model.DeviceKind
-import com.spotiduck.backend.connect.command.CommandTrack
-import com.spotiduck.backend.connect.command.ContentType
-import com.spotiduck.backend.connect.command.PlaybackCommand
-import com.spotiduck.backend.connect.command.TrackUid
-import com.spotiduck.backend.connect.state.DebugSource
-import com.spotiduck.backend.connect.state.Snapshot
-import com.spotiduck.backend.player.KrespotPlayer
-import com.spotiduck.backend.player.PlayerEvent
-import com.spotiduck.backend.player.PlayerState
+import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.components.RepeatMode
+import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.shell.ComposePlaybackState
+import com.quackify.compose.shell.ComposePlayerListener
+import com.quackify.backend.connect.KrespotConnect
+import com.quackify.backend.connect.cluster.ClusterState
+import com.quackify.backend.connect.cluster.ClusterTrack
+import com.quackify.backend.model.ConnectDevice
+import com.quackify.backend.model.DeviceKind
+import com.quackify.backend.connect.command.CommandTrack
+import com.quackify.backend.connect.command.ContentType
+import com.quackify.backend.connect.command.PlaybackCommand
+import com.quackify.backend.connect.command.TrackUid
+import com.quackify.backend.connect.state.DebugSource
+import com.quackify.backend.connect.state.Snapshot
+import com.quackify.backend.player.KrespotPlayer
+import com.quackify.backend.player.PlayerEvent
+import com.quackify.backend.player.PlayerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -35,15 +35,15 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.filter
 import androidx.compose.runtime.snapshotFlow
-import com.spotiduck.backend.core.log.Logs
-import com.spotiduck.backend.library.TrackSource
-import com.spotiduck.backend.api.Library
+import com.quackify.backend.core.log.Logs
+import com.quackify.backend.library.TrackSource
+import com.quackify.backend.api.Library
 import android.os.SystemClock
 
 private val log = Logs.of(Logs.Module.BRIDGE)
 
 /** Shared local prefs file the client keeps its UI flags in. */
-const val CLIENT_PREFS = "spotiduck.client"
+const val CLIENT_PREFS = "quackify.client"
 
 /** Settings toggle: start playback as soon as the session's track loads. */
 const val AUTOPLAY_ON_STARTUP_PREF = "autoplayOnStartup"
@@ -786,7 +786,7 @@ class PlaybackBridge(private val context: Context) {
         connect.report(snapshot)
     }
 
-    private suspend fun toggleRemote(cluster: ClusterState, active: com.spotiduck.backend.model.ConnectDevice) {
+    private suspend fun toggleRemote(cluster: ClusterState, active: com.quackify.backend.model.ConnectDevice) {
         connect.refreshCluster()
         val fresh = connect.cluster.value ?: cluster
         val playing = fresh.isPlaying
@@ -1922,7 +1922,7 @@ class PlaybackBridge(private val context: Context) {
             remoteCanShuffle = !remoteActive || !cluster.licenseRestricted,
             remoteCanRepeat = !remoteActive || !cluster.licenseRestricted,
             connectedDevice = label.ifBlank {
-                if (mine || player.hasSource || noneActive) "SpotiDuck" else ""
+                if (mine || player.hasSource || noneActive) "Quackify" else ""
             },
         )
         if (active != null && !mine && player.hasSource && player.isPlaying) {
@@ -1945,7 +1945,7 @@ class PlaybackBridge(private val context: Context) {
 
     private fun localDeviceRow(active: Boolean): ConnectDevice = ConnectDevice(
         id = deviceId,
-        name = "SpotiDuck",
+        name = "Quackify",
         kind = DeviceKind.COMPUTER,
         canPlay = true,
         volume = 0,

@@ -1,9 +1,9 @@
-package com.spotiduck.app
+package com.quackify.app
 
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
-import com.spotiduck.backend.core.log.Logs
+import com.quackify.backend.core.log.Logs
 
 object PlaybackHost {
 

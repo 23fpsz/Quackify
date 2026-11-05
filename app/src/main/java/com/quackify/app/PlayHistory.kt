@@ -1,8 +1,8 @@
 
-package com.spotiduck.app
+package com.quackify.app
 
 import android.content.Context
-import com.spotiduck.compose.playlist.TrackItem
+import com.quackify.compose.playlist.TrackItem
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -13,7 +13,7 @@ data class PlayedTrack(
 
 object PlayHistory {
 
-    private const val PREFS = "spotiduck.client"
+    private const val PREFS = "quackify.client"
     private const val KEY = "playHistory"
     private const val LIMIT = 200
 

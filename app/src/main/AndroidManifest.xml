@@ -17,12 +17,12 @@
         android:label="${appName}"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SpotiDuck">
+        android:theme="@style/Theme.Quackify">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="${appName}"
-            android:theme="@style/Theme.SpotiDuck"
+            android:theme="@style/Theme.Quackify"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

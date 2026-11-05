@@ -1,10 +1,10 @@
-package com.spotiduck.app
+package com.quackify.app
 
 import android.content.Context
-import com.spotiduck.backend.core.auth.SpotifyAuth
-import com.spotiduck.backend.core.log.Logs
-import com.spotiduck.backend.core.net.ClientToken
-import com.spotiduck.backend.core.net.Net
+import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.net.ClientToken
+import com.quackify.backend.core.net.Net
 import org.json.JSONObject
 import java.io.File
 import kotlinx.coroutines.Dispatchers
