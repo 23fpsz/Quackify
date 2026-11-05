@@ -1,4 +1,4 @@
-# SpotiDuck Compose & Native Engine 🦆🎵
+# Quackify Compose & Native Engine 🦆🎵
 
 A 1:1 pixel-perfect Android client recreation of Spotify's mobile experience, built with **Jetpack Compose**, **Material 3**, and a headless **Native Audio Engine** powered by Spotify Connect & Widevine L3/L1 hardware DRM.
 
@@ -9,7 +9,7 @@ A 1:1 pixel-perfect Android client recreation of Spotify's mobile experience, bu
 The project is structured into fully decoupled modules adhering to strict separation of concerns:
 
 ```text
-SpotiDuck-Compose/
+Quackify/
 ├── ui/             # Pure Jetpack Compose UI library (Encore design system, screens, theme)
 ├── app/            # Runnable Android application, wires the shell to the backend
 ├── krespot-model/  # Shared data models
@@ -64,8 +64,8 @@ SpotiDuck-Compose/
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/23fpsz/SpotiDuck-Compose.git
-cd SpotiDuck-Compose
+git clone https://github.com/23fpsz/Quackify-Compose.git
+cd Quackify
 ```
 
 ### 2. Configure Authentication

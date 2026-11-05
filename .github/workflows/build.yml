@@ -1,4 +1,4 @@
-name: Build SpotiDuck Compose
+name: Build Quackify Compose
 
 on:
   push:
@@ -111,14 +111,14 @@ jobs:
       - name: Collect Generated APKs
         run: |
           mkdir -p apk_output
-          find app/build/outputs/apk -type f -name "SpotiDuck-*.apk" -exec cp {} apk_output/ \;
+          find app/build/outputs/apk -type f -name "Quackify-*.apk" -exec cp {} apk_output/ \;
           echo "Collected APKs:"
           ls -la apk_output/
 
       - name: Upload APKs as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SpotiDuck-Compose-APKs
+          name: Quackify-Compose-APKs
           path: apk_output/*.apk
           if-no-files-found: error
           retention-days: 14
@@ -132,7 +132,7 @@ jobs:
           fi
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           TAG="v${VERSION_NAME}-b${{ github.run_number }}-${SHORT_SHA}"
-          TITLE="SpotiDuck Compose v${VERSION_NAME} (Build #${{ github.run_number }} - ${SHORT_SHA})"
+          TITLE="Quackify Compose v${VERSION_NAME} (Build #${{ github.run_number }} - ${SHORT_SHA})"
           
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "title=$TITLE" >> $GITHUB_OUTPUT
@@ -145,15 +145,15 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: ${{ steps.release_info.outputs.title }}
           body: |
-            ### 📱 SpotiDuck Compose Build
+            ### 📱 Quackify Compose Build
             - **Commit:** [${{ steps.release_info.outputs.short_sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
             - **Branch:** `${{ github.ref_name }}`
             - **Build Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
             ### 📦 Available Editions:
-            - **Standard**: `SpotiDuck-v*-standard-*.apk` (`com.spotiduck.app`)
-            - **Spotify Island**: `SpotiDuck-v*-spotify-*.apk` (`com.spotify.music`)
-            - **Apple Island**: `SpotiDuck-v*-apple-*.apk` (`com.apple.android.music`)
+            - **Standard**: `Quackify-v*-standard-*.apk` (`com.quackify.app`)
+            - **Spotify Island**: `Quackify-v*-spotify-*.apk` (`com.spotify.music`)
+            - **Apple Island**: `Quackify-v*-apple-*.apk` (`com.apple.android.music`)
           files: apk_output/*.apk
           prerelease: true
           draft: false
