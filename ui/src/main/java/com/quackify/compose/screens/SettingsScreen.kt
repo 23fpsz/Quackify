@@ -112,6 +112,9 @@ fun SettingsScreen(
     var autoplayOnStartup by remember {
         mutableStateOf(clientPrefs.getBoolean("autoplayOnStartup", false))
     }
+    var autoplayOnEnd by remember {
+        mutableStateOf(clientPrefs.getBoolean("autoplayOnEnd", true))
+    }
 
     // Hidden developer entry: five taps on the Version row open the log viewer.
     // Like the Android build-number gesture, each tap toasts the remaining count,
@@ -230,6 +233,16 @@ fun SettingsScreen(
                     onCheckedChange = { on ->
                         autoplayOnStartup = on
                         clientPrefs.edit().putBoolean("autoplayOnStartup", on).apply()
+                    }
+                )
+                SettingsToggleRow(
+                    title = "Autoplay",
+                    subtitle = "Keep playing a station when the album or playlist runs out.",
+                    isChecked = autoplayOnEnd,
+                    enabled = true,
+                    onCheckedChange = { on ->
+                        autoplayOnEnd = on
+                        clientPrefs.edit().putBoolean("autoplayOnEnd", on).apply()
                     }
                 )
             }
