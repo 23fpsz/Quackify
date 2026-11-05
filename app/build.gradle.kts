@@ -47,7 +47,7 @@ android {
     }
 
     signingConfigs {
-        create("release") {
+        create("quackify") {
             val envStoreFile = System.getenv("RELEASE_STORE_FILE")
             if (envStoreFile != null && file(envStoreFile).exists()) {
                 storeFile = file(envStoreFile)
@@ -61,6 +61,11 @@ android {
                     storePassword = keystoreProperties["signing.storePassword"] as String?
                     keyAlias = keystoreProperties["signing.keyAlias"] as String?
                     keyPassword = keystoreProperties["signing.keyPassword"] as String?
+                } else {
+                    storeFile = rootProject.file("keystore/Quackify.jks")
+                    storePassword = "quackifyrebranded"
+                    keyAlias = "quackify"
+                    keyPassword = "quackifyrebranded"
                 }
             }
         }
@@ -70,13 +75,11 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             manifestPlaceholders["appName"] = "Quackify β"
+            signingConfig = signingConfigs.getByName("quackify")
         }
         release {
             manifestPlaceholders["appName"] = "Quackify"
-            val releaseSigning = signingConfigs.getByName("release")
-            if (releaseSigning.storeFile != null) {
-                signingConfig = releaseSigning
-            }
+            signingConfig = signingConfigs.getByName("quackify")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
