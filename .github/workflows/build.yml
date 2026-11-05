@@ -1,0 +1,161 @@
+name: Build SpotiDuck Compose
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'app/**'
+      - 'ui/**'
+      - 'krespot-model/**'
+      - 'krespot-core/**'
+      - 'krespot-api/**'
+      - 'krespot-library/**'
+      - 'krespot-connect/**'
+      - 'krespot-player/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'gradle.properties'
+      - 'settings.gradle.kts'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - '!**.md'
+
+  workflow_dispatch:
+    inputs:
+      flavor:
+        description: 'Flavor to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'standard'
+          - 'spotify'
+          - 'apple'
+      build_type:
+        description: 'Build Type'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'debug'
+          - 'release'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Decode Keystore
+        env:
+          RELEASE_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE }}
+        run: |
+          if [ -n "$RELEASE_KEYSTORE" ]; then
+            printf "%s" "$RELEASE_KEYSTORE" | base64 -di > release.keystore
+          fi
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Determine Gradle Tasks
+        id: gradle_tasks
+        run: |
+          FLAVOR="${{ github.event.inputs.flavor || 'all' }}"
+          TYPE="${{ github.event.inputs.build_type || 'all' }}"
+          
+          capitalise() {
+            echo "$(tr '[:lower:]' '[:upper:]' <<< ${1:0:1})${1:1}"
+          }
+          
+          if [ "$FLAVOR" = "all" ] && [ "$TYPE" = "all" ]; then
+            TASKS="assemble"
+          elif [ "$FLAVOR" = "all" ]; then
+            TYPE_CAP=$(capitalise "$TYPE")
+            TASKS="assemble${TYPE_CAP}"
+          elif [ "$TYPE" = "all" ]; then
+            FLAVOR_CAP=$(capitalise "$FLAVOR")
+            TASKS="assemble${FLAVOR_CAP}"
+          else
+            FLAVOR_CAP=$(capitalise "$FLAVOR")
+            TYPE_CAP=$(capitalise "$TYPE")
+            TASKS="assemble${FLAVOR_CAP}${TYPE_CAP}"
+          fi
+          
+          echo "Selected tasks: $TASKS"
+          echo "tasks=$TASKS" >> $GITHUB_OUTPUT
+
+      - name: Build APKs with Gradle
+        env:
+          RELEASE_STORE_FILE: ${{ github.workspace }}/release.keystore
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew ${{ steps.gradle_tasks.outputs.tasks }} --stacktrace
+
+      - name: Collect Generated APKs
+        run: |
+          mkdir -p apk_output
+          find app/build/outputs/apk -type f -name "SpotiDuck-*.apk" -exec cp {} apk_output/ \;
+          echo "Collected APKs:"
+          ls -la apk_output/
+
+      - name: Upload APKs as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpotiDuck-Compose-APKs
+          path: apk_output/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Prepare Release Info
+        id: release_info
+        run: |
+          VERSION_NAME=$(grep 'versionName =' app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ -z "$VERSION_NAME" ]; then
+            VERSION_NAME="1.0.0"
+          fi
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          TAG="v${VERSION_NAME}-b${{ github.run_number }}-${SHORT_SHA}"
+          TITLE="SpotiDuck Compose v${VERSION_NAME} (Build #${{ github.run_number }} - ${SHORT_SHA})"
+          
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "version=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+      - name: Publish GitHub Release (Preserves All Previous Releases)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: ${{ steps.release_info.outputs.title }}
+          body: |
+            ### 📱 SpotiDuck Compose Build
+            - **Commit:** [${{ steps.release_info.outputs.short_sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            - **Branch:** `${{ github.ref_name }}`
+            - **Build Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            ### 📦 Available Editions:
+            - **Standard**: `SpotiDuck-v*-standard-*.apk` (`com.spotiduck.app`)
+            - **Spotify Island**: `SpotiDuck-v*-spotify-*.apk` (`com.spotify.music`)
+            - **Apple Island**: `SpotiDuck-v*-apple-*.apk` (`com.apple.android.music`)
+          files: apk_output/*.apk
+          prerelease: true
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
