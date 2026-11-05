@@ -1,4 +1,5 @@
 name: Build Quackify
+
 on:
   push:
     branches: [ "main", "master" ]
