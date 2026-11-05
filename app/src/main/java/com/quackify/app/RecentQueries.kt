@@ -1,11 +1,11 @@
-package com.spotiduck.app
+package com.quackify.app
 
 import android.content.Context
 import org.json.JSONArray
 
 object RecentQueries {
 
-    private const val PREFS = "spotiduck.client"
+    private const val PREFS = "quackify.client"
     private const val KEY = "recentQueries"
     private const val LIMIT = 20
 

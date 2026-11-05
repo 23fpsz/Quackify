@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.spotiduck.app"
+    namespace = "com.quackify.app"
     compileSdk {
         version = release(37)
     }
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.spotiduck.app"
+        applicationId = "com.quackify.app"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
@@ -34,7 +34,7 @@ android {
     productFlavors {
         create("standard") {
             dimension = "islandId"
-            applicationId = "com.spotiduck.app"
+            applicationId = "com.quackify.app"
         }
         create("spotify") {
             dimension = "islandId"
@@ -69,10 +69,10 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
-            manifestPlaceholders["appName"] = "SpotiDuck β"
+            manifestPlaceholders["appName"] = "Quackify β"
         }
         release {
-            manifestPlaceholders["appName"] = "SpotiDuck"
+            manifestPlaceholders["appName"] = "Quackify"
             val releaseSigning = signingConfigs.getByName("release")
             if (releaseSigning.storeFile != null) {
                 signingConfig = releaseSigning
@@ -104,7 +104,7 @@ androidComponents {
         }
         variant.outputs.forEach { output ->
             if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                val appName = "SpotiDuck"
+                val appName = "Quackify"
                 val versionName = android.defaultConfig.versionName ?: "1.0.0"
                 val flavor = variant.flavorName ?: "standard"
                 val type = variant.buildType ?: "debug"

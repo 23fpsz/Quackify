@@ -1,4 +1,4 @@
-package com.spotiduck.app
+package com.quackify.app
 
 import android.app.Activity
 import android.content.Context
@@ -19,62 +19,62 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import com.spotiduck.backend.core.auth.SpotifyAuth
-import com.spotiduck.backend.api.HomeFeed
-import com.spotiduck.backend.model.HomeSection
-import com.spotiduck.backend.model.CollectionDetail
-import com.spotiduck.backend.model.AlbumDetail
-import com.spotiduck.backend.model.ArtistDetail
-import com.spotiduck.backend.model.Credits
-import com.spotiduck.backend.model.PlaylistChoice
-import com.spotiduck.backend.api.Library
-import com.spotiduck.backend.core.net.Net
-import com.spotiduck.backend.core.net.Pathfinder
-import com.spotiduck.compose.library.LibraryItem
-import com.spotiduck.compose.library.LibraryItemType
-import com.spotiduck.compose.shell.PlaylistEditDraft
-import com.spotiduck.compose.playlist.TrackItem
-import com.spotiduck.compose.screens.PopularTrack
-import com.spotiduck.compose.screens.ArtistRelease
-import com.spotiduck.compose.home.toTrackItem
-import com.spotiduck.compose.home.toArtistRelease
-import com.spotiduck.backend.model.ShelfKind
+import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.api.HomeFeed
+import com.quackify.backend.model.HomeSection
+import com.quackify.backend.model.CollectionDetail
+import com.quackify.backend.model.AlbumDetail
+import com.quackify.backend.model.ArtistDetail
+import com.quackify.backend.model.Credits
+import com.quackify.backend.model.PlaylistChoice
+import com.quackify.backend.api.Library
+import com.quackify.backend.core.net.Net
+import com.quackify.backend.core.net.Pathfinder
+import com.quackify.compose.library.LibraryItem
+import com.quackify.compose.library.LibraryItemType
+import com.quackify.compose.shell.PlaylistEditDraft
+import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.screens.PopularTrack
+import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.home.toTrackItem
+import com.quackify.compose.home.toArtistRelease
+import com.quackify.backend.model.ShelfKind
 import androidx.compose.runtime.collectAsState
-import com.spotiduck.backend.api.Search
-import com.spotiduck.backend.api.WhatsNew
-import com.spotiduck.compose.screens.SettingsSwitches
-import com.spotiduck.compose.screens.SettingsLocks
-import com.spotiduck.backend.api.Settings
-import com.spotiduck.compose.screens.SpotifyNotification
-import com.spotiduck.compose.search.SearchHistoryItem
-import com.spotiduck.compose.screens.CategoryShelf
-import com.spotiduck.compose.screens.CategoryRecommendationItem
-import com.spotiduck.compose.format.parseHexColor
+import com.quackify.backend.api.Search
+import com.quackify.backend.api.WhatsNew
+import com.quackify.compose.screens.SettingsSwitches
+import com.quackify.compose.screens.SettingsLocks
+import com.quackify.backend.api.Settings
+import com.quackify.compose.screens.SpotifyNotification
+import com.quackify.compose.search.SearchHistoryItem
+import com.quackify.compose.screens.CategoryShelf
+import com.quackify.compose.screens.CategoryRecommendationItem
+import com.quackify.compose.format.parseHexColor
 import androidx.compose.ui.graphics.Color
-import com.spotiduck.backend.api.Browse
-import com.spotiduck.backend.api.Podcasts
-import com.spotiduck.backend.model.BrowsePage
-import com.spotiduck.backend.model.EpisodeDetail
-import com.spotiduck.backend.model.ShowDetail
-import com.spotiduck.backend.model.SearchHit
-import com.spotiduck.backend.model.SearchResults
-import com.spotiduck.backend.model.TrackLyrics
-import com.spotiduck.compose.home.toQuickAccess
-import com.spotiduck.compose.home.toShelves
-import com.spotiduck.compose.player.TimeSyncedLyric
-import com.spotiduck.compose.format.formatCount
-import com.spotiduck.compose.screens.LoginScreen
-import com.spotiduck.compose.screens.PathfinderCaptureScreen
-import com.spotiduck.compose.shell.SpotifyAppShell
-import com.spotiduck.compose.theme.SpotifyEncoreTheme
-import com.spotiduck.compose.util.rememberIsOffline
-import com.spotiduck.backend.core.webview.SilentTokenRefresh
+import com.quackify.backend.api.Browse
+import com.quackify.backend.api.Podcasts
+import com.quackify.backend.model.BrowsePage
+import com.quackify.backend.model.EpisodeDetail
+import com.quackify.backend.model.ShowDetail
+import com.quackify.backend.model.SearchHit
+import com.quackify.backend.model.SearchResults
+import com.quackify.backend.model.TrackLyrics
+import com.quackify.compose.home.toQuickAccess
+import com.quackify.compose.home.toShelves
+import com.quackify.compose.player.TimeSyncedLyric
+import com.quackify.compose.format.formatCount
+import com.quackify.compose.screens.LoginScreen
+import com.quackify.compose.screens.PathfinderCaptureScreen
+import com.quackify.compose.shell.SpotifyAppShell
+import com.quackify.compose.theme.SpotifyEncoreTheme
+import com.quackify.compose.util.rememberIsOffline
+import com.quackify.backend.core.webview.SilentTokenRefresh
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.spotiduck.backend.core.log.Logs
-import com.spotiduck.backend.library.Krespot
+import com.quackify.backend.core.log.Logs
+import com.quackify.backend.library.Krespot
 
 private val log = Logs.of(Logs.Module.MAIN)
 
@@ -652,7 +652,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         SpotifyAppShell(
-                                userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "SpotiDuck",
+                                userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
                                 userAvatarUrl = account?.imageUrl.orEmpty(),
                             playbackState = bridge.state,
                             playerListener = bridge.listener,
@@ -874,7 +874,7 @@ class MainActivity : ComponentActivity() {
                             homeLoading = loading,
                             searchResults = remember(searchHits) {
                                 searchHits.map { hit ->
-                                    com.spotiduck.compose.playlist.TrackItem(
+                                    com.quackify.compose.playlist.TrackItem(
                                         title = hit.title,
                                         artist = hit.subtitle,
                                         uri = hit.uri,
@@ -1180,10 +1180,10 @@ class MainActivity : ComponentActivity() {
  */
 private suspend fun decorateSearchTracks(
     context: android.content.Context,
-    results: com.spotiduck.backend.model.SearchResults,
-): com.spotiduck.backend.model.SearchResults {
-    fun thin(hit: com.spotiduck.backend.model.SearchHit) =
-        hit.kind == com.spotiduck.backend.model.SearchKind.TRACK &&
+    results: com.quackify.backend.model.SearchResults,
+): com.quackify.backend.model.SearchResults {
+    fun thin(hit: com.quackify.backend.model.SearchHit) =
+        hit.kind == com.quackify.backend.model.SearchKind.TRACK &&
                 (hit.imageUrl.isBlank() || hit.subtitle.isBlank())
     val missing = (listOfNotNull(results.top) + results.tracks)
         .filter(::thin)
@@ -1191,10 +1191,10 @@ private suspend fun decorateSearchTracks(
         .distinct()
     if (missing.isEmpty()) return results
     val rows = runCatching {
-        com.spotiduck.backend.library.TrackSource.decorate(context, missing)
+        com.quackify.backend.library.TrackSource.decorate(context, missing)
     }.getOrDefault(emptyMap())
     if (rows.isEmpty()) return results
-    fun fill(hit: com.spotiduck.backend.model.SearchHit): com.spotiduck.backend.model.SearchHit {
+    fun fill(hit: com.quackify.backend.model.SearchHit): com.quackify.backend.model.SearchHit {
         val row = rows[hit.uri] ?: return hit
         return hit.copy(
             subtitle = hit.subtitle.ifBlank { row.artists },
