@@ -148,6 +148,9 @@ fun SpotifyPlaylistScreen(
     recommendationsLoading: Boolean = false,
     onRecommendRefresh: () -> Unit = {},
     onAddRecommended: (TrackItem) -> Unit = {},
+    onChangeTitle: (() -> Unit)? = null,
+    onAddTracksClick: (() -> Unit)? = null,
+    onEditCoverClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     headerColor: Color = Color(0xFF144D3F),
     coverUrl: String? = null,
@@ -457,7 +460,7 @@ fun SpotifyPlaylistScreen(
             }
         } else {
             // ==========================================
-            // NORMAL PLAYLIST MODE (Image 1, 2, 4, 5 & Latest Screenshot)
+            // NORMAL PLAYLIST MODE
             // ==========================================
 
             val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -593,7 +596,18 @@ fun SpotifyPlaylistScreen(
                                 .fillMaxWidth()
                                 .padding(top = 4.dp)
                         ) {
-                            // Interactive Pull-Down Snapping Search Bar
+                            if (displayedTracks.isEmpty()) {
+                                PlaylistEmptyCurationHeader(
+                                    coverUrl = coverUrl,
+                                    title = currentTitle,
+                                    creator = creator,
+                                    onEditCoverClick = { onEditCoverClick?.invoke() ?: onPlaylistOptionsClick() },
+                                    onChangeTitle = onChangeTitle,
+                                    onShareClick = onShareClick,
+                                    onAddTracksClick = { onAddTracksClick?.invoke() ?: run { isSearching = true } }
+                                )
+                            } else {
+                                // Interactive Pull-Down Snapping Search Bar
                             if (currentSearchHeightDp > 0.dp) {
                                 Box(
                                     modifier = Modifier
@@ -911,12 +925,14 @@ fun SpotifyPlaylistScreen(
                             }
 
                             Spacer(modifier = Modifier.height(14.dp))
+                            }
                         }
                     }
                 }
 
                 // In-List Filter Chips Bar matching Spotify specs:
-                item(key = "filter_chips_row") {
+                if (displayedTracks.isNotEmpty()) {
+                    item(key = "filter_chips_row") {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -938,6 +954,7 @@ fun SpotifyPlaylistScreen(
                             onSortClick = { isSortSheetOpen = true }
                         )
                     }
+                }
                 }
 
                 // Track Rows (Solid pure #121212 background, 60dp standard row height, scrolls under sticky chips)
@@ -1000,27 +1017,29 @@ fun SpotifyPlaylistScreen(
                     }
                 }
 
-                // "Recommended" Section (add_more_row_blend_playlist.xml)
+                // "Recommended Songs" Section (add_more_row_blend_playlist.xml)
                 if (recommendedTracks.isNotEmpty() || recommendationsLoading) {
                     item {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 28.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
+                                .padding(top = 24.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
                         ) {
                             Text(
-                                text = "Recommended",
+                                text = "Recommended Songs",
                                 style = SpotifyTheme.typography.titleLarge.copy(
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Based on what's in this playlist",
-                                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-                            )
+                            if (displayedTracks.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Based on what's in this playlist",
+                                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
                         }
                     }
 
@@ -1109,7 +1128,7 @@ fun SpotifyPlaylistScreen(
                     }
 
                     item {
-                        // Refresh Recommendations Button
+                        // Refresh Recommendations Button (Solid white pill button)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1118,19 +1137,19 @@ fun SpotifyPlaylistScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(999.dp))
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(Color.White)
                                     .clickable(enabled = !recommendationsLoading, onClick = onRecommendRefresh)
                                     .padding(horizontal = 24.dp, vertical = 10.dp)
                             ) {
                                 if (recommendationsLoading) {
-                                    InlineLoadingDots(color = Color.White)
+                                    InlineLoadingDots(color = Color.Black)
                                 } else {
                                     Text(
                                         text = "Refresh",
                                         style = SpotifyTheme.typography.bodySmallBold.copy(
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White
+                                            color = Color.Black
                                         )
                                     )
                                 }
@@ -1256,7 +1275,7 @@ fun SpotifyPlaylistScreen(
 
             // Pinned Filter Chips Bar directly below the Top Bar:
             // Locks at toolbarBottom as soon as list scrolls beneath the top bar
-            if (chipsRowYInRoot <= toolbarBottomPx || isHeaderOffScreen) {
+            if (displayedTracks.isNotEmpty() && (chipsRowYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1362,7 +1381,7 @@ private fun PlaylistChipsRow(
 }
 
 /**
- * Filter Chip Button matching Spotify Mobile specs (Image 1, 4 & Latest Screenshot):
+ * Filter Chip Button matching Spotify Mobile specs:
  * Pill shape, #2A2A2A background, white icon + bold white text.
  */
 @Composable
@@ -1427,5 +1446,217 @@ fun PreviewSpotifyPlaylistScreen() {
             onPlayPauseClick = {},
             onTrackSelect = {}
         )
+    }
+}
+
+
+/**
+ * 1:1 Spotify Empty Playlist Curation Header:
+ * - Square Cover placeholder (120dp x 120dp) with centered edit pencil icon
+ * - Playlist Title with right-side "Change" pill button
+ * - Collaborator row with (+) circle button, Avatar circle, and User name
+ * - Action row: Globe (public) and Share icon
+ * - Large centered solid white pill button: "+ Add to this playlist"
+ */
+@Composable
+private fun PlaylistEmptyCurationHeader(
+    coverUrl: String?,
+    title: String,
+    creator: String,
+    onEditCoverClick: () -> Unit,
+    onChangeTitle: (() -> Unit)?,
+    onShareClick: () -> Unit,
+    onAddTracksClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Square Cover placeholder (120dp square with centered pencil icon)
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF282828))
+                    .clickable(onClick = onEditCoverClick),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!coverUrl.isNullOrBlank()) {
+                    SpotifyArtworkImage(
+                        imageUrl = coverUrl,
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize(),
+                        cornerRadius = 8.dp
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_edit_24),
+                        contentDescription = "Edit cover",
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Title & Change Button & User Info Column
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = title,
+                        style = SpotifyTheme.typography.titleLarge.copy(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // "Change" pill button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF3E3E3E))
+                            .clickable { onChangeTitle?.invoke() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Change",
+                            style = SpotifyTheme.typography.bodySmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 12.sp
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // User / Creator Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // (+) Add collaborator circle
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF333333)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_plus_24),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+
+                    // User Profile Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF444444)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_user_24),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+
+                    Text(
+                        text = creator,
+                        style = SpotifyTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 12.sp
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Actions Row: 🌐 Globe + Share icon
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "🌐",
+                fontSize = 14.sp
+            )
+            Icon(
+                painter = painterResource(id = R.drawable.encore_icon_share_android_24),
+                contentDescription = "Share",
+                tint = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .size(20.dp)
+                    .clickable(onClick = onShareClick)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Big Centered White Pill Button: "+ Add to this playlist"
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.White)
+                    .clickable(onClick = onAddTracksClick)
+                    .padding(horizontal = 28.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_plus_24),
+                        contentDescription = null,
+                        tint = Color.Black,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Add to this playlist",
+                        style = SpotifyTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            fontSize = 15.sp
+                        )
+                    )
+                }
+            }
+        }
     }
 }

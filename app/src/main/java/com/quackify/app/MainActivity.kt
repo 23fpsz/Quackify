@@ -424,21 +424,30 @@ class MainActivity : ComponentActivity() {
                                         .shuffled()
                                         .take(3)
                                 } else {
-                                    // Empty playlist: seed from user's liked collection or popular artists
+                                    // Empty playlist: dynamically seed from user's liked collection or library
+                                    val candidateArtists = LinkedHashSet<String>()
                                     val likedDetail = Krespot.collections.collection(context, "spotify:user:@me:collection")
-                                    val likedArtists = likedDetail?.tracks
-                                        ?.mapNotNull { it.artistUri.takeIf { uri -> uri.startsWith("spotify:artist:") } }
-                                        ?.distinct()
-                                        ?.shuffled()
-                                        ?.take(4)
-                                    if (!likedArtists.isNullOrEmpty()) {
-                                        likedArtists
+                                    likedDetail?.tracks?.forEach { t ->
+                                        if (t.artistUri.startsWith("spotify:artist:")) candidateArtists.add(t.artistUri)
+                                    }
+
+                                    if (candidateArtists.size < 5) {
+                                        val libraryPage = Krespot.library.page(context)
+                                        libraryPage?.items?.forEach { item ->
+                                            if (item.uri.startsWith("spotify:artist:")) {
+                                                candidateArtists.add(item.uri)
+                                            }
+                                        }
+                                    }
+
+                                    if (candidateArtists.isNotEmpty()) {
+                                        candidateArtists.shuffled().take(4)
                                     } else {
+                                        // Graceful fallback for brand new accounts with no library or liked songs
                                         listOf(
                                             "spotify:artist:4YRxDV8wJFPHPTeXepOstw",
-                                            "spotify:artist:0oOet2ZQ0QvFBsP9mO065v",
-                                            "spotify:artist:2FKWNmUpLgahBMUWosUaZy",
-                                            "spotify:artist:1mYsTxn959jds3DaR7qa9Y"
+                                            "spotify:artist:3g2kUQ6tHLLbmkV7T4GPdf",
+                                            "spotify:artist:246dkjvS1zLTtiykYqq8Gv"
                                         )
                                     }
                                 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -105,6 +107,10 @@ fun SpotifyLibraryScreen(
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
     title: String = "Your Library",
+    isFolder: Boolean = false,
+    onBackClick: (() -> Unit)? = null,
+    onFolderOptionsClick: (() -> Unit)? = null,
+    onPlayClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedFilter by remember { mutableStateOf<String?>(null) }
@@ -224,6 +230,67 @@ fun SpotifyLibraryScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
+            } else if (isFolder) {
+                // Folder Title Header: Back Arrow + Folder Title + 3-Dots + Plus + Play
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_chevron_left_24,
+                        contentDescription = "Back",
+                        onClick = { onBackClick?.invoke() },
+                        size = 40.dp,
+                        iconSize = 24.dp,
+                        tint = EncoreColors.TextPrimary
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = title,
+                        style = SpotifyTheme.typography.titleMedium.copy(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EncoreColors.TextPrimary
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Folder Options (3-dots)
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_more_android_24,
+                        contentDescription = "Folder options",
+                        onClick = { onFolderOptionsClick?.invoke() },
+                        size = 40.dp,
+                        iconSize = 22.dp,
+                        tint = EncoreColors.TextPrimary
+                    )
+
+                    // Plus (+) Create Button
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_plus_24,
+                        contentDescription = "Create",
+                        onClick = onPlusClick,
+                        size = 40.dp,
+                        iconSize = 24.dp,
+                        tint = EncoreColors.TextPrimary
+                    )
+
+                    // Play Button
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_play_24,
+                        contentDescription = "Play",
+                        onClick = { onPlayClick?.invoke() },
+                        size = 40.dp,
+                        iconSize = 24.dp,
+                        tint = if (allLibraryItems.isNotEmpty()) Color.White else Color.White.copy(alpha = 0.38f)
+                    )
+                }
             } else {
                 // Standard Title Header: Profile Avatar + "Your Library" + Search + Plus
                 Row(
@@ -272,63 +339,67 @@ fun SpotifyLibraryScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (!isFolder) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // Filter Chips Row (matching your_library_content_filter_* tokens and library_chip_* dimensions)
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                items(filters) { filter ->
-                    val isSelected = selectedFilter == filter
-                    EncoreChip(
-                        text = filter,
-                        isSelected = isSelected,
-                        onClick = {
-                            selectedFilter = if (isSelected) null else filter
-                        }
-                    )
+                // Filter Chips Row (matching your_library_content_filter_* tokens and library_chip_* dimensions)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(filters) { filter ->
+                        val isSelected = selectedFilter == filter
+                        EncoreChip(
+                            text = filter,
+                            isSelected = isSelected,
+                            onClick = {
+                                selectedFilter = if (isSelected) null else filter
+                            }
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (!isFolder || filteredItems.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // Sort & View Toggle Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Sort Button (Recents etc.)
+                // Sort & View Toggle Row
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable(onClick = onSortClick)
-                        .padding(vertical = 4.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.encore_icon_sort_24),
-                        contentDescription = "Sort order",
+                    // Sort Button (Recents etc.)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable(onClick = onSortClick)
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_sort_24),
+                            contentDescription = "Sort order",
+                            tint = EncoreColors.TextPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = currentSort.displayName,
+                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
+                        )
+                    }
+
+                    // Grid / List View Toggle Button
+                    EncoreIconButton(
+                        iconRes = if (isGridView) R.drawable.encore_icon_list_view_24 else R.drawable.encore_icon_grid_view_24,
+                        contentDescription = if (isGridView) "List view" else "Grid view",
+                        onClick = { isGridView = !isGridView },
                         tint = EncoreColors.TextPrimary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = currentSort.displayName,
-                        style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
+                        size = 32.dp,
+                        iconSize = 18.dp
                     )
                 }
-
-                // Grid / List View Toggle Button
-                EncoreIconButton(
-                    iconRes = if (isGridView) R.drawable.encore_icon_list_view_24 else R.drawable.encore_icon_grid_view_24,
-                    contentDescription = if (isGridView) "List view" else "Grid view",
-                    onClick = { isGridView = !isGridView },
-                    tint = EncoreColors.TextPrimary,
-                    size = 32.dp,
-                    iconSize = 18.dp
-                )
             }
         }
 
@@ -355,36 +426,60 @@ fun SpotifyLibraryScreen(
                     .padding(bottom = bottomPadding),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = if (isSearchActive && searchFilterText.isNotEmpty()) {
-                            "Couldn't find \"$searchFilterText\""
-                        } else {
-                            "Find your favorites"
-                        },
-                        style = SpotifyTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = if (isSearchActive && searchFilterText.isNotEmpty()) {
-                            "Try searching again using a different spelling or keyword."
-                        } else {
-                            "Search everything you've saved, followed, or created."
-                        },
-                        style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
-                    )
+                if (isFolder) {
+                    // 1:1 Spotify Empty Folder State
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "This folder looks empty",
+                            style = SpotifyTheme.typography.titleLarge.copy(
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            ),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Add playlists from Your Library.",
+                            style = SpotifyTheme.typography.bodyMedium.copy(
+                                color = EncoreColors.TextSecondary,
+                                fontSize = 14.sp
+                            ),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = if (isSearchActive && searchFilterText.isNotEmpty()) {
+                                "Couldn't find \"$searchFilterText\""
+                            } else {
+                                "Find your favorites"
+                            },
+                            style = SpotifyTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = if (isSearchActive && searchFilterText.isNotEmpty()) {
+                                "Try searching again using a different spelling or keyword."
+                            } else {
+                                "Search everything you've saved, followed, or created."
+                            },
+                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                        )
+                    }
                 }
             }
         } else if (isGridView) {
-            // 2-Column Grid View
+            // 3-Column Dense Grid View matching your_library_dense_span_count
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(3),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
                 contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(filteredItems) { item ->
@@ -408,8 +503,8 @@ fun SpotifyLibraryScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(140.dp)
-                                .clip(if (isArtist) CircleShape else RoundedCornerShape(6.dp))
+                                .aspectRatio(1f)
+                                .clip(if (isArtist) CircleShape else RoundedCornerShape(4.dp))
                                 .background(Brush.linearGradient(item.coverGradient)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -418,45 +513,51 @@ fun SpotifyLibraryScreen(
                                     imageUrl = item.imageUrl,
                                     contentDescription = item.title,
                                     modifier = Modifier.fillMaxSize(),
-                                    cornerRadius = if (isArtist) 70.dp else 6.dp
+                                    cornerRadius = if (isArtist) 999.dp else 4.dp
                                 )
                             } else if (item.title == "Liked Songs") {
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_heart_active_24),
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(28.dp)
                                 )
                             } else if (item.type == LibraryItemType.FOLDER) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_folder_24),
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(32.dp)
                                 )
                             } else {
                                 Text(
                                     text = if (isArtist) "★" else "♫",
-                                    fontSize = 40.sp,
+                                    fontSize = 28.sp,
                                     color = Color.White
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
                             text = item.title,
-                            style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            style = SpotifyTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(1.dp))
 
                         Text(
                             text = item.subtitle,
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            style = SpotifyTheme.typography.bodySmall.copy(
+                                color = EncoreColors.TextSecondary,
+                                fontSize = 11.sp
+                            ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )

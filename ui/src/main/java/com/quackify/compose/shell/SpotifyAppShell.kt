@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import com.quackify.compose.sheets.FolderOptionsSheet
 import com.quackify.compose.sheets.SpotifyCreateNameDialog
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -431,6 +432,8 @@ fun SpotifyAppShell(
     var isCreditsOpen by remember { mutableStateOf(false) }
     var isAddToPlaylistOpen by remember { mutableStateOf(false) }
     var libraryItemOptions by remember { mutableStateOf<EntityOptions?>(null) }
+    var activeFolderOptionsItem by remember { mutableStateOf<LibraryItem?>(null) }
+    var isRenamePlaylistDialogOpen by remember { mutableStateOf(false) }
     var folderDraft by remember { mutableStateOf<FolderDraft?>(null) }
     var isCreatePlaylistOpen by remember { mutableStateOf(false) }
     var playlistCreateName by remember { mutableStateOf("My Playlist") }
@@ -778,7 +781,7 @@ fun SpotifyAppShell(
 
     val handleLibraryLongPress: (LibraryItem) -> Unit = { item ->
         if (item.type == LibraryItemType.FOLDER) {
-            folderDraft = FolderDraft(mode = FolderMode.RENAME, folderUri = item.uri, title = item.title)
+            activeFolderOptionsItem = item
         } else {
             libraryItemOptions = EntityOptions(
                 title = item.title,
@@ -968,7 +971,19 @@ fun SpotifyAppShell(
                     localPositionMs = 12000L
                 },
                 onPlaylistOptions = { isPlaylistOptionsOpen = true },
-                onEditModeChange = { isEditing -> isPlaylistEditMode = isEditing }
+                onEditModeChange = { isEditing -> isPlaylistEditMode = isEditing },
+                onChangeTitle = { isRenamePlaylistDialogOpen = true },
+                onAddTracksClick = {
+                    currentScreen = ShellScreen.SEARCH
+                },
+                onEditCoverClick = {
+                    val uri = activePlaylistUri
+                    if (uri.startsWith("spotify:playlist:") && playlistDetail?.editable == true) {
+                        onEditPlaylist?.invoke(uri)
+                    } else {
+                        isPlaylistOptionsOpen = true
+                    }
+                }
             )
             ShellScreen.ALBUM -> ShellAlbumPane(
                 activeAlbumTitle = activeAlbumTitle,
@@ -1181,7 +1196,22 @@ fun SpotifyAppShell(
                 onProfileClick = openProfileDrawer,
                 onPlusClick = { isCreateSheetOpen = true },
                 onSortClick = { isSortSheetOpen = true },
-                currentSort = currentSortOption
+                currentSort = currentSortOption,
+                onBackClick = { handleBack() },
+                onFolderOptionsClick = {
+                    activeFolderOptionsItem = LibraryItem(
+                        title = activeFolderTitle,
+                        subtitle = "${folderItems?.size ?: 0} playlists",
+                        type = LibraryItemType.FOLDER,
+                        uri = activeFolderUri
+                    )
+                },
+                onPlayClick = {
+                    val firstItem = folderItems?.firstOrNull()
+                    if (firstItem != null && firstItem.type == LibraryItemType.PLAYLIST) {
+                        openPlaylist(firstItem.title, firstItem.uri)
+                    }
+                }
             )
         }
         }
@@ -1346,6 +1376,7 @@ fun SpotifyAppShell(
             userAvatarUrl = userAvatarUrl,
             savedAccounts = savedAccounts,
             activeAccountId = activeAccountId,
+            isFolder = currentScreen == ShellScreen.FOLDER,
             canvasAvailable = isCanvasAllowed && canvasFilePath != null,
             isCanvasEnabled = isCanvasEnabled,
             onCanvasToggle = { onCanvasToggle?.invoke(!isCanvasEnabled) },
@@ -1637,6 +1668,68 @@ fun SpotifyAppShell(
                 )
             }
         }
+
+        activeFolderOptionsItem?.let { folderItem ->
+            FolderOptionsSheet(
+                isOpen = true,
+                folderTitle = folderItem.title,
+                playlistCount = if (folderItem.uri == activeFolderUri) folderItems?.size ?: 0 else 0,
+                onMoveToFolder = {
+                    val targetUri = folderItem.uri
+                    val targetTitle = folderItem.title
+                    activeFolderOptionsItem = null
+                    folderDraft = FolderDraft(
+                        mode = FolderMode.PICKER,
+                        folderUri = targetUri,
+                        title = targetTitle,
+                        folders = libraryFolderChoices
+                    )
+                },
+                onRenameFolder = {
+                    val targetUri = folderItem.uri
+                    val targetTitle = folderItem.title
+                    activeFolderOptionsItem = null
+                    folderDraft = FolderDraft(
+                        mode = FolderMode.RENAME,
+                        folderUri = targetUri,
+                        title = targetTitle
+                    )
+                },
+                onMoveToLibrary = {
+                    val targetUri = folderItem.uri
+                    activeFolderOptionsItem = null
+                    onMoveToFolder?.invoke(targetUri, "")
+                },
+                onDeleteFolder = {
+                    val targetUri = folderItem.uri
+                    activeFolderOptionsItem = null
+                    onDeleteFolder?.invoke(targetUri)
+                    if (currentScreen == ShellScreen.FOLDER && activeFolderUri == targetUri) {
+                        handleBack()
+                    }
+                },
+                onDismiss = { activeFolderOptionsItem = null }
+            )
+        }
+
+        SpotifyCreateNameDialog(
+            isOpen = isRenamePlaylistDialogOpen,
+            title = "Give your playlist a name",
+            initialName = activePlaylistTitle,
+            confirmLabel = "Save",
+            cancelLabel = "Cancel",
+            onConfirm = { newTitle ->
+                isRenamePlaylistDialogOpen = false
+                val uri = activePlaylistUri
+                if (uri.isNotBlank()) {
+                    activePlaylistTitle = newTitle
+                    shellScope.launch {
+                        onEditPlaylistDetails?.invoke(uri, newTitle, "", null, false)
+                    }
+                }
+            },
+            onDismiss = { isRenamePlaylistDialogOpen = false }
+        )
     }
 }
 
@@ -1905,7 +1998,10 @@ private fun ShellPlaylistPane(
     onLocalPlayPause: () -> Unit,
     onLocalTrack: (TrackItem) -> Unit,
     onPlaylistOptions: () -> Unit,
-    onEditModeChange: (Boolean) -> Unit = {}
+    onEditModeChange: (Boolean) -> Unit = {},
+    onChangeTitle: (() -> Unit)? = null,
+    onAddTracksClick: (() -> Unit)? = null,
+    onEditCoverClick: (() -> Unit)? = null
 ) {
     androidx.compose.runtime.key(activePlaylistUri.ifEmpty { activePlaylistTitle }) {
         LaunchedEffect(playlistTracks, activePlaylistUri) {
@@ -1999,6 +2095,9 @@ private fun ShellPlaylistPane(
             recommendationsLoading = recommendationsLoading,
             onRecommendRefresh = { onRefreshRecommendations?.invoke() },
             onAddRecommended = { track -> onAddRecommended?.invoke(track) },
+            onChangeTitle = onChangeTitle,
+            onAddTracksClick = onAddTracksClick,
+            onEditCoverClick = onEditCoverClick,
             onEditModeChange = onEditModeChange
         )
     }
@@ -2169,7 +2268,10 @@ private fun ShellFolderPane(
     onProfileClick: () -> Unit,
     onPlusClick: () -> Unit = {},
     onSortClick: () -> Unit = {},
-    currentSort: LibrarySortOption = LibrarySortOption.RECENTS
+    currentSort: LibrarySortOption = LibrarySortOption.RECENTS,
+    onBackClick: () -> Unit = {},
+    onFolderOptionsClick: () -> Unit = {},
+    onPlayClick: () -> Unit = {}
 ) {
     SpotifyLibraryScreen(
         onItemClick = onItemClick,
@@ -2183,7 +2285,11 @@ private fun ShellFolderPane(
         onProfileClick = onProfileClick,
         onPlusClick = onPlusClick,
         onSortClick = onSortClick,
-        currentSort = currentSort
+        currentSort = currentSort,
+        isFolder = true,
+        onBackClick = onBackClick,
+        onFolderOptionsClick = onFolderOptionsClick,
+        onPlayClick = onPlayClick
     )
 }
 
