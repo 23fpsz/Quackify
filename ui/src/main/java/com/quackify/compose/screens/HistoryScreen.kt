@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncoreTrackRow
+import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
@@ -85,18 +85,12 @@ fun HistoryScreen(
         }
 
         if (loading && !hasContent) {
-            Box(
+            TrackListSkeleton(
+                rows = 9,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = bottomPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = EncoreColors.Green,
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
+                    .padding(top = 8.dp)
+            )
         } else if (!hasContent) {
             Box(
                 modifier = Modifier

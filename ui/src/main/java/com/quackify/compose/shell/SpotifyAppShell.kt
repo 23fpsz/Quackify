@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,6 +36,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.quackify.compose.R
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.components.DetailPageSkeleton
 import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.home.RecommendationCard
 import com.quackify.compose.home.SpotifyHomeScreen
@@ -1574,6 +1574,15 @@ internal fun isCollectionUri(uri: String): Boolean =
 
 @Composable
 private fun ShellLoadingState(loading: Boolean, onRetry: () -> Unit) {
+    if (loading) {
+        DetailPageSkeleton(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(EncoreColors.Background)
+                .statusBarsPadding()
+        )
+        return
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1581,23 +1590,15 @@ private fun ShellLoadingState(loading: Boolean, onRetry: () -> Unit) {
             .statusBarsPadding(),
         contentAlignment = Alignment.Center
     ) {
-        if (loading) {
-            CircularProgressIndicator(
-                color = EncoreColors.Green,
-                strokeWidth = 3.dp,
-                modifier = Modifier.size(36.dp)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "Couldn't load",
+                style = SpotifyTheme.typography.titleMedium,
+                color = EncoreColors.TextPrimary
             )
-        } else {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Couldn't load",
-                    style = SpotifyTheme.typography.titleMedium,
-                    color = EncoreColors.TextPrimary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                TextButton(onClick = onRetry) {
-                    Text(text = "Try again", color = EncoreColors.Green)
-                }
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = onRetry) {
+                Text(text = "Try again", color = EncoreColors.Green)
             }
         }
     }

@@ -40,7 +40,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -83,6 +82,9 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreTrackRow
+import com.quackify.compose.components.InlineLoadingDots
+import com.quackify.compose.components.TrackListSkeleton
+import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
@@ -156,6 +158,7 @@ fun SpotifyPlaylistScreen(
     onRetry: () -> Unit = {}
 ) {
     var currentTitle by remember(title) { mutableStateOf(title) }
+    val smoothHeaderColor by rememberSmoothColor(target = headerColor)
     var currentDescription by remember(description) { mutableStateOf(description) }
     var isEditMode by remember { mutableStateOf(false) }
     var isSortSheetOpen by remember { mutableStateOf(false) }
@@ -549,10 +552,10 @@ fun SpotifyPlaylistScreen(
                         .background(
                             Brush.verticalGradient(
                                 colorStops = arrayOf(
-                                    0.0f to headerColor,
-                                    0.35f to headerColor.copy(alpha = 0.90f),
-                                    0.65f to headerColor.copy(alpha = 0.55f),
-                                    0.85f to headerColor.copy(alpha = 0.20f),
+                                    0.0f to smoothHeaderColor,
+                                    0.35f to smoothHeaderColor.copy(alpha = 0.90f),
+                                    0.65f to smoothHeaderColor.copy(alpha = 0.55f),
+                                    0.85f to smoothHeaderColor.copy(alpha = 0.20f),
                                     1.0f to Color(0xFF121212)
                                 )
                             )
@@ -646,7 +649,7 @@ fun SpotifyPlaylistScreen(
                                         }
                                         .shadow(elevation = (14 * (1f - shrinkFraction)).dp, shape = RoundedCornerShape(4.dp))
                                         .clip(RoundedCornerShape(4.dp))
-                                        .background(headerColor.copy(alpha = 0.9f)),
+                                        .background(smoothHeaderColor.copy(alpha = 0.9f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (!coverUrl.isNullOrBlank()) {
@@ -797,7 +800,7 @@ fun SpotifyPlaylistScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxSize()
-                                                    .background(headerColor.copy(alpha = 0.8f)),
+                                                    .background(smoothHeaderColor.copy(alpha = 0.8f)),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text("♫", fontSize = 14.sp, color = Color.White)
@@ -918,18 +921,10 @@ fun SpotifyPlaylistScreen(
                 // Track Rows (Solid pure #121212 background, 60dp standard row height, scrolls under sticky chips)
                 if (loading && displayedTracks.isEmpty()) {
                     item(key = "playlist_loading") {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 48.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                color = EncoreColors.Green,
-                                strokeWidth = 3.dp,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
+                        TrackListSkeleton(
+                            rows = 8,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                     }
                 }
                 if (!loading && loadFailed && displayedTracks.isEmpty()) {
@@ -976,18 +971,10 @@ fun SpotifyPlaylistScreen(
 
                 if (loadingMore) {
                     item(key = "playlist_loading_more") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 20.dp),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(
-                                color = EncoreColors.Green,
-                                strokeWidth = 3.dp,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
+                        TrackListSkeleton(
+                            rows = 2,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
                     }
                 }
 
@@ -1115,11 +1102,7 @@ fun SpotifyPlaylistScreen(
                                     .padding(horizontal = 24.dp, vertical = 10.dp)
                             ) {
                                 if (recommendationsLoading) {
-                                    CircularProgressIndicator(
-                                        color = Color.White,
-                                        strokeWidth = 2.dp,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    InlineLoadingDots(color = Color.White)
                                 } else {
                                     Text(
                                         text = "Refresh",
@@ -1144,7 +1127,7 @@ fun SpotifyPlaylistScreen(
                     .graphicsLayer {
                         alpha = topBarAlpha
                     }
-                    .background(headerColor)
+                    .background(smoothHeaderColor)
                     .zIndex(9.8f)
             )
 

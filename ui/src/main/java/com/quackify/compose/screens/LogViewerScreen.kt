@@ -36,7 +36,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
@@ -70,6 +69,7 @@ import com.quackify.backend.core.log.Logs
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.theme.DmMono
+import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
@@ -618,7 +618,7 @@ private fun DeviceInfoSheet(
                         .height(160.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = EncoreColors.Green, strokeWidth = 3.dp)
+                    InlineLoadingDots(color = EncoreColors.TextSecondary, dotSize = 6.dp)
                 }
             } else {
                 SelectionContainer {

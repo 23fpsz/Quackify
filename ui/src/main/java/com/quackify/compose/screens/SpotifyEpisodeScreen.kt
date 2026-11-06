@@ -41,6 +41,7 @@ import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.format.formatDuration
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
@@ -68,6 +69,7 @@ fun SpotifyEpisodeScreen(
 ) {
     var descriptionExpanded by remember { mutableStateOf(false) }
     var descriptionOverflows by remember { mutableStateOf(false) }
+    val smoothHeaderColor by rememberSmoothColor(target = headerColor)
     val bottomPadding = rememberBottomPadding()
 
     Column(
@@ -76,8 +78,8 @@ fun SpotifyEpisodeScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        headerColor,
-                        headerColor.copy(alpha = 0.5f),
+                        smoothHeaderColor,
+                        smoothHeaderColor.copy(alpha = 0.5f),
                         EncoreColors.Background,
                     ),
                 ),
@@ -128,7 +130,7 @@ fun SpotifyEpisodeScreen(
                             .align(if (isVideo) Alignment.CenterHorizontally else Alignment.Start)
                             .shadow(elevation = 16.dp, shape = RoundedCornerShape(6.dp))
                             .clip(RoundedCornerShape(6.dp))
-                            .background(headerColor.copy(alpha = 0.85f)),
+                            .background(smoothHeaderColor.copy(alpha = 0.85f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         val art = wideImageUrl?.takeIf { it.isNotBlank() } ?: imageUrl

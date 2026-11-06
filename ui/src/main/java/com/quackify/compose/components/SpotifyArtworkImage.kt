@@ -1,16 +1,26 @@
 package com.quackify.compose.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
@@ -59,6 +69,12 @@ fun SpotifyArtworkImage(
     val effectiveShape = shape ?: (if (cornerRadius != null && cornerRadius > 0.dp) RoundedCornerShape(cornerRadius) else null)
     val clipModifier = if (effectiveShape != null) modifier.clip(effectiveShape) else modifier
     val resolvedUrl = resolveSpotifyImageUrl(imageUrl)
+    var loaded by remember(resolvedUrl) { mutableStateOf(false) }
+    val artworkAlpha by animateFloatAsState(
+        targetValue = if (loaded) 1f else 0f,
+        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+        label = "artworkReveal"
+    )
 
     Box(
         modifier = clipModifier.background(fallbackColor),
@@ -72,8 +88,22 @@ fun SpotifyArtworkImage(
                     .build(),
                 contentDescription = contentDescription,
                 contentScale = contentScale,
-                modifier = Modifier.fillMaxSize()
+                onSuccess = { loaded = true },
+                onError = { loaded = true },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = artworkAlpha }
             )
+            if (!loaded) {
+                ShimmerHost {
+                    ShimmerBlock(
+                        modifier = Modifier.fillMaxSize(),
+                        shape = RectangleShape,
+                        base = fallbackColor,
+                        highlight = fallbackColor.copy(alpha = 0.45f).compositeOver(ShimmerHighlightTone)
+                    )
+                }
+            }
         } else {
             Text(
                 text = "♪",
@@ -82,3 +112,5 @@ fun SpotifyArtworkImage(
         }
     }
 }
+
+private val ShimmerHighlightTone = Color(0xFF2E2E2E)

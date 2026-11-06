@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,7 +49,9 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
+import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.matchesCurrent
 import com.quackify.backend.model.EpisodeRow
 import com.quackify.backend.model.ShowCard
@@ -90,6 +91,7 @@ fun SpotifyShowScreen(
 ) {
     var descriptionExpanded by remember { mutableStateOf(false) }
     var descriptionOverflows by remember { mutableStateOf(false) }
+    val smoothHeaderColor by rememberSmoothColor(target = headerColor)
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
 
@@ -125,8 +127,8 @@ fun SpotifyShowScreen(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    headerColor,
-                                    headerColor.copy(alpha = 0.55f),
+                                    smoothHeaderColor,
+                                    smoothHeaderColor.copy(alpha = 0.55f),
                                     EncoreColors.Background,
                                 ),
                             ),
@@ -167,7 +169,7 @@ fun SpotifyShowScreen(
                             .align(Alignment.CenterHorizontally)
                             .shadow(elevation = 18.dp, shape = RoundedCornerShape(6.dp))
                             .clip(RoundedCornerShape(6.dp))
-                            .background(headerColor.copy(alpha = 0.85f)),
+                            .background(smoothHeaderColor.copy(alpha = 0.85f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (!imageUrl.isNullOrBlank()) {
@@ -307,11 +309,7 @@ fun SpotifyShowScreen(
                             .padding(vertical = 16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = EncoreColors.TextSecondary,
-                            strokeWidth = 2.dp,
-                        )
+                        InlineLoadingDots(color = EncoreColors.TextSecondary)
                     }
                 }
             }
@@ -347,7 +345,7 @@ fun SpotifyShowScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(headerColor.copy(alpha = 0.98f))
+                    .background(smoothHeaderColor.copy(alpha = 0.98f))
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
