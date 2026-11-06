@@ -199,6 +199,7 @@ class MainActivity : ComponentActivity() {
                         var episodeLoading by remember { mutableStateOf(false) }
                         var episodeFetch by remember { mutableStateOf(0) }
                         var browseUri by remember { mutableStateOf("") }
+                        var browseFetch by remember { mutableStateOf(0) }
                         var browsePage by remember { mutableStateOf<BrowsePage?>(null) }
                         var categoryUri by remember { mutableStateOf("") }
                         var categoryShelves by remember { mutableStateOf<List<CategoryShelf>?>(null) }
@@ -508,7 +509,7 @@ class MainActivity : ComponentActivity() {
                             episodeLoading = false
                         }
 
-                        LaunchedEffect(browseUri) {
+                        LaunchedEffect(browseUri, browseFetch) {
                             if (browseUri.isBlank()) return@LaunchedEffect
                             browsePage = Browse.page(context, browseUri)
                         }
@@ -967,6 +968,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onOpenBrowse = { uri ->
                                 browseUri = uri
+                                browseFetch++
                                 browsePage = null
                             },
                             folderItems = folderItems,
