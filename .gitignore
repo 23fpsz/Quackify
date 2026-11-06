@@ -24,7 +24,7 @@ AGENT.md
 AGENTS.md
 
 # Secrets & local credentials
-sp_dc.txt
 *.env
 
-
+# Logs
+log.log
