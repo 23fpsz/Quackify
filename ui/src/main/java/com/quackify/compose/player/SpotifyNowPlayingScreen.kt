@@ -413,10 +413,7 @@ fun SpotifyNowPlayingScreen(
                             contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
                             onCollapseClick = onCollapseClick,
                             onMoreClick = onMoreClick,
-                            dragModifier = headerDragModifier,
-                            canvasAvailable = isCanvasAllowed && canvasFilePath != null,
-                            isCanvasEnabled = canvasActive,
-                            onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) }
+                            dragModifier = headerDragModifier
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -651,10 +648,7 @@ fun SpotifyNowPlayingScreen(
                         contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
                         onCollapseClick = onCollapseClick,
                         onMoreClick = onMoreClick,
-                        dragModifier = headerDragModifier,
-                        canvasAvailable = isCanvasAllowed && canvasFilePath != null,
-                        isCanvasEnabled = canvasActive,
-                        onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) }
+                        dragModifier = headerDragModifier
                     )
                 }
             }
@@ -879,10 +873,7 @@ private fun NowPlayingHeaderRow(
     contextSubtitle: String?,
     onCollapseClick: () -> Unit,
     onMoreClick: () -> Unit,
-    dragModifier: Modifier = Modifier,
-    canvasAvailable: Boolean = false,
-    isCanvasEnabled: Boolean = false,
-    onCanvasToggle: () -> Unit = {}
+    dragModifier: Modifier = Modifier
 ) {
     Row(
         modifier = Modifier
@@ -929,17 +920,6 @@ private fun NowPlayingHeaderRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-
-        if (canvasAvailable) {
-            EncoreIconButton(
-                iconRes = R.drawable.encore_icon_video_24,
-                contentDescription = if (isCanvasEnabled) "Turn Canvas off" else "Turn Canvas on",
-                onClick = onCanvasToggle,
-                tint = if (isCanvasEnabled) EncoreColors.Green else Color.White.copy(alpha = 0.7f),
-                size = 40.dp,
-                iconSize = 22.dp
-            )
         }
 
         EncoreIconButton(

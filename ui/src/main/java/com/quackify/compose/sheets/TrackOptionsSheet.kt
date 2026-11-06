@@ -75,6 +75,9 @@ fun TrackOptionsSheet(
     onSleepTimerClick: () -> Unit = {},
     onHideSong: () -> Unit = {},
     onShowCredits: () -> Unit = {},
+    canvasAvailable: Boolean = false,
+    isCanvasEnabled: Boolean = false,
+    onCanvasToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || track == null) return
@@ -311,6 +314,17 @@ fun TrackOptionsSheet(
                     onSleepTimerClick()
                 }
             )
+
+            if (canvasAvailable) {
+                ContextMenuRowItem(
+                    title = if (isCanvasEnabled) "Turn off Canvas" else "Turn on Canvas",
+                    iconRes = R.drawable.encore_icon_video_24,
+                    onClick = {
+                        onDismiss()
+                        onCanvasToggle()
+                    }
+                )
+            }
 
             ContextMenuRowItem(
                 title = "Share",
