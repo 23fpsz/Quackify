@@ -93,12 +93,14 @@ import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import com.quackify.compose.util.rememberIsOffline
+import kotlinx.coroutines.delay
 
 data class CategoryCard(
     val title: String,
     val color: Color,
     val uri: String = "",
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val subtitle: String = ""
 )
 
 data class SearchArtistItem(
@@ -230,6 +232,19 @@ fun SpotifySearchScreen(
     }
 
     val categories = remember(browseCategories) { browseCategories }
+
+    // The grid has no retry of its own, so a blank list after a moment means the
+    // fetch failed rather than still running. Without this the spinner sits there
+    // forever on an offline launch.
+    var categoriesFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(categories.isEmpty()) {
+        categoriesFailed = false
+        if (categories.isEmpty()) {
+            delay(6_000)
+            categoriesFailed = true
+        }
+    }
+
     val allSearchableTracks = remember(searchData) {
         searchData?.tracks.orEmpty().map { it.toTrackItem() }
     }
@@ -1143,13 +1158,22 @@ fun SpotifySearchScreen(
                                 .padding(vertical = 32.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            InlineLoadingDots(color = EncoreColors.TextSecondary)
+                            if (categoriesFailed) {
+                                Text(
+                                    text = "Couldn't load categories",
+                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                        color = EncoreColors.TextSecondary
+                                    )
+                                )
+                            } else {
+                                InlineLoadingDots(color = EncoreColors.TextSecondary)
+                            }
                         }
                     }
                 }
 
                 // Category Cards (96dp category_card_max_height from dimens.xml, 4dp corner radius)
-                items(categories) { category ->
+                items(categories, key = { it.uri.ifBlank { it.title } }) { category ->
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1158,17 +1182,32 @@ fun SpotifySearchScreen(
                             .background(category.color)
                             .clickable { onCategoryClick(category) }
                     ) {
-                        Text(
-                            text = category.title,
-                            style = SpotifyTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            ),
+                        Column(
                             modifier = Modifier
                                 .align(Alignment.TopStart)
                                 .padding(12.dp)
                                 .fillMaxWidth(0.65f)
-                        )
+                        ) {
+                            Text(
+                                text = category.title,
+                                style = SpotifyTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                ),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (category.subtitle.isNotBlank()) {
+                                Text(
+                                    text = category.subtitle,
+                                    style = SpotifyTheme.typography.bodySmall.copy(
+                                        color = Color.White.copy(alpha = 0.75f)
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
 
                         // Rotated Art Thumbnail Peek (offset 16dp x, 6dp y, 25 deg rotate)
                         Box(
