@@ -84,6 +84,9 @@ import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreTrackRow
 import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.TrackListSkeleton
+import com.quackify.compose.components.ShimmerBlock
+import com.quackify.compose.components.ShimmerHost
+import com.quackify.compose.components.ShimmerText
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.format.formatCollectionDuration
@@ -596,7 +599,7 @@ fun SpotifyPlaylistScreen(
                                 .fillMaxWidth()
                                 .padding(top = 4.dp)
                         ) {
-                            if (displayedTracks.isEmpty()) {
+                            if (!loading && !loadFailed && displayedTracks.isEmpty()) {
                                 PlaylistEmptyCurationHeader(
                                     coverUrl = coverUrl,
                                     title = currentTitle,
@@ -737,70 +740,104 @@ fun SpotifyPlaylistScreen(
                                     )
                                 }
 
-                                // Avatar Circle
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF333333)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (creatorAvatarUrl.isNotBlank()) {
-                                        SpotifyArtworkImage(
-                                            imageUrl = creatorAvatarUrl,
-                                            contentDescription = creator,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .clip(CircleShape),
-                                            cornerRadius = 12.dp
+                                if (creator.isNotBlank()) {
+                                    // Avatar Circle
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF333333)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (creatorAvatarUrl.isNotBlank()) {
+                                            SpotifyArtworkImage(
+                                                imageUrl = creatorAvatarUrl,
+                                                contentDescription = creator,
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .clip(CircleShape),
+                                                cornerRadius = 12.dp
+                                            )
+                                        } else {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.encore_icon_user_24),
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Creator Name
+                                    Text(
+                                        text = creator,
+                                        style = SpotifyTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            fontSize = 13.sp
                                         )
-                                    } else {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.encore_icon_user_24),
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(14.dp)
-                                        )
+                                    )
+                                } else if (loading) {
+                                    ShimmerHost {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            ShimmerBlock(
+                                                modifier = Modifier.size(24.dp),
+                                                shape = CircleShape
+                                            )
+                                            ShimmerText(
+                                                widthFraction = 0.35f,
+                                                height = 13.dp
+                                            )
+                                        }
                                     }
                                 }
-
-                                // Creator Name
-                                Text(
-                                    text = creator,
-                                    style = SpotifyTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 13.sp
-                                    )
-                                )
                             }
 
                             Spacer(modifier = Modifier.height(6.dp))
 
                             // Metadata Row: 🌐 Globe + Save Count & Duration
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            ) {
-                                Text(
-                                    text = "🌐",
-                                    fontSize = 12.sp
-                                )
-                                Text(
-                                    text = buildString {
-                                        if (saveCount.isNotBlank()) append(saveCount)
-                                        val duration = formatCollectionDuration(totalDurationMs, totalIsEstimate)
-                                        if (duration.isNotBlank()) {
-                                            if (isNotEmpty()) append(" • ")
-                                            append(duration)
-                                        }
-                                    }.ifBlank { saveCount },
-                                    style = SpotifyTheme.typography.bodySmall.copy(
-                                        color = EncoreColors.TextSecondary,
-                                        fontSize = 12.5.sp
+                            val metadataText = buildString {
+                                if (saveCount.isNotBlank()) append(saveCount)
+                                val duration = formatCollectionDuration(totalDurationMs, totalIsEstimate)
+                                if (duration.isNotBlank()) {
+                                    if (isNotEmpty()) append(" • ")
+                                    append(duration)
+                                }
+                            }.ifBlank { saveCount }
+
+                            if (metadataText.isNotBlank()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                ) {
+                                    Text(
+                                        text = "🌐",
+                                        fontSize = 12.sp
                                     )
-                                )
+                                    Text(
+                                        text = metadataText,
+                                        style = SpotifyTheme.typography.bodySmall.copy(
+                                            color = EncoreColors.TextSecondary,
+                                            fontSize = 12.5.sp
+                                        )
+                                    )
+                                }
+                            } else if (loading) {
+                                ShimmerHost {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    ) {
+                                        ShimmerText(
+                                            widthFraction = 0.45f,
+                                            height = 12.dp
+                                        )
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
@@ -1018,7 +1055,7 @@ fun SpotifyPlaylistScreen(
                 }
 
                 // "Recommended Songs" Section (add_more_row_blend_playlist.xml)
-                if (recommendedTracks.isNotEmpty() || recommendationsLoading) {
+                if (!loading && !loadFailed && (recommendedTracks.isNotEmpty() || recommendationsLoading)) {
                     item {
                         Column(
                             modifier = Modifier

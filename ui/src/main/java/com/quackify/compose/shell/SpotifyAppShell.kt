@@ -1941,6 +1941,7 @@ private fun ShellAlbumPane(
             currentTrackTitle = currentTrackTitle,
             isPlaying = isPlaying,
             coverUrl = activeAlbumCoverUrl ?: albumDetail?.imageUrl?.takeIf { it.isNotBlank() },
+            artistImageUrl = albumDetail?.artistImageUrl?.takeIf { it.isNotBlank() },
             moreByArtist = remember(albumDetail) {
                 albumDetail?.moreByArtist?.map { it.toArtistRelease() }.orEmpty()
             },
@@ -2028,7 +2029,7 @@ private fun ShellPlaylistPane(
         SpotifyPlaylistScreen(
             title = playlistDetail?.title?.takeIf { it.isNotBlank() } ?: activePlaylistTitle,
             description = playlistDetail?.description.orEmpty(),
-            creator = playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: userDisplayName,
+            creator = playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: if (activePlaylistUri.startsWith("spotiduck:local:playlist:") || activePlaylistUri.isEmpty()) userDisplayName else "",
             creatorAvatarUrl = playlistDetail?.creatorAvatarUrl.orEmpty(),
             saveCount = playlistDetail?.saveCount.orEmpty(),
             totalDurationMs = playlistDurationMs,

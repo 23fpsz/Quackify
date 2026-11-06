@@ -497,7 +497,12 @@ class MainActivity : ComponentActivity() {
                                 val detail = Krespot.artists.artist(context, uri)
                                 if (uri != artistUri) return@LaunchedEffect
                                 artistDetail = detail
-                                artistTracks = detail?.topTracks?.map { PopularTrack(it.toTrackItem(), "") }
+                                artistTracks = detail?.topTracks?.map { row ->
+                                    val countFormatted = if (row.plays > 0L) {
+                                        java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(row.plays)
+                                    } else ""
+                                    PopularTrack(row.toTrackItem(), countFormatted)
+                                }
                                 artistReleases = detail?.albums?.map { it.toArtistRelease() }
                                 artistListeners = detail?.monthlyListeners?.takeIf { it > 0L }?.let { formatCount(it) }
                             } finally {

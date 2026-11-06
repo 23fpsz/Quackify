@@ -45,7 +45,16 @@ object ArtistSource {
         val top = discography?.optJSONObject("topTracks")?.optJSONArray("items")
         val rows = ArrayList<TrackRow>(top?.length() ?: 0)
         for (i in 0 until (top?.length() ?: 0)) {
-            track(top?.optJSONObject(i)?.optJSONObject("track"), "")?.let(rows::add)
+            val item = top?.optJSONObject(i) ?: continue
+            val trackNode = item.optJSONObject("track") ?: item
+            val row = track(trackNode, "") ?: continue
+            val playcount = item.optString("playcount").ifBlank {
+                item.optLong("playcount", 0L).takeIf { it > 0L }?.toString()
+            } ?: trackNode.optString("playcount").ifBlank {
+                trackNode.optLong("playcount", 0L).takeIf { it > 0L }?.toString()
+            }
+            val plays = playcount?.toLongOrNull() ?: row.plays
+            rows.add(if (row.plays == 0L && plays > 0L) row.copy(plays = plays) else row)
         }
         val stats = union.optJSONObject("stats")
         val related = union.optJSONObject("relatedContent")
