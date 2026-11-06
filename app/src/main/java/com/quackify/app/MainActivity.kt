@@ -204,13 +204,6 @@ class MainActivity : ComponentActivity() {
                         var categoryShelves by remember { mutableStateOf<List<CategoryShelf>?>(null) }
                         var browseCategories by remember { mutableStateOf<List<BrowseCard>>(emptyList()) }
 
-                        val clientPrefs = remember {
-                            context.getSharedPreferences("quackify.client", Context.MODE_PRIVATE)
-                        }
-                        var fullArtworkPlayer by remember {
-                            mutableStateOf(clientPrefs.getBoolean("fullArtworkPlayer", true))
-                        }
-
                         LaunchedEffect(Unit) {
                             browseCategories = Browse.all(context).take(16)
                             log.i("browse categories: ${browseCategories.size}")
@@ -559,6 +552,9 @@ class MainActivity : ComponentActivity() {
                         val canvasAllowed = settingsSwitches.canvas
                         val clientPrefs = remember { context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE) }
                         var canvasEnabled by remember { mutableStateOf(clientPrefs.getBoolean("canvasNpvEnabled", true)) }
+                        var fullArtworkPlayer by remember {
+                            mutableStateOf(clientPrefs.getBoolean("fullArtworkPlayer", true))
+                        }
                         LaunchedEffect(playback.trackUri, canvasAllowed) {
                             canvasFile = null
                             if (!canvasAllowed) return@LaunchedEffect
