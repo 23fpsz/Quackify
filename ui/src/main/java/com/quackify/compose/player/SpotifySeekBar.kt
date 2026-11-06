@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +51,9 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyTheme
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+
+private const val SEEK_HOLD_MS = 2000L
 
 /**
  * 1:1 Spotify Native NPV Scrubber SeekBar matching decompiled:
@@ -70,11 +74,31 @@ fun SpotifySeekBar(
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(progress) }
+    var seekingTo by remember { mutableStateOf<Float?>(null) }
+    val currentSeek by rememberUpdatedState(onSeek)
 
     // The player position keeps ticking while the finger is down; sync only
     // when idle so a tick never snaps the thumb away mid-gesture.
     LaunchedEffect(progress) {
         if (!isDragging) dragProgress = progress
+        // A seek lands a segment later than the gesture: hold the thumb on
+        // the target until the player reports a position next to it, or the
+        // bar jumps back to where the track was and looks like the seek was
+        // ignored.
+        val pending = seekingTo
+        if (pending != null && kotlin.math.abs(progress - pending) < 0.01f) seekingTo = null
+    }
+
+    // A seek the player never confirms must not freeze the bar forever.
+    LaunchedEffect(seekingTo) {
+        if (seekingTo == null) return@LaunchedEffect
+        delay(SEEK_HOLD_MS)
+        seekingTo = null
+    }
+
+    fun commit(target: Float) {
+        seekingTo = target
+        currentSeek(target)
     }
 
     // Smooth continuous progress interpolation between periodic player ticks (120fps / 60fps)
@@ -83,7 +107,11 @@ fun SpotifySeekBar(
         animationSpec = if (isDragging) snap() else tween(durationMillis = 250, easing = LinearEasing),
         label = "smoothProgress"
     )
-    val displayProgress = if (isDragging) dragProgress else smoothProgress
+    val displayProgress = when {
+        isDragging -> dragProgress
+        seekingTo != null -> seekingTo!!
+        else -> smoothProgress
+    }
 
     // Thumb size: 8dp resting (crisp and visible matching Spotify), 12dp when user is scrubbing
     val thumbDotSize by animateDpAsState(
@@ -118,7 +146,7 @@ fun SpotifySeekBar(
                             // seek to the press point mid-gesture.
                             val released = tryAwaitRelease()
                             isDragging = false
-                            if (released) onSeek(dragProgress)
+                            if (released) commit(dragProgress)
                         }
                     )
                 }
@@ -130,7 +158,7 @@ fun SpotifySeekBar(
                         },
                         onDragEnd = {
                             isDragging = false
-                            onSeek(dragProgress)
+                            commit(dragProgress)
                         },
                         onDragCancel = {
                             isDragging = false
