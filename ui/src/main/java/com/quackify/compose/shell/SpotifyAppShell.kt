@@ -36,6 +36,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.quackify.compose.R
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.components.rememberHeaderTint
 import com.quackify.compose.components.DetailPageSkeleton
 import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.home.RecommendationCard
@@ -1168,6 +1169,19 @@ fun SpotifyAppShell(
             defaultColor = Color(0xFF432371)
         )
 
+        val headerTintSeed = when (currentScreen) {
+            ShellScreen.HOME -> homeQuickAccessItems?.firstOrNull()?.coverColor ?: EncoreColors.Background
+            ShellScreen.ALBUM -> albumDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card
+            ShellScreen.PLAYLIST -> playlistDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card
+            ShellScreen.ARTIST -> artistDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card
+            ShellScreen.SHOW -> showDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card
+            ShellScreen.EPISODE -> episodeDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card
+            ShellScreen.CATEGORY -> activeCategoryColor
+            ShellScreen.BROWSE -> browsePage?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card
+            else -> EncoreColors.Background
+        }
+        val headerTint by rememberHeaderTint(headerTintSeed)
+
         if (!isPlaylistEditMode) {
             ShellBottomBar(
                 title = playerIdentity.title,
@@ -1177,6 +1191,7 @@ fun SpotifyAppShell(
                 isLiked = isLiked,
                 coverUrl = currentCoverUrl,
                 coverColor = nowPlayingDominantColor,
+                headerTint = headerTint,
                 connectedDevice = connectedDevice,
                 navItems = navItems,
                 currentNavIndex = selectedNavIndex,

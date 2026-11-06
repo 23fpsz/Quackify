@@ -24,7 +24,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -37,14 +36,6 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyTheme
 import com.quackify.compose.util.rememberIsOffline
 
-private const val NAV_BAR_TOP_ALPHA = 0.70f
-
-private val NAV_BAR_FADE = Brush.verticalGradient(
-    0.0f to EncoreColors.PureBlack.copy(alpha = NAV_BAR_TOP_ALPHA),
-    0.55f to EncoreColors.PureBlack.copy(alpha = 0.88f),
-    1.0f to EncoreColors.PureBlack
-)
-
 @Composable
 internal fun ShellBottomBar(
     title: String,
@@ -54,6 +45,7 @@ internal fun ShellBottomBar(
     isLiked: Boolean,
     coverUrl: String,
     coverColor: Color,
+    headerTint: Color,
     connectedDevice: String,
     navItems: List<NavItem>,
     currentNavIndex: Int,
@@ -130,7 +122,7 @@ internal fun ShellBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(NAV_BAR_FADE)
+                .background(headerTint)
                 .navigationBarsPadding()
                 .height(56.dp),
             verticalAlignment = Alignment.CenterVertically
