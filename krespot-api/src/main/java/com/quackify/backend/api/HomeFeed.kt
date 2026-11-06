@@ -20,12 +20,27 @@ object HomeFeed {
     const val GENERIC = "HomeGenericSectionData"
     const val BASELINE = "HomeFeedBaselineSectionData"
     const val RECENT = "HomeRecentlyPlayedSectionData"
+    const val GRID = "HomeGridSectionData"
+    const val YOUR_DJ = "HomeYourDJSectionData"
+    const val WATCH_FEED = "HomeWatchFeedSectionData"
+    const val MUSIC_VIDEOS = "HomeMusicVideosSectionData"
+    const val PODCAST_VIDEOS = "HomePodcastVideosCarouselSectionData"
 
-    suspend fun load(context: Context): List<HomeSection> {
+    private val SILENT = setOf(
+        "HomeOnboardingSectionData",
+        "HomeOnboardingSectionDataV2",
+        "HomeFeatureActivationSectionData",
+        "HomeFeatureActivationSectionDataV2",
+        "HomeContentEvaluationListSectionData",
+        "HomeHaloCarouselSectionData",
+        "",
+    )
+
+    suspend fun load(context: Context, facet: String = ""): HomeFeedPayload {
         val token = SpotifyAuth.token(context)
         if (token.isBlank()) {
             log.w("no token, cannot load the home feed")
-            return emptyList()
+            return HomeFeedPayload()
         }
         // The tap truncates the captured variables at 400 chars; a cut string
         // must not take the home screen down with an uncaught JSONException.
@@ -36,47 +51,50 @@ object HomeFeed {
         }
         val variables = (base ?: JSONObject())
             .put("sp_t", Pathfinder.sessionToken())
+            .put("facet", facet)
+            .put("sectionItemsLimit", 10)
             .toString()
         val json = Pathfinder.query(
             context = context,
             token = token,
             operation = "home",
             variables = variables,
-        ) ?: return emptyList()
-        val sections = withContext(Dispatchers.Default) { parse(json) }
-        val colored = sections.sumOf { section -> section.items.count { it.colorHex.isNotBlank() } }
-        log.i("parsed ${sections.size} sections, ${sections.sumOf { it.items.size }} items, $colored with extracted color")
-        sections.take(6).forEach { s ->
+        ) ?: return HomeFeedPayload()
+        val payload = withContext(Dispatchers.Default) { parse(json) }
+        val colored = payload.sections.sumOf { section -> section.items.count { it.colorHex.isNotBlank() } }
+        log.i("facet='$facet' parsed ${payload.sections.size} sections, " +
+                "${payload.sections.sumOf { it.items.size }} items, $colored with extracted color, " +
+                "${payload.chips.size} chips")
+        payload.sections.take(6).forEach { s ->
             log.i("  ${s.kind} '${s.title}' -> ${s.items.size} items")
             s.items.take(2).forEach { i ->
                 log.i("     ${i.kind} '${i.title}' / '${i.subtitle}' img=${i.imageUrl.isNotBlank()} color=${i.colorHex.ifBlank { "-" }}")
             }
         }
-        return sections
+        return payload
     }
 
-    private fun SpotifyAuthToken(context: Context): String =
-        SpotifyAuth.token(context)
-
-    fun parse(json: JSONObject): List<HomeSection> {
-        val array = json.optJSONObject("data")
-            ?.optJSONObject("home")
-            ?.optJSONObject("sectionContainer")
+    fun parse(json: JSONObject): HomeFeedPayload {
+        val home = json.optJSONObject("data")?.optJSONObject("home") ?: return HomeFeedPayload()
+        val greeting = home.optJSONObject("greeting")?.let { label(it) }.orEmpty()
+        val chips = chips(home.optJSONArray("homeChips"))
+        val array = home.optJSONObject("sectionContainer")
             ?.optJSONObject("sections")
             ?.optJSONArray("items")
-            ?: return emptyList()
+            ?: return HomeFeedPayload(greeting = greeting, chips = chips)
         val out = ArrayList<HomeSection>(array.length())
         for (i in 0 until array.length()) {
             val section = array.optJSONObject(i) ?: continue
             val data = section.optJSONObject("data")
             val kind = data?.optString("__typename").orEmpty()
+            if (kind in SILENT) continue
             val title = label(data?.optJSONObject("title"))
                 ?: label(data?.optJSONObject("sectionTitle"))
                 ?: label(section.optJSONObject("sectionTitle"))
                 ?: ""
             val items = section.optJSONObject("sectionItems")?.optJSONArray("items")
                 ?: continue
-            val parsed = (0 until items.length()).mapNotNull { item(items.optJSONObject(it)) }
+            val parsed = (0 until items.length()).mapNotNull { item(items.optJSONObject(it), data) }
             if (parsed.isEmpty()) continue
             out += HomeSection(
                 id = section.optString("uri"),
@@ -85,10 +103,23 @@ object HomeFeed {
                 items = parsed,
             )
         }
+        return HomeFeedPayload(greeting = greeting, chips = chips, sections = out)
+    }
+
+    private fun chips(array: JSONArray?): List<HomeChip> {
+        if (array == null) return emptyList()
+        val out = ArrayList<HomeChip>(array.length())
+        for (i in 0 until array.length()) {
+            val node = array.optJSONObject(i) ?: continue
+            val id = node.optString("id")
+            val name = label(node.optJSONObject("label")).orEmpty()
+            if (id.isBlank() || name.isBlank()) continue
+            out += HomeChip(id = id, label = name, subChips = chips(node.optJSONArray("subChips")))
+        }
         return out
     }
 
-    private fun item(node: JSONObject?): HomeItem? {
+    private fun item(node: JSONObject?, sectionData: JSONObject?): HomeItem? {
         if (node == null) return null
         val content = node.optJSONObject("content") ?: node
         val entity = content.optJSONObject("data") ?: node.optJSONObject("data")
@@ -97,6 +128,7 @@ object HomeFeed {
         val kind = entity?.optString("__typename")
             ?: content.optString("__typename").takeIf { it != "UnknownType" }
             ?: ""
+        if (kind == "GenericError" || kind == "NotFound" || kind == "RestrictedContent") return null
         val title = nameOf(entity, uri)
         if (title.isBlank() && uri !in COLLECTION_URIS) return null
         return HomeItem(
@@ -106,7 +138,15 @@ object HomeFeed {
             imageUrl = imageOf(entity),
             kind = kind,
             colorHex = colorOf(entity),
+            caption = captionOf(sectionData, entity),
         )
+    }
+
+    private fun captionOf(sectionData: JSONObject?, entity: JSONObject?): String {
+        val raw = label(sectionData?.optJSONObject("title")) ?: return ""
+        if (!raw.contains("{0}")) return raw
+        val show = entity?.optJSONObject("podcastV2")?.optString("name").orEmpty()
+        return if (show.isBlank()) raw.substringBefore(" {0}").trim() else raw.replace("{0}", show)
     }
 
     private fun nameOf(entity: JSONObject?, uri: String): String {
@@ -149,6 +189,7 @@ object HomeFeed {
     private fun label(obj: JSONObject?): String? {
         if (obj == null) return null
         val raw = obj.optString("transformedLabel").takeIf { it.isNotBlank() }
+            ?: obj.optString("translatedBaseText").takeIf { it.isNotBlank() }
             ?: obj.optString("text").takeIf { it.isNotBlank() }
             ?: obj.optString("title").takeIf { it.isNotBlank() }
             ?: return null

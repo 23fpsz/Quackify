@@ -7,6 +7,7 @@ data class HomeItem(
     val imageUrl: String,
     val kind: String,
     val colorHex: String = "",
+    val caption: String = "",
 )
 
 data class HomeSection(
@@ -14,4 +15,16 @@ data class HomeSection(
     val title: String,
     val kind: String,
     val items: List<HomeItem>,
+)
+
+data class HomeChip(
+    val id: String,
+    val label: String,
+    val subChips: List<HomeChip> = emptyList(),
+)
+
+data class HomeFeedPayload(
+    val greeting: String = "",
+    val chips: List<HomeChip> = emptyList(),
+    val sections: List<HomeSection> = emptyList(),
 )
