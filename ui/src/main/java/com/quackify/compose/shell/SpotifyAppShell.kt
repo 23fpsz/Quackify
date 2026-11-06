@@ -844,9 +844,13 @@ fun SpotifyAppShell(
                         pushCurrentState()
                         activeCategoryTitle = category.title
                         activeCategoryColor = category.color
-                        currentScreen = ShellScreen.CATEGORY
-                        if (category.uri.isNotBlank()) onOpenBrowse?.invoke(category.uri)
-                        else onOpenCategory?.invoke(category.title)
+                        if (category.uri.isNotBlank()) {
+                            currentScreen = ShellScreen.BROWSE
+                            onOpenBrowse?.invoke(category.uri)
+                        } else {
+                            currentScreen = ShellScreen.CATEGORY
+                            onOpenCategory?.invoke(category.title)
+                        }
                     },
                     onAlbumClick = openAlbum,
                     onArtistClick = openArtist,
@@ -1103,7 +1107,6 @@ fun SpotifyAppShell(
                 page = browsePage,
                 fallbackTitle = activeCategoryTitle,
                 onBack = handleBack,
-                onOpenBrowse = { onOpenBrowse?.invoke(activeCategoryTitle) },
                 onOpenShow = { uri -> onOpenShow?.invoke(uri) },
                 onOpenAlbum = { title, uri -> openAlbum(title, "", uri) },
                 onOpenPlaylist = openPlaylist,
@@ -1966,16 +1969,24 @@ private fun ShellBrowsePane(
     page: BrowsePage?,
     fallbackTitle: String,
     onBack: () -> Unit,
-    onOpenBrowse: () -> Unit,
     onOpenShow: (String) -> Unit,
     onOpenAlbum: (String, String) -> Unit,
     onOpenPlaylist: (String, String) -> Unit,
     onLoadMore: () -> Unit
 ) {
     if (page == null) {
-        // A state-mutating callback must not run during composition: this
-        // pane recomposes on every shell tick, which re-triggered the fetch.
-        LaunchedEffect(fallbackTitle) { onOpenBrowse() }
+        SpotifyBrowseScreen(
+            title = fallbackTitle,
+            subtitle = "",
+            colorHex = "",
+            sections = emptyList(),
+            isLoading = true,
+            isLoadingMore = false,
+            hasMore = false,
+            onBackClick = onBack,
+            onCardClick = { _, _ -> },
+            onLoadMore = {}
+        )
     } else {
         SpotifyBrowseScreen(
             title = page.title.ifBlank { fallbackTitle },

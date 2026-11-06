@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -202,6 +203,23 @@ fun SpotifyBrowseScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         InlineLoadingDots(color = EncoreColors.TextSecondary)
+                    }
+                }
+            }
+
+            if (sections.isEmpty() && !isLoading && !hasMore) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp, vertical = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Nothing here yet",
+                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }
