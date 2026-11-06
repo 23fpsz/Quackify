@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -94,6 +95,7 @@ import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreRepeatButton
 import com.quackify.compose.components.EncoreSmartShuffleButton
 import com.quackify.compose.components.FullArtworkBackdrop
+import com.quackify.compose.components.dissolveInto
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.components.SpotifyArtworkImage
@@ -128,6 +130,7 @@ private const val REVEAL_INFO_DELAY_MS = 90
 private const val REVEAL_CONTROLS_DELAY_MS = 160
 private const val REVEAL_REST_DELAY_MS = 220
 private const val REVEAL_RISE_FRACTION = 0.06f
+private const val ARTWORK_FADE_FRACTION = 0.42f
 
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
@@ -261,17 +264,6 @@ fun SpotifyNowPlayingScreen(
 
     val effectiveIsLoading = isLoading
     val effectiveLyricsVisible = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
-
-    // When lyrics become available, the album art smoothly glides UPWARD
-    // to accommodate the 1-line lyrics while the player controls remain at their exact vertical positions!
-    val artworkPushUpOffset by animateDpAsState(
-        targetValue = if (effectiveLyricsVisible) 0.dp else 40.dp,
-        animationSpec = tween(
-            durationMillis = 400,
-            easing = EncoreAnimation.DecelerateInterpolator
-        ),
-        label = "artworkPushUpOffset"
-    )
 
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
@@ -512,52 +504,42 @@ fun SpotifyNowPlayingScreen(
                     }
                 }
             } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .verticalScroll(state = scrollState, enabled = isScrollEnabled),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Top Navigation Bar (Collapse Chevron, Context Header, More Options)
-                    NowPlayingHeaderRow(
-                        resolvedContextTitle = resolvedContextTitle,
-                        contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
-                        onCollapseClick = onCollapseClick,
-                        onMoreClick = onMoreClick,
-                        dragModifier = headerDragModifier,
-                        canvasAvailable = isCanvasAllowed && canvasFilePath != null,
-                        isCanvasEnabled = canvasActive,
-                        onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) }
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Large 1:1 Album Artwork with 8dp rounded corners and interactive swipe-to-skip gesture
-                    // Reference: revised_template_page_layout.xml (@id/track_carousel) -> bounds [63,308][1017,1262] (24dp margins)
-                    Box(
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
+                            .fillMaxSize()
+                            .verticalScroll(state = scrollState, enabled = isScrollEnabled),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        NowPlayingArtworkCard(
-                            title = title,
-                            coverUrl = coverUrl,
-                            dominantColor = dynamicArtworkColor,
-                            backgroundColor = animatedDominantColor,
-                            canvasFilePath = canvasFilePath,
-                            isCanvasEnabled = canvasActive,
-                            gestureModifier = artworkGestureModifier,
-                            fullBleed = true,
+                        // Full-bleed banner: the artwork starts at the very top of the
+                        // screen, behind the status bar, and dissolves into the blurred
+                        // backdrop along its bottom edge.
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .offset(y = artworkPushUpOffset)
-                                .aspectRatio(1.0f)
-                                .graphicsLayer { translationX = artworkOffsetX.value }
-                        )
-                    }
+                                .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
+                        ) {
+                            NowPlayingArtworkCard(
+                                title = title,
+                                coverUrl = coverUrl,
+                                dominantColor = dynamicArtworkColor,
+                                backgroundColor = animatedDominantColor,
+                                canvasFilePath = canvasFilePath,
+                                isCanvasEnabled = canvasActive,
+                                gestureModifier = artworkGestureModifier,
+                                fullBleed = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1.0f)
+                                    .graphicsLayer {
+                                        translationX = artworkOffsetX.value
+                                        compositingStrategy = CompositingStrategy.Offscreen
+                                    }
+                                    .dissolveInto(ARTWORK_FADE_FRACTION)
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
                     Box(
                         modifier = Modifier
@@ -663,7 +645,21 @@ fun SpotifyNowPlayingScreen(
                         }
                     }
                 }
+
+                Box(modifier = Modifier.statusBarsPadding()) {
+                    NowPlayingHeaderRow(
+                        resolvedContextTitle = resolvedContextTitle,
+                        contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                        onCollapseClick = onCollapseClick,
+                        onMoreClick = onMoreClick,
+                        dragModifier = headerDragModifier,
+                        canvasAvailable = isCanvasAllowed && canvasFilePath != null,
+                        isCanvasEnabled = canvasActive,
+                        onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) }
+                    )
+                }
             }
+        }
         }
 
         // Fullscreen Lyrics Overlay (Slides up over player)
