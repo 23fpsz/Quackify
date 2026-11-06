@@ -1,7 +1,6 @@
 package com.quackify.backend.connect.command
 
 import android.content.Context
-import java.util.UUID
 import com.quackify.backend.connect.ConnectHeaders
 import com.quackify.backend.connect.cluster.Device
 import com.quackify.backend.core.log.Logs
@@ -150,14 +149,12 @@ object Registration {
     ): Net.Response? {
         val url = "https://$spclient/track-playback/v1/devices"
         val info = trackDevice(deviceId)
-        // Exactly the shape the web player posts: the correlation id is a
-        // plain UUID (the server chokes on anything it cannot parse as one)
-        // and there is nothing outside the device block, the snooping flag
-        // and the connection id.
         val body = JSONObject()
             .put("device", info)
             .put("outro_endcontent_snooping", false)
             .put("connection_id", connectionId)
+            .put("client_version", SDK_VERSION)
+            .put("volume", 65535)
             .toString()
         val headers = ConnectHeaders.of(context) + mapOf(
             "Accept" to "application/json",
@@ -203,7 +200,7 @@ object Registration {
         .put("platform_identifier", "web_player windows 10;chrome 150.0.0.0;desktop")
         .put("is_group", false)
         .put("is_public", false)
-        .put("correlation_id", UUID.randomUUID().toString())
+        .put("correlation_id", deviceId)
         .put("client_version", SDK_VERSION)
         .put("metadata", JSONObject())
         .put("capabilities", capabilities())
@@ -226,22 +223,7 @@ object Registration {
         .put("is_controllable", true)
         .put("is_observable", true)
         .put("needs_full_player_state", true)
-        .put("volume_steps", 64)
         .put("supported_types", supportedTypes())
-        .put("supports_transfer_command", true)
-        .put("command_acks", false)
-        .put("supports_gzip_pushes", true)
-        .put("gaia_eq_connect_id", true)
-        .put("supports_playlist_v2", true)
-        .put("supports_command_request", true)
-        .put("hidden", false)
-        .put("disable_volume", false)
-        .put("connect_disabled", false)
-        .put("is_voice_enabled", false)
-        .put("supports_logout", false)
-        .put("supports_rename", false)
-        .put("supports_external_episodes", false)
-        .put("supports_set_backend_metadata", true)
 
     private fun supportedTypes(): JSONArray = JSONArray()
         .put("audio/track")

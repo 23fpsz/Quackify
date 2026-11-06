@@ -18,30 +18,30 @@ data class DealerFrame(
     val isConnection: Boolean get() = uri.startsWith(DealerUri.CONNECTIONS)
 
     /**
-     * The connection id the server wants in X-Spotify-Connection-Id and in the
-     * track-playback register body. The `Spotify-Connection-Id` header of the
-     * first dealer frame is the authoritative form, but some dealer builds
-     * omit it, and then the only copy lives base64-encoded in the frame uri.
+     * The connection id exactly as the dealer handed it out: the
+     * `Spotify-Connection-Id` header of the first frame, still base64.
      *
-     * Whatever the source, the id must stay printable ascii: the dealer
-     * appends raw binary bytes to it, and a mangled id (control characters,
-     * U+FFFD replacement chars or the undecoded base64 itself) makes
-     * track-playback/v1/devices answer 500 and the device never shows up in
-     * the account's "Listening on" list.
+     * Both the connect-state header (`X-Spotify-Connection-Id`) and the
+     * track-playback register body want this form. Decoding it and sending
+     * the plain uuid is what makes every player command answer
+     * `410 COMMAND_FAILED`: the server binds the routed connection by the
+     * base64 string, so a decoded one names a connection that is not ours.
      */
     val connectionId: String
-        get() {
-            val header = headers.entries
-                .firstOrNull { it.key.contains("connection-id", ignoreCase = true) }
-                ?.value.orEmpty()
-            val candidate = header.ifBlank {
-                runCatching {
-                    val raw = uri.removePrefix(DealerUri.CONNECTIONS)
-                    String(Base64.decode(raw, Base64.URL_SAFE or Base64.NO_WRAP))
-                }.getOrDefault("")
-            }
-            return candidate.filter { it.code in 0x21..0x7E }.trim()
-        }
+        get() = headers.entries
+            .firstOrNull { it.key.contains("connection-id", ignoreCase = true) }
+            ?.value.orEmpty()
+            .ifBlank { uri.removePrefix(DealerUri.CONNECTIONS) }
+            .filter { it.code in 0x21..0x7E }
+            .trim()
+
+    /** The same id decoded, for log lines only. */
+    val decodedConnectionId: String
+        get() = runCatching {
+            String(Base64.decode(connectionId, Base64.URL_SAFE or Base64.NO_WRAP))
+        }.getOrDefault("")
+            .filter { it.code in 0x21..0x7E }
+            .trim()
 
     val firstJson: JSONObject?
         get() = payloads.firstOrNull()?.let { runCatching { JSONObject(it) }.getOrNull() }

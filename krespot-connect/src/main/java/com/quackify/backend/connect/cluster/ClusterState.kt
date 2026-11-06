@@ -146,7 +146,9 @@ data class ClusterState(
         if (elapsed < 0L || elapsed > STALE_STATE_MS) return positionMs
         val at = positionMs + elapsed
         val total = if (durationMs > 0L) durationMs else track.durationMs
-        return if (total > 0L) at.coerceIn(0L, total) else at
+        if (total <= 0L) return at
+        if (at >= total) return 0L
+        return at.coerceAtLeast(0L)
     }
 
     companion object {

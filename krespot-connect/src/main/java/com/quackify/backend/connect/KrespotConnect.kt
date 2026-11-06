@@ -168,7 +168,7 @@ class KrespotConnect(private val context: Context) {
                 connected = true
                 _connectionId.value = frame.connectionId
                 log.i("connection ${frame.connectionId.take(24)}… len=${frame.connectionId.length} " +
-                        "tail='${frame.connectionId.takeLast(6)}' " +
+                        "decoded=${frame.decodedConnectionId.length} " +
                         "frameHeaders=[${frame.headers.keys.joinToString(",")}]"
                 )
                 registerScope.launch {
@@ -340,6 +340,7 @@ class KrespotConnect(private val context: Context) {
         repeatContext: Boolean = false,
         repeatTrack: Boolean = false,
         queueRevision: String = "",
+        nextRows: List<ClusterTrack> = emptyList(),
     ): Boolean {
         val connection = _connectionId.value
         if (spclient.isBlank() || connection.isBlank()) {
@@ -353,7 +354,7 @@ class KrespotConnect(private val context: Context) {
         val state = withContext(Dispatchers.Default) {
             localPlayerState(
                 track, contextUri, contextIndex, positionMs, playing, durationMs,
-                shuffle, repeatContext, repeatTrack, queueRevision,
+                shuffle, repeatContext, repeatTrack, queueRevision, nextRows,
             )
         }
         val response = Registration.connectState(
@@ -405,6 +406,7 @@ class KrespotConnect(private val context: Context) {
         repeatContext: Boolean,
         repeatTrack: Boolean,
         queueRevision: String,
+        nextRows: List<ClusterTrack>,
     ): JSONObject {
         val now = System.currentTimeMillis()
         val window = _cluster.value
@@ -413,11 +415,14 @@ class KrespotConnect(private val context: Context) {
             .orEmpty()
         val anchor = window.indexOfFirst { it.uri == track.uri }
         val prev = if (anchor > 0) window.take(anchor).takeLast(PREV_TRACKS_MAX) else emptyList()
-        val next = if (anchor >= 0) {
-            window.drop(anchor + 1).filter { it.isVisible }.take(NEXT_TRACKS_MAX)
-        } else {
-            emptyList()
+        val upcoming = LinkedHashMap<String, ClusterTrack>()
+        nextRows.filter { it.uri.isNotBlank() && it.uri != track.uri }.forEach { upcoming[it.uri] = it }
+        if (anchor >= 0) {
+            window.drop(anchor + 1)
+                .filter { it.isVisible && it.uri != track.uri }
+                .forEach { upcoming.putIfAbsent(it.uri, it) }
         }
+        val next = upcoming.values.take(NEXT_TRACKS_MAX)
         val metadata = runCatching { JSONObject(track.raw) }.getOrElse { JSONObject() }
         if (metadata.length() == 0 && track.title.isNotBlank()) {
             metadata
