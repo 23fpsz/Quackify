@@ -30,6 +30,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quackify.backend.model.DeviceKind
 import com.quackify.compose.R
 import com.quackify.compose.player.SpotifyMiniPlayer
 import com.quackify.compose.theme.EncoreAnimation
@@ -54,7 +55,8 @@ internal fun ShellBottomBar(
     isLiked: Boolean,
     coverUrl: String,
     coverColor: Color,
-    connectedDevice: String,
+    connectedDevice: String?,
+    connectedDeviceKind: DeviceKind? = null,
     navItems: List<NavItem>,
     currentNavIndex: Int,
     onNavSelect: (Int) -> Unit,
@@ -118,6 +120,7 @@ internal fun ShellBottomBar(
             coverUrl = coverUrl,
             coverColor = coverColor,
             connectedDeviceName = connectedDevice,
+            connectedDeviceKind = connectedDeviceKind,
             onPlayPauseClick = onPlayPause,
             onLikeClick = onLike,
             onDeviceClick = onDeviceClick,
