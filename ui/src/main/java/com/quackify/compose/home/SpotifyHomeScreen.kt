@@ -24,10 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +39,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
+import com.quackify.backend.model.HomeChip
 import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreProfileAvatar
 import com.quackify.compose.components.EncorePlayButton
@@ -70,7 +69,8 @@ data class RecommendationCard(
     val coverColor: Color,
     val uri: String = "",
     val imageUrl: String? = null,
-    val tag: String = ""
+    val tag: String = "",
+    val caption: String = ""
 )
 
 private const val TINT_WEIGHT = 0.55f
@@ -112,21 +112,28 @@ fun SpotifyHomeScreen(
     loading: Boolean = false,
     quickAccessItems: List<QuickAccessItem>? = null,
     recommendations: List<RecommendationCard>? = null,
+    chips: List<HomeChip> = emptyList(),
+    selectedFacet: String = "",
+    onFacetSelected: (String) -> Unit = {},
+    greeting: String = "",
     modifier: Modifier = Modifier
 ) {
-    var selectedFilterIndex by remember { mutableIntStateOf(0) }
-    val filters = listOf("All", "Music", "Podcasts")
     val bottomPadding = rememberBottomPadding()
 
     val quickItems = quickAccessItems.orEmpty()
 
+    // The chip row mirrors whatever the server sent: an "All" entry with no
+    // facet, then one chip per homeChips node. Selecting one refetches the feed
+    // with that facet, so the filtering stays server-side.
+    val filterChips = remember(chips) {
+        buildList {
+            add(HomeChip(id = "", label = "All"))
+            addAll(chips)
+        }
+    }
 
     val shelfSections = remember(shelves) {
         shelves.orEmpty().filter { it.cards.isNotEmpty() }
-    }
-
-    val podcastShelves = remember(shelves) {
-        shelves.orEmpty().filter { it.podcasts && it.cards.isNotEmpty() }
     }
 
     // The tint comes from the first cover on screen, so the backdrop belongs
@@ -199,12 +206,14 @@ fun SpotifyHomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            items(filters.size) { index ->
+                            items(filterChips, key = { it.id }) { chip ->
                                 EncoreChip(
-                                    text = filters[index],
-                                    isSelected = selectedFilterIndex == index,
+                                    text = chip.label,
+                                    isSelected = selectedFacet == chip.id,
                                     onClick = {
-                                        selectedFilterIndex = if (selectedFilterIndex == index) 0 else index
+                                        onFacetSelected(
+                                            if (selectedFacet == chip.id) "" else chip.id
+                                        )
                                     }
                                 )
                             }
@@ -232,17 +241,17 @@ fun SpotifyHomeScreen(
             }
         }
 
-        // If "All" or "Music" is selected: show Greeting and 8-Tile Quick Access Grid
-        if (selectedFilterIndex == 0 || selectedFilterIndex == 1) {
+        // The greeting and the shortcut grid belong to the unfiltered feed; a
+        // facet query answers with a different set of shelves entirely.
+        if (selectedFacet.isEmpty()) {
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    // Greeting matching martini_greeting_header_* (24sp bold)
                     Text(
-                        text = getGreeting(userDisplayName),
+                        text = greeting.ifBlank { getGreeting(userDisplayName) },
                         style = SpotifyTheme.typography.headlineMedium.copy(
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
@@ -252,7 +261,6 @@ fun SpotifyHomeScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // 8-Tile Quick Access Grid (4 rows x 2 columns) matching shortcut_card.xml
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (i in quickItems.indices step 2) {
                             Row(
@@ -280,7 +288,7 @@ fun SpotifyHomeScreen(
 
         // Nothing from the feed yet: a quiet spinner while it loads, or a hint
         // that it could not be fetched. No made-up shelves or shortcuts.
-        if (quickItems.isEmpty() && shelfSections.isEmpty() && podcastShelves.isEmpty()) {
+        if (quickItems.isEmpty() && shelfSections.isEmpty()) {
             item(key = "home_feed_status") {
                 if (loading) {
                     HomeFeedSkeleton(
@@ -302,56 +310,18 @@ fun SpotifyHomeScreen(
             }
         }
 
-        // ==========================
-        // TAB 0: "ALL"
-        // ==========================
-        if (selectedFilterIndex == 0) {
-            items(shelfSections, key = { it.id }) { shelf ->
-                if (shelf.artists.isNotEmpty()) {
-                    ArtistShelfSection(
-                        title = shelf.title,
-                        artists = shelf.artists,
-                        onArtistClick = onArtistClick
-                    )
-                } else {
-                    ShelfSection(
-                        title = shelf.title,
-                        subtitle = "",
-                        cards = shelf.cards,
-                        onCardClick = onPlaylistClick
-                    )
-                }
-            }
-        }
-
-        // ==========================
-        // TAB 1: "MUSIC"
-        // ==========================
-        if (selectedFilterIndex == 1) {
-            items(shelfSections, key = { it.id }) { shelf ->
-                if (shelf.artists.isNotEmpty()) {
-                    ArtistShelfSection(
-                        title = shelf.title,
-                        artists = shelf.artists,
-                        onArtistClick = onArtistClick
-                    )
-                } else {
-                    ShelfSection(
-                        title = shelf.title,
-                        subtitle = "",
-                        cards = shelf.cards,
-                        onCardClick = onPlaylistClick
-                    )
-                }
-            }
-        }
-
-        // ==========================
-        // TAB 2: "PODCASTS"
-        // ==========================
-        if (selectedFilterIndex == 2) {
-            items(podcastShelves, key = { it.id }) { shelf ->
-                ShelfSection(
+        items(shelfSections, key = { it.id }) { shelf ->
+            when {
+                shelf.artists.isNotEmpty() -> ArtistShelfSection(
+                    title = shelf.title,
+                    artists = shelf.artists,
+                    onArtistClick = onArtistClick
+                )
+                shelf.grid -> BaselineGridSection(
+                    cards = shelf.cards,
+                    onCardClick = onPlaylistClick
+                )
+                else -> ShelfSection(
                     title = shelf.title,
                     subtitle = "",
                     cards = shelf.cards,
@@ -693,8 +663,80 @@ private fun ArtistShelfSection(
     }
 }
 
-private fun getGreeting(name: String): String {
-    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+@Composable
+private fun BaselineGridSection(
+    cards: List<RecommendationCard>,
+    onCardClick: (String, String) -> Unit
+) {
+    Column(modifier = Modifier.padding(top = 16.dp)) {
+        cards.forEach { card ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onCardClick(card.title, card.uri.ifEmpty { "spotify:search:${card.title}" }) }
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(card.coverColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (card.imageUrl != null) {
+                        SpotifyArtworkImage(
+                            imageUrl = card.imageUrl,
+                            contentDescription = card.title,
+                            modifier = Modifier.fillMaxSize(),
+                            cornerRadius = 4.dp
+                        )
+                    } else {
+                        Text(text = "♫", color = Color.White.copy(alpha = 0.5f), fontSize = 24.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    if (card.caption.isNotEmpty()) {
+                        Text(
+                            text = card.caption,
+                            style = SpotifyTheme.typography.bodySmall.copy(
+                                fontSize = 11.sp,
+                                color = EncoreColors.TextSecondary
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
+                    Text(
+                        text = card.title,
+                        style = SpotifyTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = EncoreColors.TextPrimary
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (card.subtitle.isNotEmpty() && card.subtitle != card.caption) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = card.subtitle,
+                            style = SpotifyTheme.typography.bodySmall.copy(
+                                fontSize = 12.sp,
+                                color = EncoreColors.TextSecondary
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun getGreeting(name: String): String {    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val base = when (hour) {
         in 5..11 -> "Good morning"
         in 12..17 -> "Good afternoon"

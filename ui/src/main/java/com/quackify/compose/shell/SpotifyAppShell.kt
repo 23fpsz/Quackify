@@ -87,6 +87,7 @@ import com.quackify.backend.model.SearchKind
 import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
+import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.ShowDetail
 import com.quackify.compose.screens.SpotifyBrowseScreen
@@ -268,6 +269,10 @@ fun SpotifyAppShell(
     homeQuickAccessItems: List<QuickAccessItem>? = null,
     homeRecommendations: List<RecommendationCard>? = null,
     homeShelves: List<HomeShelf>? = null,
+    homeChips: List<HomeChip> = emptyList(),
+    homeFacet: String = "",
+    homeGreeting: String = "",
+    onHomeFacetSelected: (String) -> Unit = {},
     libraryItems: List<LibraryItem>? = null,
     libraryLoading: Boolean = false,
     searchResults: List<TrackItem>? = null,
@@ -834,6 +839,10 @@ fun SpotifyAppShell(
                     recommendations = homeRecommendations,
                     shelves = homeShelves,
                     loading = homeLoading,
+                    chips = homeChips,
+                    selectedFacet = homeFacet,
+                    onFacetSelected = onHomeFacetSelected,
+                    greeting = homeGreeting,
                     whatsNewCount = notifications.count { it.isNew },
                     onArtistClick = openArtist,
                     userDisplayName = userDisplayName,

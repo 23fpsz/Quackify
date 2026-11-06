@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.api.HomeFeed
 import com.quackify.backend.model.HomeSection
+import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
@@ -159,13 +160,21 @@ class MainActivity : ComponentActivity() {
                         })
                     } else {
                         var feed by remember { mutableStateOf<List<HomeSection>>(emptyList()) }
+                        var homeChips by remember { mutableStateOf<List<HomeChip>>(emptyList()) }
+                        var homeGreeting by remember { mutableStateOf("") }
+                        var homeFacet by remember { mutableStateOf("") }
                         var loading by remember { mutableStateOf(true) }
-                        LaunchedEffect(resumeSignal) {
+                        LaunchedEffect(resumeSignal, homeFacet) {
                             if (resumeSignal == 0) loading = true
-                            val fresh = HomeFeed.load(context)
-                            if (fresh.isNotEmpty() || resumeSignal == 0) feed = fresh
+                            val payload = HomeFeed.load(context, homeFacet)
+                            if (payload.sections.isNotEmpty() || resumeSignal == 0) {
+                                feed = payload.sections
+                                homeGreeting = payload.greeting
+                            }
+                            if (payload.chips.isNotEmpty()) homeChips = payload.chips
                             loading = false
-                            log.i("home feed loaded sections=${feed.size} signal=$resumeSignal"
+                            log.i("home feed loaded facet='$homeFacet' sections=${feed.size} " +
+                                    "chips=${homeChips.size} signal=$resumeSignal"
                             )
                         }
                         LaunchedEffect(resumeSignal) {
@@ -175,7 +184,9 @@ class MainActivity : ComponentActivity() {
                         val quick = remember(feed) { feed.toQuickAccess() }
                         val shelves = remember(feed) { feed.toShelves() }
                         LaunchedEffect(shelves) {
-                            log.i("home shelves=${shelves.size} podcasts=${shelves.count { it.podcasts }} " +
+                            log.i("home shelves=${shelves.size} " +
+                                    "grids=${shelves.count { it.grid }} " +
+                                    "cards=${shelves.sumOf { it.cards.size }} " +
                                     "titles=${shelves.take(8).joinToString(" | ") { it.title.ifBlank { "-" } }}"
                             )
                         }
@@ -670,6 +681,10 @@ class MainActivity : ComponentActivity() {
                             expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
                                 homeQuickAccessItems = quick,
                             homeShelves = shelves,
+                            homeChips = homeChips,
+                            homeFacet = homeFacet,
+                            homeGreeting = homeGreeting,
+                            onHomeFacetSelected = { facet -> homeFacet = facet },
                             libraryItems = libraryItems,
                             libraryLoading = libraryItems == null,
                             playlistTracks = playlistTracks,

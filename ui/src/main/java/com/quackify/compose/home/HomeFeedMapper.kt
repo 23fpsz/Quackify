@@ -33,44 +33,63 @@ data class HomeShelf(
     val title: String,
     val cards: List<RecommendationCard> = emptyList(),
     val artists: List<ArtistCardItem> = emptyList(),
-    val podcasts: Boolean = false,
+    val grid: Boolean = false,
 )
 
-private val PODCAST_TAGS = setOf("EPISODE", "SHOW", "PODCAST", "AUDIOBOOK", "CHAPTER")
+private fun HomeItem.toCard() = RecommendationCard(
+    title = title,
+    subtitle = subtitle.ifBlank { kind },
+    coverColor = colorOf(this),
+    uri = uri,
+    imageUrl = imageUrl.takeIf { it.isNotBlank() },
+    tag = tagOf(kind),
+    caption = caption,
+)
 
-private fun List<HomeItem>.podcastShelf(): Boolean {
-    if (isEmpty()) return false
-    val podcast = count { tagOf(it.kind) in PODCAST_TAGS }
-    return podcast * 2 >= size
-}
+private fun List<HomeItem>.toCards(): List<RecommendationCard> = map { it.toCard() }
 
-fun List<HomeSection>.toShelves(): List<HomeShelf> = mapNotNull { section ->
-    if (section.kind == HomeFeed.SHORTS) return@mapNotNull null
-    val cards = section.items.map { item ->
-        RecommendationCard(
-            title = item.title,
-            subtitle = item.subtitle.ifBlank { item.kind },
-            coverColor = colorOf(item),
-            uri = item.uri,
-            imageUrl = item.imageUrl.takeIf { it.isNotBlank() },
-            tag = tagOf(item.kind),
+// The server ships every recommendation as its own single-item section. Drawing
+// them one by one turns the feed into dozens of one-card carousels, so a run of
+// consecutive baseline sections collapses into one grid shelf anchored where the
+// first of them landed. Any other section kind ends the run.
+fun List<HomeSection>.toShelves(): List<HomeShelf> {
+    val out = ArrayList<HomeShelf>()
+    var run: MutableList<HomeItem>? = null
+    var runIndex = -1
+    for (section in this) {
+        if (section.kind == HomeFeed.SHORTS) continue
+        if (section.kind == HomeFeed.BASELINE) {
+            if (section.items.isEmpty()) continue
+            val open = run
+            if (open == null) {
+                val started = ArrayList(section.items)
+                run = started
+                runIndex = out.size
+                out += HomeShelf(id = "baseline", title = "", grid = true, cards = started.toCards())
+            } else {
+                open += section.items
+                out[runIndex] = out[runIndex].copy(cards = open.toCards())
+            }
+            continue
+        }
+        run = null
+        val cards = section.items.toCards()
+        if (cards.isEmpty()) continue
+        val artistsOnly = section.items.all { tagOf(it.kind) == "ARTIST" }
+        out += HomeShelf(
+            id = section.id.ifBlank { section.title + section.kind },
+            title = section.title,
+            cards = if (artistsOnly) emptyList() else cards,
+            artists = if (artistsOnly) {
+                section.items.map { item ->
+                    ArtistCardItem(name = item.title, color = colorOf(item), uri = item.uri)
+                }
+            } else {
+                emptyList()
+            },
         )
     }
-    if (cards.isEmpty()) return@mapNotNull null
-    val artistsOnly = section.items.all { tagOf(it.kind) == "ARTIST" }
-    HomeShelf(
-        id = section.id.ifBlank { section.title + section.kind },
-        title = section.title,
-        cards = if (artistsOnly) emptyList() else cards,
-        artists = if (artistsOnly) {
-            section.items.map { item ->
-                ArtistCardItem(name = item.title, color = colorOf(item), uri = item.uri)
-            }
-        } else {
-            emptyList()
-        },
-        podcasts = section.items.podcastShelf(),
-    )
+    return out
 }
 
 fun List<HomeSection>.toQuickAccess(): List<QuickAccessItem> =
