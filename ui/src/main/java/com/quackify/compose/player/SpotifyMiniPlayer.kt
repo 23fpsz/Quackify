@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
@@ -57,8 +58,19 @@ import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
 private val MINI_PLAYER_BASE = Color(0xFF282828)
-private const val MINI_PLAYER_TINT_BLEND = 0.35f
+private const val MINI_PLAYER_TINT_STRENGTH = 0.22f
+private const val MINI_PLAYER_MAX_LUMINANCE = 0.30f
 private const val MINI_PLAYER_TINT_DURATION = 650
+
+private fun miniPlayerTint(cover: Color): Color {
+    var tint = lerp(MINI_PLAYER_BASE, cover, MINI_PLAYER_TINT_STRENGTH)
+    var guard = 0
+    while (tint.luminance() > MINI_PLAYER_MAX_LUMINANCE && guard < 8) {
+        tint = lerp(tint, MINI_PLAYER_BASE, 0.18f)
+        guard++
+    }
+    return tint
+}
 
 /**
  * Floating Mini Player Bar matching Spotify Mobile's `now_playing_bar.xml` specifications.
@@ -88,7 +100,7 @@ fun SpotifyMiniPlayer(
     var containerWidthPx by remember { mutableFloatStateOf(600f) }
 
     val dynamicTint by rememberSmoothColor(
-        target = lerp(coverColor, MINI_PLAYER_BASE, MINI_PLAYER_TINT_BLEND),
+        target = miniPlayerTint(coverColor),
         durationMillis = MINI_PLAYER_TINT_DURATION
     )
 
