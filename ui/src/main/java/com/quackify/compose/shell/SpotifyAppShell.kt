@@ -56,6 +56,7 @@ import com.quackify.compose.screens.SettingsLocks
 import com.quackify.compose.screens.LogViewerScreen
 import com.quackify.compose.screens.SpotifyAlbumScreen
 import com.quackify.compose.screens.SpotifyArtistScreen
+import com.quackify.compose.search.CategoryCard
 import com.quackify.compose.screens.SpotifyCategoryScreen
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.getCategoryColor
@@ -84,6 +85,7 @@ import com.quackify.backend.model.PlaylistChoice
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.SearchKind
 import com.quackify.backend.model.SearchResults
+import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.ShowDetail
@@ -271,7 +273,9 @@ fun SpotifyAppShell(
     searchResults: List<TrackItem>? = null,
     onSearchQueryChange: ((String) -> Unit)? = null,
     searchSuggestions: List<TrackItem> = emptyList(),
+    searchSuggestionHits: List<SearchHit> = emptyList(),
     searchRecent: List<SearchHistoryItem> = emptyList(),
+    browseCategories: List<BrowseCard>? = null,
     searchLoading: Boolean = false,
     searchFailed: Boolean = false,
     onRetrySearch: (() -> Unit)? = null,
@@ -838,14 +842,17 @@ fun SpotifyAppShell(
                 SpotifySearchScreen(
                     onCategoryClick = { category ->
                         pushCurrentState()
-                        activeCategoryTitle = category
-                        activeCategoryColor = getCategoryColor(category)
+                        activeCategoryTitle = category.title
+                        activeCategoryColor = category.color
                         currentScreen = ShellScreen.CATEGORY
-                        onOpenCategory?.invoke(category)
+                        if (category.uri.isNotBlank()) onOpenBrowse?.invoke(category.uri)
+                        else onOpenCategory?.invoke(category.title)
                     },
                     onAlbumClick = openAlbum,
                     onArtistClick = openArtist,
                     onPodcastClick = handlePodcastOpen,
+                    onEpisodeClick = { _, uri -> if (uri.isNotEmpty()) openEpisode(uri) },
+                    onShowClick = { _, uri -> if (uri.isNotEmpty()) openShow(uri) },
                     onPlaylistClick = openPlaylist,
                     onTrackSelect = handleTrackPlay,
                     onTrackOptionsClick = handleTrackOptions,
@@ -857,15 +864,28 @@ fun SpotifyAppShell(
                     },
                     recentSearches = searchRecent,
                     suggestions = searchSuggestions,
+                    suggestionHits = searchSuggestionHits,
                     loading = searchLoading,
                     loadFailed = searchFailed,
                     onRetry = { onRetrySearch?.invoke() },
                     onClearRecent = { onClearRecentSearches?.invoke() },
                     onRemoveRecent = { item -> onRemoveRecentSearch?.invoke(item.title) },
                     onToggleSaved = { uri -> onToggleSaved?.invoke(uri) },
+                    onLoadSection = onLoadSearchSection,
+                    browseCategories = remember(browseCategories) {
+                        browseCategories.orEmpty().map { card ->
+                            CategoryCard(
+                                title = card.title,
+                                color = parseHexColor(card.colorHex) ?: getCategoryColor(card.title),
+                                uri = card.uri,
+                                imageUrl = card.imageUrl.takeIf { it.isNotBlank() }
+                            )
+                        }
+                    },
                     userDisplayName = userDisplayName,
                     userAvatarUrl = userAvatarUrl,
                     currentTrackTitle = currentTrackTitle,
+                    currentTrackUri = playbackState?.trackUri.orEmpty(),
                     isPlaying = isPlaying
                 )
             }

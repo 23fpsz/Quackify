@@ -53,6 +53,7 @@ import com.quackify.compose.format.parseHexColor
 import androidx.compose.ui.graphics.Color
 import com.quackify.backend.api.Browse
 import com.quackify.backend.api.Podcasts
+import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.ShowDetail
@@ -201,6 +202,12 @@ class MainActivity : ComponentActivity() {
                         var browsePage by remember { mutableStateOf<BrowsePage?>(null) }
                         var categoryUri by remember { mutableStateOf("") }
                         var categoryShelves by remember { mutableStateOf<List<CategoryShelf>?>(null) }
+                        var browseCategories by remember { mutableStateOf<List<BrowseCard>>(emptyList()) }
+
+                        LaunchedEffect(Unit) {
+                            browseCategories = Browse.all(context).take(16)
+                            log.i("browse categories: ${browseCategories.size}")
+                        }
 
                         LaunchedEffect(categoryUri) {
                             if (categoryUri.isBlank()) return@LaunchedEffect
@@ -883,6 +890,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onSearchQueryChange = { query -> searchTerm = query },
+                            searchSuggestionHits = searchHits,
+                            browseCategories = browseCategories,
                             searchSuggestions = remember(searchHits) {
                                 searchHits.map { hit ->
                                     TrackItem(
