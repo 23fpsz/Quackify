@@ -86,6 +86,7 @@ import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.format.formatCollectionDuration
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
@@ -150,6 +151,9 @@ fun SpotifyPlaylistScreen(
     modifier: Modifier = Modifier,
     headerColor: Color = Color(0xFF144D3F),
     coverUrl: String? = null,
+    creatorAvatarUrl: String = "",
+    totalDurationMs: Long = 0L,
+    totalIsEstimate: Boolean = false,
     loading: Boolean = false,
     hasMore: Boolean = false,
     loadingMore: Boolean = false,
@@ -727,12 +731,23 @@ fun SpotifyPlaylistScreen(
                                         .background(Color(0xFF333333)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.encore_icon_user_24),
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(14.dp)
-                                    )
+                                    if (creatorAvatarUrl.isNotBlank()) {
+                                        SpotifyArtworkImage(
+                                            imageUrl = creatorAvatarUrl,
+                                            contentDescription = creator,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(CircleShape),
+                                            cornerRadius = 12.dp
+                                        )
+                                    } else {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.encore_icon_user_24),
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
                                 }
 
                                 // Creator Name
@@ -759,7 +774,14 @@ fun SpotifyPlaylistScreen(
                                     fontSize = 12.sp
                                 )
                                 Text(
-                                    text = "$saveCount • 10h 1min",
+                                    text = buildString {
+                                        if (saveCount.isNotBlank()) append(saveCount)
+                                        val duration = formatCollectionDuration(totalDurationMs, totalIsEstimate)
+                                        if (duration.isNotBlank()) {
+                                            if (isNotEmpty()) append(" • ")
+                                            append(duration)
+                                        }
+                                    }.ifBlank { saveCount },
                                     style = SpotifyTheme.typography.bodySmall.copy(
                                         color = EncoreColors.TextSecondary,
                                         fontSize = 12.5.sp

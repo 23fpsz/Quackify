@@ -78,6 +78,8 @@ import com.quackify.compose.theme.SpotifyTheme
 import androidx.compose.runtime.mutableStateListOf
 import com.quackify.backend.model.ConnectDevice
 import com.quackify.backend.model.CollectionDetail
+import com.quackify.backend.model.collectionDuration
+import com.quackify.backend.model.collectionDurationIsEstimate
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.Credits
@@ -1879,6 +1881,16 @@ private fun ShellPlaylistPane(
             }
         }
         val resolvedPlaylistCover = activePlaylistCoverUrl ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl
+        val playlistTotal = playlistDetail?.total ?: 0
+        val playlistDurations = remember(playlistTracks) {
+            playlistTracks.orEmpty().map { it.durationMs }
+        }
+        val playlistDurationMs = remember(playlistDurations, playlistTotal) {
+            collectionDuration(playlistDurations, playlistTotal)
+        }
+        val playlistDurationIsEstimate = remember(playlistDurations, playlistTotal) {
+            collectionDurationIsEstimate(playlistDurations, playlistTotal)
+        }
         val playlistDominantColor by rememberDominantColor(
             imageUrl = resolvedPlaylistCover,
             fallbackSeed = activePlaylistTitle,
@@ -1888,7 +1900,10 @@ private fun ShellPlaylistPane(
             title = playlistDetail?.title?.takeIf { it.isNotBlank() } ?: activePlaylistTitle,
             description = playlistDetail?.description.orEmpty(),
             creator = playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: userDisplayName,
+            creatorAvatarUrl = playlistDetail?.creatorAvatarUrl.orEmpty(),
             saveCount = playlistDetail?.saveCount.orEmpty(),
+            totalDurationMs = playlistDurationMs,
+            totalIsEstimate = playlistDurationIsEstimate,
             tracks = playlistTracks ?: emptyList(),
             loading = playlistLoading,
             hasMore = playlistHasMore,
