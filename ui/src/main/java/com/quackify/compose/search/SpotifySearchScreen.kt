@@ -40,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -72,7 +73,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreHeartButton
+import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.TrackListSkeleton
+import com.quackify.compose.components.matchesCurrent
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreProfileAvatar
@@ -93,6 +97,7 @@ import com.quackify.compose.util.rememberIsOffline
 data class CategoryCard(
     val title: String,
     val color: Color,
+    val uri: String = "",
     val imageUrl: String? = null
 )
 
@@ -100,7 +105,9 @@ data class SearchArtistItem(
     val name: String,
     val monthlyListeners: String,
     val color: Color,
-    val uri: String = ""
+    val uri: String = "",
+    val imageUrl: String = "",
+    val saved: Boolean = false
 )
 
 data class SearchAlbumItem(
@@ -108,7 +115,9 @@ data class SearchAlbumItem(
     val artist: String,
     val year: String,
     val color: Color,
-    val uri: String = ""
+    val uri: String = "",
+    val imageUrl: String = "",
+    val saved: Boolean = false
 )
 
 data class SearchPlaylistItem(
@@ -116,7 +125,8 @@ data class SearchPlaylistItem(
     val creator: String,
     val followerCount: String,
     val color: Color,
-    val uri: String = ""
+    val uri: String = "",
+    val imageUrl: String = ""
 )
 
 data class SearchPodcastItem(
@@ -124,7 +134,8 @@ data class SearchPodcastItem(
     val publisher: String,
     val color: Color,
     val description: String,
-    val uri: String = ""
+    val uri: String = "",
+    val imageUrl: String = ""
 )
 
 data class SearchHistoryItem(
@@ -132,7 +143,9 @@ data class SearchHistoryItem(
     val subtitle: String,
     val isArtist: Boolean = false,
     val isQuery: Boolean = false,
-    val color: Color = Color(0xFF1E3264)
+    val color: Color = Color(0xFF1E3264),
+    val uri: String = "",
+    val imageUrl: String = ""
 )
 
 /**
@@ -146,28 +159,34 @@ data class SearchHistoryItem(
  */
 @Composable
 fun SpotifySearchScreen(
-    onCategoryClick: (String) -> Unit,
+    onCategoryClick: (CategoryCard) -> Unit,
     onTrackSelect: (TrackItem) -> Unit = {},
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAlbumClick: (String, String, String) -> Unit = { _, _, _ -> },
     onArtistClick: (String, String) -> Unit = { _, _ -> },
     onPodcastClick: (String, String) -> Unit = { _, _ -> },
+    onEpisodeClick: (String, String) -> Unit = { _, _ -> },
+    onShowClick: (String, String) -> Unit = { _, _ -> },
     searchData: SearchResults? = null,
     onPlaylistClick: (String, String) -> Unit = { _, _ -> },
     searchResults: List<TrackItem>? = null,
     onSearchQueryChange: (String) -> Unit = {},
     recentSearches: List<SearchHistoryItem> = emptyList(),
     suggestions: List<TrackItem> = emptyList(),
+    suggestionHits: List<SearchHit> = emptyList(),
     loading: Boolean = false,
     loadFailed: Boolean = false,
     onRetry: () -> Unit = {},
     onToggleSaved: (String) -> Unit = {},
     onClearRecent: () -> Unit = {},
     onRemoveRecent: (SearchHistoryItem) -> Unit = {},
+    onLoadSection: (suspend (SearchKind, Int) -> List<SearchHit>)? = null,
+    browseCategories: List<CategoryCard> = emptyList(),
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
     currentTrackTitle: String = "",
+    currentTrackUri: String = "",
     isPlaying: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -210,25 +229,29 @@ fun SpotifySearchScreen(
         mutableStateListOf<SearchHistoryItem>().apply { addAll(recentSearches) }
     }
 
-    val categories = remember {
-        listOf(
-            CategoryCard("Podcasts", Color(0xFFE13300)),
-            CategoryCard("Live Events", Color(0xFF7358FF)),
-            CategoryCard("Made For You", Color(0xFF1E3264)),
-            CategoryCard("New Releases", Color(0xFFE8115B)),
-            CategoryCard("Pop", Color(0xFF148A08)),
-            CategoryCard("Hip-Hop", Color(0xFFBC5900)),
-            CategoryCard("Rock", Color(0xFFE91429)),
-            CategoryCard("Latin", Color(0xFFE1118C)),
-            CategoryCard("Dance/Electronic", Color(0xFFD84000)),
-            CategoryCard("Discover", Color(0xFF8D67AB)),
-            CategoryCard("Indie", Color(0xFF608108)),
-            CategoryCard("Workout", Color(0xFF777777)),
-            CategoryCard("R&B", Color(0xFFDC148C)),
-            CategoryCard("Chill", Color(0xFF432371)),
-            CategoryCard("Sleep", Color(0xFF1E3264)),
-            CategoryCard("Gaming", Color(0xFFE8115B))
-        )
+    val categories = remember(browseCategories) {
+        if (browseCategories.isNotEmpty()) {
+            browseCategories
+        } else {
+            listOf(
+                CategoryCard("Podcasts", Color(0xFFE13300)),
+                CategoryCard("Live Events", Color(0xFF7358FF)),
+                CategoryCard("Made For You", Color(0xFF1E3264)),
+                CategoryCard("New Releases", Color(0xFFE8115B)),
+                CategoryCard("Pop", Color(0xFF148A08)),
+                CategoryCard("Hip-Hop", Color(0xFFBC5900)),
+                CategoryCard("Rock", Color(0xFFE91429)),
+                CategoryCard("Latin", Color(0xFFE1118C)),
+                CategoryCard("Dance/Electronic", Color(0xFFD84000)),
+                CategoryCard("Discover", Color(0xFF8D67AB)),
+                CategoryCard("Indie", Color(0xFF608108)),
+                CategoryCard("Workout", Color(0xFF777777)),
+                CategoryCard("R&B", Color(0xFFDC148C)),
+                CategoryCard("Chill", Color(0xFF432371)),
+                CategoryCard("Sleep", Color(0xFF1E3264)),
+                CategoryCard("Gaming", Color(0xFFE8115B))
+            )
+        }
     }
     val allSearchableTracks = remember(searchData) {
         searchData?.tracks.orEmpty().map { it.toTrackItem() }
@@ -237,9 +260,11 @@ fun SpotifySearchScreen(
         searchData?.artists.orEmpty().map { hit ->
             SearchArtistItem(
                 name = hit.title,
-                monthlyListeners = "",
+                monthlyListeners = hit.subtitle,
                 color = parseHexColor(hit.colorHex) ?: Color(0xFF1E3264),
-                uri = hit.uri
+                uri = hit.uri,
+                imageUrl = hit.imageUrl,
+                saved = hit.saved
             )
         }
     }
@@ -250,7 +275,9 @@ fun SpotifySearchScreen(
                 artist = hit.subtitle,
                 year = "",
                 color = parseHexColor(hit.colorHex) ?: Color(0xFF1E3264),
-                uri = hit.uri
+                uri = hit.uri,
+                imageUrl = hit.imageUrl,
+                saved = hit.saved
             )
         }
     }
@@ -261,7 +288,8 @@ fun SpotifySearchScreen(
                 creator = hit.subtitle,
                 followerCount = "",
                 color = parseHexColor(hit.colorHex) ?: Color(0xFF1E3264),
-                uri = hit.uri
+                uri = hit.uri,
+                imageUrl = hit.imageUrl
             )
         }
     }
@@ -275,7 +303,8 @@ fun SpotifySearchScreen(
                     publisher = hit.subtitle,
                     color = parseHexColor(hit.colorHex) ?: Color(0xFF1E3264),
                     description = "",
-                    uri = hit.uri
+                    uri = hit.uri,
+                    imageUrl = hit.imageUrl
                 )
             }
     }
@@ -329,6 +358,57 @@ fun SpotifySearchScreen(
 
     val isSearching = searchQuery.isNotBlank() || isSearchBarFocused
     val showRecentSearches = isSearchBarFocused && searchQuery.isEmpty() && recentSearches.isNotEmpty()
+    val showSuggestions = isSearchBarFocused && searchQuery.isNotBlank() && suggestionHits.isNotEmpty()
+
+    var sectionHits by remember { mutableStateOf<List<SearchHit>>(emptyList()) }
+    var sectionExhausted by remember { mutableStateOf(false) }
+    var sectionLoadingMore by remember { mutableStateOf(false) }
+
+    val tabKind = kindOfTab(selectedSearchTab)
+    val loader = onLoadSection
+
+    LaunchedEffect(tabKind, searchQuery, isSearchBarFocused, loader) {
+        if (tabKind == null || loader == null || isSearchBarFocused || searchQuery.isBlank()) {
+            sectionHits = emptyList()
+            sectionExhausted = true
+            return@LaunchedEffect
+        }
+        sectionHits = emptyList()
+        sectionExhausted = false
+        val first = loader(tabKind, 0)
+        sectionHits = first
+        sectionExhausted = first.isEmpty()
+    }
+
+    val loadMoreSection: suspend () -> Unit = {
+        val kind = tabKind
+        if (kind != null && loader != null && !sectionLoadingMore && !sectionExhausted) {
+            sectionLoadingMore = true
+            val next = loader(kind, sectionHits.size)
+            if (next.isEmpty()) sectionExhausted = true else sectionHits = sectionHits + next
+            sectionLoadingMore = false
+        }
+    }
+
+    val tabHits = remember(selectedSearchTab, sectionHits, searchData) {
+        if (sectionHits.isNotEmpty()) {
+            sectionHits
+        } else {
+            tabKind?.let { searchData?.of(it).orEmpty() }.orEmpty()
+        }
+    }
+
+    val openHit: (SearchHit) -> Unit = { hit ->
+        when (hit.kind) {
+            SearchKind.ARTIST -> onArtistClick(hit.title, hit.uri)
+            SearchKind.ALBUM -> onAlbumClick(hit.title, hit.subtitle, hit.uri)
+            SearchKind.PLAYLIST -> onPlaylistClick(hit.title, hit.uri)
+            SearchKind.EPISODE -> onEpisodeClick(hit.title, hit.uri)
+            SearchKind.SHOW -> onShowClick(hit.title, hit.uri)
+            SearchKind.TRACK -> onTrackSelect(hit.toTrackItem())
+            else -> Unit
+        }
+    }
 
     Column(
         modifier = modifier
@@ -647,12 +727,74 @@ fun SpotifySearchScreen(
                     }
                 }
             }
+        } else if (showSuggestions) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(EncoreColors.Background),
+                contentPadding = PaddingValues(top = 4.dp, bottom = bottomPadding)
+            ) {
+                items(suggestionHits, key = { it.uri.ifBlank { it.title } }) { hit ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                isSearchBarFocused = false
+                                searchQuery = hit.title
+                                focusManager.clearFocus()
+                                onSearchQueryChange(hit.title)
+                            }
+                            .padding(horizontal = 16.dp)
+                            .height(56.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (hit.kind == SearchKind.QUERY) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_search_24),
+                                contentDescription = null,
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            SearchHitArtwork(hit = hit, size = 40.dp)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = hit.title,
+                                style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = EncoreColors.TextPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (hit.subtitle.isNotBlank()) {
+                                Text(
+                                    text = hit.subtitle,
+                                    style = SpotifyTheme.typography.bodySmall,
+                                    color = EncoreColors.TextSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        if (hit.kind != SearchKind.QUERY) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_search_24),
+                                contentDescription = null,
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
         } else if (searchQuery.isNotEmpty()) {
             val hasResults = filteredTracks.isNotEmpty() ||
                     filteredArtists.isNotEmpty() ||
                     filteredAlbums.isNotEmpty() ||
                     filteredPlaylists.isNotEmpty() ||
-                    filteredPodcasts.isNotEmpty()
+                    filteredPodcasts.isNotEmpty() ||
+                    searchData?.sections?.isNotEmpty() == true
 
             if (loading && !isOffline) {
                 TrackListSkeleton(
@@ -733,19 +875,11 @@ fun SpotifySearchScreen(
                                 val topLabel = topHit?.kind?.sectionLabel() ?: "Song"
                                 val openTopResult = {
                                     val hit = topHit
-                                    if (hit == null) {
-                                        onTrackSelect(top)
-                                    } else {
-                                        when (hit.kind) {
-                                            SearchKind.ARTIST -> onArtistClick(hit.title, hit.uri)
-                                            SearchKind.ALBUM -> onAlbumClick(hit.title, hit.subtitle, hit.uri)
-                                            SearchKind.PLAYLIST -> onPlaylistClick(hit.title, hit.uri)
-                                            SearchKind.SHOW, SearchKind.EPISODE -> onPodcastClick(hit.title, hit.uri)
-                                            else -> onTrackSelect(hit.toTrackItem())
-                                        }
-                                    }
+                                    if (hit == null) onTrackSelect(top) else openHit(hit)
                                 }
-                                val isThisPlaying = isPlaying && top.title == currentTrackTitle
+                                val isThisPlaying = isPlaying && matchesCurrent(
+                                    top.uri, currentTrackUri, top.title, currentTrackTitle
+                                )
 
                                 Text(
                                     text = "Top result",
@@ -834,7 +968,8 @@ fun SpotifySearchScreen(
                             }
 
                             items(filteredTracks.take(4)) { track ->
-                                val isThisPlaying = isPlaying && track.title == currentTrackTitle
+                                val isThisPlaying = isPlaying &&
+                                    matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                                 SearchTrackRow(
                                     track = track,
                                     isPlaying = isThisPlaying,
@@ -862,7 +997,8 @@ fun SpotifySearchScreen(
                             items(filteredArtists.take(2)) { artist ->
                                 ArtistRow(
                                     artist = artist,
-                                    onArtistClick = { onArtistClick(artist.name, artist.uri) }
+                                    onArtistClick = { onArtistClick(artist.name, artist.uri) },
+                                    onFollowToggle = { onToggleSaved(artist.uri) }
                                 )
                             }
 
@@ -884,7 +1020,8 @@ fun SpotifySearchScreen(
                             items(filteredAlbums.take(2)) { album ->
                                 AlbumRow(
                                     album = album,
-                                    onClick = { onAlbumClick(album.title, album.artist, album.uri) }
+                                    onClick = { onAlbumClick(album.title, album.artist, album.uri) },
+                                    onToggleSaved = { onToggleSaved(album.uri) }
                                 )
                             }
 
@@ -892,59 +1029,119 @@ fun SpotifySearchScreen(
                                 Spacer(modifier = Modifier.height(16.dp))
                             }
                         }
-                    }
 
-                    // TAB 1: "Songs"
-                    if (selectedSearchTab == 1) {
-                        items(filteredTracks) { track ->
-                            val isThisPlaying = isPlaying && track.title == currentTrackTitle
-                            SearchTrackRow(
-                                track = track,
-                                isPlaying = isThisPlaying,
-                                onClick = { onTrackSelect(track) },
-                                onMoreClick = { onTrackOptionsClick(track) },
-                                onLikeClick = { onToggleSaved(track.uri) }
-                            )
+                        // Playlists subset
+                        if (filteredPlaylists.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Playlists",
+                                    style = SpotifyTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
+
+                            items(filteredPlaylists.take(2)) { playlist ->
+                                PlaylistRow(
+                                    playlist = playlist,
+                                    onClick = { onPlaylistClick(playlist.title, playlist.uri) }
+                                )
+                            }
+
+                            item {
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+                        }
+
+                        // Podcasts subset
+                        if (filteredPodcasts.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Podcasts & Shows",
+                                    style = SpotifyTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
+
+                            items(filteredPodcasts.take(2)) { podcast ->
+                                PodcastRow(
+                                    podcast = podcast,
+                                    onClick = { onPodcastClick(podcast.title, podcast.uri) }
+                                )
+                            }
+
+                            item {
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+                        }
+
+                        // Server shelves interleaved in topResultsV2 ("Featuring …",
+                        // "Music videos", …): the web player gives each its own block.
+                        searchData?.sections.orEmpty().forEach { section ->
+                            if (section.items.isNotEmpty()) {
+                                item(key = "section_${section.title}") {
+                                    Text(
+                                        text = section.title,
+                                        style = SpotifyTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                }
+
+                                items(section.items, key = { "hit_${it.uri}_${it.title}" }) { hit ->
+                                    SearchHitRow(
+                                        hit = hit,
+                                        isPlaying = isPlaying,
+                                        currentTrackTitle = currentTrackTitle,
+                                        currentTrackUri = currentTrackUri,
+                                        onTrackSelect = onTrackSelect,
+                                        onTrackOptionsClick = onTrackOptionsClick,
+                                        onAlbumClick = onAlbumClick,
+                                        onArtistClick = onArtistClick,
+                                        onPlaylistClick = onPlaylistClick,
+                                        onToggleSaved = onToggleSaved,
+                                        onOpen = { openHit(hit) }
+                                    )
+                                }
+
+                                item(key = "section_gap_${section.title}") {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                }
+                            }
                         }
                     }
 
-                    // TAB 2: "Artists"
-                    if (selectedSearchTab == 2) {
-                        items(filteredArtists) { artist ->
-                            ArtistRow(
-                                artist = artist,
-                                onArtistClick = { onArtistClick(artist.name, artist.uri) }
+                    // A specific tab: the server's own operation for that section
+                    // once it answered, the slice of the top 50 until then.
+                    if (tabKind != null) {
+                        items(tabHits, key = { "tab_${it.uri}_${it.title}" }) { hit ->
+                            SearchHitRow(
+                                hit = hit,
+                                isPlaying = isPlaying,
+                                currentTrackTitle = currentTrackTitle,
+                                currentTrackUri = currentTrackUri,
+                                onTrackSelect = onTrackSelect,
+                                onTrackOptionsClick = onTrackOptionsClick,
+                                onAlbumClick = onAlbumClick,
+                                onArtistClick = onArtistClick,
+                                onPlaylistClick = onPlaylistClick,
+                                onToggleSaved = onToggleSaved,
+                                onOpen = { openHit(hit) }
                             )
                         }
-                    }
 
-                    // TAB 3: "Playlists"
-                    if (selectedSearchTab == 3) {
-                        items(filteredPlaylists) { playlist ->
-                            PlaylistRow(
-                                playlist = playlist,
-                                onClick = { onPlaylistClick(playlist.title, playlist.uri) }
-                            )
-                        }
-                    }
-
-                    // TAB 4: "Albums"
-                    if (selectedSearchTab == 4) {
-                        items(filteredAlbums) { album ->
-                            AlbumRow(
-                                album = album,
-                                onClick = { onAlbumClick(album.title, album.artist, album.uri) }
-                            )
-                        }
-                    }
-
-                    // TAB 5: "Podcasts"
-                    if (selectedSearchTab == 5) {
-                        items(filteredPodcasts) { podcast ->
-                            PodcastRow(
-                                podcast = podcast,
-                                onClick = { onPodcastClick(podcast.title, podcast.uri) }
-                            )
+                        if (loader != null && !sectionExhausted && sectionHits.isNotEmpty()) {
+                            item(key = "section_more") {
+                                LaunchedEffect(tabKind, sectionHits.size) {
+                                    loadMoreSection()
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(56.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    InlineLoadingDots(color = EncoreColors.TextSecondary)
+                                }
+                            }
                         }
                     }
 
@@ -980,7 +1177,7 @@ fun SpotifySearchScreen(
                             .height(96.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .background(category.color)
-                            .clickable { onCategoryClick(category.title) }
+                            .clickable { onCategoryClick(category) }
                     ) {
                         Text(
                             text = category.title,
@@ -1157,9 +1354,10 @@ private fun SearchTrackRow(
 @Composable
 private fun ArtistRow(
     artist: SearchArtistItem,
-    onArtistClick: () -> Unit
+    onArtistClick: () -> Unit,
+    onFollowToggle: () -> Unit = {}
 ) {
-    var isFollowing by remember { mutableStateOf(false) }
+    var isFollowing by remember(artist.uri, artist.saved) { mutableStateOf(artist.saved) }
 
     Row(
         modifier = Modifier
@@ -1175,13 +1373,24 @@ private fun ArtistRow(
                 .background(artist.color),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "★", color = Color.White, fontSize = 22.sp)
+            if (artist.imageUrl.isNotBlank()) {
+                SpotifyArtworkImage(
+                    imageUrl = artist.imageUrl,
+                    contentDescription = artist.name,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 26.dp
+                )
+            } else {
+                Text(text = "★", color = Color.White, fontSize = 22.sp)
+            }
         }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = artist.name,
-                style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
@@ -1193,7 +1402,10 @@ private fun ArtistRow(
             modifier = Modifier
                 .clip(RoundedCornerShape(16.dp))
                 .background(if (isFollowing) EncoreColors.Green else EncoreColors.Card)
-                .clickable { isFollowing = !isFollowing }
+                .clickable {
+                    isFollowing = !isFollowing
+                    onFollowToggle()
+                }
                 .padding(horizontal = 14.dp, vertical = 6.dp)
         ) {
             Text(
@@ -1209,7 +1421,8 @@ private fun ArtistRow(
 @Composable
 private fun AlbumRow(
     album: SearchAlbumItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onToggleSaved: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -1225,7 +1438,16 @@ private fun AlbumRow(
                 .background(album.color),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "♫", color = Color.White, fontSize = 22.sp)
+            if (album.imageUrl.isNotBlank()) {
+                SpotifyArtworkImage(
+                    imageUrl = album.imageUrl,
+                    contentDescription = album.title,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 4.dp
+                )
+            } else {
+                Text(text = "♫", color = Color.White, fontSize = 22.sp)
+            }
         }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -1237,12 +1459,18 @@ private fun AlbumRow(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "Album • ${album.year} • ${album.artist}",
+                text = if (album.year.isBlank()) "Album • ${album.artist}" else "Album • ${album.year} • ${album.artist}",
                 style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
+        EncoreHeartButton(
+            isLiked = album.saved,
+            onLikeToggle = onToggleSaved,
+            size = 32.dp,
+            iconSize = 18.dp
+        )
     }
 }
 
@@ -1265,12 +1493,21 @@ private fun PlaylistRow(
                 .background(playlist.color),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.encore_icon_playlist_24),
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
+            if (playlist.imageUrl.isNotBlank()) {
+                SpotifyArtworkImage(
+                    imageUrl = playlist.imageUrl,
+                    contentDescription = playlist.title,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 4.dp
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_playlist_24),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -1298,6 +1535,148 @@ private fun SearchKind.sectionLabel(): String = when (this) {
     SearchKind.PLAYLIST -> "Playlist"
     SearchKind.SHOW, SearchKind.EPISODE -> "Podcast"
     else -> "Result"
+}
+
+private fun kindOfTab(index: Int): SearchKind? = when (index) {
+    1 -> SearchKind.TRACK
+    2 -> SearchKind.ARTIST
+    3 -> SearchKind.PLAYLIST
+    4 -> SearchKind.ALBUM
+    5 -> SearchKind.SHOW
+    else -> null
+}
+
+private fun SearchHit.toArtistItem(): SearchArtistItem = SearchArtistItem(
+    name = title,
+    monthlyListeners = subtitle,
+    color = parseHexColor(colorHex) ?: Color(0xFF1E3264),
+    uri = uri,
+    imageUrl = imageUrl,
+    saved = saved
+)
+
+private fun SearchHit.toAlbumItem(): SearchAlbumItem = SearchAlbumItem(
+    title = title,
+    artist = subtitle,
+    year = "",
+    color = parseHexColor(colorHex) ?: Color(0xFF1E3264),
+    uri = uri,
+    imageUrl = imageUrl,
+    saved = saved
+)
+
+private fun SearchHit.toPlaylistItem(): SearchPlaylistItem = SearchPlaylistItem(
+    title = title,
+    creator = subtitle,
+    followerCount = "",
+    color = parseHexColor(colorHex) ?: Color(0xFF1E3264),
+    uri = uri,
+    imageUrl = imageUrl
+)
+
+@Composable
+private fun SearchHitRow(
+    hit: SearchHit,
+    isPlaying: Boolean,
+    currentTrackTitle: String,
+    currentTrackUri: String,
+    onTrackSelect: (TrackItem) -> Unit,
+    onTrackOptionsClick: (TrackItem) -> Unit,
+    onAlbumClick: (String, String, String) -> Unit,
+    onArtistClick: (String, String) -> Unit,
+    onPlaylistClick: (String, String) -> Unit,
+    onToggleSaved: (String) -> Unit,
+    onOpen: () -> Unit,
+) {
+    when (hit.kind) {
+        SearchKind.TRACK -> {
+            val item = hit.toTrackItem()
+            SearchTrackRow(
+                track = item,
+                isPlaying = isPlaying && matchesCurrent(item.uri, currentTrackUri, item.title, currentTrackTitle),
+                onClick = { onTrackSelect(item) },
+                onMoreClick = { onTrackOptionsClick(item) },
+                onLikeClick = { onToggleSaved(item.uri) }
+            )
+        }
+        SearchKind.PLAYLIST -> PlaylistRow(
+            playlist = hit.toPlaylistItem(),
+            onClick = { onPlaylistClick(hit.title, hit.uri) }
+        )
+        SearchKind.ALBUM -> AlbumRow(
+            album = hit.toAlbumItem(),
+            onClick = { onAlbumClick(hit.title, hit.subtitle, hit.uri) },
+            onToggleSaved = { onToggleSaved(hit.uri) }
+        )
+        SearchKind.ARTIST -> ArtistRow(
+            artist = hit.toArtistItem(),
+            onArtistClick = { onArtistClick(hit.title, hit.uri) },
+            onFollowToggle = { onToggleSaved(hit.uri) }
+        )
+        else -> GenericHitRow(hit = hit, onClick = onOpen)
+    }
+}
+
+@Composable
+private fun GenericHitRow(
+    hit: SearchHit,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SearchHitArtwork(hit = hit, size = 52.dp)
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = hit.title,
+                style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (hit.subtitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = hit.subtitle,
+                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchHitArtwork(hit: SearchHit, size: androidx.compose.ui.unit.Dp) {
+    val round = hit.kind == SearchKind.ARTIST || hit.kind == SearchKind.USER
+    val shape = if (round) CircleShape else RoundedCornerShape(4.dp)
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(shape)
+            .background(parseHexColor(hit.colorHex) ?: Color(0xFF282828)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (hit.imageUrl.isNotBlank()) {
+            SpotifyArtworkImage(
+                imageUrl = hit.imageUrl,
+                contentDescription = hit.title,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = if (round) size / 2 else 4.dp
+            )
+        } else {
+            Text(
+                text = if (round) "★" else "♫",
+                fontSize = 20.sp,
+                color = Color.White
+            )
+        }
+    }
 }
 
 private fun SearchHit.toTrackItem(): TrackItem = TrackItem(
@@ -1330,12 +1709,21 @@ private fun PodcastRow(
                 .background(podcast.color),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.encore_icon_podcasts_24),
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
+            if (podcast.imageUrl.isNotBlank()) {
+                SpotifyArtworkImage(
+                    imageUrl = podcast.imageUrl,
+                    contentDescription = podcast.title,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 6.dp
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_podcasts_24),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
