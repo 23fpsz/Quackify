@@ -24,7 +24,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -36,9 +35,6 @@ import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyTheme
 import com.quackify.compose.util.rememberIsOffline
-
-private const val NAV_BAR_ALPHA = 0.72f
-private val NAV_GAP = 8.dp
 
 @Composable
 internal fun ShellBottomBar(
@@ -122,12 +118,10 @@ internal fun ShellBottomBar(
             hasTrack = hasTrack
         )
 
-        Spacer(modifier = Modifier.height(NAV_GAP))
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(EncoreColors.PureBlack.copy(alpha = NAV_BAR_ALPHA))
+                .background(EncoreColors.PureBlack)
                 .navigationBarsPadding()
                 .height(56.dp),
             verticalAlignment = Alignment.CenterVertically
