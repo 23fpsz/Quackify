@@ -293,6 +293,7 @@ fun SpotifyAppShell(
     settingsCountry: String = "",
     settingsLoading: Boolean = false,
     onToggleSetting: ((String, Boolean) -> Unit)? = null,
+    onToggleFullArtwork: (Boolean) -> Unit = {},
     browsePage: BrowsePage? = null,
     categoryShelves: List<CategoryShelf>? = null,
     onOpenCategory: ((String) -> Unit)? = null,
@@ -346,6 +347,7 @@ fun SpotifyAppShell(
     isCanvasAllowed: Boolean = true,
     isCanvasEnabled: Boolean = false,
     onCanvasToggle: ((Boolean) -> Unit)? = null,
+    fullArtworkPlayer: Boolean = true,
     artistDetail: ArtistDetail? = null,
     artistLoading: Boolean = false,
     trackCredits: Credits? = null,
@@ -1042,6 +1044,7 @@ fun SpotifyAppShell(
                 country = settingsCountry,
                 loading = settingsLoading,
                 onToggleSetting = onToggleSetting,
+                onToggleFullArtwork = onToggleFullArtwork,
                 onOpenLogViewer = {
                     pushCurrentState()
                     currentScreen = ShellScreen.LOGS
@@ -1224,6 +1227,7 @@ fun SpotifyAppShell(
             canvasFilePath = canvasFilePath,
             isCanvasAllowed = isCanvasAllowed,
             isCanvasEnabled = isCanvasEnabled,
+            fullArtwork = fullArtworkPlayer,
             onCanvasToggle = { on -> onCanvasToggle?.invoke(on) },
             shuffleMode = currentShuffleMode,
             repeatMode = currentRepeatMode,
@@ -1700,6 +1704,7 @@ private fun ShellSettingsPane(
     country: String,
     loading: Boolean,
     onToggleSetting: ((String, Boolean) -> Unit)?,
+    onToggleFullArtwork: (Boolean) -> Unit = {},
     onOpenLogViewer: () -> Unit = {}
 ) {
     SettingsScreen(
@@ -1715,6 +1720,7 @@ private fun ShellSettingsPane(
         onToggleOtherVideos = { onToggleSetting?.invoke("otherVideoDisabled", !it) },
         onToggleShowFollows = { onToggleSetting?.invoke("showFollows", !it) },
         onToggleShowPlaylists = { onToggleSetting?.invoke("showPublishedPlaylists", !it) },
+        onToggleFullArtwork = onToggleFullArtwork,
         onOpenLogViewer = onOpenLogViewer
     )
 }

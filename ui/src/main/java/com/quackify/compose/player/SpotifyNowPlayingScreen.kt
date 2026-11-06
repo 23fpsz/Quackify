@@ -130,6 +130,7 @@ private const val REVEAL_CONTROLS_DELAY_MS = 160
 private const val REVEAL_REST_DELAY_MS = 220
 private const val REVEAL_RISE_FRACTION = 0.06f
 private const val ARTWORK_FADE_FRACTION = 0.42f
+private val HEADER_ROW_HEIGHT = 60.dp
 
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
@@ -218,6 +219,7 @@ fun SpotifyNowPlayingScreen(
     canvasFilePath: String? = null,
     isCanvasAllowed: Boolean = true,
     isCanvasEnabled: Boolean = false,
+    fullArtwork: Boolean = true,
     onCanvasToggle: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     onBanClick: (() -> Unit)? = null,
@@ -357,10 +359,12 @@ fun SpotifyNowPlayingScreen(
                 )
         )
 
-        FullArtworkBackdrop(
-            image = fullArtworkBlur,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (fullArtwork) {
+            FullArtworkBackdrop(
+                image = fullArtworkBlur,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         @OptIn(ExperimentalFoundationApi::class)
         CompositionLocalProvider(
@@ -504,7 +508,8 @@ fun SpotifyNowPlayingScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(state = scrollState, enabled = isScrollEnabled),
+                            .verticalScroll(state = scrollState, enabled = isScrollEnabled)
+                            .padding(top = if (fullArtwork) 0.dp else HEADER_ROW_HEIGHT),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Full-bleed banner: the artwork starts at the very top of the
@@ -513,6 +518,8 @@ fun SpotifyNowPlayingScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .then(if (fullArtwork) Modifier else Modifier.statusBarsPadding())
+                                .padding(horizontal = if (fullArtwork) 0.dp else 24.dp)
                                 .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
                         ) {
                             NowPlayingArtworkCard(
@@ -523,8 +530,8 @@ fun SpotifyNowPlayingScreen(
                                 canvasFilePath = canvasFilePath,
                                 isCanvasEnabled = canvasActive,
                                 gestureModifier = artworkGestureModifier,
-                                fullBleed = true,
-                                fadeFraction = ARTWORK_FADE_FRACTION,
+                                fullBleed = fullArtwork,
+                                fadeFraction = if (fullArtwork) ARTWORK_FADE_FRACTION else 0f,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1.0f)
