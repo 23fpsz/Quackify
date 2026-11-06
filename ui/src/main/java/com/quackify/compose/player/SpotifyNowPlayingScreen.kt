@@ -959,11 +959,11 @@ private fun NowPlayingArtworkCard(
     }
     Box(
         modifier = modifier
+            .then(layerModifier)
             .shadow(elevation = if (fullBleed) 0.dp else 16.dp, shape = RoundedCornerShape(corner))
             .then(gestureModifier)
             .clip(RoundedCornerShape(corner))
-            .background(backgroundColor)
-            .then(layerModifier),
+            .background(backgroundColor),
         contentAlignment = Alignment.Center
     ) {
         if (canvasActive) {
