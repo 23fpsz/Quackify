@@ -14,6 +14,8 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -32,11 +34,37 @@ private const val BlurSourcePx = 128
 private const val BlurPasses = 3
 private const val BlurCacheEntries = 8
 
+const val FadeCurveStops = 16
+
+fun smootherStep(t: Float): Float {
+    val x = t.coerceIn(0f, 1f)
+    return x * x * x * (x * (x * 6f - 15f) + 10f)
+}
+
 val FullArtworkScrimBrush = Brush.verticalGradient(
     0.0f to Color.Black.copy(alpha = 0.30f),
     0.55f to Color.Black.copy(alpha = 0.46f),
     1.0f to Color.Black.copy(alpha = 0.66f)
 )
+
+fun Modifier.dissolveInto(fraction: Float): Modifier = if (fraction <= 0f) {
+    this
+} else {
+    drawWithContent {
+        drawContent()
+        drawRect(
+            brush = Brush.verticalGradient(
+                colorStops = Array(FadeCurveStops + 1) { index ->
+                    val t = index / FadeCurveStops.toFloat()
+                    t to Color.Black.copy(alpha = 1f - smootherStep(t))
+                },
+                startY = size.height * (1f - fraction.coerceIn(0f, 1f)),
+                endY = size.height
+            ),
+            blendMode = BlendMode.DstIn
+        )
+    }
+}
 
 @Composable
 fun rememberFullArtworkBlur(imageUrl: String?): State<ImageBitmap?> {
