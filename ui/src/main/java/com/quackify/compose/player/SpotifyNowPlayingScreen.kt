@@ -957,13 +957,18 @@ private fun NowPlayingArtworkCard(
     } else {
         Modifier
     }
+    val surfaceModifier = if (canvasActive) {
+        Modifier
+    } else {
+        Modifier.background(backgroundColor)
+    }
     Box(
         modifier = modifier
             .then(layerModifier)
             .shadow(elevation = if (fullBleed) 0.dp else 16.dp, shape = RoundedCornerShape(corner))
             .then(gestureModifier)
             .clip(RoundedCornerShape(corner))
-            .background(backgroundColor),
+            .then(surfaceModifier),
         contentAlignment = Alignment.Center
     ) {
         if (canvasActive) {
