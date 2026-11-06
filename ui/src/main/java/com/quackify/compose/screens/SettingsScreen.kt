@@ -91,6 +91,7 @@ fun SettingsScreen(
     onToggleOtherVideos: (Boolean) -> Unit = {},
     onToggleShowFollows: (Boolean) -> Unit = {},
     onToggleShowPlaylists: (Boolean) -> Unit = {},
+    onToggleFullArtwork: (Boolean) -> Unit = {},
     onOpenLogViewer: () -> Unit = {},
 ) {
     val bottomPadding = rememberBottomPadding()
@@ -114,6 +115,9 @@ fun SettingsScreen(
     }
     var autoplayOnEnd by remember {
         mutableStateOf(clientPrefs.getBoolean("autoplayOnEnd", true))
+    }
+    var fullArtwork by remember {
+        mutableStateOf(clientPrefs.getBoolean("fullArtworkPlayer", true))
     }
 
     // Hidden developer entry: five taps on the Version row open the log viewer.
@@ -243,6 +247,17 @@ fun SettingsScreen(
                     onCheckedChange = { on ->
                         autoplayOnEnd = on
                         clientPrefs.edit().putBoolean("autoplayOnEnd", on).apply()
+                    }
+                )
+                SettingsToggleRow(
+                    title = "Full artwork",
+                    subtitle = "Stretch the cover edge to edge behind the status bar, fading into a blurred copy of it. When off, the cover sits in a card.",
+                    isChecked = fullArtwork,
+                    enabled = true,
+                    onCheckedChange = { on ->
+                        fullArtwork = on
+                        clientPrefs.edit().putBoolean("fullArtworkPlayer", on).apply()
+                        onToggleFullArtwork(on)
                     }
                 )
             }

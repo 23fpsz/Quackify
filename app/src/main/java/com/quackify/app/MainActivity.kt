@@ -204,6 +204,13 @@ class MainActivity : ComponentActivity() {
                         var categoryShelves by remember { mutableStateOf<List<CategoryShelf>?>(null) }
                         var browseCategories by remember { mutableStateOf<List<BrowseCard>>(emptyList()) }
 
+                        val clientPrefs = remember {
+                            context.getSharedPreferences("quackify.client", Context.MODE_PRIVATE)
+                        }
+                        var fullArtworkPlayer by remember {
+                            mutableStateOf(clientPrefs.getBoolean("fullArtworkPlayer", true))
+                        }
+
                         LaunchedEffect(Unit) {
                             browseCategories = Browse.all(context).take(16)
                             log.i("browse categories: ${browseCategories.size}")
@@ -939,6 +946,11 @@ class MainActivity : ComponentActivity() {
                             },
                             browsePage = browsePage,
                             categoryShelves = categoryShelves,
+                            fullArtworkPlayer = fullArtworkPlayer,
+                            onToggleFullArtwork = { on ->
+                                fullArtworkPlayer = on
+                                clientPrefs.edit().putBoolean("fullArtworkPlayer", on).apply()
+                            },
                             onOpenCategory = { category ->
                                 categoryUri = "spotify:genre:" + category.lowercase().replace(" ", "-")
                                 categoryShelves = null
