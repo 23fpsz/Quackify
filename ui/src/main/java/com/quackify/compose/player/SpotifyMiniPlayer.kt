@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,9 +37,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
-import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreControlSizes
 import com.quackify.compose.theme.EncoreCornerRadii
@@ -57,12 +53,6 @@ import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
-
-/** How far the bar has to travel before the release counts as an open. */
-private val SWIPE_UP_DISTANCE = 48.dp
-
-/** Upward fling speed, in dp per second, that opens on release regardless. */
-private val SWIPE_UP_VELOCITY = 900.dp
 
 /**
  * Floating Mini Player Bar matching Spotify Mobile's `now_playing_bar.xml` specifications.
@@ -80,7 +70,6 @@ fun SpotifyMiniPlayer(
     onDeviceClick: () -> Unit,
     onBarClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onExpandClick: () -> Unit = onBarClick,
     onSkipNextClick: () -> Unit = {},
     onSkipPreviousClick: () -> Unit = {},
     connectedDeviceName: String? = null,
@@ -91,10 +80,6 @@ fun SpotifyMiniPlayer(
     val coroutineScope = rememberCoroutineScope()
     val titleOffsetX = remember { Animatable(0f) }
     var containerWidthPx by remember { mutableFloatStateOf(600f) }
-    val density = LocalDensity.current
-    val liftOffsetY = remember { Animatable(0f) }
-    val openDistancePx = with(density) { SWIPE_UP_DISTANCE.toPx() }
-    val openVelocityPx = with(density) { SWIPE_UP_VELOCITY.toPx() }
 
     LaunchedEffect(title) {
         if (!titleOffsetX.isRunning && titleOffsetX.value != 0f) {
@@ -106,48 +91,6 @@ fun SpotifyMiniPlayer(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = EncoreControlSizes.FloatingPlayerMargin)
-            .graphicsLayer { translationY = -liftOffsetY.value }
-            .pointerInput(openDistancePx, openVelocityPx) {
-                val tracker = VelocityTracker()
-                detectVerticalDragGestures(
-                    onDragStart = {
-                        tracker.resetTracking()
-                        coroutineScope.launch { liftOffsetY.snapTo(0f) }
-                    },
-                    onDragEnd = {
-                        val velocity = tracker.calculateVelocity()
-                        val lifted = liftOffsetY.value
-                        coroutineScope.launch {
-                            liftOffsetY.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(EncoreAnimation.ButtonDuration)
-                            )
-                        }
-                        if (lifted > openDistancePx || velocity.y < -openVelocityPx) {
-                            onExpandClick()
-                        }
-                    },
-                    onDragCancel = {
-                        coroutineScope.launch {
-                            liftOffsetY.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(EncoreAnimation.ButtonDuration)
-                            )
-                        }
-                    },
-                    onVerticalDrag = { change, dragAmount ->
-                        tracker.addPosition(change.uptimeMillis, change.position)
-                        if (dragAmount < 0f || liftOffsetY.value > 0f) {
-                            change.consume()
-                            coroutineScope.launch {
-                                liftOffsetY.snapTo(
-                                    (liftOffsetY.value - dragAmount).coerceIn(0f, openDistancePx)
-                                )
-                            }
-                        }
-                    }
-                )
-            }
             .shadow(elevation = 8.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
             .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
             .background(EncoreColors.Card)
