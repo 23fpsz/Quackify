@@ -2127,8 +2127,9 @@ class PlaybackBridge(private val context: Context) {
         val server = cluster != null
         val live = connect.playback?.currentTrack?.contextUri.orEmpty()
         val clusterContext = cluster?.contextUri.orEmpty()
+        val chain = chainFor()
         val context = live.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
-            ?: chainContext.takeIf { it.isNotBlank() }
+            ?: chainContext.takeIf { it.isNotBlank() && chain.isNotEmpty() }
             ?: clusterContext.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
                 .orEmpty()
         val single = clusterContext.startsWith("spotify:track:") ||
@@ -2151,7 +2152,6 @@ class PlaybackBridge(private val context: Context) {
             if (server) cluster!!.queued.forEach { add(it.uri) }
             queued.forEach { add(it.uri) }
         }
-        val chain = chainFor()
         val chainFits = chainContext.isNotBlank() && (context.isBlank() || chainContext == context)
         val chainTail = if (anchor.isNotBlank() && chain.isNotEmpty() && chainFits) {
             val at = chain.indexOf(anchor)
@@ -2274,7 +2274,7 @@ class PlaybackBridge(private val context: Context) {
         val keptFor = context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
             .getString(CHAIN_CONTEXT_PREF, "").orEmpty()
         val remembered = if (keptFor == contextUri) restoredRows() else emptyList()
-        if (remembered.isNotEmpty()) {
+        if (remembered.isNotEmpty() && anchor in remembered) {
             chainRows = remembered
             chainContext = contextUri
             val at = remembered.indexOf(anchor)
@@ -2285,6 +2285,12 @@ class PlaybackBridge(private val context: Context) {
             publishQueue(connect.cluster.value)
             return
         }
+        if (remembered.isNotEmpty()) {
+            log.i("restore: '${contextUri.take(32)}' does not hold '${anchor.takeLast(12)}', " +
+                    "the track is its own context"
+            )
+            return
+        }
         restoreJob = scope.launch {
             val rows = runCatching { rowsOf(contextUri) }.getOrNull().orEmpty()
             if (rows.isEmpty()) {
@@ -2292,6 +2298,12 @@ class PlaybackBridge(private val context: Context) {
                 return@launch
             }
             if (chainRows.isNotEmpty() || chainContext.isNotBlank()) return@launch
+            if (anchor !in rows) {
+                log.i("restore: '${contextUri.take(32)}' does not hold '${anchor.takeLast(12)}', " +
+                        "the track is its own context"
+                )
+                return@launch
+            }
             chainRows = rows
             chainContext = contextUri
             rememberChain(contextUri)
@@ -2655,7 +2667,8 @@ class PlaybackBridge(private val context: Context) {
             val single = playing.startsWith("spotify:track:") ||
                 playing.startsWith("spotify:episode:")
             val barren = cluster == null || cluster.nextTracks.isEmpty()
-            if (!single && !barren) {
+            val holds = cluster?.track?.uri?.let { it in chainRows } == true
+            if ((!single && !barren) || (single && !holds)) {
                 log.w("chain '$chainContext' is not the playing context '$playing', following the server")
                 return emptyList()
             }
@@ -2818,18 +2831,19 @@ class PlaybackBridge(private val context: Context) {
             ?.map { it.uri }
             ?.filter { it.startsWith("spotify:track:") || it.startsWith("spotify:episode:") }
             .orEmpty()
-        val first = rows.firstOrNull()
+        val start = rows.indexOfFirst { it != ended }
+        val first = rows.getOrNull(start)
         if (first == null) {
             log.w("autoplay: the station '$station' has no playable rows, staying quiet")
             return
         }
         log.i("autoplay -> '${first.takeLast(12)}' from the station '$station' " +
-                "seeded by '${seed.takeLast(12)}', ${rows.size} rows"
+                "seeded by '${seed.takeLast(12)}', ${rows.size} rows at row $start"
         )
         chainRows = rows
         chainContext = station
-        resumeRow = 0
-        playTrack(first, station, 0)
+        resumeRow = start
+        playTrack(first, station, start)
     }
 
     private fun autoplayEnabled(): Boolean =
