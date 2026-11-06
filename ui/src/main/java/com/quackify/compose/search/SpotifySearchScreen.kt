@@ -400,7 +400,6 @@ fun SpotifySearchScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             if (!isSearching) {
-                // Browse Header: Profile Avatar + "Search" Title + Camera Button
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -423,16 +422,6 @@ fun SpotifySearchScreen(
                             color = EncoreColors.TextPrimary
                         ),
                         modifier = Modifier.weight(1f)
-                    )
-
-                    // Camera Button (find_header_profile.xml: encore_camera_button_size)
-                    EncoreIconButton(
-                        iconRes = R.drawable.encore_icon_camera_24,
-                        contentDescription = "Scan Spotify Code",
-                        onClick = { /* Open Camera Scan */ },
-                        size = 40.dp,
-                        iconSize = 24.dp,
-                        tint = EncoreColors.TextPrimary
                     )
                 }
 
