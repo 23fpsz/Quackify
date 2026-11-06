@@ -524,14 +524,11 @@ fun SpotifyNowPlayingScreen(
                                 isCanvasEnabled = canvasActive,
                                 gestureModifier = artworkGestureModifier,
                                 fullBleed = true,
+                                fadeFraction = ARTWORK_FADE_FRACTION,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1.0f)
-                                    .graphicsLayer {
-                                        translationX = artworkOffsetX.value
-                                        compositingStrategy = CompositingStrategy.Offscreen
-                                    }
-                                    .dissolveInto(ARTWORK_FADE_FRACTION)
+                                    .graphicsLayer { translationX = artworkOffsetX.value }
                             )
                         }
 
@@ -948,24 +945,35 @@ private fun NowPlayingArtworkCard(
     isCanvasEnabled: Boolean,
     gestureModifier: Modifier = Modifier,
     fullBleed: Boolean = false,
+    fadeFraction: Float = 0f,
     modifier: Modifier = Modifier
 ) {
     val corner = if (fullBleed) 0.dp else EncoreCornerRadii.Larger2
+    val canvasActive = isCanvasEnabled && canvasFilePath != null
+    val layerModifier = if (!canvasActive && fadeFraction > 0f) {
+        Modifier
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .dissolveInto(fadeFraction)
+    } else {
+        Modifier
+    }
     Box(
         modifier = modifier
             .shadow(elevation = if (fullBleed) 0.dp else 16.dp, shape = RoundedCornerShape(corner))
             .then(gestureModifier)
             .clip(RoundedCornerShape(corner))
-            .background(backgroundColor),
+            .background(backgroundColor)
+            .then(layerModifier),
         contentAlignment = Alignment.Center
     ) {
-        if (isCanvasEnabled && canvasFilePath != null) {
+        if (canvasActive) {
             CanvasVideoPlayer(
                 filePath = canvasFilePath,
+                fadeFraction = fadeFraction,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            com.quackify.compose.components.SpotifyArtworkImage(
+            SpotifyArtworkImage(
                 imageUrl = coverUrl,
                 contentDescription = title,
                 fallbackColor = dominantColor,
