@@ -34,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -89,16 +88,9 @@ fun SpotifyMiniPlayer(
     var containerWidthPx by remember { mutableFloatStateOf(600f) }
 
     val dynamicTint by rememberSmoothColor(
-        target = lerp(coverColor, Color(0xFF121212), MINI_PLAYER_TINT_BLEND),
+        target = lerp(coverColor, MINI_PLAYER_BASE, MINI_PLAYER_TINT_BLEND),
         durationMillis = MINI_PLAYER_TINT_DURATION
     )
-    val barBrush = remember(dynamicTint) {
-        Brush.verticalGradient(
-            0.0f to dynamicTint,
-            0.55f to lerp(dynamicTint, MINI_PLAYER_BASE, 0.55f),
-            1.0f to MINI_PLAYER_BASE
-        )
-    }
 
     LaunchedEffect(title) {
         if (!titleOffsetX.isRunning && titleOffsetX.value != 0f) {
@@ -112,7 +104,7 @@ fun SpotifyMiniPlayer(
             .padding(horizontal = EncoreControlSizes.FloatingPlayerMargin)
             .shadow(elevation = 8.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
             .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
-            .background(barBrush)
+            .background(dynamicTint)
             .clickable(onClick = onBarClick)
     ) {
         Column(
