@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -22,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -34,6 +36,8 @@ import com.quackify.compose.theme.SpotifyTheme
 
 /**
  * Spotify Library Create Bottom Sheet (+ button).
+ * When opened from root library: shows "Create" header + Playlist, Folder, Blend.
+ * When opened from within a folder: shows Playlist, Folder (no Blend, no header).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +46,8 @@ fun LibraryCreateSheet(
     onCreatePlaylist: () -> Unit,
     onCreateBlend: () -> Unit,
     onCreateFolder: () -> Unit = {},
+    showBlend: Boolean = true,
+    showHeader: Boolean = true,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -53,14 +59,14 @@ fun LibraryCreateSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = Color(0xFF282828),
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
+                    .background(Color.White.copy(alpha = 0.4f))
             )
         },
         modifier = modifier
@@ -68,14 +74,18 @@ fun LibraryCreateSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = 20.dp)
                 .navigationBarsPadding()
         ) {
-            Text(
-                text = "Create",
-                style = SpotifyTheme.typography.titleLarge.copy(fontSize = 18.sp),
-                modifier = Modifier.padding(vertical = 12.dp)
-            )
+            if (showHeader) {
+                Text(
+                    text = "Create",
+                    style = SpotifyTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            } else {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
 
             CreateOptionItem(
                 title = "Playlist",
@@ -97,17 +107,19 @@ fun LibraryCreateSheet(
                 }
             )
 
-            CreateOptionItem(
-                title = "Blend",
-                subtitle = "Combine your friends' tastes into a playlist",
-                iconRes = R.drawable.encore_icon_user_24,
-                onClick = {
-                    onDismiss()
-                    onCreateBlend()
-                }
-            )
+            if (showBlend) {
+                CreateOptionItem(
+                    title = "Blend",
+                    subtitle = "Combine your friends' tastes into a playlist",
+                    iconRes = R.drawable.encore_icon_user_24,
+                    onClick = {
+                        onDismiss()
+                        onCreateBlend()
+                    }
+                )
+            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -124,28 +136,40 @@ private fun CreateOptionItem(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            painter = painterResource(id = iconRes),
-            contentDescription = title,
-            tint = EncoreColors.TextPrimary,
-            modifier = Modifier.size(28.dp)
-        )
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF383838)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = iconRes),
+                contentDescription = title,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = SpotifyTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    color = Color.White,
+                    fontSize = 15.sp
                 )
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                style = SpotifyTheme.typography.bodySmall.copy(
+                    color = EncoreColors.TextSecondary,
+                    fontSize = 13.sp
+                )
             )
         }
     }

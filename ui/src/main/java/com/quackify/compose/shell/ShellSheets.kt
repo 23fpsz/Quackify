@@ -63,6 +63,7 @@ internal fun ShellSheets(
     userAvatarUrl: String,
     savedAccounts: List<SpotifyAuth.Account>,
     activeAccountId: String,
+    isFolder: Boolean = false,
     canvasAvailable: Boolean = false,
     isCanvasEnabled: Boolean = false,
     onCanvasToggle: () -> Unit = {},
@@ -197,6 +198,8 @@ internal fun ShellSheets(
         onCreatePlaylist = onCreatePlaylist,
         onCreateBlend = onCreateBlend,
         onCreateFolder = onCreateFolder,
+        showBlend = !isFolder,
+        showHeader = !isFolder,
         onDismiss = onDismissCreate
     )
 
