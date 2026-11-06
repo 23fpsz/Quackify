@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import com.quackify.compose.sheets.SpotifyCreateNameDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -1177,7 +1178,10 @@ fun SpotifyAppShell(
                 },
                 onItemLongPress = handleLibraryLongPress,
                 onFolderClick = handleFolderClick,
-                onProfileClick = openProfileDrawer
+                onProfileClick = openProfileDrawer,
+                onPlusClick = { isCreateSheetOpen = true },
+                onSortClick = { isSortSheetOpen = true },
+                currentSort = currentSortOption
             )
         }
         }
@@ -1521,20 +1525,33 @@ fun SpotifyAppShell(
             )
         }
 
-        ShellPlaylistEditSheets(
-            createOpen = isCreatePlaylistOpen,
-            createName = playlistCreateName,
-            editDraft = playlistEditDraft,
-            onCreateSave = onCreatePlaylist,
-            onCreated = { uri, name ->
+        SpotifyCreateNameDialog(
+            isOpen = isCreatePlaylistOpen,
+            title = "Give your playlist a name",
+            initialName = playlistCreateName,
+            confirmLabel = "Create",
+            cancelLabel = "Cancel",
+            onConfirm = { name ->
                 isCreatePlaylistOpen = false
-                pushCurrentState()
-                activePlaylistTitle = name
-                activePlaylistUri = uri
-                currentScreen = ShellScreen.PLAYLIST
-                if (onLoadPlaylist != null) onLoadPlaylist?.invoke(uri) else playerListener?.onLoadPlaylist(uri)
+                shellScope.launch {
+                    val uri = onCreatePlaylist?.invoke(name, "", null)
+                    if (!uri.isNullOrEmpty()) {
+                        pushCurrentState()
+                        activePlaylistTitle = name
+                        activePlaylistUri = uri
+                        currentScreen = ShellScreen.PLAYLIST
+                        if (onLoadPlaylist != null) onLoadPlaylist?.invoke(uri) else playerListener?.onLoadPlaylist(uri)
+                        if (activeFolderUri.isNotBlank()) {
+                            onMoveToFolder?.invoke(uri, activeFolderUri)
+                        }
+                    }
+                }
             },
-            onDismissCreate = { isCreatePlaylistOpen = false },
+            onDismiss = { isCreatePlaylistOpen = false }
+        )
+
+        ShellPlaylistEditSheets(
+            editDraft = playlistEditDraft,
             onEditSave = onEditPlaylistDetails,
             onDismissEdit = onDismissEditPlaylist
         )
@@ -1588,33 +1605,37 @@ fun SpotifyAppShell(
         }
 
         folderDraft?.let { draft ->
-            FolderSheet(
-                draft = draft,
-                onDismiss = { folderDraft = null },
-                onSubmit = { name ->
-                    when (draft.mode) {
-                        FolderMode.CREATE -> shellScope.launch {
-                            val uri = onCreateFolder?.invoke(name)
-                            if (uri != null) folderDraft = null
-                        }
-                        FolderMode.RENAME -> {
-                            folderDraft = null
-                            onRenameFolder?.invoke(draft.folderUri, name)
-                        }
-                        FolderMode.PICKER -> {}
-                    }
-                },
-                onPick = { folderUri ->
-                    folderDraft = null
-                    onMoveToFolder?.invoke(draft.folderUri, folderUri)
-                },
-                onDelete = if (draft.mode == FolderMode.RENAME) {
-                    {
+            if (draft.mode == FolderMode.PICKER) {
+                FolderSheet(
+                    draft = draft,
+                    onDismiss = { folderDraft = null },
+                    onSubmit = {},
+                    onPick = { folderUri ->
                         folderDraft = null
-                        onDeleteFolder?.invoke(draft.folderUri)
+                        onMoveToFolder?.invoke(draft.folderUri, folderUri)
                     }
-                } else null
-            )
+                )
+            } else {
+                SpotifyCreateNameDialog(
+                    isOpen = true,
+                    title = if (draft.mode == FolderMode.CREATE) "Give your folder a name" else "Rename folder",
+                    initialName = if (draft.mode == FolderMode.CREATE) "New folder" else draft.title,
+                    confirmLabel = if (draft.mode == FolderMode.CREATE) "Create" else "Save",
+                    cancelLabel = "Cancel",
+                    onConfirm = { name ->
+                        val currentDraft = folderDraft
+                        folderDraft = null
+                        if (currentDraft?.mode == FolderMode.CREATE) {
+                            shellScope.launch {
+                                onCreateFolder?.invoke(name)
+                            }
+                        } else if (currentDraft?.mode == FolderMode.RENAME) {
+                            onRenameFolder?.invoke(currentDraft.folderUri, name)
+                        }
+                    },
+                    onDismiss = { folderDraft = null }
+                )
+            }
         }
     }
 }
@@ -2145,7 +2166,10 @@ private fun ShellFolderPane(
     onItemClick: (String, String) -> Unit,
     onItemLongPress: (LibraryItem) -> Unit,
     onFolderClick: (LibraryItem) -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onPlusClick: () -> Unit = {},
+    onSortClick: () -> Unit = {},
+    currentSort: LibrarySortOption = LibrarySortOption.RECENTS
 ) {
     SpotifyLibraryScreen(
         onItemClick = onItemClick,
@@ -2156,41 +2180,21 @@ private fun ShellFolderPane(
         title = title,
         userDisplayName = userDisplayName,
         userAvatarUrl = userAvatarUrl,
-        onProfileClick = onProfileClick
+        onProfileClick = onProfileClick,
+        onPlusClick = onPlusClick,
+        onSortClick = onSortClick,
+        currentSort = currentSort
     )
 }
 
 /** Create + edit playlist bottom sheets, extracted to keep the shell method small. */
 @Composable
 private fun ShellPlaylistEditSheets(
-    createOpen: Boolean,
-    createName: String,
     editDraft: PlaylistEditDraft?,
-    onCreateSave: (suspend (String, String, ByteArray?) -> String?)?,
-    onCreated: (String, String) -> Unit,
-    onDismissCreate: () -> Unit,
     onEditSave: (suspend (String, String, String, ByteArray?, Boolean) -> Boolean)?,
     onDismissEdit: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    if (createOpen) {
-        EditPlaylistSheet(
-            isOpen = true,
-            title = "Create playlist",
-            saveLabel = "Create",
-            initialName = createName,
-            initialDescription = "",
-            coverUrl = null,
-            canRemoveCover = false,
-            onSave = { name, description, cover, _ ->
-                scope.launch {
-                    val uri = onCreateSave?.invoke(name, description, cover)
-                    if (!uri.isNullOrEmpty()) onCreated(uri, name)
-                }
-            },
-            onDismiss = onDismissCreate
-        )
-    }
     if (editDraft != null) {
         EditPlaylistSheet(
             isOpen = true,

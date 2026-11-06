@@ -410,22 +410,38 @@ class MainActivity : ComponentActivity() {
                             val inPlaylist = tracks.map { it.uri }
                                 .filter { it.startsWith("spotify:track:") }
                                 .toHashSet()
-                            if (inPlaylist.isEmpty()) {
-                                playlistRecommendations = emptyList()
-                                return@LaunchedEffect
-                            }
                             recommendationsLoading = true
                             try {
-                                val seedArtists = tracks
-                                    .filter { it.artistUri.startsWith("spotify:artist:") }
-                                    .groupingBy { it.artistUri }
-                                    .eachCount()
-                                    .entries
-                                    .sortedByDescending { it.value }
-                                    .take(6)
-                                    .map { it.key }
-                                    .shuffled()
-                                    .take(3)
+                                val seedArtists = if (inPlaylist.isNotEmpty()) {
+                                    tracks
+                                        .filter { it.artistUri.startsWith("spotify:artist:") }
+                                        .groupingBy { it.artistUri }
+                                        .eachCount()
+                                        .entries
+                                        .sortedByDescending { it.value }
+                                        .take(6)
+                                        .map { it.key }
+                                        .shuffled()
+                                        .take(3)
+                                } else {
+                                    // Empty playlist: seed from user's liked collection or popular artists
+                                    val likedDetail = Krespot.collections.collection(context, "spotify:user:@me:collection")
+                                    val likedArtists = likedDetail?.tracks
+                                        ?.mapNotNull { it.artistUri.takeIf { uri -> uri.startsWith("spotify:artist:") } }
+                                        ?.distinct()
+                                        ?.shuffled()
+                                        ?.take(4)
+                                    if (!likedArtists.isNullOrEmpty()) {
+                                        likedArtists
+                                    } else {
+                                        listOf(
+                                            "spotify:artist:4YRxDV8wJFPHPTeXepOstw",
+                                            "spotify:artist:0oOet2ZQ0QvFBsP9mO065v",
+                                            "spotify:artist:2FKWNmUpLgahBMUWosUaZy",
+                                            "spotify:artist:1mYsTxn959jds3DaR7qa9Y"
+                                        )
+                                    }
+                                }
                                 val picks = LinkedHashMap<String, TrackItem>()
                                 for (artist in seedArtists) {
                                     val detail = Krespot.artists.artist(context, artist) ?: continue
