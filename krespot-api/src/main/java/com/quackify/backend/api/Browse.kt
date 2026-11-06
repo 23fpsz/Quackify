@@ -115,12 +115,26 @@ object Browse {
         if (node == null) return null
         val content = node.optJSONObject("content") ?: return null
         val data = content.optJSONObject("data") ?: return null
+        val nodeUri = node.optString("uri")
+        // BrowseClientFeature is the client-owned entry (Live Events today): it
+        // carries the same cardRepresentation fields but under featureUri, and
+        // its own uri is an opaque xlink that the page loader cannot resolve.
+        if (data.optString("__typename") == "BrowseClientFeature") {
+            val title = label(data.optJSONObject("title"))
+            val target = data.optString("featureUri").takeIf { it.startsWith("spotify:") }
+            if (title.isBlank() || target == null) return null
+            return BrowseCard(
+                uri = target,
+                title = title,
+                subtitle = "",
+                imageUrl = GraphQl.largestSource(data.optJSONObject("artwork")),
+                colorHex = data.optJSONObject("backgroundColor")?.optString("hex").orEmpty(),
+            )
+        }
         if (data.optString("__typename") == "BrowseSectionContainer") {
             val rep = data.optJSONObject("data")?.optJSONObject("cardRepresentation")
-            val title = rep?.optJSONObject("title")?.optString("transformedLabel")
-                .orEmpty().plainText()
-            val uri = node.optString("uri").takeIf { it.startsWith("spotify:") }
-                ?: data.optString("uri")
+            val title = label(rep?.optJSONObject("title"))
+            val uri = nodeUri.takeIf { it.startsWith("spotify:") } ?: data.optString("uri")
             if (title.isBlank() || !uri.startsWith("spotify:")) return null
             return BrowseCard(
                 uri = uri,
@@ -130,8 +144,7 @@ object Browse {
                 colorHex = rep?.optJSONObject("backgroundColor")?.optString("hex").orEmpty(),
             )
         }
-        val uri = data.optString("uri").takeIf { it.startsWith("spotify:") }
-            ?: node.optString("uri")
+        val uri = data.optString("uri").takeIf { it.startsWith("spotify:") } ?: nodeUri
         if (!uri.startsWith("spotify:")) return null
         val title = data.optString("name").ifBlank {
             data.optJSONObject("profile")?.optString("name").orEmpty()
@@ -150,6 +163,15 @@ object Browse {
             imageUrl = GraphQl.entityImage(data),
             colorHex = GraphQl.entityColor(data),
         )
+    }
+
+    private fun label(obj: JSONObject?): String {
+        if (obj == null) return ""
+        val raw = obj.optString("transformedLabel").takeIf { it.isNotBlank() }
+            ?: obj.optString("translatedBaseText").takeIf { it.isNotBlank() }
+            ?: obj.optString("text").takeIf { it.isNotBlank() }
+            ?: return ""
+        return raw.plainText()
     }
 
     private suspend fun call(context: Context, operation: String, variables: String): JSONObject? {

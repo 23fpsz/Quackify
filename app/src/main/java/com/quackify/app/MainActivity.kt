@@ -217,7 +217,7 @@ class MainActivity : ComponentActivity() {
                         var browseCategories by remember { mutableStateOf<List<BrowseCard>>(emptyList()) }
 
                         LaunchedEffect(Unit) {
-                            browseCategories = Browse.all(context).take(16)
+                            browseCategories = Browse.all(context)
                             log.i("browse categories: ${browseCategories.size}")
                         }
 

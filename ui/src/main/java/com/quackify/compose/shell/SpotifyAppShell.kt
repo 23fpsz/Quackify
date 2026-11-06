@@ -857,7 +857,11 @@ fun SpotifyAppShell(
                         pushCurrentState()
                         activeCategoryTitle = category.title
                         activeCategoryColor = category.color
-                        if (category.uri.isNotBlank()) {
+                        // Only a spotify:page uri resolves through browsePage. Client
+                        // features (Live Events -> spotify:concerts) and any other
+                        // scheme have no browsable section tree, so they fall back to
+                        // the local category screen instead of an empty page.
+                        if (category.uri.startsWith("spotify:page:")) {
                             currentScreen = ShellScreen.BROWSE
                             onOpenBrowse?.invoke(category.uri)
                         } else {
@@ -895,7 +899,8 @@ fun SpotifyAppShell(
                                 title = card.title,
                                 color = parseHexColor(card.colorHex) ?: getCategoryColor(card.title),
                                 uri = card.uri,
-                                imageUrl = card.imageUrl.takeIf { it.isNotBlank() }
+                                imageUrl = card.imageUrl.takeIf { it.isNotBlank() },
+                                subtitle = card.subtitle
                             )
                         }
                     },
