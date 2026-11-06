@@ -247,7 +247,9 @@ object CommandClient {
                 .put("album_uri", track.albumUri)
                 .put("image_url", track.imageUrl)
                 .put("duration", track.durationMs.toString())
+                .put("is_explicit", track.explicit.toString())
         }
+        if (track.isQueued) metadata.put("is_queued", "true")
         return JSONObject()
             .put("uri", track.uri)
             .put("uid", track.uid)

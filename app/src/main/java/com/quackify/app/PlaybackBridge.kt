@@ -40,6 +40,7 @@ import com.quackify.backend.library.Krespot
 import com.quackify.backend.library.TrackSource
 import com.quackify.backend.api.Library
 import android.os.SystemClock
+import org.json.JSONObject
 
 private val log = Logs.of(Logs.Module.BRIDGE)
 
@@ -57,6 +58,8 @@ const val CHAIN_CONTEXT_PREF = "chainContext"
 
 /** The rows of that context, so the rebuild survives a cold start offline. */
 const val CHAIN_ROWS_PREF = "chainRows"
+
+private const val QUEUE_RETRY_MS = 1200L
 
 class PlaybackBridge(private val context: Context) {
 
@@ -372,14 +375,29 @@ class PlaybackBridge(private val context: Context) {
 
         override fun onQueueAdd(uri: String) {
             scope.launch {
-                val ok = connect.addToQueue(uri)
-                log.i("queue += '$uri' ok=$ok")
-                if (!ok) return@launch
+                if (uri.isBlank()) return@launch
                 if (queuedTail.none { it.uri == uri }) {
                     queuedTail = queuedTail + TrackItem(title = "", artist = "", uri = uri)
                 }
                 publishQueue(connect.cluster.value)
+                var added = connect.addToQueue(uri)
+                if (!added) {
+                    connect.refreshCluster()
+                    delay(QUEUE_RETRY_MS)
+                    added = connect.addToQueue(uri)
+                }
+                log.i("queue += '$uri' ok=$added")
+                val cluster = connect.cluster.value
+                val written = added || (cluster != null && writeQueue(queueTailUris(uri), cluster))
+                if (!added && cluster != null) log.i("queue += '$uri' through set_queue ok=$written")
+                if (!written) {
+                    queuedTail = queuedTail.filterNot { it.uri == uri }
+                    publishQueue(cluster)
+                    return@launch
+                }
+                publishQueue(cluster)
                 connect.refreshCluster()
+                scheduleDecorate(listOf(uri))
             }
         }
 
@@ -390,38 +408,67 @@ class PlaybackBridge(private val context: Context) {
                     log.w("queue set ignored, no cluster yet")
                     return@launch
                 }
-                val known = (cluster.queued + cluster.fromContext)
-                    .associateBy { it.uri }
+                if (!writeQueue(uris, cluster)) return@launch
                 val local = queuedTail.associateBy { it.uri }
-                val tracks = uris.mapNotNull { uri ->
-                    known[uri] ?: local[uri]?.let { row ->
-                        ClusterTrack(
-                            uri = uri,
-                            uid = "",
-                            title = row.title,
-                            artistName = row.artist,
-                            artistUri = row.artistUri,
-                            imageUrl = row.imageUrl.orEmpty(),
-                            albumTitle = "",
-                            albumUri = row.albumUri,
-                            durationMs = row.durationMs,
-                            explicit = row.isExplicit,
-                            creativeId = "",
-                            provider = "queue",
-                        )
-                    }
-                }
-                if (tracks.size != uris.size) {
-                    log.w("queue set: ${uris.size - tracks.size} of ${uris.size} rows have no metadata")
-                }
-                val ok = connect.setQueue(tracks)
-                log.i("queue = ${tracks.size} rows ok=$ok")
-                if (!ok) return@launch
                 queuedTail = uris.map { local[it] ?: TrackItem(title = "", artist = "", uri = it) }
                 publishQueue(cluster)
                 connect.refreshCluster()
             }
         }
+    }
+
+    private fun queueTailUris(uri: String): List<String> {
+        val queued = state.queue.map { it.uri }.filter { it.isNotBlank() && it != uri }
+        val context = state.queueFromContext.map { it.uri }.filter { it.isNotBlank() }
+        return (queued + uri + context).distinct()
+    }
+
+    private suspend fun writeQueue(uris: List<String>, cluster: ClusterState): Boolean {
+        val known = (cluster.queued + cluster.fromContext).associateBy { it.uri }
+        val missing = uris.filter { uri ->
+            known[uri] == null &&
+                (decorated[uri] ?: queuedTail.firstOrNull { it.uri == uri })?.title.isNullOrBlank()
+        }
+        if (missing.isNotEmpty()) {
+            val rows = runCatching { TrackSource.decorate(context, missing) }.getOrDefault(emptyMap())
+            rows.forEach { (uri, track) ->
+                decorated[uri] = TrackItem(
+                    title = track.title,
+                    artist = track.artists,
+                    uri = track.uri,
+                    imageUrl = track.imageUrl.takeIf { it.isNotBlank() },
+                    durationMs = track.durationMs,
+                    isExplicit = track.explicit,
+                    albumUri = track.albumUri,
+                    artistUri = track.artistUri,
+                )
+            }
+        }
+        val tracks = uris.mapNotNull { uri -> known[uri] ?: clusterRowFor(uri) }
+        if (tracks.size != uris.size) {
+            log.w("queue set: ${uris.size - tracks.size} of ${uris.size} rows have no metadata")
+        }
+        val ok = connect.setQueue(tracks)
+        log.i("queue = ${tracks.size} rows ok=$ok")
+        return ok
+    }
+
+    private fun clusterRowFor(uri: String): ClusterTrack? {
+        val row = decorated[uri] ?: queuedTail.firstOrNull { it.uri == uri } ?: return null
+        return ClusterTrack(
+            uri = uri,
+            uid = "",
+            title = row.title,
+            artistName = row.artist,
+            artistUri = row.artistUri,
+            imageUrl = row.imageUrl.orEmpty(),
+            albumTitle = "",
+            albumUri = row.albumUri,
+            durationMs = row.durationMs,
+            explicit = row.isExplicit,
+            creativeId = "",
+            provider = "queue",
+        )
     }
 
     fun start() {
@@ -1087,7 +1134,25 @@ class PlaybackBridge(private val context: Context) {
             repeatContext = repeatContextOn(at),
             repeatTrack = repeatTrackOn(at),
             queueRevision = at?.queueRevision.orEmpty(),
+            nextRows = queueTailRows(),
         )
+    }
+
+    private fun queueTailRows(): List<ClusterTrack> {
+        val at = connect.cluster.value
+        val queued = queuedTail.map { row ->
+            val known = at?.queued?.firstOrNull { it.uri == row.uri }
+                ?: at?.window()?.firstOrNull { it.uri == row.uri && it.isQueued }
+            known ?: asQueued(clusterTrackFor(row.uri))
+        }
+        val context = at?.fromContext.orEmpty().filterNot { row -> queued.any { it.uri == row.uri } }
+        return queued + context
+    }
+
+    private fun asQueued(track: ClusterTrack): ClusterTrack {
+        val metadata = runCatching { JSONObject(track.raw) }.getOrElse { JSONObject() }
+        metadata.put("is_queued", "true")
+        return track.copy(provider = "queue", queued = true, raw = metadata.toString())
     }
 
     private fun resumePositionFor(uri: String): Long? {
@@ -2063,7 +2128,8 @@ class PlaybackBridge(private val context: Context) {
         val queued = if (server) {
             val onServer = cluster!!.queued.map(::row)
             val known = onServer.mapTo(HashSet()) { it.uri }
-            onServer + queuedTail.filterNot { it.uri in known }
+            (onServer + queuedTail.filterNot { it.uri in known })
+                .map { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
         } else {
             queuedTail
         }
@@ -2083,7 +2149,7 @@ class PlaybackBridge(private val context: Context) {
             emptyList()
         }
         val knownUpcoming = serverRows.mapTo(HashSet()) { it.uri }
-        val sparse = serverRows.filter { it.title.isBlank() }.map { it.uri }
+        val sparse = (serverRows + queued).filter { it.title.isBlank() }.map { it.uri }
         val missing = (sparse + chainTail.filterNot { it in knownUpcoming })
             .filterNot { decorated.containsKey(it) || it in undecoratable }
             .distinct()
@@ -2644,7 +2710,7 @@ class PlaybackBridge(private val context: Context) {
             publishQueue(server)
             log.i("advance -> the queued '${queued.title.ifBlank { queued.uri.takeLast(12) }}', " +
                     "the list resumes at row $resumeRow of ${rows.size}")
-            playTrack(queued.uri, queued.uri, -1)
+            playTrack(queued.uri, chainContext.ifBlank { server?.contextUri.orEmpty() }, -1)
             return
         }
         if (repeatTrackOn(server) && ended.isNotBlank() && !ended.startsWith(AD_PREFIX)) {
@@ -2727,16 +2793,28 @@ class PlaybackBridge(private val context: Context) {
         val seed = ended.takeIf { it.startsWith("spotify:track:") }
             ?: chainRows.lastOrNull { it.startsWith("spotify:track:") }
             ?: return
-        val radio = runCatching { Krespot.artists.artistRadio(context, seed) }.getOrNull()
-        if (radio.isNullOrBlank()) {
+        val station = runCatching { Krespot.artists.artistRadio(context, seed) }.getOrNull()
+        if (station.isNullOrBlank()) {
             log.w("autoplay: no station for '${seed.takeLast(12)}', staying quiet")
             return
         }
-        log.i("autoplay -> '$radio' from the station seeded by '${seed.takeLast(12)}'")
-        chainRows = emptyList()
-        chainContext = radio
-        resumeRow = -1
-        playTrack(radio, radio, 0)
+        val rows = runCatching { Krespot.collections.collection(context, station) }.getOrNull()
+            ?.tracks
+            ?.map { it.uri }
+            ?.filter { it.startsWith("spotify:track:") || it.startsWith("spotify:episode:") }
+            .orEmpty()
+        val first = rows.firstOrNull()
+        if (first == null) {
+            log.w("autoplay: the station '$station' has no playable rows, staying quiet")
+            return
+        }
+        log.i("autoplay -> '${first.takeLast(12)}' from the station '$station' " +
+                "seeded by '${seed.takeLast(12)}', ${rows.size} rows"
+        )
+        chainRows = rows
+        chainContext = station
+        resumeRow = 0
+        playTrack(first, station, 0)
     }
 
     private fun autoplayEnabled(): Boolean =

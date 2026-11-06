@@ -223,13 +223,18 @@ internal fun ShellSheets(
     }
 
     if (flags.queue) {
+        val queued = userQueue.filter { it.uri.isNotBlank() && it.title.isNotBlank() }
+        val upcoming = queueFromContext
+            .filter { it.uri.isNotBlank() }
+            .dropWhile { it.uri == currentTrackUri }
+            .filter { it.title.isNotBlank() }
         SpotifyQueueSheet(
             currentTrackTitle = currentTrackTitle,
             currentTrackArtist = currentTrackArtist,
             currentTrackCoverUrl = currentTrackCoverUrl,
             queueSourceContext = queueSourceContext,
-            userQueue = userQueue,
-            nextFromContext = queueFromContext.filter { it.uri != currentTrackUri },
+            userQueue = queued,
+            nextFromContext = upcoming,
             onDismissRequest = onDismissQueue,
             onTrackSelect = onQueueTrackSelect,
             onRemoveFromQueue = onRemoveFromQueue,
