@@ -65,7 +65,12 @@ fun List<HomeSection>.toShelves(): List<HomeShelf> {
                 val started = ArrayList(section.items)
                 run = started
                 runIndex = out.size
-                out += HomeShelf(id = "baseline", title = "", grid = true, cards = started.toCards())
+                out += HomeShelf(
+                    id = "baseline:${section.id}",
+                    title = "",
+                    grid = true,
+                    cards = started.toCards(),
+                )
             } else {
                 open += section.items
                 out[runIndex] = out[runIndex].copy(cards = open.toCards())
@@ -77,7 +82,7 @@ fun List<HomeSection>.toShelves(): List<HomeShelf> {
         if (cards.isEmpty()) continue
         val artistsOnly = section.items.all { tagOf(it.kind) == "ARTIST" }
         out += HomeShelf(
-            id = section.id.ifBlank { section.title + section.kind },
+            id = section.id.ifBlank { "${section.title}:${section.kind}" },
             title = section.title,
             cards = if (artistsOnly) emptyList() else cards,
             artists = if (artistsOnly) {

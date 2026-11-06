@@ -38,8 +38,8 @@ object Pathfinder {
             "0195d9f61b43606d490bca64c3456e3593528cea6cc05c7e822c7c42beed0f4e",
         "searchFullEpisodes" to
             "397a4e93a21d140d088cfd26641133c5146a2f5f08e420654868153e720f5571",
-        "searchAudiobooks" to
-            "e05ac765d02c084f8783d3c1572b23d57761c43f47eb8b87ce2f9ccced3fa068",
+        // "searchAudiobooks" to
+        //     "e05ac765d02c084f8783d3c1572b23d57761c43f47eb8b87ce2f9ccced3fa068",
         "searchGenres" to
             "9e1c0e056c46239dd1956ea915b988913c87c04ce3dadccdb537774490266f46",
         "recentSearches" to
