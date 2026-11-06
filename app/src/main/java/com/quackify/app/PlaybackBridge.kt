@@ -109,6 +109,11 @@ class PlaybackBridge(private val context: Context) {
 
     private var restoreJob: Job? = null
 
+    private var primeJob: Job? = null
+
+    @Volatile
+    private var primedStationFor: String = ""
+
     private val restoreTried = HashSet<String>()
 
     @Volatile
@@ -1082,6 +1087,38 @@ class PlaybackBridge(private val context: Context) {
         connect.holdsStream = true
         publishLocalFromEngine(positionMs, playing)
         publishQueue(connect.cluster.value)
+        if (row.uri.startsWith("spotify:track:") || row.uri.startsWith("spotify:episode:")) {
+            if (contextUri.isBlank() || contextUri == row.uri) primeStation(row.uri)
+        }
+    }
+
+    private fun primeStation(seed: String) {
+        if (seed.isBlank()) return
+        if (chainContext == primedStationFor && chainRows.isNotEmpty()) return
+        if (primedStationFor == seed && primeJob?.isActive == true) return
+        if (chainContext.isNotBlank() && chainRows.isNotEmpty()) return
+        primedStationFor = seed
+        primeJob?.cancel()
+        primeJob = scope.launch {
+            val station = runCatching { Krespot.artists.artistRadio(context, seed) }.getOrNull()
+            if (station.isNullOrBlank()) return@launch
+            val rows = runCatching { Krespot.collections.collection(context, station) }.getOrNull()
+                ?.tracks
+                ?.map { it.uri }
+                ?.filter { it.startsWith("spotify:track:") || it.startsWith("spotify:episode:") }
+                .orEmpty()
+            if (rows.isEmpty()) return@launch
+            if (chainContext.isNotBlank() && chainContext != station) return@launch
+            if (player.state.value.trackUri != seed) return@launch
+            val start = rows.indexOfFirst { it != seed }.coerceAtLeast(0)
+            chainRows = rows
+            chainContext = station
+            resumeRow = start
+            log.i("station '$station' primed from '${seed.takeLast(12)}', " +
+                    "${rows.size} rows at row $start"
+            )
+            publishQueue(connect.cluster.value)
+        }
     }
 
     /** The cluster row for what the engine plays, thin when nothing knows it yet. */
