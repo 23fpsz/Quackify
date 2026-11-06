@@ -229,30 +229,7 @@ fun SpotifySearchScreen(
         mutableStateListOf<SearchHistoryItem>().apply { addAll(recentSearches) }
     }
 
-    val categories = remember(browseCategories) {
-        if (browseCategories.isNotEmpty()) {
-            browseCategories
-        } else {
-            listOf(
-                CategoryCard("Podcasts", Color(0xFFE13300)),
-                CategoryCard("Live Events", Color(0xFF7358FF)),
-                CategoryCard("Made For You", Color(0xFF1E3264)),
-                CategoryCard("New Releases", Color(0xFFE8115B)),
-                CategoryCard("Pop", Color(0xFF148A08)),
-                CategoryCard("Hip-Hop", Color(0xFFBC5900)),
-                CategoryCard("Rock", Color(0xFFE91429)),
-                CategoryCard("Latin", Color(0xFFE1118C)),
-                CategoryCard("Dance/Electronic", Color(0xFFD84000)),
-                CategoryCard("Discover", Color(0xFF8D67AB)),
-                CategoryCard("Indie", Color(0xFF608108)),
-                CategoryCard("Workout", Color(0xFF777777)),
-                CategoryCard("R&B", Color(0xFFDC148C)),
-                CategoryCard("Chill", Color(0xFF432371)),
-                CategoryCard("Sleep", Color(0xFF1E3264)),
-                CategoryCard("Gaming", Color(0xFFE8115B))
-            )
-        }
-    }
+    val categories = remember(browseCategories) { browseCategories }
     val allSearchableTracks = remember(searchData) {
         searchData?.tracks.orEmpty().map { it.toTrackItem() }
     }
@@ -1167,6 +1144,19 @@ fun SpotifySearchScreen(
                         style = SpotifyTheme.typography.titleLarge.copy(fontSize = 18.sp),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
+                }
+
+                if (categories.isEmpty()) {
+                    item(span = { GridItemSpan(2) }) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            InlineLoadingDots(color = EncoreColors.TextSecondary)
+                        }
+                    }
                 }
 
                 // Category Cards (96dp category_card_max_height from dimens.xml, 4dp corner radius)

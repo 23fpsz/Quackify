@@ -1111,6 +1111,10 @@ fun SpotifyAppShell(
                 page = browsePage,
                 fallbackTitle = activeCategoryTitle,
                 onBack = handleBack,
+                onOpenBrowse = { uri, title ->
+                    activeCategoryTitle = title
+                    onOpenBrowse?.invoke(uri)
+                },
                 onOpenShow = { uri -> onOpenShow?.invoke(uri) },
                 onOpenAlbum = { title, uri -> openAlbum(title, "", uri) },
                 onOpenPlaylist = openPlaylist,
@@ -1990,6 +1994,7 @@ private fun ShellBrowsePane(
     page: BrowsePage?,
     fallbackTitle: String,
     onBack: () -> Unit,
+    onOpenBrowse: (String, String) -> Unit,
     onOpenShow: (String) -> Unit,
     onOpenAlbum: (String, String) -> Unit,
     onOpenPlaylist: (String, String) -> Unit,
@@ -2019,12 +2024,12 @@ private fun ShellBrowsePane(
             hasMore = page.nextOffset != null,
             onBackClick = onBack,
             onCardClick = { title, uri ->
-                if (uri.startsWith("spotify:show:")) {
-                    onOpenShow(uri)
-                } else if (uri.startsWith("spotify:album:")) {
-                    onOpenAlbum(title, uri)
-                } else {
-                    onOpenPlaylist(title, uri)
+                when {
+                    uri.startsWith("spotify:show:") -> onOpenShow(uri)
+                    uri.startsWith("spotify:page:") -> onOpenBrowse(uri, title)
+                    uri.startsWith("spotify:album:") -> onOpenAlbum(title, uri)
+                    uri.startsWith("spotify:") -> onOpenPlaylist(title, uri)
+                    else -> Unit
                 }
             },
             onLoadMore = onLoadMore
