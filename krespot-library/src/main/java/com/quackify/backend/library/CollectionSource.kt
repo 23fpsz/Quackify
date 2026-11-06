@@ -153,9 +153,13 @@ object CollectionSource {
             creator = owner?.optString("name").orEmpty(),
             creatorAvatarUrl = GraphQl.userAvatar(owner),
             saveCount = when {
-                followers > 0L -> "${compact(followers)} likes"
+                followers > 0L -> {
+                    val formatted = java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(followers)
+                    if (followers == 1L) "1 save" else "$formatted saves"
+                }
                 total == 1 -> "1 song"
-                else -> "$total songs"
+                total > 0 -> "$total songs"
+                else -> ""
             },
             description = playlist.optString("description").plainText(),
             imageUrl = GraphQl.entityImage(playlist),
