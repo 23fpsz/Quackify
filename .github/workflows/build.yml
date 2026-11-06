@@ -148,7 +148,7 @@ jobs:
           fi
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           TAG="v${VERSION_NAME}-b${{ github.run_number }}-${SHORT_SHA}"
-          TITLE="Quackify Compose v${VERSION_NAME} (Build #${{ github.run_number }} - ${SHORT_SHA})"
+          TITLE="Quackify v${VERSION_NAME} (Build #${{ github.run_number }} - ${SHORT_SHA})"
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "title=$TITLE" >> "$GITHUB_OUTPUT"
@@ -161,7 +161,7 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: ${{ steps.release_info.outputs.title }}
           body: |
-            ### 📱 Quackify Compose Build
+            ### 📱 Quackify Build
             - **Commit:** [${{ steps.release_info.outputs.short_sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
             - **Branch:** `${{ github.ref_name }}`
             - **Build Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
