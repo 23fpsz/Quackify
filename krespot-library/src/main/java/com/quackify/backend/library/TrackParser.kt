@@ -34,7 +34,7 @@ internal fun track(data: JSONObject?, fallbackUri: String, savedHint: Boolean? =
         durationMs = duration,
         explicit = data.optJSONObject("contentRating")?.optString("label") == "EXPLICIT",
         playable = data.optJSONObject("playability")?.optBoolean("playable", true) ?: true,
-        plays = data.optString("playcount").toLongOrNull() ?: 0L,
+        plays = data.optString("playcount").toLongOrNull() ?: data.optLong("playcount", 0L).takeIf { it > 0L } ?: 0L,
         saved = if (data.has("saved")) data.optBoolean("saved", false) else savedHint,
         albumUri = albumNode?.optString("uri").orEmpty(),
         artistUri = data.optJSONObject("artists")?.optJSONArray("items")

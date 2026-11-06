@@ -105,7 +105,8 @@ fun SpotifyAlbumScreen(
     onArtistClick: (String) -> Unit = {},
     onAlbumClick: (ArtistRelease) -> Unit = {},
     modifier: Modifier = Modifier,
-    coverUrl: String? = null
+    coverUrl: String? = null,
+    artistImageUrl: String? = null
 ) {
     val density = LocalDensity.current
     var isLiked by remember { mutableStateOf(false) }
@@ -283,13 +284,24 @@ fun SpotifyAlbumScreen(
                                 modifier = Modifier
                                     .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(smoothCoverColor),
+                                    .background(Color(0xFF333333)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = (artistName.trim().firstOrNull() ?: 'A').uppercaseChar().toString(),
-                                    style = SpotifyTheme.typography.bodySmallBold.copy(fontSize = 11.sp, color = Color.White)
-                                )
+                                if (!artistImageUrl.isNullOrBlank()) {
+                                    SpotifyArtworkImage(
+                                        imageUrl = artistImageUrl,
+                                        contentDescription = artistName,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape),
+                                        cornerRadius = 12.dp
+                                    )
+                                } else {
+                                    Text(
+                                        text = (artistName.trim().firstOrNull() ?: 'A').uppercaseChar().toString(),
+                                        style = SpotifyTheme.typography.bodySmallBold.copy(fontSize = 11.sp, color = Color.White)
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.width(8.dp))
