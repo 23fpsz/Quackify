@@ -34,8 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
+import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreControlSizes
 import com.quackify.compose.theme.EncoreCornerRadii
@@ -53,6 +56,10 @@ import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
+
+private val MINI_PLAYER_BASE = Color(0xFF282828)
+private const val MINI_PLAYER_TINT_BLEND = 0.35f
+private const val MINI_PLAYER_TINT_DURATION = 650
 
 /**
  * Floating Mini Player Bar matching Spotify Mobile's `now_playing_bar.xml` specifications.
@@ -81,6 +88,18 @@ fun SpotifyMiniPlayer(
     val titleOffsetX = remember { Animatable(0f) }
     var containerWidthPx by remember { mutableFloatStateOf(600f) }
 
+    val dynamicTint by rememberSmoothColor(
+        target = lerp(coverColor, Color(0xFF121212), MINI_PLAYER_TINT_BLEND),
+        durationMillis = MINI_PLAYER_TINT_DURATION
+    )
+    val barBrush = remember(dynamicTint) {
+        Brush.verticalGradient(
+            0.0f to dynamicTint,
+            0.55f to lerp(dynamicTint, MINI_PLAYER_BASE, 0.55f),
+            1.0f to MINI_PLAYER_BASE
+        )
+    }
+
     LaunchedEffect(title) {
         if (!titleOffsetX.isRunning && titleOffsetX.value != 0f) {
             titleOffsetX.snapTo(0f)
@@ -93,7 +112,7 @@ fun SpotifyMiniPlayer(
             .padding(horizontal = EncoreControlSizes.FloatingPlayerMargin)
             .shadow(elevation = 8.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
             .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
-            .background(EncoreColors.Card)
+            .background(barBrush)
             .clickable(onClick = onBarClick)
     ) {
         Column(
