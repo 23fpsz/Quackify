@@ -258,7 +258,12 @@ class PlaybackBridge(private val context: Context) {
                 durationMs = duration,
                 progress = progressOf(target, duration),
             )
-            scope.launch { player.seekTo(target) }
+            player.seekTo(target)
+            // Tell the server where the stream is now instead of waiting for
+            // the next poll: the old position went out for up to 15s and the
+            // remote clients (and this screen, once the cluster came back)
+            // snapped to it.
+            scope.launch { publishLocalFromEngine(target) }
         }
 
         override fun onShuffleToggle() {
@@ -2738,7 +2743,11 @@ class PlaybackBridge(private val context: Context) {
         val ended = endedIn
         val rows = chainFor()
         val at = rowOf(rows, ended)
-        resumeRow = if (at >= 0) at + 1 else -1
+        // A row queued from somewhere else is not in the chain: keep the
+        // cursor where the context left it instead of dropping to -1, which
+        // made the next advance look like the end of the list and start a
+        // station nobody asked for.
+        if (at >= 0) resumeRow = at + 1
         val server = connect.cluster.value
         val serverQueued = server?.queued.orEmpty()
         val queued = queuedTail.firstOrNull()

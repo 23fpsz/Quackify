@@ -126,7 +126,15 @@ internal class PlayerEngine(
 
     fun seekTo(ms: Long) {
         val limit = (durationMs - SEEK_TAIL_MS).coerceAtLeast(0L)
-        pendingSeekSeconds = ms.coerceIn(0L, limit) / 1000.0
+        val target = ms.coerceIn(0L, limit)
+        // The seek is only consumed by the decode loop, which can be a whole
+        // segment away: until then every reader (the seekbar, the published
+        // member state) kept seeing the pre-seek position and the thumb
+        // snapped back. Report the target from here on.
+        reachedEnd = false
+        positionMs = target
+        reportedMs = target
+        pendingSeekSeconds = target / 1000.0
     }
 
     suspend fun run(fromMs: Long) {
@@ -583,8 +591,13 @@ internal class PlayerEngine(
                 audio.rebuild()
             }
         }
-        if (!paused) positionMs = (to - init.primingFrames) * 1000L / init.sampleRate
-        if (pendingSeekSeconds == null && !paused) report()
+        // A seek in flight owns the position: the samples drained here still
+        // belong to the old spot, and letting them write it back undid the
+        // jump the user just asked for.
+        if (!paused && pendingSeekSeconds == null) {
+            positionMs = (to - init.primingFrames) * 1000L / init.sampleRate
+            report()
+        }
         if (mediaCursor >= windowEnd) reachedEnd = true
     }
 

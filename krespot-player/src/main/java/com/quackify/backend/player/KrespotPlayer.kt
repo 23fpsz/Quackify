@@ -430,6 +430,7 @@ class KrespotPlayer(private val context: Context) {
                 // seconds; a scrub that lands in that window used to be
                 // dropped outright.
                 pendingSeekMs = ms
+                _state.update { it.copy(positionMs = ms) }
                 log.i("seek -> ${ms}ms parked, the engine is still loading")
             } else {
                 log.w("seek -> ${ms}ms ignored, nothing is running")
@@ -438,6 +439,11 @@ class KrespotPlayer(private val context: Context) {
         }
         log.i("seek -> ${ms}ms")
         engine.seekTo(ms)
+        // Mirror the clamped target right away: the state flow kept the
+        // pre-seek position until the decode loop reached the new segment,
+        // and every reader of it (the bar, the published member state, the
+        // next cluster echo) put the thumb back where the track was.
+        _state.update { it.copy(positionMs = engine.currentPositionMs) }
     }
 
     fun stop() {
