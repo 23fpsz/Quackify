@@ -58,8 +58,6 @@ import com.quackify.compose.theme.SpotifyTheme
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
-private const val MINI_PLAYER_ALPHA = 0.88f
-
 /** How far the bar has to travel before the release counts as an open. */
 private val SWIPE_UP_DISTANCE = 48.dp
 
@@ -108,7 +106,6 @@ fun SpotifyMiniPlayer(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = EncoreControlSizes.FloatingPlayerMargin)
-            .padding(bottom = EncoreControlSizes.FloatingPlayerMargin)
             .graphicsLayer { translationY = -liftOffsetY.value }
             .pointerInput(openDistancePx, openVelocityPx) {
                 val tracker = VelocityTracker()
@@ -153,7 +150,7 @@ fun SpotifyMiniPlayer(
             }
             .shadow(elevation = 8.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
             .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
-            .background(EncoreColors.Card.copy(alpha = MINI_PLAYER_ALPHA))
+            .background(EncoreColors.Card)
             .clickable(onClick = onBarClick)
     ) {
         Column(
