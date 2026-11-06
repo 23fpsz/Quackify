@@ -504,24 +504,32 @@ fun SpotifyNowPlayingScreen(
                     }
                 }
             } else {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Column(
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .verticalScroll(state = scrollState, enabled = isScrollEnabled),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    NowPlayingHeaderRow(
+                        resolvedContextTitle = resolvedContextTitle,
+                        contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                        onCollapseClick = onCollapseClick,
+                        onMoreClick = onMoreClick,
+                        dragModifier = headerDragModifier
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Full-bleed banner: the artwork starts at the very top of the
+                    // screen, behind the status bar, and dissolves into the blurred
+                    // backdrop along its bottom edge.
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(state = scrollState, enabled = isScrollEnabled)
-                            .padding(top = if (fullArtwork) 0.dp else HEADER_ROW_HEIGHT),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .fillMaxWidth()
+                            .padding(horizontal = if (fullArtwork) 0.dp else 24.dp)
+                            .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
                     ) {
-                        // Full-bleed banner: the artwork starts at the very top of the
-                        // screen, behind the status bar, and dissolves into the blurred
-                        // backdrop along its bottom edge.
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(if (fullArtwork) Modifier else Modifier.statusBarsPadding())
-                                .padding(horizontal = if (fullArtwork) 0.dp else 24.dp)
-                                .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
-                        ) {
                             NowPlayingArtworkCard(
                                 title = title,
                                 coverUrl = coverUrl,
@@ -645,18 +653,7 @@ fun SpotifyNowPlayingScreen(
                         }
                     }
                 }
-
-                Box(modifier = Modifier.statusBarsPadding()) {
-                    NowPlayingHeaderRow(
-                        resolvedContextTitle = resolvedContextTitle,
-                        contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
-                        onCollapseClick = onCollapseClick,
-                        onMoreClick = onMoreClick,
-                        dragModifier = headerDragModifier
-                    )
-                }
             }
-        }
         }
 
         // Fullscreen Lyrics Overlay (Slides up over player)
