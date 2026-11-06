@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,9 +36,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.quackify.compose.theme.EncoreAnimation
+import com.quackify.compose.theme.EncoreColors
 
 private val ShimmerBase = Color(0xFF1C1C1C)
 private val ShimmerHighlight = Color(0xFF2E2E2E)
@@ -56,6 +59,14 @@ fun rememberSmoothColor(
     ),
     label = "smoothAccentColor"
 )
+
+const val HeaderTintWeight = 0.55f
+
+@Composable
+fun rememberHeaderTint(seed: Color, durationMillis: Int = 650): State<Color> {
+    val resolved = remember(seed) { lerp(EncoreColors.Background, seed, HeaderTintWeight) }
+    return rememberSmoothColor(target = resolved, durationMillis = durationMillis)
+}
 
 @Composable
 fun ShimmerHost(content: @Composable () -> Unit) {
