@@ -318,7 +318,12 @@ fun TrackOptionsSheet(
             if (canvasAvailable) {
                 ContextMenuRowItem(
                     title = if (isCanvasEnabled) "Turn off Canvas" else "Turn on Canvas",
-                    iconRes = R.drawable.encore_icon_video_24,
+                    iconRes = if (isCanvasEnabled) {
+                        R.drawable.encore_icon_video_24
+                    } else {
+                        R.drawable.encore_icon_video_outline_24
+                    },
+                    iconTint = if (isCanvasEnabled) EncoreColors.Green else EncoreColors.TextPrimary,
                     onClick = {
                         onDismiss()
                         onCanvasToggle()
