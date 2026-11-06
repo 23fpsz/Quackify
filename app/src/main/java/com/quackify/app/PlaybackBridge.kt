@@ -2197,8 +2197,12 @@ class PlaybackBridge(private val context: Context) {
         val chainFits = chainContext.isNotBlank() && (context.isBlank() || chainContext == context)
         val chainTail = if (anchor.isNotBlank() && chain.isNotEmpty() && chainFits) {
             val at = chain.indexOf(anchor)
-            if (at >= 0) {
-                chain.drop(at + 1).filterNot { it in queuedUris }.take(20)
+            // A row queued from another context is playing but is not part of
+            // this chain: the playlist it interrupted still owes its own next
+            // rows, and resumeRow is exactly where it was left off.
+            val cursor = if (at >= 0) at else resumeRow.takeIf { it in chain.indices } ?: -1
+            if (cursor >= 0) {
+                chain.drop(cursor + 1).filterNot { it in queuedUris }.take(20)
             } else {
                 emptyList()
             }
