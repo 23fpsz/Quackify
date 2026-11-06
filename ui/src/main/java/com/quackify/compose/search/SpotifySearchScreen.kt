@@ -36,7 +36,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,6 +72,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreProfileAvatar
@@ -655,28 +655,12 @@ fun SpotifySearchScreen(
                     filteredPodcasts.isNotEmpty()
 
             if (loading && !isOffline) {
-                // Debounce + fetch in flight: show feedback instead of a premature
-                // "Couldn't find" while the results have not landed yet
-                Box(
+                TrackListSkeleton(
+                    rows = 8,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(
-                            color = EncoreColors.Green,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Searching \"$searchQuery\"...",
-                            style = SpotifyTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+                        .padding(top = 8.dp)
+                )
             } else if (!hasResults && (isOffline || loadFailed)) {
                 // Nothing came back because the network is gone or the query
                 // itself failed - the same card the playlist screen shows,

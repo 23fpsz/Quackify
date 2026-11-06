@@ -59,6 +59,7 @@ import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
@@ -143,7 +144,8 @@ fun SpotifyAlbumScreen(
     val topBarThreeDotsAlpha = if (isHeaderOffScreen) 0f else dockFraction
     val topBarTitleAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
     val topBarAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
-    val topBarBgColor = coverColor.copy(alpha = topBarAlpha)
+    val smoothCoverColor by rememberSmoothColor(target = coverColor)
+    val topBarBgColor = smoothCoverColor.copy(alpha = topBarAlpha)
     val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
     val topOffsetPx = with(density) { (toolbarHeight - 8.dp).toPx().toInt() }
 
@@ -180,10 +182,10 @@ fun SpotifyAlbumScreen(
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
-                            0.0f to coverColor,
-                            0.35f to coverColor.copy(alpha = 0.90f),
-                            0.65f to coverColor.copy(alpha = 0.55f),
-                            0.85f to coverColor.copy(alpha = 0.20f),
+                            0.0f to smoothCoverColor,
+                            0.35f to smoothCoverColor.copy(alpha = 0.90f),
+                            0.65f to smoothCoverColor.copy(alpha = 0.55f),
+                            0.85f to smoothCoverColor.copy(alpha = 0.20f),
                             1.0f to Color(0xFF121212)
                         )
                     )
@@ -231,7 +233,7 @@ fun SpotifyAlbumScreen(
                                     }
                                     .shadow(elevation = (14 * (1f - shrinkFraction)).dp, shape = RoundedCornerShape(4.dp))
                                     .clip(RoundedCornerShape(4.dp))
-                                    .background(coverColor.copy(alpha = 0.9f)),
+                                    .background(smoothCoverColor.copy(alpha = 0.9f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (!coverUrl.isNullOrBlank()) {
@@ -279,7 +281,7 @@ fun SpotifyAlbumScreen(
                                 modifier = Modifier
                                     .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(coverColor),
+                                    .background(smoothCoverColor),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(

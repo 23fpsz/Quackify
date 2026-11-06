@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +50,8 @@ import com.quackify.compose.R
 import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncoreProfileAvatar
+import com.quackify.compose.components.LibraryGridSkeleton
+import com.quackify.compose.components.LibraryListSkeleton
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.sheets.LibrarySortOption
 import com.quackify.compose.theme.EncoreColors
@@ -333,17 +334,18 @@ fun SpotifyLibraryScreen(
 
         // Library Items Content: Loading State, Empty State, List View OR Grid View
         if (loading && filteredItems.isEmpty()) {
-            Box(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = bottomPadding),
-                contentAlignment = Alignment.Center
+                    .padding(bottom = bottomPadding)
             ) {
-                CircularProgressIndicator(
-                    color = EncoreColors.Green,
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(36.dp)
-                )
+                item {
+                    if (isGridView) {
+                        LibraryGridSkeleton(rows = 5)
+                    } else {
+                        LibraryListSkeleton(rows = 9)
+                    }
+                }
             }
         } else if (filteredItems.isEmpty()) {
             Box(

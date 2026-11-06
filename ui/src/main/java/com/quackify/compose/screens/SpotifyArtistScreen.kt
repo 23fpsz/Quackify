@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -58,7 +58,10 @@ import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncorePlayIndicator
+import com.quackify.compose.components.ShimmerBlock
+import com.quackify.compose.components.ShimmerHost
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
@@ -155,7 +158,8 @@ fun SpotifyArtistScreen(
     val topBarThreeDotsAlpha = if (isHeaderOffScreen) 0f else dockFraction
     val topBarTitleAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
     val topBarAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
-    val topBarBgColor = heroColor.copy(alpha = topBarAlpha)
+    val smoothHeroColor by rememberSmoothColor(target = heroColor)
+    val topBarBgColor = smoothHeroColor.copy(alpha = topBarAlpha)
     val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
 
     val followBorderColor by animateColorAsState(
@@ -198,15 +202,18 @@ fun SpotifyArtistScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(heroColor),
+                        .background(smoothHeroColor),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) {
-                        CircularProgressIndicator(
-                            color = EncoreColors.Green,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(36.dp)
-                        )
+                        ShimmerHost {
+                            ShimmerBlock(
+                                modifier = Modifier.fillMaxSize(),
+                                shape = RectangleShape,
+                                base = smoothHeroColor,
+                                highlight = smoothHeroColor.copy(alpha = 0.65f)
+                            )
+                        }
                     }
                 }
             }

@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +43,7 @@ import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
@@ -130,18 +130,12 @@ fun NotificationsScreen(
 
         // Notification List
         if (loading) {
-            Box(
+            TrackListSkeleton(
+                rows = 9,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = bottomPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = EncoreColors.Green,
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
+                    .padding(top = 8.dp)
+            )
         } else if (loadFailed && filtered.isEmpty()) {
             // The fetch finished with nothing: say the network is the reason
             // and offer a retry, the same card the playlist screen shows,

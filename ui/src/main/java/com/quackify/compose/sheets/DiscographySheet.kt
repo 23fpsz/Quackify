@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -48,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.backend.model.ShelfItem
 import com.quackify.compose.theme.EncoreColors
@@ -346,11 +346,7 @@ private fun StatusTile(failed: Boolean) {
                 style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
         } else {
-            CircularProgressIndicator(
-                color = EncoreColors.Green,
-                strokeWidth = 2.dp,
-                modifier = Modifier.size(22.dp)
-            )
+            InlineLoadingDots(color = EncoreColors.TextSecondary)
         }
     }
 }

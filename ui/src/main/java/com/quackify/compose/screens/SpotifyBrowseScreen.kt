@@ -20,10 +20,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +35,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
+import com.quackify.compose.components.InlineLoadingDots
+import com.quackify.compose.components.ShimmerBlock
+import com.quackify.compose.components.ShimmerHost
+import com.quackify.compose.components.ShimmerText
+import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.backend.api.Browse
 import com.quackify.compose.format.parseHexColor
@@ -58,7 +63,7 @@ fun SpotifyBrowseScreen(
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val accent = parseHexColor(colorHex) ?: EncoreColors.Card
+    val accent by rememberSmoothColor(target = parseHexColor(colorHex) ?: EncoreColors.Card)
 
     Column(
         modifier = modifier
@@ -90,15 +95,38 @@ fun SpotifyBrowseScreen(
         }
 
         if (isLoading && sections.isEmpty()) {
-            Box(
+            LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(28.dp),
-                    strokeWidth = 2.dp,
-                    color = EncoreColors.TextSecondary
-                )
+                item {
+                    ShimmerHost {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
+                            ShimmerText(widthFraction = 0.55f, height = 30.dp)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            ShimmerText(widthFraction = 0.35f, height = 13.dp)
+                            Spacer(modifier = Modifier.height(28.dp))
+                            repeat(2) { index ->
+                                ShimmerText(
+                                    widthFraction = 0.4f,
+                                    height = 20.dp,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    repeat(3) {
+                                        ShimmerBlock(
+                                            modifier = Modifier
+                                                .width(150.dp)
+                                                .height(150.dp),
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(if (index == 0) 22.dp else 0.dp))
+                            }
+                        }
+                    }
+                }
             }
             return@Column
         }
@@ -173,11 +201,7 @@ fun SpotifyBrowseScreen(
                             .height(56.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            strokeWidth = 2.dp,
-                            color = EncoreColors.TextSecondary
-                        )
+                        InlineLoadingDots(color = EncoreColors.TextSecondary)
                     }
                 }
             }

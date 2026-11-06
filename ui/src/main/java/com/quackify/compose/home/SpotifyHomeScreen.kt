@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,7 +45,9 @@ import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreProfileAvatar
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncorePlayIndicator
+import com.quackify.compose.components.HomeFeedSkeleton
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
@@ -132,7 +133,7 @@ fun SpotifyHomeScreen(
     // to the artwork instead of a fixed accent. A missing or dull cover falls
     // back to the surface, which keeps the header and the feed one colour.
     val tintSeed = quickItems.firstOrNull()?.coverColor
-    val heroTint = remember(tintSeed) {
+    val resolvedTint = remember(tintSeed) {
         if (tintSeed == null) {
             EncoreColors.Background
         } else {
@@ -143,17 +144,15 @@ fun SpotifyHomeScreen(
             )
         }
     }
-
-    // One gradient behind everything, held flat for the height of the sticky
-    // header before it starts fading. The header itself paints the same flat
-    // tint, so its bottom edge lands on a colour that has not moved yet and
-    // the two never meet on a seam.
-    val heroBackdropBrush = Brush.verticalGradient(
-        0f to heroTint,
-        HEADER_HOLD to heroTint,
-        0.55f to EncoreColors.Background,
-        1f to EncoreColors.Background
-    )
+    val heroTint by rememberSmoothColor(target = resolvedTint)
+    val heroBackdropBrush = remember(heroTint) {
+        Brush.verticalGradient(
+            0f to heroTint,
+            HEADER_HOLD to heroTint,
+            0.55f to EncoreColors.Background,
+            1f to EncoreColors.Background
+        )
+    }
 
     Box(
         modifier = modifier
@@ -283,19 +282,17 @@ fun SpotifyHomeScreen(
         // that it could not be fetched. No made-up shelves or shortcuts.
         if (quickItems.isEmpty() && shelfSections.isEmpty() && podcastShelves.isEmpty()) {
             item(key = "home_feed_status") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 64.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (loading) {
-                        CircularProgressIndicator(
-                            color = EncoreColors.Green,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    } else {
+                if (loading) {
+                    HomeFeedSkeleton(
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 64.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
                             text = "Couldn't load your feed",
                             style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
