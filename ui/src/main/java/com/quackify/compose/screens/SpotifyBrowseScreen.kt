@@ -24,11 +24,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +52,8 @@ import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.BrowseSection
 
+private const val HEADER_TINT_WEIGHT = 0.55f
+
 @Composable
 fun SpotifyBrowseScreen(
     title: String,
@@ -65,6 +69,7 @@ fun SpotifyBrowseScreen(
     modifier: Modifier = Modifier,
 ) {
     val accent by rememberSmoothColor(target = parseHexColor(colorHex) ?: EncoreColors.Card)
+    val headerTint = remember(accent) { lerp(EncoreColors.Background, accent, HEADER_TINT_WEIGHT) }
 
     Column(
         modifier = modifier
@@ -74,7 +79,7 @@ fun SpotifyBrowseScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(accent.copy(alpha = 0.22f))
+                .background(headerTint)
                 .statusBarsPadding()
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
