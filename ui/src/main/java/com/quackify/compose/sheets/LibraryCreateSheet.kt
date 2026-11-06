@@ -79,7 +79,7 @@ fun LibraryCreateSheet(
 
             CreateOptionItem(
                 title = "Playlist",
-                subtitle = "Build a playlist with songs, or episodes",
+                subtitle = "Create a playlist with songs or episodes",
                 iconRes = R.drawable.encore_icon_playlist_24,
                 onClick = {
                     onDismiss()
@@ -89,7 +89,7 @@ fun LibraryCreateSheet(
 
             CreateOptionItem(
                 title = "Folder",
-                subtitle = "Organize and group your playlists",
+                subtitle = "Organize your playlists",
                 iconRes = R.drawable.encore_icon_folder_24,
                 onClick = {
                     onDismiss()
@@ -99,7 +99,7 @@ fun LibraryCreateSheet(
 
             CreateOptionItem(
                 title = "Blend",
-                subtitle = "Combine tastes in a playlist with friends",
+                subtitle = "Combine your friends' tastes into a playlist",
                 iconRes = R.drawable.encore_icon_user_24,
                 onClick = {
                     onDismiss()
