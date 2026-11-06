@@ -63,6 +63,9 @@ internal fun ShellSheets(
     userAvatarUrl: String,
     savedAccounts: List<SpotifyAuth.Account>,
     activeAccountId: String,
+    canvasAvailable: Boolean = false,
+    isCanvasEnabled: Boolean = false,
+    onCanvasToggle: () -> Unit = {},
     onDismissProfile: () -> Unit,
     onDismissAccounts: () -> Unit,
     onSwitchAccount: (String) -> Unit,
@@ -142,7 +145,10 @@ internal fun ShellSheets(
         onViewAlbum = onViewAlbum,
         onShare = { selectedTrack?.uri?.takeIf { it.isNotBlank() }?.let(onShare) },
         onSleepTimerClick = onSleepTimerClick,
-        onShowCredits = onShowCredits
+        onShowCredits = onShowCredits,
+        canvasAvailable = canvasAvailable,
+        isCanvasEnabled = isCanvasEnabled,
+        onCanvasToggle = onCanvasToggle
     )
 
     EntityOptionsSheet(
