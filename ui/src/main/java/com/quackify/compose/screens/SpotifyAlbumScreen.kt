@@ -60,6 +60,8 @@ import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
+import com.quackify.compose.format.formatCollectionDuration
+import com.quackify.backend.model.collectionDuration
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
@@ -498,9 +500,13 @@ fun SpotifyAlbumScreen(
                     }
 
                     if (tracks.isNotEmpty()) {
-                        val totalDuration = calculateTotalDuration(tracks.size)
+                        val totalDuration = remember(tracks) {
+                            calculateTotalDuration(tracks.map { it.durationMs })
+                        }
                         Text(
-                            text = "${tracks.size} songs • $totalDuration",
+                            text = listOf("${tracks.size} songs", totalDuration)
+                                .filter { it.isNotBlank() }
+                                .joinToString(" • "),
                             style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                         )
                     }
@@ -799,15 +805,10 @@ private fun AlbumTrackRow(
     }
 }
 
-private fun calculateTotalDuration(trackCount: Int): String {
-    val totalSeconds = trackCount * 215 // avg 3m 35s per song
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    return if (hours > 0) {
-        "${hours}h ${minutes}m"
-    } else {
-        "${minutes} min"
-    }
+private fun calculateTotalDuration(durations: List<Long>): String {
+    val total = collectionDuration(durations, durations.size)
+    if (total <= 0L) return ""
+    return formatCollectionDuration(total)
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
