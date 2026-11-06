@@ -93,9 +93,11 @@ import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreRepeatButton
 import com.quackify.compose.components.EncoreSmartShuffleButton
+import com.quackify.compose.components.FullArtworkBackdrop
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.rememberFullArtworkBlur
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
@@ -347,6 +349,8 @@ fun SpotifyNowPlayingScreen(
             label = "npvDominantColorTransition"
         )
 
+        val fullArtworkBlur by rememberFullArtworkBlur(coverUrl)
+
         // Authentic album-art-extracted vertical gradient matching Spotify nowplaying_overlay_gradient.xml
         // Vivid artwork color on top easing into base black across most of the screen
         Box(
@@ -360,6 +364,11 @@ fun SpotifyNowPlayingScreen(
                         1.0f to Color(0xFF121212)
                     )
                 )
+        )
+
+        FullArtworkBackdrop(
+            image = fullArtworkBlur,
+            modifier = Modifier.fillMaxSize()
         )
 
         @OptIn(ExperimentalFoundationApi::class)
@@ -394,9 +403,7 @@ fun SpotifyNowPlayingScreen(
                             dominantColor = dynamicArtworkColor,
                             backgroundColor = animatedDominantColor,
                             canvasFilePath = canvasFilePath,
-                            isCanvasAllowed = isCanvasAllowed,
                             isCanvasEnabled = canvasActive,
-                            onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) },
                             gestureModifier = artworkGestureModifier,
                             modifier = Modifier
                                 .aspectRatio(1.0f)
@@ -415,7 +422,10 @@ fun SpotifyNowPlayingScreen(
                             contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
                             onCollapseClick = onCollapseClick,
                             onMoreClick = onMoreClick,
-                            dragModifier = headerDragModifier
+                            dragModifier = headerDragModifier,
+                            canvasAvailable = isCanvasAllowed && canvasFilePath != null,
+                            isCanvasEnabled = canvasActive,
+                            onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) }
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -515,7 +525,10 @@ fun SpotifyNowPlayingScreen(
                         contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
                         onCollapseClick = onCollapseClick,
                         onMoreClick = onMoreClick,
-                        dragModifier = headerDragModifier
+                        dragModifier = headerDragModifier,
+                        canvasAvailable = isCanvasAllowed && canvasFilePath != null,
+                        isCanvasEnabled = canvasActive,
+                        onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) }
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -525,7 +538,6 @@ fun SpotifyNowPlayingScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
                             .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
                     ) {
                         NowPlayingArtworkCard(
@@ -534,10 +546,9 @@ fun SpotifyNowPlayingScreen(
                             dominantColor = dynamicArtworkColor,
                             backgroundColor = animatedDominantColor,
                             canvasFilePath = canvasFilePath,
-                            isCanvasAllowed = isCanvasAllowed,
                             isCanvasEnabled = canvasActive,
-                            onCanvasToggle = { onCanvasToggle(!isCanvasEnabled) },
                             gestureModifier = artworkGestureModifier,
+                            fullBleed = true,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .offset(y = artworkPushUpOffset)
@@ -873,7 +884,10 @@ private fun NowPlayingHeaderRow(
     contextSubtitle: String?,
     onCollapseClick: () -> Unit,
     onMoreClick: () -> Unit,
-    dragModifier: Modifier = Modifier
+    dragModifier: Modifier = Modifier,
+    canvasAvailable: Boolean = false,
+    isCanvasEnabled: Boolean = false,
+    onCanvasToggle: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -922,6 +936,17 @@ private fun NowPlayingHeaderRow(
             }
         }
 
+        if (canvasAvailable) {
+            EncoreIconButton(
+                iconRes = R.drawable.encore_icon_video_24,
+                contentDescription = if (isCanvasEnabled) "Turn Canvas off" else "Turn Canvas on",
+                onClick = onCanvasToggle,
+                tint = if (isCanvasEnabled) EncoreColors.Green else Color.White.copy(alpha = 0.7f),
+                size = 40.dp,
+                iconSize = 22.dp
+            )
+        }
+
         EncoreIconButton(
             iconRes = R.drawable.encore_icon_more_android_24,
             contentDescription = "More options",
@@ -945,17 +970,17 @@ private fun NowPlayingArtworkCard(
     dominantColor: Color,
     backgroundColor: Color,
     canvasFilePath: String?,
-    isCanvasAllowed: Boolean,
     isCanvasEnabled: Boolean,
-    onCanvasToggle: () -> Unit,
     gestureModifier: Modifier = Modifier,
+    fullBleed: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val corner = if (fullBleed) 0.dp else EncoreCornerRadii.Larger2
     Box(
         modifier = modifier
-            .shadow(elevation = 16.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
+            .shadow(elevation = if (fullBleed) 0.dp else 16.dp, shape = RoundedCornerShape(corner))
             .then(gestureModifier)
-            .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
+            .clip(RoundedCornerShape(corner))
             .background(backgroundColor),
         contentAlignment = Alignment.Center
     ) {
@@ -971,30 +996,6 @@ private fun NowPlayingArtworkCard(
                 fallbackColor = dominantColor,
                 modifier = Modifier.fillMaxSize()
             )
-        }
-
-        // Canvas Mode Toggle Pill (matches the Spotify "Canvas on/off" badge);
-        // only offered while the Canvas setting is enabled and the track has one
-        if (isCanvasAllowed && canvasFilePath != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .clickable(onClick = onCanvasToggle)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (isCanvasEnabled) "Canvas on" else "Canvas off",
-                    style = SpotifyTheme.typography.marginal.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp,
-                        color = if (isCanvasEnabled) EncoreColors.Green else Color.White.copy(alpha = 0.7f)
-                    )
-                )
-            }
         }
     }
 }
