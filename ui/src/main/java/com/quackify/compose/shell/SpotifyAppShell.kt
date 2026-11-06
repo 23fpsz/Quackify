@@ -1156,6 +1156,12 @@ fun SpotifyAppShell(
         }
         }
 
+        val nowPlayingDominantColor by rememberDominantColor(
+            imageUrl = currentCoverUrl,
+            fallbackSeed = currentTrackTitle + currentArtist,
+            defaultColor = Color(0xFF432371)
+        )
+
         if (!isPlaylistEditMode) {
             ShellBottomBar(
                 title = playerIdentity.title,
@@ -1164,6 +1170,7 @@ fun SpotifyAppShell(
                 progress = currentProgress,
                 isLiked = isLiked,
                 coverUrl = currentCoverUrl,
+                coverColor = nowPlayingDominantColor,
                 connectedDevice = connectedDevice,
                 navItems = navItems,
                 currentNavIndex = selectedNavIndex,
@@ -1193,11 +1200,6 @@ fun SpotifyAppShell(
             playlistTitle = activePlaylistTitle,
             albumTitle = activeAlbumTitle,
             artistName = activeArtistName,
-        )
-        val nowPlayingDominantColor by rememberDominantColor(
-            imageUrl = currentCoverUrl,
-            fallbackSeed = currentTrackTitle + currentArtist,
-            defaultColor = Color(0xFF432371)
         )
         ShellNowPlaying(
             visible = isPlayerExpanded,
