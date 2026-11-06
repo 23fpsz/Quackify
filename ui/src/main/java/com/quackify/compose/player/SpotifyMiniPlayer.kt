@@ -20,7 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.quackify.backend.model.DeviceKind
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
@@ -76,6 +79,17 @@ private fun miniPlayerTint(cover: Color): Color {
  * Floating Mini Player Bar matching Spotify Mobile's `now_playing_bar.xml` specifications.
  * Supports swiping the track title/artist (CarouselView) to skip tracks with real-time translation and spring physics.
  */
+private fun resolveDeviceIcon(kind: DeviceKind?): Int = when (kind) {
+    DeviceKind.COMPUTER -> R.drawable.encore_icon_device_computer_24
+    DeviceKind.SPEAKER -> R.drawable.encore_icon_device_speaker_24
+    DeviceKind.TV, DeviceKind.STICK, DeviceKind.RECEIVER -> R.drawable.encore_icon_device_tv_24
+    DeviceKind.PHONE -> R.drawable.encore_icon_device_mobile_24
+    DeviceKind.TABLET -> R.drawable.encore_icon_device_tablet_24
+    DeviceKind.CAR -> R.drawable.encore_icon_device_car_24
+    DeviceKind.CAST -> R.drawable.encore_icon_chromecast_connected_24
+    else -> R.drawable.encore_icon_device_computer_24
+}
+
 @Composable
 fun SpotifyMiniPlayer(
     title: String,
@@ -91,6 +105,7 @@ fun SpotifyMiniPlayer(
     onSkipNextClick: () -> Unit = {},
     onSkipPreviousClick: () -> Unit = {},
     connectedDeviceName: String? = null,
+    connectedDeviceKind: DeviceKind? = null,
     coverColor: Color = Color(0xFF5A3E85),
     coverUrl: String? = null,
     hasTrack: Boolean = true
@@ -218,13 +233,8 @@ fun SpotifyMiniPlayer(
                                     )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (connectedDeviceName != null) "🎧 $connectedDeviceName • $artist" else artist,
-                                style = SpotifyTheme.typography.marginal.copy(
-                                    color = if (connectedDeviceName != null) EncoreColors.Green else EncoreColors.TextSecondary
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Clip,
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .basicMarquee(
@@ -232,19 +242,54 @@ fun SpotifyMiniPlayer(
                                         initialDelayMillis = 2000,
                                         velocity = 30.dp
                                     )
-                            )
+                            ) {
+                                if (connectedDeviceName != null) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.encore_icon_spotify_connect_24),
+                                        contentDescription = null,
+                                        tint = EncoreColors.Green,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "$connectedDeviceName • $artist",
+                                        style = SpotifyTheme.typography.marginal.copy(
+                                            color = EncoreColors.Green
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Clip
+                                    )
+                                } else {
+                                    Text(
+                                        text = artist,
+                                        style = SpotifyTheme.typography.marginal.copy(
+                                            color = EncoreColors.TextSecondary
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Clip
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
                 // Connect device icon button (now_playing_bar_actions_button_size = 40dp)
+                val hasConnectedDevice = !connectedDeviceName.isNullOrBlank()
+                val connectIconRes = if (hasConnectedDevice) {
+                    resolveDeviceIcon(connectedDeviceKind)
+                } else {
+                    R.drawable.encore_icon_devices_24
+                }
+                val connectIconTint = if (hasConnectedDevice) EncoreColors.Green else Color.White
+
                 EncoreIconButton(
-                    iconRes = R.drawable.encore_icon_devices_24,
-                    contentDescription = "Connect to device",
+                    iconRes = connectIconRes,
+                    contentDescription = if (hasConnectedDevice) "Connected to $connectedDeviceName" else "Connect to device",
                     onClick = onDeviceClick,
                     size = EncoreControlSizes.FloatingPlayerButtonSize,
                     iconSize = 20.dp,
-                    tint = if (connectedDeviceName != null) EncoreColors.Green else EncoreColors.TextSecondary
+                    tint = connectIconTint
                 )
 
                 // Like / Heart button with signature bouncy physics (now_playing_bar_actions_button_size = 40dp)
