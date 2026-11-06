@@ -114,10 +114,15 @@ object HomeFeed {
             val id = node.optString("id")
             val name = label(node.optJSONObject("label")).orEmpty()
             if (id.isBlank() || name.isBlank()) continue
+            if (id in DISABLED_CHIPS) continue
             out += HomeChip(id = id, label = name, subChips = chips(node.optJSONArray("subChips")))
         }
         return out
     }
+
+    private val DISABLED_CHIPS = setOf("audiobooks-chip")
+
+    private val DISABLED_KINDS = setOf("Audiobook", "Chapter", "AudiobookResponseWrapper")
 
     private fun item(node: JSONObject?, sectionData: JSONObject?): HomeItem? {
         if (node == null) return null
@@ -129,6 +134,7 @@ object HomeFeed {
             ?: content.optString("__typename").takeIf { it != "UnknownType" }
             ?: ""
         if (kind == "GenericError" || kind == "NotFound" || kind == "RestrictedContent") return null
+        if (kind in DISABLED_KINDS) return null
         val title = nameOf(entity, uri)
         if (title.isBlank() && uri !in COLLECTION_URIS) return null
         return HomeItem(
