@@ -60,7 +60,7 @@ fun SpotifyBrowseScreen(
     isLoadingMore: Boolean,
     hasMore: Boolean,
     onBackClick: () -> Unit,
-    onCardClick: (String, String) -> Unit,
+    onCardClick: (title: String, uri: String) -> Unit,
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -185,7 +185,7 @@ fun SpotifyBrowseScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(section.cards) { card ->
-                            BrowseCardTile(card = card, onClick = { onCardClick(card.uri, card.title) })
+                            BrowseCardTile(card = card, onClick = { onCardClick(card.title, card.uri) })
                         }
                     }
                 }
