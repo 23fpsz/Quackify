@@ -507,29 +507,74 @@ fun SpotifyNowPlayingScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .statusBarsPadding()
                         .verticalScroll(state = scrollState, enabled = isScrollEnabled),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    NowPlayingHeaderRow(
-                        resolvedContextTitle = resolvedContextTitle,
-                        contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
-                        onCollapseClick = onCollapseClick,
-                        onMoreClick = onMoreClick,
-                        dragModifier = headerDragModifier
-                    )
+                    if (fullArtwork) {
+                        // Full-bleed banner: the artwork starts at the very top of the screen
+                        // behind the status bar and dissolves into the backdrop, with the
+                        // header overlaying it so both scroll together without pushing the art down.
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
+                            ) {
+                                NowPlayingArtworkCard(
+                                    title = title,
+                                    coverUrl = coverUrl,
+                                    dominantColor = dynamicArtworkColor,
+                                    backgroundColor = animatedDominantColor,
+                                    canvasFilePath = canvasFilePath,
+                                    isCanvasEnabled = canvasActive,
+                                    gestureModifier = artworkGestureModifier,
+                                    fullBleed = true,
+                                    fadeFraction = ARTWORK_FADE_FRACTION,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1.0f)
+                                        .graphicsLayer { translationX = artworkOffsetX.value }
+                                )
+                            }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .statusBarsPadding()
+                            ) {
+                                NowPlayingHeaderRow(
+                                    resolvedContextTitle = resolvedContextTitle,
+                                    contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                                    onCollapseClick = onCollapseClick,
+                                    onMoreClick = onMoreClick,
+                                    dragModifier = headerDragModifier
+                                )
+                            }
+                        }
+                    } else {
+                        // Standard card mode: header with statusBarsPadding, 24dp spacing, and inset artwork
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                        ) {
+                            NowPlayingHeaderRow(
+                                resolvedContextTitle = resolvedContextTitle,
+                                contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                                onCollapseClick = onCollapseClick,
+                                onMoreClick = onMoreClick,
+                                dragModifier = headerDragModifier
+                            )
+                        }
 
-                    // Full-bleed banner: the artwork starts at the very top of the
-                    // screen, behind the status bar, and dissolves into the blurred
-                    // backdrop along its bottom edge.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = if (fullArtwork) 0.dp else 24.dp)
-                            .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
-                    ) {
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
+                        ) {
                             NowPlayingArtworkCard(
                                 title = title,
                                 coverUrl = coverUrl,
@@ -538,14 +583,15 @@ fun SpotifyNowPlayingScreen(
                                 canvasFilePath = canvasFilePath,
                                 isCanvasEnabled = canvasActive,
                                 gestureModifier = artworkGestureModifier,
-                                fullBleed = fullArtwork,
-                                fadeFraction = if (fullArtwork) ARTWORK_FADE_FRACTION else 0f,
+                                fullBleed = false,
+                                fadeFraction = 0f,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1.0f)
                                     .graphicsLayer { translationX = artworkOffsetX.value }
                             )
                         }
+                    }
 
                         Spacer(modifier = Modifier.height(16.dp))
 
