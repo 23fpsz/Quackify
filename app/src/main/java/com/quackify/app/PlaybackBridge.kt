@@ -1123,9 +1123,12 @@ class PlaybackBridge(private val context: Context) {
             ?: rowOf(chainFor(), uri).takeIf { it >= 0 }
             ?: at?.window()?.indexOfFirst { it.uri == uri }?.takeIf { it >= 0 }?.let { at.indexOf(it) }
             ?: 0
+        val contextUri = state.contextUri.takeIf { it.isNotBlank() }
+            ?: chainContext.takeIf { it.isNotBlank() }
+            ?: at?.contextUri.orEmpty()
         connect.publishLocalState(
             track = track,
-            contextUri = at?.contextUri?.takeIf { it.isNotBlank() } ?: chainContext,
+            contextUri = contextUri,
             contextIndex = index,
             positionMs = if (positionMs >= 0L) positionMs else player.positionMs,
             playing = playing ?: player.isPlaying,
@@ -1134,18 +1137,23 @@ class PlaybackBridge(private val context: Context) {
             repeatContext = repeatContextOn(at),
             repeatTrack = repeatTrackOn(at),
             queueRevision = at?.queueRevision.orEmpty(),
-            nextRows = queueTailRows(),
+            nextRows = queueTailRows(contextUri),
         )
     }
 
-    private fun queueTailRows(): List<ClusterTrack> {
+    private fun queueTailRows(contextUri: String): List<ClusterTrack> {
         val at = connect.cluster.value
         val queued = queuedTail.map { row ->
             val known = at?.queued?.firstOrNull { it.uri == row.uri }
                 ?: at?.window()?.firstOrNull { it.uri == row.uri && it.isQueued }
             known ?: asQueued(clusterTrackFor(row.uri))
         }
-        val context = at?.fromContext.orEmpty().filterNot { row -> queued.any { it.uri == row.uri } }
+        val follows = at?.contextUri.orEmpty().isNotBlank() && at?.contextUri == contextUri
+        val context = if (follows) {
+            at!!.fromContext.filterNot { row -> queued.any { it.uri == row.uri } }
+        } else {
+            emptyList()
+        }
         return queued + context
     }
 
@@ -2118,13 +2126,19 @@ class PlaybackBridge(private val context: Context) {
         }
         val server = cluster != null
         val live = connect.playback?.currentTrack?.contextUri.orEmpty()
-        val serverRows = if (server) cluster!!.fromContext.map(::row) else emptyList()
-        val context = live.ifBlank {
-            if (server) cluster!!.contextUri else ""
-        }.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
-            ?: chainContext.ifBlank { if (server) cluster!!.contextUri else "" }
-        val radio = server && cluster!!.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
-        val label = if (server && !radio) cluster!!.contextDescription else ""
+        val clusterContext = cluster?.contextUri.orEmpty()
+        val context = live.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
+            ?: chainContext.takeIf { it.isNotBlank() }
+            ?: clusterContext.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
+                .orEmpty()
+        val single = clusterContext.startsWith("spotify:track:") ||
+                clusterContext.startsWith("spotify:episode:")
+        val follows = clusterContext.isNotBlank() &&
+                (clusterContext == context || (single && context.isBlank()))
+        val serverRows = if (server && follows) cluster!!.fromContext.map(::row) else emptyList()
+        val radio = server && follows &&
+                cluster!!.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
+        val label = if (server && follows && !radio && !single) cluster!!.contextDescription else ""
         val queued = if (server) {
             val onServer = cluster!!.queued.map(::row)
             val known = onServer.mapTo(HashSet()) { it.uri }
@@ -2138,7 +2152,8 @@ class PlaybackBridge(private val context: Context) {
             queued.forEach { add(it.uri) }
         }
         val chain = chainFor()
-        val chainTail = if (anchor.isNotBlank() && chain.isNotEmpty()) {
+        val chainFits = chainContext.isNotBlank() && (context.isBlank() || chainContext == context)
+        val chainTail = if (anchor.isNotBlank() && chain.isNotEmpty() && chainFits) {
             val at = chain.indexOf(anchor)
             if (at >= 0) {
                 chain.drop(at + 1).filterNot { it in queuedUris }.take(20)
