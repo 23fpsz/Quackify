@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.quackify.compose.R
+import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
@@ -888,21 +889,10 @@ private fun PodcastEpisodeRow(
         // Episode Metadata: Day • Duration • Status (e.g. "Tue • 1h 15m" or "Sat • 1h 50m left • Finished")
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (episode.isExplicit) {
-                Box(
-                    modifier = Modifier
-                        .padding(end = 6.dp)
-                        .size(13.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(Color.White.copy(alpha = 0.6f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "E",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
+                EncoreExplicitTag(
+                    modifier = Modifier.padding(end = 6.dp),
+                    background = Color.White.copy(alpha = 0.6f)
+                )
             }
 
             val metaText = buildString {

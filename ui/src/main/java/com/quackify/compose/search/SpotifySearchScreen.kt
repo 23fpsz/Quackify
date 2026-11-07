@@ -80,6 +80,7 @@ import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.components.matchesCurrent
 import com.quackify.compose.R
+import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreProfileAvatar
 import com.quackify.compose.components.EncoreIconButton
@@ -1358,22 +1359,7 @@ private fun SearchTrackRow(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (track.isExplicit) {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(EncoreColors.TextSecondary)
-                            .padding(horizontal = 3.dp, vertical = 1.dp)
-                    ) {
-                        Text(
-                            text = "E",
-                            style = SpotifyTheme.typography.tagLabel.copy(
-                                color = EncoreColors.PureBlack,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                    }
+                    EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
                 }
                 Text(
                     text = "Song • ${track.artist}",

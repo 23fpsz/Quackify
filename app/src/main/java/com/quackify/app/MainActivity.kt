@@ -94,6 +94,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Honor the "Logging" toggle from the log viewer before anything else
+        // writes, so a paused capture stays paused across restarts.
+        Logs.capturing = getSharedPreferences(Logs.PREFS_NAME, MODE_PRIVATE)
+            .getBoolean(Logs.CAPTURE_PREF_KEY, true)
         // A cold start launched by the notification carries the flag here;
         // later taps arrive through onNewIntent instead.
         if (intent?.getBooleanExtra(PlaybackService.EXTRA_OPEN_PLAYER, false) == true) {
