@@ -23,14 +23,28 @@ private val log = Logs.of(Logs.Module.CAPTURE)
 @Composable
 fun PathfinderCaptureScreen(onDone: () -> Unit) {
     val context = LocalContext.current
+    // The system webview provider can vanish (package disabled, hidden or
+    // mid-update); building the host then throws straight out of composition
+    // and takes the app down. Skip the capture pass instead — the stored
+    // session still carries the token until a refresh becomes possible.
     val host = remember {
-        SpotifyAuth.applySession(context)
-        LoginFlow.markAttempt(context)
-        log.i("starting capture pass on $PLAYER_URL")
-        LoginWebViewHost(context, PLAYER_URL)
+        runCatching {
+            SpotifyAuth.applySession(context)
+            LoginFlow.markAttempt(context)
+            log.i("starting capture pass on $PLAYER_URL")
+            LoginWebViewHost(context, PLAYER_URL)
+        }.getOrElse { t ->
+            log.w("capture pass skipped, the webview is unusable: " +
+                    "${t.cause?.message ?: t.message}")
+            null
+        }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(host) {
+        if (host == null) {
+            onDone()
+            return@LaunchedEffect
+        }
         LoginFlow.harvest(
             context = context,
             log = { log.i(it) },
@@ -43,10 +57,12 @@ fun PathfinderCaptureScreen(onDone: () -> Unit) {
         onDone()
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(host) {
         onDispose {
-            log.i("capture pass over, ops=${LoginFlow.ops()}")
-            host.destroy()
+            if (host != null) {
+                log.i("capture pass over, ops=${LoginFlow.ops()}")
+                host.destroy()
+            }
         }
     }
 
@@ -55,12 +71,14 @@ fun PathfinderCaptureScreen(onDone: () -> Unit) {
             .fillMaxSize()
             .background(EncoreColors.Background),
     ) {
-        AndroidView(
-            modifier = Modifier
-                .fillMaxSize()
-                .alpha(0f),
-            factory = { host.container },
-        )
+        host?.let { captureHost ->
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0f),
+                factory = { captureHost.container },
+            )
+        }
         SplashScreen()
     }
 }

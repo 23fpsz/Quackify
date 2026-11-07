@@ -533,8 +533,10 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
         @SuppressLint("SetJavaScriptEnabled")
         private fun buildWebView(context: Context, parent: ViewGroup): WebView {
             val view = WebView(context)
-            CookieManager.getInstance().setAcceptCookie(true)
-            CookieManager.getInstance().setAcceptThirdPartyCookies(view, true)
+            cookieManagerOrNull()?.let { manager ->
+                manager.setAcceptCookie(true)
+                manager.setAcceptThirdPartyCookies(view, true)
+            }
             view.settings.apply {
                 userAgentString = SpotifyAuth.DESKTOP_UA
                 javaScriptEnabled = true

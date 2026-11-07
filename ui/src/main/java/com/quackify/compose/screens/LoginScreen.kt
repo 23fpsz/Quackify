@@ -16,7 +16,10 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -34,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -80,7 +84,20 @@ fun LoginScreen(
 ) {
 
     val context = LocalContext.current
-    val host = remember { LoginWebViewHost(context) }
+    // The login webview is the whole screen; when the system WebView
+    // provider is missing, disabled or mid-update, building the host throws
+    // straight out of composition. Show what happened instead of crashing.
+    var webviewAttempts by remember { mutableStateOf(0) }
+    val host = remember(webviewAttempts) {
+        runCatching { LoginWebViewHost(context) }.getOrElse { t ->
+            log.w("login webview unusable: ${t.cause?.message ?: t.message}")
+            null
+        }
+    }
+    if (host == null) {
+        WebViewUnavailableScreen(onRetry = { webviewAttempts++ })
+        return
+    }
     var splash by remember { mutableStateOf(false) }
     // Native escape hatch for the login webview: it cannot reach Settings, so
     // a translucent LOGS pill in the corner opens the log viewer directly —
@@ -257,6 +274,55 @@ fun LoginScreen(
         if (viewerOpen) {
             BackHandler { viewerOpen = false }
             LogViewerScreen(onBackClick = { viewerOpen = false })
+        }
+    }
+}
+
+/** Shown instead of the login webview when the system WebView provider
+ * cannot be loaded at all (package missing, disabled or mid-update). */
+@Composable
+private fun WebViewUnavailableScreen(onRetry: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EncoreColors.Background)
+            .padding(horizontal = 32.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "System WebView unavailable",
+                style = SpotifyTheme.typography.titleMedium,
+                color = EncoreColors.TextPrimary,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "The Android System WebView package is missing, disabled " +
+                        "or updating on this device, so the login page can't open. " +
+                        "Enable or update Android System WebView in system settings, " +
+                        "then retry.",
+                style = SpotifyTheme.typography.bodyMedium,
+                color = EncoreColors.TextSecondary,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(22.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(EncoreColors.Green)
+                    .clickable { onRetry() }
+                    .padding(horizontal = 28.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "RETRY",
+                    style = SpotifyTheme.typography.marginalBold.copy(
+                        color = EncoreColors.PureBlack,
+                        letterSpacing = 1.2.sp,
+                    ),
+                )
+            }
         }
     }
 }

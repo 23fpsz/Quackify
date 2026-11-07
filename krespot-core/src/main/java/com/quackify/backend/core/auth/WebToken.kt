@@ -1,7 +1,7 @@
 package com.quackify.backend.core.auth
 
 import android.content.Context
-import android.webkit.CookieManager
+import com.quackify.backend.core.webview.cookieManagerOrNull
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import com.quackify.backend.core.log.Logs
@@ -85,7 +85,7 @@ object WebToken {
 
     private fun cookieHeader(context: Context, spDc: String): String {
         if (spDc.isNotBlank()) return "sp_dc=$spDc"
-        return CookieManager.getInstance().getCookie(ORIGIN).orEmpty()
+        return cookieManagerOrNull()?.getCookie(ORIGIN).orEmpty()
     }
 
     private suspend fun serverSeconds(cookie: String): Long {
