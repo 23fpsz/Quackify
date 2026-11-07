@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -80,6 +81,7 @@ import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
 import androidx.compose.runtime.mutableStateListOf
 import com.quackify.backend.model.ConnectDevice
+import com.quackify.backend.api.Collection2
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.collectionDuration
 import com.quackify.backend.model.collectionDurationIsEstimate
@@ -421,6 +423,12 @@ fun SpotifyAppShell(
     var isAccountsSheetOpen by remember { mutableStateOf(false) }
     var isTrackOptionsOpen by remember { mutableStateOf(false) }
     var selectedTrackForOptions by remember { mutableStateOf<TrackItem?>(null) }
+
+    // Taste-profile exclusion for the track whose options sheet is open:
+    // null while the collection/v2 contains check is in flight (the row hides
+    // until it answers), cached per uri so reopening a sheet is instant.
+    var trackTasteExcluded by remember { mutableStateOf<Boolean?>(null) }
+    val tasteExclusionCache = remember { mutableMapOf<String, Boolean>() }
     var isPlaylistOptionsOpen by remember { mutableStateOf(false) }
     var isPlaylistEditMode by remember { mutableStateOf(false) }
     var isAlbumOptionsOpen by remember { mutableStateOf(false) }
@@ -459,6 +467,25 @@ fun SpotifyAppShell(
     val navBackStack = remember { mutableStateListOf<BackStackItem>() }
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    // Reads the taste-profile contains answer for the track whose options sheet
+    // just opened (both the track three-dot menus and the fullscreen NPV's
+    // three-dot land here), memoized per uri.
+    LaunchedEffect(isTrackOptionsOpen, selectedTrackForOptions?.uri) {
+        val uri = selectedTrackForOptions?.uri.orEmpty()
+        if (!isTrackOptionsOpen || !uri.startsWith("spotify:track:")) {
+            trackTasteExcluded = null
+            return@LaunchedEffect
+        }
+        trackTasteExcluded = tasteExclusionCache[uri]
+        if (trackTasteExcluded == null) {
+            val excluded = Collection2.excludedFromTasteProfile(context, uri)
+            if (uri == selectedTrackForOptions?.uri) {
+                tasteExclusionCache[uri] = excluded
+                trackTasteExcluded = excluded
+            }
+        }
+    }
 
     fun pushCurrentState() {
         navBackStack.add(
@@ -1044,6 +1071,10 @@ fun SpotifyAppShell(
                         isPlaying = isPlaying,
                         biography = artistDetail?.biography.orEmpty(),
                         verified = artistDetail?.verified == true,
+                        followers = artistDetail?.followers ?: 0L,
+                        worldRank = artistDetail?.worldRank ?: 0,
+                        topCities = artistDetail?.topCities.orEmpty(),
+                        gallery = artistDetail?.gallery.orEmpty(),
                         isLoading = artistLoading,
                         onBackClick = handleBack,
                         onPlayPauseClick = handlePlayPause,
@@ -1401,6 +1432,7 @@ fun SpotifyAppShell(
             albumCoverUrl = activeAlbumCoverUrl,
             artistName = activeArtistName,
             artistAvatarUrl = activeArtistAvatarUrl,
+            artistUri = activeArtistUri,
             sortOption = currentSortOption,
             sleepTimer = activeSleepTimer,
             userDisplayName = userDisplayName,
@@ -1501,6 +1533,35 @@ fun SpotifyAppShell(
             onDeviceVisible = { visible -> playerListener?.onDeviceSheetVisible(visible) },
             onVolumeChange = { id, level -> playerListener?.onVolumeChange(id, level) },
             userQueue = playbackState?.queue.orEmpty(),
+            trackTasteExcluded = trackTasteExcluded,
+            onToggleTasteExclusion = toggle@{ exclude ->
+                val track = selectedTrackForOptions
+                val uri = track?.uri.orEmpty()
+                if (!uri.startsWith("spotify:track:")) return@toggle
+                val previous = trackTasteExcluded
+                // Optimistic: flip the cached answer so the next sheet open is
+                // already correct, then reconcile with the real write result.
+                trackTasteExcluded = exclude
+                tasteExclusionCache[uri] = exclude
+                shellScope.launch {
+                    val ok = Collection2.setExcludedFromTasteProfile(context, uri, exclude)
+                    if (uri == selectedTrackForOptions?.uri) {
+                        if (!ok) {
+                            trackTasteExcluded = previous
+                            if (previous != null) tasteExclusionCache[uri] = previous
+                        }
+                        Toast.makeText(
+                            context,
+                            when {
+                                ok && exclude -> "Excluded from your taste profile"
+                                ok -> "Included in your taste profile"
+                                else -> "Couldn't update your taste profile"
+                            },
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            },
             queueSourceContext = playbackState?.queueContextLabel?.takeIf { it.isNotBlank() }
                 ?: playbackState?.contextLabel?.takeIf { it.isNotBlank() } ?: "",
             onQueueTrackSelect = { track ->

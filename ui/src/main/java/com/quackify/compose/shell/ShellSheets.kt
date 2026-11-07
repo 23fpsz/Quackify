@@ -43,6 +43,9 @@ internal fun ShellSheets(
     connectedDevice: String,
     userQueue: List<TrackItem>,
     queueFromContext: List<TrackItem>,
+    /** null while the taste-profile contains check is loading. */
+    trackTasteExcluded: Boolean? = null,
+    onToggleTasteExclusion: (Boolean) -> Unit = {},
     queueSourceContext: String,
     currentTrackTitle: String,
     currentTrackArtist: String,
@@ -57,6 +60,7 @@ internal fun ShellSheets(
     albumCoverUrl: String?,
     artistName: String,
     artistAvatarUrl: String?,
+    artistUri: String = "",
     sortOption: LibrarySortOption,
     sleepTimer: SleepTimerOption?,
     userDisplayName: String,
@@ -149,7 +153,9 @@ internal fun ShellSheets(
         onShowCredits = onShowCredits,
         canvasAvailable = canvasAvailable,
         isCanvasEnabled = isCanvasEnabled,
-        onCanvasToggle = onCanvasToggle
+        onCanvasToggle = onCanvasToggle,
+        isTasteExcluded = trackTasteExcluded,
+        onToggleTasteExclusion = onToggleTasteExclusion
     )
 
     EntityOptionsSheet(
@@ -183,7 +189,8 @@ internal fun ShellSheets(
         artistName = artistName,
         avatarUrl = artistAvatarUrl,
         isOpen = flags.artistOptions,
-        onDismiss = onDismissArtistOptions
+        onDismiss = onDismissArtistOptions,
+        onShare = { artistUri.takeIf { it.startsWith("spotify:artist:") }?.let(onShare) }
     )
 
     LibrarySortSheet(

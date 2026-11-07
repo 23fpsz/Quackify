@@ -56,7 +56,7 @@ import com.quackify.compose.theme.SpotifyTheme
  * - 112dp artwork thumbnail with 8dp rounded corners
  * - Centered title & artist metadata
  * - Quick action row: Like (with spring heart-pop animation), Add to playlist, Add to queue
- * - Vertical action list: Ban/Hide song, Add to playlist, Go to artist, Go to album, Show credits, Sleep timer, Share
+ * - Vertical action list: Ban/Hide song, taste-profile exclude, Add to playlist, Go to artist, Go to album, Show credits, Sleep timer, Share
  * - Grapple dimensions: 36dp x 4dp with 10dp vertical margin
  * - Background: #242424 (bg_page_bottom_sheet_color)
  */
@@ -78,6 +78,9 @@ fun TrackOptionsSheet(
     canvasAvailable: Boolean = false,
     isCanvasEnabled: Boolean = false,
     onCanvasToggle: () -> Unit = {},
+    /** null while the taste-profile check is still loading (row hidden). */
+    isTasteExcluded: Boolean? = null,
+    onToggleTasteExclusion: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || track == null) return
@@ -269,6 +272,24 @@ fun TrackOptionsSheet(
                     onHideSong()
                 }
             )
+
+            // Taste-profile exclusion (Spotify's "Exclude from your taste profile").
+            // Hidden until the contains check answers, so the label never flashes
+            // the wrong action for a track that is already excluded.
+            if (isTasteExcluded != null) {
+                ContextMenuRowItem(
+                    title = if (isTasteExcluded) {
+                        "Include in your taste profile"
+                    } else {
+                        "Exclude from your taste profile"
+                    },
+                    iconRes = R.drawable.encore_icon_tune_24,
+                    onClick = {
+                        onDismiss()
+                        onToggleTasteExclusion(!isTasteExcluded)
+                    }
+                )
+            }
 
             ContextMenuRowItem(
                 title = "Add to playlist",
