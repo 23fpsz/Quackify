@@ -41,6 +41,10 @@ private const val SPOTIFY_ORIGIN = "https://open.spotify.com"
 private const val ACCOUNTS_ORIGIN = "https://accounts.spotify.com"
 private const val GOOGLE_ORIGIN = "https://accounts.google.com"
 
+/** Login form paths: /login itself plus locale variants like /en/login or
+ * /pt-BR/login. OTP subpaths (/login/ott/v2) and /signup stay out. */
+private val LOGIN_PATH = Regex("^/(?:[a-z]{2}(?:-[A-Za-z]{2})?/)?login/?$")
+
 class LoginWebViewHost(val context: Context, private val startUrl: String = LOGIN_URL) {
 
     val container: FrameLayout = FrameLayout(context)
@@ -63,11 +67,14 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     }
 
     /** Whether [url] is the accounts login form itself (the page the
-     * classic-login pill belongs on), not OTP/signup/other accounts pages. */
+     * classic-login pill belongs on), not OTP/signup/other accounts pages.
+     * /login redirects to locale paths like /en/login or /id/login, so both
+     * shapes pass; the OTP pages are subpaths such as /login/ott/v2 and must
+     * not match. */
     private fun isLoginPage(url: String): Boolean {
         if (!url.startsWith(ACCOUNTS_ORIGIN)) return false
-        val path = runCatching { Uri.parse(url).path }.getOrNull()
-        return path == "/login"
+        val path = runCatching { Uri.parse(url).path }.getOrNull() ?: return false
+        return LOGIN_PATH.matches(path)
     }
 
     private fun notifyBackAvailable() {

@@ -16,18 +16,21 @@ package com.quackify.backend.core.webview
  *
  * The script is handed to every accounts.spotify.com page (the document-start
  * API only filters by origin, not path), so it guards itself: it bails unless
- * the page really is the login form — the pill must never show up on the OTP
- * or signup pages that live under the same origin.
+ * the page really is the login form — /login or its locale variants like
+ * /en/login and /id/login. The pill must never show up on the OTP pages
+ * (subpaths such as /login/ott/v2) or the signup page.
  */
 object ClassicLoginButton {
 
     const val CONTENT = """
         (function(){
             if (window.__classicLoginButton) return;
-            // Only the login form itself. The pill's own ?allow_password=1
-            // reload stays on /login, but OTP/signup/other accounts pages
-            // must never grow a classic-login button.
-            if (location.pathname !== '/login') return;
+            // Only the login form itself. accounts.spotify.com redirects
+            // /login to a locale path like /en/login or /id/login, so both
+            // shapes are allowed. The OTP pages live UNDER /login/ (e.g.
+            // /login/ott/v2) and signup is /signup — those must never grow
+            // a classic-login button, and they don't match this pattern.
+            if (!/^\/(?:[a-z]{2}(?:-[A-Za-z]{2})?\/)?login\/?$/.test(location.pathname)) return;
             window.__classicLoginButton = true;
 
             function install(){
