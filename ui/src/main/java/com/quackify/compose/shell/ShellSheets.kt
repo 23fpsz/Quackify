@@ -58,6 +58,7 @@ internal fun ShellSheets(
     albumTitle: String,
     albumArtist: String,
     albumCoverUrl: String?,
+    albumUri: String = "",
     artistName: String,
     artistAvatarUrl: String?,
     artistUri: String = "",
@@ -182,7 +183,8 @@ internal fun ShellSheets(
         coverUrl = albumCoverUrl,
         isOpen = flags.albumOptions,
         onDismiss = onDismissAlbumOptions,
-        onGoToArtist = onGoToArtist
+        onGoToArtist = onGoToArtist,
+        onShare = { albumUri.takeIf { it.startsWith("spotify:album:") }?.let(onShare) }
     )
 
     ArtistOptionsSheet(
