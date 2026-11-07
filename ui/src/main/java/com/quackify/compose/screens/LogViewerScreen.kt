@@ -128,16 +128,19 @@ fun LogViewerScreen(
                     (entry.error?.contains(needle, ignoreCase = true) == true))
         }
     }
-    // reverseLayout renders index 0 at the bottom, so feeding the list
-    // newest-first puts the oldest line at the top and lets fresh lines grow
-    // downward — the top-to-bottom reading order the viewer promises.
-    val newestFirst = remember(entries) { entries.asReversed() }
+    // entries is already oldest-first, so a plain top-anchored list reads the
+    // way the viewer promises: oldest at the top, fresh lines growing
+    // downward. No reverseLayout — that would pin short content to the
+    // bottom of the screen with a blank area above it.
 
     // While Auto-scroll is on, keep the newest line pinned to the bottom as
     // fresh entries stream in. Turn it off to browse older lines undisturbed.
+    // scrollToItem clamps at the end of the content, so the tail lands at the
+    // bottom of the viewport (and lists shorter than the screen do not
+    // scroll at all — they just sit anchored at the top).
     LaunchedEffect(revision, autoScroll) {
         if (autoScroll && entries.isNotEmpty()) {
-            listState.scrollToItem(0)
+            listState.scrollToItem(entries.size + 1)
         }
     }
 
@@ -328,22 +331,22 @@ fun LogViewerScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(vertical = 4.dp),
-                contentPadding = PaddingValues(bottom = bottomPadding),
-                reverseLayout = true
+                contentPadding = PaddingValues(bottom = bottomPadding)
             ) {
-                // Index 0 renders at the bottom of the screen.
-                item(key = "newest") {
-                    LogEdgeMarker(text = "newest of ${entries.size}")
+                // Top of the screen: the oldest end of the ring buffer.
+                item(key = "oldest") {
+                    LogEdgeMarker(text = "oldest of ${entries.size}")
                 }
-                items(newestFirst, key = { it.seq }, contentType = { "log" }) { entry ->
+                items(entries, key = { it.seq }, contentType = { "log" }) { entry ->
                     LogRow(
                         entry = entry,
                         onClick = { selected = entry },
                         onLongClick = { copy(Logs.format(entry), "Line copied") }
                     )
                 }
-                item(key = "oldest") {
-                    LogEdgeMarker(text = "oldest of ${entries.size}")
+                // Bottom of the screen: where fresh lines land.
+                item(key = "newest") {
+                    LogEdgeMarker(text = "newest of ${entries.size}")
                 }
             }
         }

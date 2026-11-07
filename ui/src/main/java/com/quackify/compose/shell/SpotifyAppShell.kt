@@ -1437,6 +1437,7 @@ fun SpotifyAppShell(
             albumTitle = activeAlbumTitle,
             albumArtist = activeAlbumArtist,
             albumCoverUrl = activeAlbumCoverUrl,
+            albumUri = activeAlbumUri.ifBlank { albumDetail?.uri.orEmpty() },
             artistName = activeArtistName,
             artistAvatarUrl = activeArtistAvatarUrl,
             artistUri = activeArtistUri,
