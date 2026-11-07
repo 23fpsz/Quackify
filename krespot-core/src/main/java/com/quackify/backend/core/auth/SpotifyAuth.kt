@@ -2,8 +2,8 @@ package com.quackify.backend.core.auth
 
 import android.content.Context
 import android.util.Base64
-import android.webkit.CookieManager
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.webview.cookieManagerOrNull
 import com.quackify.backend.core.net.Net
 import com.quackify.backend.core.net.Pathfinder
 import com.quackify.backend.core.net.plainText
@@ -137,9 +137,13 @@ object SpotifyAuth {
             .remove(KEY_CLIENT_TOKEN_EXP)
             .apply()
         resolvedUserId = ""
-        val manager = CookieManager.getInstance()
-        manager.removeAllCookies(null)
-        manager.flush()
+        val manager = cookieManagerOrNull()
+        if (manager != null) {
+            manager.removeAllCookies(null)
+            manager.flush()
+        } else {
+            log.w("switchAccount: cookie jar unavailable, the old cookies stay put")
+        }
         applySession(context)
         log.i("switchAccount: now on '$id' ($name)")
         return true
@@ -176,7 +180,11 @@ object SpotifyAuth {
      * for credentials. The secure session itself is untouched.
      */
     fun beginAddAccount(context: Context) {
-        val manager = CookieManager.getInstance()
+        val manager = cookieManagerOrNull()
+        if (manager == null) {
+            log.w("beginAddAccount: cookie jar unavailable, cannot clear cookies")
+            return
+        }
         manager.removeAllCookies(null)
         manager.flush()
         log.i("beginAddAccount: cookie jar cleared for a fresh login")
@@ -310,7 +318,10 @@ object SpotifyAuth {
     }
 
     fun cookieSummary(context: Context): String {
-        val manager = CookieManager.getInstance()
+        val manager = cookieManagerOrNull()
+            ?: return COOKIE_DOMAINS.joinToString(" ") {
+                "${it.removePrefix("https://")}=unavailable"
+            }
         return COOKIE_DOMAINS.joinToString(" ") { domain ->
             val cookies = manager.getCookie(domain)
             val host = domain.removePrefix("https://")
@@ -428,7 +439,7 @@ object SpotifyAuth {
     fun savedAt(context: Context): Long = SecurePrefs.get(context).getLong(KEY_SAVED_AT, 0L)
 
     fun captureCookies(context: Context): String? {
-        val manager = CookieManager.getInstance()
+        val manager = cookieManagerOrNull() ?: return null
         val map = JSONObject()
         var hasSpDc = false
         COOKIE_DOMAINS.forEach { domain ->
@@ -460,9 +471,13 @@ object SpotifyAuth {
         applySession(context)
     }
 
-    fun applySession(context: Context) {        val session = SecurePrefs.get(context).getString(KEY_SESSION, null) ?: return
+    fun applySession(context: Context) {
+        val session = SecurePrefs.get(context).getString(KEY_SESSION, null) ?: return
         val map = runCatching { JSONObject(session) }.getOrNull() ?: return
-        val manager = CookieManager.getInstance()
+        val manager = cookieManagerOrNull() ?: run {
+            log.w("applySession skipped, the cookie jar is unavailable")
+            return
+        }
         manager.setAcceptCookie(true)
         map.keys().asSequence().forEach { domain ->
             map.optString(domain, "").split(";")
@@ -499,14 +514,18 @@ object SpotifyAuth {
             .remove(KEY_MULTI_ACTIVE)
             .apply()
         resolvedUserId = ""
-        val manager = CookieManager.getInstance()
-        manager.removeAllCookies(null)
-        manager.flush()
+        val manager = cookieManagerOrNull()
+        if (manager != null) {
+            manager.removeAllCookies(null)
+            manager.flush()
+        } else {
+            log.w("logout: cookie jar unavailable, the cookies stay put")
+        }
     }
 
     suspend fun fetchToken(context: Context, spDc: String): String? {
         WebToken.mint(context, spDc)?.let { return it }
-        val jar = CookieManager.getInstance().getCookie("https://open.spotify.com")
+        val jar = cookieManagerOrNull()?.getCookie("https://open.spotify.com")
         val cookieHeader = jar?.takeIf { it.isNotBlank() } ?: "sp_dc=$spDc"
         log.i("fetchToken jar=${!jar.isNullOrBlank()} cookies=${cookieHeader.length}B")
         val response = Net.get(
