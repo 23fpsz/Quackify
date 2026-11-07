@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.quackify.compose.R
+import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.SpotifyArtworkImage
@@ -260,18 +261,7 @@ private fun QueueTrackRow(
             Spacer(modifier = Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (track.isExplicit) {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(EncoreColors.TextSecondary)
-                            .padding(horizontal = 3.dp, vertical = 1.dp)
-                    ) {
-                        Text(
-                            text = "E",
-                            style = SpotifyTheme.typography.tagLabel.copy(color = EncoreColors.PureBlack)
-                        )
-                    }
+                    EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
                 }
                 Text(
                     text = track.artist,

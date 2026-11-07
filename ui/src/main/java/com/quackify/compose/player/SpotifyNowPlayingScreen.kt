@@ -89,6 +89,7 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.CanvasVideoPlayer
 import com.quackify.compose.components.EncoreHeartButton
+import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreRepeatButton
@@ -1128,23 +1129,12 @@ private fun NowPlayingTrackInfoRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isExplicit) {
                     // ContentRestrictionBadgeView from track_info_nowplaying_view.xml: 16dp x 16dp, 3dp radius, marginEnd 8dp
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(16.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(EncoreColors.TextSecondary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "E",
-                            style = SpotifyTheme.typography.marginal.copy(
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EncoreColors.PureBlack
-                            )
-                        )
-                    }
+                    EncoreExplicitTag(
+                        modifier = Modifier.padding(end = 8.dp),
+                        size = 16.dp,
+                        cornerRadius = 3.dp,
+                        fontSize = 10.sp
+                    )
                 }
                 Text(
                     text = artist,
