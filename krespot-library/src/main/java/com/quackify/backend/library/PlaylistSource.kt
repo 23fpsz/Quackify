@@ -24,6 +24,12 @@ object PlaylistSource {
 
     private const val APP_VERSION = "9.1.92.3058"
 
+    /** How long a fetched song count stays fresh; a sheet reopen inside it never re-reads. */
+    private const val COUNT_TTL_MS = 5 * 60_000L
+
+    /** uri -> (fetched at, count); -1 counts are not cached. */
+    private val countCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Int>>()
+
     private suspend fun headers(context: Context): Map<String, String> = buildMap {
         put("Authorization", "Bearer ${SpotifyAuth.token(context)}")
         put("Accept", "application/json")
@@ -135,6 +141,53 @@ object PlaylistSource {
         return out
     }
 
+    /**
+     * How many tracks a collection holds, for the add-to-playlist sheet's rows.
+     * A playlist reads the playlist/v2 length decoration in one small GET; the
+     * pinned Liked Songs pseudo playlist has no playlist/v2 entry, so its count
+     * comes from the library page's PseudoPlaylist node (a cached read when the
+     * library was already listed). Answers sit in [countCache] for [COUNT_TTL_MS]
+     * so paging in and out of folders never re-reads a playlist twice.
+     */
+    suspend fun trackCount(context: Context, uri: String): Int {
+        if (uri == PlaylistChoice.LIKED_SONGS_URI) return likedCount(context)
+        val playlist = id(uri)
+        if (playlist.isBlank()) return -1
+        countCache[uri]?.let { (at, count) ->
+            if (System.currentTimeMillis() - at < COUNT_TTL_MS) {
+                log.i("trackCount $uri -> $count (cached)")
+                return count
+            }
+        }
+        val response = Net.get(
+            "$BASE/playlist/$playlist?decorate=revision,length",
+            headers(context),
+            "playlist/length",
+        ) ?: return -1
+        val json = response.json()
+        // length sits at the top of the playlist/v2 answer next to revision.
+        val count = json?.optInt("length", -1) ?: -1
+        log.i("trackCount $uri -> $count http=${response.code}")
+        if (count >= 0) countCache[uri] = System.currentTimeMillis() to count
+        return count
+    }
+
+    private suspend fun likedCount(context: Context): Int {
+        val page = LibraryPageSource.page(context) ?: return -1
+        val count = page.items
+            .firstOrNull { it.uri == PlaylistChoice.LIKED_SONGS_URI && it.count > 0 }
+            ?.count ?: -1
+        log.i("trackCount liked songs -> $count of ${page.items.size} library row(s)")
+        return count
+    }
+
+    /** Keeps a cached count honest after a write the app itself performed. */
+    private fun bumpCount(playlistUri: String, delta: Int) {
+        countCache[playlistUri]?.let { (at, count) ->
+            countCache[playlistUri] = at to (count + delta).coerceAtLeast(0)
+        }
+    }
+
     suspend fun defaultName(context: Context): String {
         // Only real playlists number the default name; folders and the liked
         // songs entry ride along in the answer but never create one.
@@ -235,6 +288,7 @@ object PlaylistSource {
         log.i("removeTrack $trackUri from $playlistUri ok=$ok http=${response?.code ?: -1} " +
                 response?.body?.take(160).orEmpty()
         )
+        if (ok) bumpCount(playlistUri, -1)
         return ok
     }
 
@@ -460,7 +514,10 @@ object PlaylistSource {
         log.i("addTrack $trackUri -> $playlistUri ok=$ok errors=$errors " +
                 "keys=${data?.keys()?.asSequence()?.toList()}"
         )
-        if (ok) LibraryPageSource.invalidate()
+        if (ok) {
+            LibraryPageSource.invalidate()
+            bumpCount(playlistUri, +1)
+        }
         return ok
     }
 }
