@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.quackify.compose.R
+import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
@@ -777,23 +778,10 @@ private fun AlbumTrackRow(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (track.isExplicit) {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 6.dp)
-                            .size(width = 14.dp, height = 14.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(EncoreColors.TextSecondary.copy(alpha = 0.6f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "E",
-                            style = SpotifyTheme.typography.tagLabel.copy(
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Black
-                            )
-                        )
-                    }
+                    EncoreExplicitTag(
+                        modifier = Modifier.padding(end = 6.dp),
+                        background = EncoreColors.TextSecondary.copy(alpha = 0.6f)
+                    )
                 }
 
                 Text(

@@ -87,7 +87,12 @@ fun List<HomeSection>.toShelves(): List<HomeShelf> {
             cards = if (artistsOnly) emptyList() else cards,
             artists = if (artistsOnly) {
                 section.items.map { item ->
-                    ArtistCardItem(name = item.title, color = colorOf(item), uri = item.uri)
+                    ArtistCardItem(
+                        name = item.title,
+                        color = colorOf(item),
+                        uri = item.uri,
+                        imageUrl = item.imageUrl.takeIf { it.isNotBlank() },
+                    )
                 }
             } else {
                 emptyList()
@@ -122,11 +127,16 @@ fun TrackRow.toTrackItem(): TrackItem = TrackItem(
     hasVideo = video,
 )
 
-fun ShelfItem.toArtistRelease(): ArtistRelease = ArtistRelease(
-    title = title,
-    year = subtitle.substringBefore(" \u2022 ").trim(),
-    type = subtitle.substringAfter(" \u2022 ", "Album").trim(),
-    color = parseHexColor(colorHex) ?: Color(0xFF333333),
-    imageUrl = imageUrl.takeIf { it.isNotBlank() },
-    uri = uri
-)
+fun ShelfItem.toArtistRelease(): ArtistRelease {
+    // The release parser title-cases the raw type ("album" -> "Album"), which
+    // mangles "ep" into "Ep" — the shelf line should read "EP" like Spotify.
+    val rawType = subtitle.substringAfter(" \u2022 ", "Album").trim()
+    return ArtistRelease(
+        title = title,
+        year = subtitle.substringBefore(" \u2022 ").trim(),
+        type = if (rawType.equals("Ep", ignoreCase = true)) "EP" else rawType,
+        color = parseHexColor(colorHex) ?: Color(0xFF333333),
+        imageUrl = imageUrl.takeIf { it.isNotBlank() },
+        uri = uri
+    )
+}

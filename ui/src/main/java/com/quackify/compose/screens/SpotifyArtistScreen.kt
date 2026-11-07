@@ -57,11 +57,13 @@ import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
+import com.quackify.backend.model.CityStat
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.ShimmerBlock
 import com.quackify.compose.components.ShimmerHost
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
+import com.quackify.compose.format.formatCount
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
@@ -92,8 +94,8 @@ data class PopularTrack(
  * - Continuous gliding play button docking into the top bar (ComposePlayButtonBehavior)
  * - Pinned overlay top bar (transparent at rest, solid heroColor when scrolled)
  * - Top 5 Popular tracks with track numbers, equalizer, stream count, and 3-dots
- * - Popular Releases carousel (Albums & Singles)
- * - "About the artist" biography card
+ * - Popular Releases carousel plus dedicated Albums and Singles & EPs carousels
+ * - "Gallery" photo strip and "About the artist" biography card
  */
 @Composable
 fun SpotifyArtistScreen(
@@ -102,6 +104,10 @@ fun SpotifyArtistScreen(
     heroColor: Color = Color(0xFF7A1C28),
     popularTracks: List<PopularTrack>,
     releases: List<ArtistRelease>,
+    /** The overview's dedicated albums group; falls back to splitting [releases]. */
+    albums: List<ArtistRelease> = emptyList(),
+    /** The overview's singles group (EPs included); falls back to splitting [releases]. */
+    singles: List<ArtistRelease> = emptyList(),
     currentTrackTitle: String,
     isPlaying: Boolean,
     onBackClick: () -> Unit,
@@ -116,13 +122,30 @@ fun SpotifyArtistScreen(
     headerImageUrl: String? = null,
     biography: String = "",
     verified: Boolean = false,
-    isLoading: Boolean = false
+    followers: Long = 0L,
+    worldRank: Int = 0,
+    topCities: List<CityStat> = emptyList(),
+    gallery: List<String> = emptyList(),
+    isLoading: Boolean = false,
+    /** The artist's real follow state from the library; the pill only flips
+     *  once addToLibrary/removeFromLibrary has answered. */
+    isFollowing: Boolean = false,
+    onFollowToggle: (Boolean) -> Unit = {}
 ) {
     val density = LocalDensity.current
-    var isFollowing by remember { mutableStateOf(false) }
     var isShuffle by remember { mutableStateOf(false) }
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
+
+    // Discography sections: prefer the overview's dedicated groups; when it
+    // came back thin, split the popular-releases rows by their own type tags
+    // so the sections appear whenever the artist actually has any.
+    val albumSection = albums.ifEmpty {
+        releases.filter { it.type.equals("Album", ignoreCase = true) }
+    }
+    val singleSection = singles.ifEmpty {
+        releases.filter { it.type.equals("Single", ignoreCase = true) || it.type.equals("EP", ignoreCase = true) }
+    }
 
     var actionRowYInRoot by remember { mutableStateOf(Float.MAX_VALUE) }
     var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
@@ -356,7 +379,7 @@ fun SpotifyArtistScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(EncoreCornerRadii.FollowPill))
                                 .border(1.dp, followBorderColor, RoundedCornerShape(EncoreCornerRadii.FollowPill))
-                                .clickable { isFollowing = !isFollowing }
+                                .clickable { onFollowToggle(!isFollowing) }
                                 .padding(horizontal = 16.dp, vertical = 6.dp)
                         ) {
                             Text(
@@ -546,57 +569,44 @@ fun SpotifyArtistScreen(
             }
 
             // Popular Releases Carousel
-            item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = EncoreSpacers.Base),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(releases) { release ->
-                        Column(
-                            modifier = Modifier
-                                .width(140.dp)
-                                .clickable { onReleaseClick(release) }
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(140.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(release.color),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (release.imageUrl != null) {
-                                    SpotifyArtworkImage(
-                                        imageUrl = release.imageUrl,
-                                        contentDescription = release.title,
-                                        modifier = Modifier.fillMaxSize(),
-                                        cornerRadius = 4.dp
-                                    )
-                                } else {
-                                    Text("♫", color = Color.White, fontSize = 36.sp)
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = release.title,
-                                style = SpotifyTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "${release.type} • ${release.year}",
-                                style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
-                            )
-                        }
-                    }
+            item { ArtistReleaseCarousel(releases, onReleaseClick) }
+
+            // "Albums": the overview's dedicated albums group (the whole list,
+            // not only the popular picks).
+            if (albumSection.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Albums",
+                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                        modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
+                    )
                 }
+                item { ArtistReleaseCarousel(albumSection, onReleaseClick) }
+            }
+
+            // "Singles & EPs": the overview's singles group (Spotify files EPs
+            // under it), with the same type-split fallback.
+            if (singleSection.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Singles & EPs",
+                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                        modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
+                    )
+                }
+                item { ArtistReleaseCarousel(singleSection, onReleaseClick) }
             }
 
             // About Section (Bio Card)
-            if (monthlyListeners.isNotBlank() || !biography.isNullOrBlank()) {
+            val aboutStatLine = listOfNotNull(
+                followers.takeIf { it > 0L }?.let { formatCount(it) + " followers" },
+                worldRank.takeIf { it > 0 }?.let { "#$it in the world" },
+            ).joinToString(" • ")
+            if (monthlyListeners.isNotBlank() || biography.isNotBlank() ||
+                aboutStatLine.isNotBlank() || topCities.isNotEmpty()
+            ) {
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
@@ -612,32 +622,98 @@ fun SpotifyArtistScreen(
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF242424))
                             .clickable { onAboutClick() }
-                            .padding(16.dp)
                     ) {
                         Column {
-                            if (monthlyListeners.isNotBlank()) {
-                                Text(
-                                    text = "$monthlyListeners monthly listeners",
-                                    style = SpotifyTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
+                            // Photo banner like Spotify's About card; the card clip
+                            // rounds the top corners for free.
+                            gallery.firstOrNull()?.let { photo ->
+                                SpotifyArtworkImage(
+                                    imageUrl = photo,
+                                    contentDescription = artistName,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(132.dp),
+                                    cornerRadius = 0.dp
                                 )
                             }
-                            if (biography.isNotBlank()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 if (monthlyListeners.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "$monthlyListeners monthly listeners",
+                                        style = SpotifyTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    )
                                 }
-                                Text(
-                                    text = biography,
-                                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                if (aboutStatLine.isNotBlank()) {
+                                    if (monthlyListeners.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                    }
+                                    Text(
+                                        text = aboutStatLine,
+                                        style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                                    )
+                                }
+                                if (topCities.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Popular in " + topCities.take(3).joinToString(", ") { it.city },
+                                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (biography.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = biography,
+                                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+
+            // "Gallery": the artist's photo strip, whenever the overview brought
+            // any (the About card only ever shows its first photo; the About
+            // sheet keeps the full grid).
+            if (gallery.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Gallery",
+                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                        modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
+                    )
+                }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = EncoreSpacers.Base),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(gallery.take(10)) { photo ->
+                            Box(
+                                modifier = Modifier
+                                    .width(232.dp)
+                                    .height(174.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF242424))
+                            ) {
+                                SpotifyArtworkImage(
+                                    imageUrl = photo,
+                                    contentDescription = "$artistName photo",
+                                    modifier = Modifier.fillMaxSize(),
+                                    cornerRadius = 8.dp
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -746,6 +822,68 @@ fun SpotifyArtistScreen(
                     showShuffleBadge = false
                 )
             }
+        }
+    }
+}
+
+/** One release tile: 140dp cover, bold title, "Type • Year" line. */
+@Composable
+private fun ArtistReleaseCard(
+    release: ArtistRelease,
+    onReleaseClick: (ArtistRelease) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable { onReleaseClick(release) }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(release.color),
+            contentAlignment = Alignment.Center
+        ) {
+            if (release.imageUrl != null) {
+                SpotifyArtworkImage(
+                    imageUrl = release.imageUrl,
+                    contentDescription = release.title,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 4.dp
+                )
+            } else {
+                Text("♫", color = Color.White, fontSize = 36.sp)
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = release.title,
+            style = SpotifyTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = "${release.type} • ${release.year}",
+            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+        )
+    }
+}
+
+@Composable
+private fun ArtistReleaseCarousel(
+    releases: List<ArtistRelease>,
+    onReleaseClick: (ArtistRelease) -> Unit
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = EncoreSpacers.Base),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(releases) { release ->
+            ArtistReleaseCard(release, onReleaseClick)
         }
     }
 }

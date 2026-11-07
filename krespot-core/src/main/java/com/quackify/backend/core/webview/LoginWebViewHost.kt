@@ -3,6 +3,7 @@ package com.quackify.backend.core.webview
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
 import android.net.http.SslError
 import android.os.SystemClock
 import android.view.View
@@ -40,6 +41,8 @@ private const val SPOTIFY_ORIGIN = "https://open.spotify.com"
 private const val ACCOUNTS_ORIGIN = "https://accounts.spotify.com"
 private const val GOOGLE_ORIGIN = "https://accounts.google.com"
 
+private val LOGIN_PATH = Regex("^/(?:[a-zA-Z0-9]{2,8}(?:-[a-zA-Z0-9]{2,8})?/)?login/?$")
+
 class LoginWebViewHost(val context: Context, private val startUrl: String = LOGIN_URL) {
 
     val container: FrameLayout = FrameLayout(context)
@@ -51,9 +54,72 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     @Volatile
     var onPlayerReached: (() -> Unit)? = null
 
+    /** Fired on every navigation with whether system back has an earlier
+     * page to walk to now (see [goBack]). */
+    @Volatile
+    var onBackAvailableChanged: ((Boolean) -> Unit)? = null
+
     private fun notifyPlayerReached(url: String?) {
         if (url == null || !url.startsWith(SPOTIFY_ORIGIN)) return
         onPlayerReached?.invoke()
+    }
+
+    private fun isLoginPageUrl(url: String): Boolean {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
+        if (uri.host?.lowercase() != "accounts.spotify.com") return false
+        val path = uri.path ?: return false
+        return LOGIN_PATH.matches(path)
+    }
+
+    private fun notifyBackAvailable() {
+        onBackAvailableChanged?.invoke(goBackAvailable())
+    }
+
+    /** The top-most popup (SSO window) when one is open, else null. */
+    private fun topPopup(): WebView? {
+        for (index in (0 until container.childCount).reversed()) {
+            val child = container.getChildAt(index)
+            if (child is WebView && child !== webView) return child
+        }
+        return null
+    }
+
+    private fun closePopup(popup: WebView) {
+        log.i("back closed popup")
+        container.removeView(popup)
+        runCatching { popup.destroy() }
+    }
+
+    /** Whether system back would do anything inside the login webview. */
+    fun goBackAvailable(): Boolean = topPopup() != null || webView.canGoBack()
+
+    /**
+     * System back for the login flow. A wrong turn (say, logging in with the
+     * wrong Google account) walks the top-most webview — an SSO popup when
+     * one is open — back through its history, closing the popup once its own
+     * history runs out; the main webview goes back one page otherwise.
+     *
+     * Returns false when there is no earlier page left, so the caller can
+     * fall back to its own back behavior (leave the login, exit the app).
+     */
+    fun goBack(): Boolean {
+        val popup = topPopup()
+        if (popup != null) {
+            if (popup.canGoBack()) {
+                log.i("back inside popup ${popup.url}")
+                popup.goBack()
+            } else {
+                closePopup(popup)
+            }
+            notifyBackAvailable()
+            return true
+        }
+        if (webView.canGoBack()) {
+            log.i("back to ${webView.url}")
+            webView.goBack()
+            return true
+        }
+        return false
     }
 
     private val bridge = object {
@@ -93,13 +159,25 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 log.i("onPageFinished $url progress=${view?.progress}")
+                view?.evaluateJavascript(
+                    """
+                    document.querySelectorAll('a.fuckd').forEach(el => el.remove());
+                    """.trimIndent(),
+                    null
+                )
                 notifyPlayerReached(url)
+                notifyBackAvailable()
+                if (url != null && isLoginPageUrl(url)) {
+                    log.d("classic login pill fallback injected")
+                    view?.evaluateJavascript(ClassicLoginButton.CONTENT, null)
+                }
             }
 
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
                 log.d("history $url reload=$isReload")
                 notifyPlayerReached(url)
+                notifyBackAvailable()
             }
 
             override fun onReceivedError(
@@ -159,6 +237,11 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                     override fun onPageFinished(v: WebView?, url: String?) {
                         super.onPageFinished(v, url)
                         log.i("popup.onPageFinished $url")
+                    }
+
+                    override fun doUpdateVisitedHistory(v: WebView?, url: String?, isReload: Boolean) {
+                        super.doUpdateVisitedHistory(v, url, isReload)
+                        notifyBackAvailable()
                     }
                 }
                 child.webChromeClient = object : WebChromeClient() {
@@ -440,8 +523,10 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
         @SuppressLint("SetJavaScriptEnabled")
         private fun buildWebView(context: Context, parent: ViewGroup): WebView {
             val view = WebView(context)
-            CookieManager.getInstance().setAcceptCookie(true)
-            CookieManager.getInstance().setAcceptThirdPartyCookies(view, true)
+            cookieManagerOrNull()?.let { manager ->
+                manager.setAcceptCookie(true)
+                manager.setAcceptThirdPartyCookies(view, true)
+            }
             view.settings.apply {
                 userAgentString = SpotifyAuth.DESKTOP_UA
                 javaScriptEnabled = true

@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -79,6 +81,7 @@ import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
 import androidx.compose.runtime.mutableStateListOf
 import com.quackify.backend.model.ConnectDevice
+import com.quackify.backend.api.Collection2
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.collectionDuration
 import com.quackify.backend.model.collectionDurationIsEstimate
@@ -178,7 +181,7 @@ internal data class ShellInputs(
     val suggestions: List<SearchHit>,
     val recent: List<SearchHit>,
     val onClearRecent: () -> Unit,
-    val onToggleSaved: (String) -> Unit,
+    val onToggleSaved: (String, Boolean) -> Unit,
     val onLoadSection: suspend (SearchKind, Int) -> List<SearchHit>,
     val searchLoading: Boolean,
     val playlistTracks: List<TrackItem>?,
@@ -254,6 +257,60 @@ private data class AlbumInfo(
 )
 
 /**
+ * The shell's sheet/dialog visibility flags. One remember slot for all of
+ * them (see SpotifyAppShell); every field stays an individual snapshot state
+ * so each sheet still recomposes on its own.
+ */
+private class ShellUiFlags {
+    var isProfileDrawerOpen by mutableStateOf(false)
+    var isAccountsSheetOpen by mutableStateOf(false)
+    var isTrackOptionsOpen by mutableStateOf(false)
+    var isPlaylistOptionsOpen by mutableStateOf(false)
+    var isPlaylistEditMode by mutableStateOf(false)
+    var isAlbumOptionsOpen by mutableStateOf(false)
+    var isArtistOptionsOpen by mutableStateOf(false)
+    var isSortSheetOpen by mutableStateOf(false)
+    var isCreateSheetOpen by mutableStateOf(false)
+    var isDeviceSheetOpen by mutableStateOf(false)
+    var isQueueSheetOpen by mutableStateOf(false)
+    var isSleepTimerOpen by mutableStateOf(false)
+    var isArtistAboutOpen by mutableStateOf(false)
+    var isDiscographyOpen by mutableStateOf(false)
+    var isCreditsOpen by mutableStateOf(false)
+    var isAddToPlaylistOpen by mutableStateOf(false)
+    var isRenamePlaylistDialogOpen by mutableStateOf(false)
+    var isCreatePlaylistOpen by mutableStateOf(false)
+}
+
+/**
+ * The title/uri/cover/color of whatever entity the shell currently has open
+ * (playlist, album, artist, category, show, episode, folder). One remember
+ * slot instead of nineteen (see SpotifyAppShell).
+ */
+private class ShellActiveEntity {
+    var playlistTitle by mutableStateOf("")
+    var playlistUri by mutableStateOf("")
+    var playlistCoverUrl by mutableStateOf<String?>(null)
+    var albumCoverUrl by mutableStateOf<String?>(null)
+    var albumUri by mutableStateOf("")
+    var albumTitle by mutableStateOf("")
+    var albumArtist by mutableStateOf("")
+    var albumYear by mutableStateOf("")
+    var albumReleaseDate by mutableStateOf("")
+    var albumColor by mutableStateOf(EncoreColors.Card)
+    var artistName by mutableStateOf("")
+    var artistUri by mutableStateOf("")
+    var artistAvatarUrl by mutableStateOf<String?>(null)
+    var categoryTitle by mutableStateOf("")
+    var categoryColor by mutableStateOf(Color(0xFF148A08))
+    var showUri by mutableStateOf("")
+    var episodeUri by mutableStateOf("")
+    var folderUri by mutableStateOf("")
+    var folderTitle by mutableStateOf("")
+}
+
+
+/**
  * Spotify App Shell containing:
  * - 3-tab Bottom Navigation (Home, Search, Your Library)
  * - Persistent floating Mini-Player
@@ -293,7 +350,8 @@ fun SpotifyAppShell(
     onClearRecentSearches: (() -> Unit)? = null,
     onRemoveRecentSearch: ((String) -> Unit)? = null,
     onLoadSearchSection: (suspend (SearchKind, Int) -> List<SearchHit>)? = null,
-    onToggleSaved: ((String) -> Unit)? = null,
+    onToggleSaved: ((uri: String, currentlySaved: Boolean) -> Unit)? = null,
+    searchSavedOverrides: Map<String, Boolean> = emptyMap(),
     homeLoading: Boolean = false,
     onLogout: (() -> Unit)? = null,
     settingsSwitches: SettingsSwitches = SettingsSwitches(),
@@ -365,6 +423,8 @@ fun SpotifyAppShell(
     onAddToPlaylist: ((TrackItem) -> Unit)? = null,
     onPickPlaylist: ((PlaylistChoice, TrackItem) -> Unit)? = null,
     onCreatePlaylistWith: ((TrackItem) -> Unit)? = null,
+    onLoadPlaylistFolder: (suspend (trackUri: String, folderUri: String) -> List<PlaylistChoice>)? = null,
+    onLoadTrackCount: (suspend (playlistUri: String) -> Int)? = null,
     onPlaylistDefaultName: (suspend () -> String)? = null,
     onCreatePlaylist: (suspend (name: String, description: String, cover: ByteArray?) -> String?)? = null,
     playlistSaved: Boolean? = null,
@@ -385,6 +445,11 @@ fun SpotifyAppShell(
     artistTracks: List<PopularTrack>? = null,
     artistReleases: List<ArtistRelease>? = null,
     artistMonthlyListeners: String? = null,
+    /** null while the library contains-check for the open artist is loading. */
+    artistFollowed: Boolean? = null,
+    onArtistFollowToggle: ((artistUri: String, follow: Boolean) -> Unit)? = null,
+    /** Resolves the artist's radio playlist uri (null when it cannot be built). */
+    onArtistRadio: (suspend (artistUri: String) -> String?)? = null,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = ""
 ) {
@@ -392,82 +457,83 @@ fun SpotifyAppShell(
     var selectedNavIndex by remember { mutableIntStateOf(0) }
     var isPlayerExpanded by remember { mutableStateOf(false) }
 
+    // Every sheet/dialog flag and active-entity field of the shell lives in one
+    // remembered holder each: SpotifyAppShell sat over ART's JIT method-size
+    // limit (UINT16_MAX/4 = 16383 code units), stayed interpreted forever and
+    // the canvas video stuttered behind it. Collapsing the per-state remember
+    // slots is what brought the method back under the limit; each field is
+    // still its own snapshot state, so recomposition granularity is unchanged.
+    val flags = remember { ShellUiFlags() }
+    val active = remember { ShellActiveEntity() }
+
     // A tap on the playback notification bumps this from the activity; the
     // full player slides up over whatever screen is showing, exactly like
     // tapping the mini bar does.
     LaunchedEffect(expandPlayerSignal) {
         if (expandPlayerSignal > 0) isPlayerExpanded = true
     }
-    var activePlaylistTitle by remember { mutableStateOf("") }
-    var activePlaylistUri by remember { mutableStateOf("") }
-    var activePlaylistCoverUrl by remember { mutableStateOf<String?>(null) }
-    var activeAlbumCoverUrl by remember { mutableStateOf<String?>(null) }
-    var activeArtistAvatarUrl by remember { mutableStateOf<String?>(null) }
-    var activeAlbumUri by remember { mutableStateOf("") }
-    var activeArtistUri by remember { mutableStateOf("") }
-    var activeCategoryTitle by remember { mutableStateOf("") }
-    var activeCategoryColor by remember { mutableStateOf(Color(0xFF148A08)) }
-    var activeShowUri by remember { mutableStateOf("") }
-    var activeEpisodeUri by remember { mutableStateOf("") }
-    var activeFolderUri by remember { mutableStateOf("") }
-    var activeFolderTitle by remember { mutableStateOf("") }
 
     // Bottom Sheet States
-    var isProfileDrawerOpen by remember { mutableStateOf(false) }
-    var isAccountsSheetOpen by remember { mutableStateOf(false) }
-    var isTrackOptionsOpen by remember { mutableStateOf(false) }
     var selectedTrackForOptions by remember { mutableStateOf<TrackItem?>(null) }
-    var isPlaylistOptionsOpen by remember { mutableStateOf(false) }
-    var isPlaylistEditMode by remember { mutableStateOf(false) }
-    var isAlbumOptionsOpen by remember { mutableStateOf(false) }
-    var isArtistOptionsOpen by remember { mutableStateOf(false) }
-    var isSortSheetOpen by remember { mutableStateOf(false) }
+
+    // Taste-profile exclusion for the track whose options sheet is open:
+    // null while the collection/v2 contains check is in flight (the row hides
+    // until it answers), cached per uri so reopening a sheet is instant.
+    var trackTasteExcluded by remember { mutableStateOf<Boolean?>(null) }
+    val tasteExclusionCache = remember { mutableMapOf<String, Boolean>() }
     var currentSortOption by remember { mutableStateOf(LibrarySortOption.RECENTS) }
-    var isCreateSheetOpen by remember { mutableStateOf(false) }
-    var isDeviceSheetOpen by remember { mutableStateOf(false) }
-    var isQueueSheetOpen by remember { mutableStateOf(false) }
-    var isSleepTimerOpen by remember { mutableStateOf(false) }
-    var isArtistAboutOpen by remember { mutableStateOf(false) }
-    var isDiscographyOpen by remember { mutableStateOf(false) }
-    var isCreditsOpen by remember { mutableStateOf(false) }
-    var isAddToPlaylistOpen by remember { mutableStateOf(false) }
+    // Where the queue that is playing was started from. The full NPV header
+    // follows this instead of the screen the user is on, so a search play keeps
+    // saying "Playing from search" after the user browses elsewhere.
+    var playbackOrigin by remember { mutableStateOf<PlaybackOrigin?>(null) }
     var libraryItemOptions by remember { mutableStateOf<EntityOptions?>(null) }
     var activeFolderOptionsItem by remember { mutableStateOf<LibraryItem?>(null) }
-    var isRenamePlaylistDialogOpen by remember { mutableStateOf(false) }
     var folderDraft by remember { mutableStateOf<FolderDraft?>(null) }
-    var isCreatePlaylistOpen by remember { mutableStateOf(false) }
     var playlistCreateName by remember { mutableStateOf("My Playlist") }
     var creditsTrack by remember { mutableStateOf<TrackItem?>(null) }
     var addTrackTarget by remember { mutableStateOf<TrackItem?>(null) }
     var activeSleepTimer by remember { mutableStateOf<SleepTimerOption?>(null) }
-    var activeArtistName by remember { mutableStateOf("") }
-    var activeAlbumTitle by remember { mutableStateOf("") }
-    var activeAlbumArtist by remember { mutableStateOf("") }
-    var activeAlbumYear by remember { mutableStateOf("") }
-    var activeAlbumReleaseDate by remember { mutableStateOf("") }
-    var activeAlbumColor by remember { mutableStateOf(EncoreColors.Card) }
 
     val shellScope = rememberCoroutineScope()
     val navBackStack = remember { mutableStateListOf<BackStackItem>() }
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
+    // Reads the taste-profile contains answer for the track whose options sheet
+    // just opened (both the track three-dot menus and the fullscreen NPV's
+    // three-dot land here), memoized per uri.
+    LaunchedEffect(flags.isTrackOptionsOpen, selectedTrackForOptions?.uri) {
+        val uri = selectedTrackForOptions?.uri.orEmpty()
+        if (!flags.isTrackOptionsOpen || !uri.startsWith("spotify:track:")) {
+            trackTasteExcluded = null
+            return@LaunchedEffect
+        }
+        trackTasteExcluded = tasteExclusionCache[uri]
+        if (trackTasteExcluded == null) {
+            val excluded = Collection2.excludedFromTasteProfile(context, uri)
+            if (uri == selectedTrackForOptions?.uri) {
+                tasteExclusionCache[uri] = excluded
+                trackTasteExcluded = excluded
+            }
+        }
+    }
+
     fun pushCurrentState() {
         navBackStack.add(
             BackStackItem(
                 screen = currentScreen,
-                categoryTitle = activeCategoryTitle,
-                playlistTitle = activePlaylistTitle,
-                playlistUri = activePlaylistUri,
-                playlistCoverUrl = activePlaylistCoverUrl,
-                albumTitle = activeAlbumTitle,
-                albumArtist = activeAlbumArtist,
-                albumUri = activeAlbumUri,
-                albumCoverUrl = activeAlbumCoverUrl,
-                artistName = activeArtistName,
-                artistUri = activeArtistUri,
-                artistAvatarUrl = activeArtistAvatarUrl,
-                showUri = activeShowUri
+                categoryTitle = active.categoryTitle,
+                playlistTitle = active.playlistTitle,
+                playlistUri = active.playlistUri,
+                playlistCoverUrl = active.playlistCoverUrl,
+                albumTitle = active.albumTitle,
+                albumArtist = active.albumArtist,
+                albumUri = active.albumUri,
+                albumCoverUrl = active.albumCoverUrl,
+                artistName = active.artistName,
+                artistUri = active.artistUri,
+                artistAvatarUrl = active.artistAvatarUrl,
+                showUri = active.showUri
             )
         )
     }
@@ -477,36 +543,36 @@ fun SpotifyAppShell(
             val previous = navBackStack.removeAt(navBackStack.lastIndex)
             currentScreen = previous.screen
             if (previous.categoryTitle.isNotEmpty()) {
-                activeCategoryTitle = previous.categoryTitle
-                activeCategoryColor = getCategoryColor(previous.categoryTitle)
+                active.categoryTitle = previous.categoryTitle
+                active.categoryColor = getCategoryColor(previous.categoryTitle)
             }
             if (previous.playlistTitle.isNotEmpty()) {
-                activePlaylistTitle = previous.playlistTitle
-                activePlaylistUri = previous.playlistUri
-                activePlaylistCoverUrl = previous.playlistCoverUrl
+                active.playlistTitle = previous.playlistTitle
+                active.playlistUri = previous.playlistUri
+                active.playlistCoverUrl = previous.playlistCoverUrl
                 if (previous.screen == ShellScreen.PLAYLIST && previous.playlistUri.isNotEmpty()) {
                     if (onLoadPlaylist != null) onLoadPlaylist?.invoke(previous.playlistUri) else playerListener?.onLoadPlaylist(previous.playlistUri)
                 }
             }
             if (previous.albumTitle.isNotEmpty()) {
-                activeAlbumTitle = previous.albumTitle
-                activeAlbumArtist = previous.albumArtist
-                activeAlbumUri = previous.albumUri
-                activeAlbumCoverUrl = previous.albumCoverUrl
+                active.albumTitle = previous.albumTitle
+                active.albumArtist = previous.albumArtist
+                active.albumUri = previous.albumUri
+                active.albumCoverUrl = previous.albumCoverUrl
                 if (previous.screen == ShellScreen.ALBUM && previous.albumUri.isNotEmpty()) {
                     if (onLoadAlbum != null) onLoadAlbum?.invoke(previous.albumUri, previous.albumTitle) else playerListener?.onLoadAlbum(previous.albumUri, previous.albumTitle, previous.albumArtist)
                 }
             }
             if (previous.artistName.isNotEmpty()) {
-                activeArtistName = previous.artistName
-                activeArtistUri = previous.artistUri
-                if (previous.artistAvatarUrl != null) activeArtistAvatarUrl = previous.artistAvatarUrl
+                active.artistName = previous.artistName
+                active.artistUri = previous.artistUri
+                if (previous.artistAvatarUrl != null) active.artistAvatarUrl = previous.artistAvatarUrl
                 if (previous.screen == ShellScreen.ARTIST && previous.artistUri.isNotEmpty()) {
                     if (onLoadArtist != null) onLoadArtist?.invoke(previous.artistUri, previous.artistName) else playerListener?.onLoadArtist(previous.artistUri, previous.artistName)
                 }
             }
             if (previous.showUri.isNotEmpty()) {
-                activeShowUri = previous.showUri
+                active.showUri = previous.showUri
                 if (previous.screen == ShellScreen.SHOW) {
                     onOpenShow?.invoke(previous.showUri)
                 }
@@ -577,15 +643,15 @@ fun SpotifyAppShell(
         ?: currentQueueRow?.artistUri.orEmpty()
 
     val openAlbum: (String, String, String) -> Unit = { title, artist, uri ->
-        activeAlbumTitle = title
-        activeAlbumArtist = artist
-        activeAlbumUri = uri
+        active.albumTitle = title
+        active.albumArtist = artist
+        active.albumUri = uri
         val foundEntity = libraryItems?.find { it.title.equals(title, ignoreCase = true) }
-        activeAlbumCoverUrl = foundEntity?.imageUrl
+        active.albumCoverUrl = foundEntity?.imageUrl
 
         val albumUriToLoad = uri.takeIf { it.startsWith("spotify:album:") }
             ?: foundEntity?.uri?.takeIf { it.startsWith("spotify:album:") }.orEmpty()
-        if (onLoadAlbum != null) onLoadAlbum?.invoke(albumUriToLoad, title) else playerListener?.onLoadAlbum(albumUriToLoad, title, activeAlbumArtist)
+        if (onLoadAlbum != null) onLoadAlbum?.invoke(albumUriToLoad, title) else playerListener?.onLoadAlbum(albumUriToLoad, title, active.albumArtist)
 
         pushCurrentState()
         currentScreen = ShellScreen.ALBUM
@@ -593,15 +659,15 @@ fun SpotifyAppShell(
 
     val openShow: (String) -> Unit = { uri ->
         pushCurrentState()
-        activeShowUri = uri
+        active.showUri = uri
         currentScreen = ShellScreen.SHOW
         onOpenShow?.invoke(uri)
     }
 
     val openPlaylist: (String, String) -> Unit = { title, uri ->
         pushCurrentState()
-        activePlaylistTitle = title
-        activePlaylistUri = uri
+        active.playlistTitle = title
+        active.playlistUri = uri
         currentScreen = ShellScreen.PLAYLIST
         if (uri.isNotEmpty()) {
             if (onLoadPlaylist != null) onLoadPlaylist?.invoke(uri) else playerListener?.onLoadPlaylist(uri)
@@ -610,12 +676,20 @@ fun SpotifyAppShell(
 
     val openEpisode: (String) -> Unit = { uri ->
         pushCurrentState()
-        activeEpisodeUri = uri
+        active.episodeUri = uri
         currentScreen = ShellScreen.EPISODE
         onOpenEpisode?.invoke(uri)
     }
 
     val handleTrackPlay: (TrackItem) -> Unit = { track ->
+        // Remember the context this play started from for the full NPV header.
+        playbackOrigin = when (currentScreen) {
+            ShellScreen.SEARCH -> PlaybackOrigin(ShellScreen.SEARCH, searchQuery.trim())
+            ShellScreen.PLAYLIST -> PlaybackOrigin(ShellScreen.PLAYLIST, active.playlistTitle)
+            ShellScreen.ALBUM -> PlaybackOrigin(ShellScreen.ALBUM, active.albumTitle)
+            ShellScreen.ARTIST -> PlaybackOrigin(ShellScreen.ARTIST, active.artistName)
+            else -> null
+        }
         if (playerListener != null) {
             if (track.uri.isNotEmpty()) {
                 val rows = when (currentScreen) {
@@ -625,9 +699,9 @@ fun SpotifyAppShell(
                     else -> emptyList()
                 }
                 val context = when (currentScreen) {
-                    ShellScreen.ARTIST -> activeArtistUri
-                    ShellScreen.PLAYLIST -> activePlaylistUri
-                    ShellScreen.ALBUM -> activeAlbumUri
+                    ShellScreen.ARTIST -> active.artistUri
+                    ShellScreen.PLAYLIST -> active.playlistUri
+                    ShellScreen.ALBUM -> active.albumUri
                     else -> ""
                 }
                 val index = rows.indexOfFirst { it == track.uri }
@@ -654,19 +728,19 @@ fun SpotifyAppShell(
 
     val handleTrackOptions: (TrackItem) -> Unit = { track ->
         selectedTrackForOptions = track
-        isTrackOptionsOpen = true
+        flags.isTrackOptionsOpen = true
     }
 
     val handlePodcastOpen: (String, String) -> Unit = { _, uri ->
         if (uri.isNotEmpty()) openShow(uri)
     }
 
-    val openProfileDrawer: () -> Unit = { isProfileDrawerOpen = true }
+    val openProfileDrawer: () -> Unit = { flags.isProfileDrawerOpen = true }
 
     val openArtist: (String, String) -> Unit = { artist, uri ->
-        activeArtistName = artist
-        activeArtistUri = uri
-        activeArtistAvatarUrl = libraryItems?.find { it.title.equals(artist, ignoreCase = true) }?.imageUrl
+        active.artistName = artist
+        active.artistUri = uri
+        active.artistAvatarUrl = libraryItems?.find { it.title.equals(artist, ignoreCase = true) }?.imageUrl
             ?: nowPlayingArtistImageUrl?.takeIf { artist.equals(currentArtist, ignoreCase = true) }
 
         val artistUriToLoad = uri.takeIf { it.startsWith("spotify:artist:") }
@@ -698,18 +772,22 @@ fun SpotifyAppShell(
         )
     }
 
+    // A double-tap on the Search tab hands this requester to the search screen's
+    // field; the plain single tap stays exactly the navigation it always was.
+    val searchFieldFocusRequester = remember { FocusRequester() }
+
     // System Back Handler
     BackHandler(
         enabled = isPlayerExpanded ||
-                isProfileDrawerOpen ||
-                isAccountsSheetOpen ||
-                isTrackOptionsOpen ||
-                isPlaylistOptionsOpen ||
-                isAlbumOptionsOpen ||
-                isArtistOptionsOpen ||
-                isSortSheetOpen ||
-                isCreateSheetOpen ||
-                isCreatePlaylistOpen ||
+                flags.isProfileDrawerOpen ||
+                flags.isAccountsSheetOpen ||
+                flags.isTrackOptionsOpen ||
+                flags.isPlaylistOptionsOpen ||
+                flags.isAlbumOptionsOpen ||
+                flags.isArtistOptionsOpen ||
+                flags.isSortSheetOpen ||
+                flags.isCreateSheetOpen ||
+                flags.isCreatePlaylistOpen ||
                 playlistEditDraft != null ||
                 libraryItemOptions != null ||
                 folderDraft != null ||
@@ -718,24 +796,24 @@ fun SpotifyAppShell(
     ) {
         if (isPlayerExpanded) {
             isPlayerExpanded = false
-        } else if (isProfileDrawerOpen) {
-            isProfileDrawerOpen = false
-        } else if (isAccountsSheetOpen) {
-            isAccountsSheetOpen = false
-        } else if (isTrackOptionsOpen) {
-            isTrackOptionsOpen = false
-        } else if (isPlaylistOptionsOpen) {
-            isPlaylistOptionsOpen = false
-        } else if (isAlbumOptionsOpen) {
-            isAlbumOptionsOpen = false
-        } else if (isArtistOptionsOpen) {
-            isArtistOptionsOpen = false
-        } else if (isSortSheetOpen) {
-            isSortSheetOpen = false
-        } else if (isCreateSheetOpen) {
-            isCreateSheetOpen = false
-        } else if (isCreatePlaylistOpen) {
-            isCreatePlaylistOpen = false
+        } else if (flags.isProfileDrawerOpen) {
+            flags.isProfileDrawerOpen = false
+        } else if (flags.isAccountsSheetOpen) {
+            flags.isAccountsSheetOpen = false
+        } else if (flags.isTrackOptionsOpen) {
+            flags.isTrackOptionsOpen = false
+        } else if (flags.isPlaylistOptionsOpen) {
+            flags.isPlaylistOptionsOpen = false
+        } else if (flags.isAlbumOptionsOpen) {
+            flags.isAlbumOptionsOpen = false
+        } else if (flags.isArtistOptionsOpen) {
+            flags.isArtistOptionsOpen = false
+        } else if (flags.isSortSheetOpen) {
+            flags.isSortSheetOpen = false
+        } else if (flags.isCreateSheetOpen) {
+            flags.isCreateSheetOpen = false
+        } else if (flags.isCreatePlaylistOpen) {
+            flags.isCreatePlaylistOpen = false
         } else if (playlistEditDraft != null) {
             onDismissEditPlaylist()
         } else if (libraryItemOptions != null) {
@@ -794,8 +872,8 @@ fun SpotifyAppShell(
 
     val handleFolderClick: (LibraryItem) -> Unit = { item ->
         pushCurrentState()
-        activeFolderUri = item.uri
-        activeFolderTitle = item.title
+        active.folderUri = item.uri
+        active.folderTitle = item.title
         currentScreen = ShellScreen.FOLDER
         onOpenFolder?.invoke(item.uri)
     }
@@ -811,115 +889,104 @@ fun SpotifyAppShell(
         val playlistLoadFailed = !playlistLoading && playlistTracks == null
         ShellScreenSlot {
         when (currentScreen) {
-            ShellScreen.HOME -> {
-                SpotifyHomeScreen(
-                    onPlaylistClick = { playlist, uri ->
-                        val foundItem = homeQuickAccessItems?.find { it.uri == uri || it.title == playlist }
-                        val foundRec = homeRecommendations?.find { it.uri == uri || it.title == playlist }
-                        val foundLib = libraryItems?.find { it.uri == uri || it.title == playlist }
-                        val cover = foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl
-                        activePlaylistCoverUrl = cover
-                        activeAlbumCoverUrl = cover
-                        if (uri.startsWith("spotify:album:")) {
-                            openAlbum(playlist, "", uri)
-                        } else if (uri.startsWith("spotify:show:")) {
-                            openShow(uri)
-                        } else if (uri.startsWith("spotify:episode:")) {
-                            openEpisode(uri)
-                        } else {
-                            openPlaylist(playlist, uri)
-                        }
-                    },
-                    onProfileClick = openProfileDrawer,
-                    onNotificationsClick = {
-                        pushCurrentState()
-                        currentScreen = ShellScreen.NOTIFICATIONS
-                    },
-                    onHistoryClick = {
-                        pushCurrentState()
-                        currentScreen = ShellScreen.HISTORY
-                        onOpenHistory?.invoke()
-                    },
-                    onSettingsClick = handleOpenSettings,
-                    quickAccessItems = homeQuickAccessItems,
-                    recommendations = homeRecommendations,
-                    shelves = homeShelves,
-                    loading = homeLoading,
-                    chips = homeChips,
-                    selectedFacet = homeFacet,
-                    onFacetSelected = onHomeFacetSelected,
-                    greeting = homeGreeting,
-                    whatsNewCount = notifications.count { it.isNew },
-                    onArtistClick = openArtist,
-                    userDisplayName = userDisplayName,
-                    userAvatarUrl = userAvatarUrl
-                )
-            }
-            ShellScreen.SEARCH -> {
-                SpotifySearchScreen(
-                    onCategoryClick = { category ->
-                        pushCurrentState()
-                        activeCategoryTitle = category.title
-                        activeCategoryColor = category.color
-                        // Only a spotify:page uri resolves through browsePage. Client
-                        // features (Live Events -> spotify:concerts) and any other
-                        // scheme have no browsable section tree, so they fall back to
-                        // the local category screen instead of an empty page.
-                        if (category.uri.startsWith("spotify:page:")) {
-                            currentScreen = ShellScreen.BROWSE
-                            onOpenBrowse?.invoke(category.uri)
-                        } else {
-                            currentScreen = ShellScreen.CATEGORY
-                            onOpenCategory?.invoke(category.title)
-                        }
-                    },
-                    onAlbumClick = openAlbum,
-                    onArtistClick = openArtist,
-                    onPodcastClick = handlePodcastOpen,
-                    onEpisodeClick = { _, uri -> if (uri.isNotEmpty()) openEpisode(uri) },
-                    onShowClick = { _, uri -> if (uri.isNotEmpty()) openShow(uri) },
-                    onPlaylistClick = openPlaylist,
-                    onTrackSelect = handleTrackPlay,
-                    onTrackOptionsClick = handleTrackOptions,
-                    onProfileClick = openProfileDrawer,
-                    searchResults = searchResults,
-                    searchData = searchData,
-                    onSearchQueryChange = { query ->
-                        onSearchQueryChange?.invoke(query) ?: playerListener?.onSearch(query)
-                    },
-                    recentSearches = searchRecent,
-                    suggestions = searchSuggestions,
-                    suggestionHits = searchSuggestionHits,
-                    loading = searchLoading,
-                    loadFailed = searchFailed,
-                    onRetry = { onRetrySearch?.invoke() },
-                    onClearRecent = { onClearRecentSearches?.invoke() },
-                    onRemoveRecent = { item -> onRemoveRecentSearch?.invoke(item.title) },
-                    onToggleSaved = { uri -> onToggleSaved?.invoke(uri) },
-                    onLoadSection = onLoadSearchSection,
-                    browseCategories = remember(browseCategories) {
-                        browseCategories.orEmpty().map { card ->
-                            CategoryCard(
-                                title = card.title,
-                                color = parseHexColor(card.colorHex) ?: getCategoryColor(card.title),
-                                uri = card.uri,
-                                imageUrl = card.imageUrl.takeIf { it.isNotBlank() },
-                                subtitle = card.subtitle
-                            )
-                        }
-                    },
-                    userDisplayName = userDisplayName,
-                    userAvatarUrl = userAvatarUrl,
-                    currentTrackTitle = currentTrackTitle,
-                    currentTrackUri = playbackState?.trackUri.orEmpty(),
-                    isPlaying = isPlaying
-                )
-            }
+            ShellScreen.HOME -> ShellHomePane(
+                quickAccessItems = homeQuickAccessItems,
+                recommendations = homeRecommendations,
+                shelves = homeShelves,
+                chips = homeChips,
+                selectedFacet = homeFacet,
+                greeting = homeGreeting,
+                loading = homeLoading,
+                libraryItems = libraryItems,
+                notifications = notifications,
+                userDisplayName = userDisplayName,
+                userAvatarUrl = userAvatarUrl,
+                onFacetSelected = onHomeFacetSelected,
+                onOpenNotifications = {
+                    pushCurrentState()
+                    currentScreen = ShellScreen.NOTIFICATIONS
+                },
+                onOpenHistory = {
+                    pushCurrentState()
+                    currentScreen = ShellScreen.HISTORY
+                    onOpenHistory?.invoke()
+                },
+                onOpenSettings = handleOpenSettings,
+                onOpenProfile = openProfileDrawer,
+                onArtistClick = openArtist,
+                onCoverResolved = { cover ->
+                    active.playlistCoverUrl = cover
+                    active.albumCoverUrl = cover
+                },
+                onPlayTrackShortcut = { uri, title ->
+                    playbackOrigin = PlaybackOrigin(ShellScreen.HOME, "Recently played")
+                    if (playerListener != null) {
+                        playerListener.onPlayUri(uri)
+                    } else {
+                        localTrackTitle = title
+                        localIsPlaying = true
+                        localProgress = 0.05f
+                    }
+                },
+                onOpenAlbum = openAlbum,
+                onOpenShow = openShow,
+                onOpenEpisode = openEpisode,
+                onOpenPlaylist = openPlaylist,
+            )
+            ShellScreen.SEARCH -> ShellSearchPane(
+                searchResults = searchResults,
+                searchData = searchData,
+                searchRecent = searchRecent,
+                searchSuggestions = searchSuggestions,
+                searchSuggestionHits = searchSuggestionHits,
+                searchLoading = searchLoading,
+                searchFailed = searchFailed,
+                searchSavedOverrides = searchSavedOverrides,
+                browseCategories = browseCategories,
+                userDisplayName = userDisplayName,
+                userAvatarUrl = userAvatarUrl,
+                currentTrackTitle = currentTrackTitle,
+                currentTrackUri = playbackState?.trackUri.orEmpty(),
+                isPlaying = isPlaying,
+                searchFieldFocusRequester = searchFieldFocusRequester,
+                playerListener = playerListener,
+                onSearchQueryChange = onSearchQueryChange,
+                onRetrySearch = { onRetrySearch?.invoke() },
+                onClearRecentSearches = { onClearRecentSearches?.invoke() },
+                onRemoveRecentSearch = { item -> onRemoveRecentSearch?.invoke(item.title) },
+                onToggleSaved = { uri, currentlySaved -> onToggleSaved?.invoke(uri, currentlySaved) },
+                onLoadSearchSection = onLoadSearchSection,
+                onCategoryClick = { category ->
+                    pushCurrentState()
+                    active.categoryTitle = category.title
+                    active.categoryColor = category.color
+                    // Only a spotify:page uri resolves through browsePage. Client
+                    // features (Live Events -> spotify:concerts) and any other
+                    // scheme have no browsable section tree, so they fall back to
+                    // the local category screen instead of an empty page.
+                    if (category.uri.startsWith("spotify:page:")) {
+                        currentScreen = ShellScreen.BROWSE
+                        onOpenBrowse?.invoke(category.uri)
+                    } else {
+                        currentScreen = ShellScreen.CATEGORY
+                        onOpenCategory?.invoke(category.title)
+                    }
+                },
+                onAlbumClick = openAlbum,
+                onArtistClick = openArtist,
+                onPodcastClick = handlePodcastOpen,
+                onOpenEpisode = openEpisode,
+                onOpenShow = openShow,
+                onOpenPlaylist = openPlaylist,
+                onTrackSelect = handleTrackPlay,
+                onTrackOptionsClick = handleTrackOptions,
+                onProfileClick = openProfileDrawer,
+            )
             ShellScreen.LIBRARY -> {
                 SpotifyLibraryScreen(
                     onItemClick = { itemTitle, itemUri ->
                         val foundItem = libraryItems?.find { it.uri == itemUri || it.title == itemTitle }
-                        activePlaylistCoverUrl = foundItem?.imageUrl
+                        active.playlistCoverUrl = foundItem?.imageUrl
                         openPlaylist(itemTitle, itemUri)
                     },
                     onItemLongPress = handleLibraryLongPress,
@@ -932,15 +999,15 @@ fun SpotifyAppShell(
                     userDisplayName = userDisplayName,
                     userAvatarUrl = userAvatarUrl,
                     onProfileClick = openProfileDrawer,
-                    onPlusClick = { isCreateSheetOpen = true },
-                    onSortClick = { isSortSheetOpen = true },
+                    onPlusClick = { flags.isCreateSheetOpen = true },
+                    onSortClick = { flags.isSortSheetOpen = true },
                     currentSort = currentSortOption
                 )
             }
             ShellScreen.PLAYLIST -> ShellPlaylistPane(
-                activePlaylistTitle = activePlaylistTitle,
-                activePlaylistUri = activePlaylistUri,
-                activePlaylistCoverUrl = activePlaylistCoverUrl,
+                activePlaylistTitle = active.playlistTitle,
+                activePlaylistUri = active.playlistUri,
+                activePlaylistCoverUrl = active.playlistCoverUrl,
                 playlistDetail = playlistDetail,
                 playlistTracks = playlistTracks,
                 playlistLoading = playlistLoading,
@@ -970,29 +1037,30 @@ fun SpotifyAppShell(
                     localProgress = 0.05f
                     localPositionMs = 12000L
                 },
-                onPlaylistOptions = { isPlaylistOptionsOpen = true },
-                onEditModeChange = { isEditing -> isPlaylistEditMode = isEditing },
-                onChangeTitle = { isRenamePlaylistDialogOpen = true },
+                onPlaylistOptions = { flags.isPlaylistOptionsOpen = true },
+                onEditModeChange = { isEditing -> flags.isPlaylistEditMode = isEditing },
+                onChangeTitle = { flags.isRenamePlaylistDialogOpen = true },
                 onAddTracksClick = {
                     currentScreen = ShellScreen.SEARCH
                 },
                 onEditCoverClick = {
-                    val uri = activePlaylistUri
+                    val uri = active.playlistUri
                     if (uri.startsWith("spotify:playlist:") && playlistDetail?.editable == true) {
                         onEditPlaylist?.invoke(uri)
                     } else {
-                        isPlaylistOptionsOpen = true
+                        flags.isPlaylistOptionsOpen = true
                     }
-                }
+                },
+                onPlaybackOrigin = { playbackOrigin = it }
             )
             ShellScreen.ALBUM -> ShellAlbumPane(
-                activeAlbumTitle = activeAlbumTitle,
-                activeAlbumArtist = activeAlbumArtist,
-                activeAlbumUri = activeAlbumUri,
-                activeAlbumCoverUrl = activeAlbumCoverUrl,
-                activeAlbumYear = activeAlbumYear,
-                activeAlbumReleaseDate = activeAlbumReleaseDate,
-                activeAlbumColor = activeAlbumColor,
+                activeAlbumTitle = active.albumTitle,
+                activeAlbumArtist = active.albumArtist,
+                activeAlbumUri = active.albumUri,
+                activeAlbumCoverUrl = active.albumCoverUrl,
+                activeAlbumYear = active.albumYear,
+                activeAlbumReleaseDate = active.albumReleaseDate,
+                activeAlbumColor = active.albumColor,
                 albumDetail = albumDetail,
                 albumTracks = albumTracks,
                 currentTrackTitle = currentTrackTitle,
@@ -1003,41 +1071,39 @@ fun SpotifyAppShell(
                 handleTrackOptions = handleTrackOptions,
                 openArtist = openArtist,
                 openAlbum = openAlbum,
-                onAlbumOptions = { isAlbumOptionsOpen = true }
+                onAlbumOptions = { flags.isAlbumOptionsOpen = true },
+                onPlaybackOrigin = { playbackOrigin = it }
             )
-            ShellScreen.ARTIST -> {
-                androidx.compose.runtime.key(activeArtistName) {
-                    SpotifyArtistScreen(
-                        artistName = activeArtistName,
-                        monthlyListeners = artistMonthlyListeners?.takeIf { it.isNotBlank() }.orEmpty(),
-                        heroColor = artistDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card,
-                        headerImageUrl = artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() }
-                            ?: artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
-                            ?: activeArtistAvatarUrl,
-                        popularTracks = artistTracks.orEmpty(),
-                        releases = artistReleases.orEmpty(),
-                        currentTrackTitle = currentTrackTitle,
-                        isPlaying = isPlaying,
-                        biography = artistDetail?.biography.orEmpty(),
-                        verified = artistDetail?.verified == true,
-                        isLoading = artistLoading,
-                        onBackClick = handleBack,
-                        onPlayPauseClick = handlePlayPause,
-                        onTrackSelect = handleTrackPlay,
-                        onTrackOptionsClick = handleTrackOptions,
-                        onArtistOptionsClick = { isArtistOptionsOpen = true },
-                        onReleaseClick = { release ->
-                            openAlbum(release.title, activeArtistName, release.uri)
-                        },
-                        onAboutClick = { isArtistAboutOpen = true },
-                        onDiscographyClick = { isDiscographyOpen = true }
-                    )
-                }
-            }
+            ShellScreen.ARTIST -> ShellArtistPane(
+                artistName = active.artistName,
+                artistAvatarUrl = active.artistAvatarUrl,
+                artistUri = active.artistUri,
+                artistDetail = artistDetail,
+                artistTracks = artistTracks,
+                artistReleases = artistReleases,
+                artistMonthlyListeners = artistMonthlyListeners,
+                artistLoading = artistLoading,
+                artistFollowed = artistFollowed,
+                currentTrackTitle = currentTrackTitle,
+                isPlaying = isPlaying,
+                onBackClick = handleBack,
+                onPlayPauseClick = handlePlayPause,
+                onTrackSelect = handleTrackPlay,
+                onTrackOptionsClick = handleTrackOptions,
+                onFollowToggle = { uri, follow ->
+                    onArtistFollowToggle?.invoke(uri, follow)
+                },
+                onReleaseClick = { release ->
+                    openAlbum(release.title, active.artistName, release.uri)
+                },
+                onAboutClick = { flags.isArtistAboutOpen = true },
+                onDiscographyClick = { flags.isDiscographyOpen = true },
+                onOptionsClick = { flags.isArtistOptionsOpen = true }
+            )
             ShellScreen.CATEGORY -> {
                 SpotifyCategoryScreen(
-                    categoryTitle = activeCategoryTitle,
-                    categoryColor = activeCategoryColor,
+                    categoryTitle = active.categoryTitle,
+                    categoryColor = active.categoryColor,
                     onBackClick = handleBack,
                     onPlaylistClick = { title, uri ->
                         if (uri.startsWith("spotify:show:")) {
@@ -1048,7 +1114,7 @@ fun SpotifyAppShell(
                         val foundRec = homeRecommendations?.find { it.uri == uri || it.title == title }
                         val foundLib = libraryItems?.find { it.uri == uri || it.title == title }
                         val cover = foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl
-                        activePlaylistCoverUrl = cover
+                        active.playlistCoverUrl = cover
                         openPlaylist(title, uri)
                     },
                     onAlbumClick = { title, artist, uri ->
@@ -1059,8 +1125,8 @@ fun SpotifyAppShell(
                     },
                     onSubcategoryClick = { subcategory ->
                         pushCurrentState()
-                        activeCategoryTitle = subcategory
-                        activeCategoryColor = getCategoryColor(subcategory)
+                        active.categoryTitle = subcategory
+                        active.categoryColor = getCategoryColor(subcategory)
                         currentScreen = ShellScreen.CATEGORY
                     },
                     onTrackSelect = handleTrackPlay,
@@ -1096,14 +1162,14 @@ fun SpotifyAppShell(
                         item.uri.startsWith("spotify:album:") -> openAlbum(item.title, "", item.uri)
                         item.uri.startsWith("spotify:episode:") -> {
                             pushCurrentState()
-                            activeEpisodeUri = item.uri
+                            active.episodeUri = item.uri
                             currentScreen = ShellScreen.EPISODE
                             onOpenEpisode?.invoke(item.uri)
                         }
                         item.uri.isNotEmpty() -> {
                             pushCurrentState()
-                            activePlaylistTitle = item.title
-                            activePlaylistUri = item.uri
+                            active.playlistTitle = item.title
+                            active.playlistUri = item.uri
                             currentScreen = ShellScreen.PLAYLIST
                             if (onLoadPlaylist != null) onLoadPlaylist?.invoke(item.uri) else playerListener?.onLoadPlaylist(item.uri)
                         }
@@ -1129,7 +1195,7 @@ fun SpotifyAppShell(
                 },
                 onTrackOptionsClick = { track ->
                     selectedTrackForOptions = track
-                    isTrackOptionsOpen = true
+                    flags.isTrackOptionsOpen = true
                 },
                 todayTracks = historyToday,
                 yesterdayTracks = historyYesterday,
@@ -1140,10 +1206,10 @@ fun SpotifyAppShell(
             )
             ShellScreen.BROWSE -> ShellBrowsePane(
                 page = browsePage,
-                fallbackTitle = activeCategoryTitle,
+                fallbackTitle = active.categoryTitle,
                 onBack = handleBack,
                 onOpenBrowse = { uri, title ->
-                    activeCategoryTitle = title
+                    active.categoryTitle = title
                     onOpenBrowse?.invoke(uri)
                 },
                 onOpenShow = { uri -> onOpenShow?.invoke(uri) },
@@ -1155,7 +1221,7 @@ fun SpotifyAppShell(
             ShellScreen.SHOW -> ShellShowPane(
                 show = showDetail,
                 loading = showLoading,
-                retryUri = activeShowUri,
+                retryUri = active.showUri,
                 isPlaying = isPlaying,
                 currentTrackTitle = currentTrackTitle,
                 onBack = handleBack,
@@ -1168,7 +1234,7 @@ fun SpotifyAppShell(
             ShellScreen.EPISODE -> ShellEpisodePane(
                 episode = episodeDetail,
                 loading = episodeLoading,
-                retryUri = activeEpisodeUri,
+                retryUri = active.episodeUri,
                 isPlaying = isPlaying,
                 onBack = handleBack,
                 onRetry = { uri -> onOpenEpisode?.invoke(uri) },
@@ -1179,31 +1245,31 @@ fun SpotifyAppShell(
             ShellScreen.FOLDER -> ShellFolderPane(
                 items = folderItems,
                 loading = folderLoading,
-                title = activeFolderTitle.ifBlank { "Your Library" },
+                title = active.folderTitle.ifBlank { "Your Library" },
                 userDisplayName = userDisplayName,
                 userAvatarUrl = userAvatarUrl,
                 onItemClick = { itemTitle, itemUri ->
                     val foundItem = folderItems?.find { it.uri == itemUri || it.title == itemTitle }
-                    activePlaylistCoverUrl = foundItem?.imageUrl
+                    active.playlistCoverUrl = foundItem?.imageUrl
                     pushCurrentState()
-                    activePlaylistTitle = itemTitle
-                    activePlaylistUri = itemUri
+                    active.playlistTitle = itemTitle
+                    active.playlistUri = itemUri
                     currentScreen = ShellScreen.PLAYLIST
                     if (itemUri.isNotEmpty()) if (onLoadPlaylist != null) onLoadPlaylist?.invoke(itemUri) else playerListener?.onLoadPlaylist(itemUri)
                 },
                 onItemLongPress = handleLibraryLongPress,
                 onFolderClick = handleFolderClick,
                 onProfileClick = openProfileDrawer,
-                onPlusClick = { isCreateSheetOpen = true },
-                onSortClick = { isSortSheetOpen = true },
+                onPlusClick = { flags.isCreateSheetOpen = true },
+                onSortClick = { flags.isSortSheetOpen = true },
                 currentSort = currentSortOption,
                 onBackClick = { handleBack() },
                 onFolderOptionsClick = {
                     activeFolderOptionsItem = LibraryItem(
-                        title = activeFolderTitle,
+                        title = active.folderTitle,
                         subtitle = "${folderItems?.size ?: 0} playlists",
                         type = LibraryItemType.FOLDER,
-                        uri = activeFolderUri
+                        uri = active.folderUri
                     )
                 },
                 onPlayClick = {
@@ -1228,7 +1294,7 @@ fun SpotifyAppShell(
             ?: playbackState?.devices?.firstOrNull { it.name == effectiveConnectedDevice }
         val activeDeviceKind = activeDevice?.kind
 
-        if (!isPlaylistEditMode) {
+        if (!flags.isPlaylistEditMode) {
             ShellBottomBar(
                 title = playerIdentity.title,
                 artist = playerIdentity.artist,
@@ -1245,13 +1311,25 @@ fun SpotifyAppShell(
                     selectedNavIndex = index
                     when (index) {
                         0 -> if (currentScreen != ShellScreen.HOME) { navBackStack.clear(); currentScreen = ShellScreen.HOME }
-                        1 -> if (currentScreen != ShellScreen.SEARCH) { navBackStack.clear(); currentScreen = ShellScreen.SEARCH }
+                        1 -> if (currentScreen != ShellScreen.SEARCH) {
+                            navBackStack.clear(); currentScreen = ShellScreen.SEARCH
+                        } else {
+                            // Already on Search: retapping the tab focuses the field —
+                            // the second focus path besides the double tap. A no-op when
+                            // the field already holds focus.
+                            runCatching { searchFieldFocusRequester.requestFocus() }
+                        }
                         2 -> if (currentScreen != ShellScreen.LIBRARY) { navBackStack.clear(); currentScreen = ShellScreen.LIBRARY }
                     }
                 },
+                onSearchDoubleTap = {
+                    // The first tap of the pair already switched to Search; focus
+                    // once the field is attached, or swallow it if it is not yet.
+                    runCatching { searchFieldFocusRequester.requestFocus() }
+                },
                 onPlayPause = handlePlayPause,
                 onLike = { if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = !localIsLiked },
-                onDeviceClick = { isDeviceSheetOpen = true },
+                onDeviceClick = { flags.isDeviceSheetOpen = true },
                 onBarClick = { isPlayerExpanded = true },
                 onSkipNext = handleSkipNext,
                 onSkipPrevious = handleSkipPrevious,
@@ -1263,10 +1341,12 @@ fun SpotifyAppShell(
         // Full Now Playing Screen
         val (contextHeader, contextSub) = nowPlayingContext(
             trackLoaded = playerIdentity.trackLoaded,
+            origin = playbackOrigin,
             screen = currentScreen,
-            playlistTitle = activePlaylistTitle,
-            albumTitle = activeAlbumTitle,
-            artistName = activeArtistName,
+            playlistTitle = active.playlistTitle,
+            albumTitle = active.albumTitle,
+            artistName = active.artistName,
+            searchQuery = searchQuery,
         )
         ShellNowPlaying(
             visible = isPlayerExpanded,
@@ -1313,10 +1393,10 @@ fun SpotifyAppShell(
                     albumUri = resolvedAlbumUri,
                     artistUri = resolvedArtistUri,
                 )
-                isTrackOptionsOpen = true
+                flags.isTrackOptionsOpen = true
             },
-            onQueue = { isQueueSheetOpen = true },
-            onDevice = { isDeviceSheetOpen = true },
+            onQueue = { flags.isQueueSheetOpen = true },
+            onDevice = { flags.isDeviceSheetOpen = true },
             onShare = { playbackState?.trackUri?.takeIf { it.isNotBlank() }?.let(::shareEntity) },
             onTitleClick = {
                 isPlayerExpanded = false
@@ -1328,30 +1408,35 @@ fun SpotifyAppShell(
             }
         )
 
-        val isPlaylistUri = activePlaylistUri.startsWith("spotify:playlist:")
-        val playlistEntity = if (activePlaylistUri.isBlank() && activePlaylistTitle.isBlank()) null
+        // Every overlay below (options sheets, dialogs, pickers) is lifted into
+        // its own composable lambda: [SpotifyAppShell] sits at the JVM 64KB
+        // method limit and this keeps the generated shell method small while
+        // leaving the sheet code exactly as is.
+        ShellOverlaySlot {
+        val isPlaylistUri = active.playlistUri.startsWith("spotify:playlist:")
+        val playlistEntity = if (active.playlistUri.isBlank() && active.playlistTitle.isBlank()) null
         else EntityOptions(
-            title = playlistDetail?.title?.takeIf { it.isNotBlank() } ?: activePlaylistTitle,
+            title = playlistDetail?.title?.takeIf { it.isNotBlank() } ?: active.playlistTitle,
             subtitle = if (isPlaylistUri)
                 "Playlist • " + (playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: userDisplayName)
             else "",
-            imageUrl = activePlaylistCoverUrl ?: playlistDetail?.imageUrl?.takeIf { it.isNotBlank() },
-            uri = activePlaylistUri,
+            imageUrl = active.playlistCoverUrl ?: playlistDetail?.imageUrl?.takeIf { it.isNotBlank() },
+            uri = active.playlistUri,
         )
 
         ShellSheets(
             flags = SheetFlags(
-                profileDrawer = isProfileDrawerOpen,
-                accounts = isAccountsSheetOpen,
-                trackOptions = isTrackOptionsOpen,
-                playlistOptions = isPlaylistOptionsOpen,
-                albumOptions = isAlbumOptionsOpen,
-                artistOptions = isArtistOptionsOpen,
-                sort = isSortSheetOpen,
-                create = isCreateSheetOpen,
-                device = isDeviceSheetOpen,
-                queue = isQueueSheetOpen,
-                sleepTimer = isSleepTimerOpen
+                profileDrawer = flags.isProfileDrawerOpen,
+                accounts = flags.isAccountsSheetOpen,
+                trackOptions = flags.isTrackOptionsOpen,
+                playlistOptions = flags.isPlaylistOptionsOpen,
+                albumOptions = flags.isAlbumOptionsOpen,
+                artistOptions = flags.isArtistOptionsOpen,
+                sort = flags.isSortSheetOpen,
+                create = flags.isCreateSheetOpen,
+                device = flags.isDeviceSheetOpen,
+                queue = flags.isQueueSheetOpen,
+                sleepTimer = flags.isSleepTimerOpen
             ),
             selectedTrack = selectedTrackForOptions,
             devices = playbackState?.devices.orEmpty(),
@@ -1365,11 +1450,35 @@ fun SpotifyAppShell(
             playlistEditable = isPlaylistUri && playlistDetail?.editable == true,
             playlistSaved = if (isPlaylistUri) playlistSaved else null,
             playlistPublished = if (isPlaylistUri) playlistPublished else null,
-            albumTitle = activeAlbumTitle,
-            albumArtist = activeAlbumArtist,
-            albumCoverUrl = activeAlbumCoverUrl,
-            artistName = activeArtistName,
-            artistAvatarUrl = activeArtistAvatarUrl,
+            albumTitle = active.albumTitle,
+            albumArtist = active.albumArtist,
+            albumCoverUrl = active.albumCoverUrl,
+            albumUri = active.albumUri.ifBlank { albumDetail?.uri.orEmpty() },
+            artistName = active.artistName,
+            artistAvatarUrl = active.artistAvatarUrl,
+            artistUri = active.artistUri,
+            artistFollowing = artistFollowed == true,
+            onArtistFollowToggle = {
+                if (active.artistUri.startsWith("spotify:artist:")) {
+                    onArtistFollowToggle?.invoke(active.artistUri, !(artistFollowed == true))
+                }
+            },
+            onArtistRadio = {
+                flags.isArtistOptionsOpen = false
+                val artistUriNow = active.artistUri
+                if (artistUriNow.startsWith("spotify:artist:")) {
+                    shellScope.launch {
+                        // seed_to_playlist resolves the artist into its radio
+                        // playlist; the shell only opens that page — no autoplay,
+                        // the queue stays exactly as it is until the user hits
+                        // the playlist's own play button.
+                        val radio = onArtistRadio?.invoke(artistUriNow)
+                        if (radio != null && radio.startsWith("spotify:playlist:")) {
+                            openPlaylist(active.artistName + " Radio", radio)
+                        }
+                    }
+                }
+            },
             sortOption = currentSortOption,
             sleepTimer = activeSleepTimer,
             userDisplayName = userDisplayName,
@@ -1380,51 +1489,51 @@ fun SpotifyAppShell(
             canvasAvailable = isCanvasAllowed && canvasFilePath != null,
             isCanvasEnabled = isCanvasEnabled,
             onCanvasToggle = { onCanvasToggle?.invoke(!isCanvasEnabled) },
-            onDismissProfile = { isProfileDrawerOpen = false },
-            onDismissAccounts = { isAccountsSheetOpen = false },
+            onDismissProfile = { flags.isProfileDrawerOpen = false },
+            onDismissAccounts = { flags.isAccountsSheetOpen = false },
             onSwitchAccount = { id -> onSwitchAccount?.invoke(id) },
             onAddAccount = { onAddAccount?.invoke() },
             onRemoveAccount = { id -> onRemoveAccount?.invoke(id) },
-            onOpenAccounts = { isAccountsSheetOpen = true },
-            onDismissTrackOptions = { isTrackOptionsOpen = false },
-            onDismissPlaylistOptions = { isPlaylistOptionsOpen = false },
-            onDismissAlbumOptions = { isAlbumOptionsOpen = false },
-            onDismissArtistOptions = { isArtistOptionsOpen = false },
-            onDismissSort = { isSortSheetOpen = false },
-            onDismissCreate = { isCreateSheetOpen = false },
-            onDismissDevice = { isDeviceSheetOpen = false },
-            onDismissQueue = { isQueueSheetOpen = false },
-            onDismissSleepTimer = { isSleepTimerOpen = false },
+            onOpenAccounts = { flags.isAccountsSheetOpen = true },
+            onDismissTrackOptions = { flags.isTrackOptionsOpen = false },
+            onDismissPlaylistOptions = { flags.isPlaylistOptionsOpen = false },
+            onDismissAlbumOptions = { flags.isAlbumOptionsOpen = false },
+            onDismissArtistOptions = { flags.isArtistOptionsOpen = false },
+            onDismissSort = { flags.isSortSheetOpen = false },
+            onDismissCreate = { flags.isCreateSheetOpen = false },
+            onDismissDevice = { flags.isDeviceSheetOpen = false },
+            onDismissQueue = { flags.isQueueSheetOpen = false },
+            onDismissSleepTimer = { flags.isSleepTimerOpen = false },
             onAddToPlaylist = {
                 selectedTrackForOptions?.let { track ->
-                    isAddToPlaylistOpen = true
+                    flags.isAddToPlaylistOpen = true
                     addTrackTarget = track
                     onAddToPlaylist?.invoke(track)
                 }
             },
             onShowCredits = {
                 selectedTrackForOptions?.let { track ->
-                    isCreditsOpen = true
+                    flags.isCreditsOpen = true
                     creditsTrack = track
                     onShowCredits?.invoke(track.uri)
                 }
             },
             onEditPlaylist = {
-                if (isPlaylistUri && activePlaylistUri.isNotEmpty()) onEditPlaylist?.invoke(activePlaylistUri)
+                if (isPlaylistUri && active.playlistUri.isNotEmpty()) onEditPlaylist?.invoke(active.playlistUri)
             },
             onTogglePlaylistSaved = {
-                if (isPlaylistUri && activePlaylistUri.isNotEmpty()) {
-                    onTogglePlaylistSaved?.invoke(activePlaylistUri, !(playlistSaved ?: false))
+                if (isPlaylistUri && active.playlistUri.isNotEmpty()) {
+                    onTogglePlaylistSaved?.invoke(active.playlistUri, !(playlistSaved ?: false))
                 }
             },
             onTogglePlaylistPublished = {
-                if (isPlaylistUri && activePlaylistUri.isNotEmpty()) {
-                    onTogglePlaylistPublished?.invoke(activePlaylistUri, !(playlistPublished ?: false))
+                if (isPlaylistUri && active.playlistUri.isNotEmpty()) {
+                    onTogglePlaylistPublished?.invoke(active.playlistUri, !(playlistPublished ?: false))
                 }
             },
             onDeletePlaylist = {
                 shellScope.launch {
-                    val ok = onDeletePlaylist?.invoke(activePlaylistUri) ?: false
+                    val ok = onDeletePlaylist?.invoke(active.playlistUri) ?: false
                     if (ok) handleBack()
                 }
             },
@@ -1442,18 +1551,18 @@ fun SpotifyAppShell(
             onLikeToggle = { liked -> if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = liked },
             onAddToQueue = { track -> playerListener?.onQueueAdd(track.uri) },
             onViewArtist = { artist, uri ->
-                isTrackOptionsOpen = false
+                flags.isTrackOptionsOpen = false
                 isPlayerExpanded = false
                 openArtist(artist, uri)
             },
             onViewAlbum = { album, uri ->
-                isTrackOptionsOpen = false
+                flags.isTrackOptionsOpen = false
                 isPlayerExpanded = false
                 openAlbum(album, selectedTrackForOptions?.artist ?: "", uri)
             },
-            onSleepTimerClick = { isSleepTimerOpen = true },
+            onSleepTimerClick = { flags.isSleepTimerOpen = true },
             onGoToArtist = { artist ->
-                isAlbumOptionsOpen = false
+                flags.isAlbumOptionsOpen = false
                 isPlayerExpanded = false
                 openArtist(artist, albumDetail?.artistUri.orEmpty())
             },
@@ -1461,15 +1570,44 @@ fun SpotifyAppShell(
             onCreatePlaylist = {
                 shellScope.launch {
                     playlistCreateName = onPlaylistDefaultName?.invoke() ?: "My Playlist"
-                    isCreatePlaylistOpen = true
+                    flags.isCreatePlaylistOpen = true
                 }
             },
-            onCreateBlend = { pushCurrentState(); activePlaylistTitle = "Duck + Friend Blend"; currentScreen = ShellScreen.PLAYLIST },
+            onCreateBlend = { pushCurrentState(); active.playlistTitle = "Duck + Friend Blend"; currentScreen = ShellScreen.PLAYLIST },
             onCreateFolder = { folderDraft = FolderDraft(mode = FolderMode.CREATE) },
-            onSelectDevice = { id -> localDevice = id; isDeviceSheetOpen = false; playerListener?.onSelectDevice(id) },
+            onSelectDevice = { id -> localDevice = id; flags.isDeviceSheetOpen = false; playerListener?.onSelectDevice(id) },
             onDeviceVisible = { visible -> playerListener?.onDeviceSheetVisible(visible) },
             onVolumeChange = { id, level -> playerListener?.onVolumeChange(id, level) },
             userQueue = playbackState?.queue.orEmpty(),
+            trackTasteExcluded = trackTasteExcluded,
+            onToggleTasteExclusion = toggle@{ exclude ->
+                val track = selectedTrackForOptions
+                val uri = track?.uri.orEmpty()
+                if (!uri.startsWith("spotify:track:")) return@toggle
+                val previous = trackTasteExcluded
+                // Optimistic: flip the cached answer so the next sheet open is
+                // already correct, then reconcile with the real write result.
+                trackTasteExcluded = exclude
+                tasteExclusionCache[uri] = exclude
+                shellScope.launch {
+                    val ok = Collection2.setExcludedFromTasteProfile(context, uri, exclude)
+                    if (uri == selectedTrackForOptions?.uri) {
+                        if (!ok) {
+                            trackTasteExcluded = previous
+                            if (previous != null) tasteExclusionCache[uri] = previous
+                        }
+                        Toast.makeText(
+                            context,
+                            when {
+                                ok && exclude -> "Excluded from your taste profile"
+                                ok -> "Included in your taste profile"
+                                else -> "Couldn't update your taste profile"
+                            },
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            },
             queueSourceContext = playbackState?.queueContextLabel?.takeIf { it.isNotBlank() }
                 ?: playbackState?.contextLabel?.takeIf { it.isNotBlank() } ?: "",
             onQueueTrackSelect = { track ->
@@ -1496,10 +1634,10 @@ fun SpotifyAppShell(
             onSleepTimerSelected = { option -> activeSleepTimer = option }
         )
 
-        if (isArtistAboutOpen) {
+        if (flags.isArtistAboutOpen) {
             ArtistAboutSheet(
-                isOpen = isArtistAboutOpen,
-                artistName = activeArtistName,
+                isOpen = flags.isArtistAboutOpen,
+                artistName = active.artistName,
                 imageUrl = artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
                     ?: artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() },
                 monthlyListeners = artistDetail?.monthlyListeners?.takeIf { it > 0L }
@@ -1511,22 +1649,22 @@ fun SpotifyAppShell(
                 topCities = artistDetail?.topCities.orEmpty(),
                 externalLinks = artistDetail?.externalLinks.orEmpty(),
                 gallery = artistDetail?.gallery.orEmpty(),
-                onDismiss = { isArtistAboutOpen = false },
+                onDismiss = { flags.isArtistAboutOpen = false },
                 onLinkClick = { }
             )
         }
 
-        if (isDiscographyOpen) {
+        if (flags.isDiscographyOpen) {
             DiscographySheet(
-                isOpen = isDiscographyOpen,
-                artistUri = activeArtistUri,
-                artistName = activeArtistName,
-                onDismiss = { isDiscographyOpen = false },
-                onOpenRelease = { title, uri -> openAlbum(title, activeArtistName, uri) }
+                isOpen = flags.isDiscographyOpen,
+                artistUri = active.artistUri,
+                artistName = active.artistName,
+                onDismiss = { flags.isDiscographyOpen = false },
+                onOpenRelease = { title, uri -> openAlbum(title, active.artistName, uri) }
             )
         }
 
-        if (isAddToPlaylistOpen) {
+        if (flags.isAddToPlaylistOpen) {
             AddToPlaylistSheet(
                 isOpen = true,
                 trackTitle = addTrackTarget?.title.orEmpty(),
@@ -1534,51 +1672,58 @@ fun SpotifyAppShell(
                 isLoading = addToPlaylistChoices == null,
                 onPick = { choice ->
                     addTrackTarget?.let { track -> onPickPlaylist?.invoke(choice, track) }
-                    isAddToPlaylistOpen = false
+                    flags.isAddToPlaylistOpen = false
                 },
+                // The sheet owns the folder drill-down; this feeds it the rows
+                // of the folder it entered, checks and all, for the same track.
+                onLoadFolder = onLoadPlaylistFolder?.let { loader ->
+                    { folderUri -> loader(addTrackTarget?.uri.orEmpty(), folderUri) }
+                },
+                // Song counts for the rows it is showing, root list or folder.
+                onLoadTrackCount = onLoadTrackCount,
                 onCreateNew = {
                     addTrackTarget?.let { track -> onCreatePlaylistWith?.invoke(track) }
-                    isAddToPlaylistOpen = false
+                    flags.isAddToPlaylistOpen = false
                 },
-                onDismiss = { isAddToPlaylistOpen = false }
+                onDismiss = { flags.isAddToPlaylistOpen = false }
             )
         }
 
-        if (isCreditsOpen) {
+        if (flags.isCreditsOpen) {
             CreditsSheet(
                 isOpen = true,
                 title = creditsTrack?.title.orEmpty(),
                 subtitle = creditsTrack?.artist.orEmpty(),
                 imageUrl = creditsTrack?.imageUrl,
                 credits = trackCredits,
-                onDismiss = { isCreditsOpen = false },
+                onDismiss = { flags.isCreditsOpen = false },
                 onArtistClick = { uri, name -> openArtist(name, uri) }
             )
         }
 
         SpotifyCreateNameDialog(
-            isOpen = isCreatePlaylistOpen,
+            isOpen = flags.isCreatePlaylistOpen,
             title = "Give your playlist a name",
             initialName = playlistCreateName,
             confirmLabel = "Create",
             cancelLabel = "Cancel",
             onConfirm = { name ->
-                isCreatePlaylistOpen = false
+                flags.isCreatePlaylistOpen = false
                 shellScope.launch {
                     val uri = onCreatePlaylist?.invoke(name, "", null)
                     if (!uri.isNullOrEmpty()) {
                         pushCurrentState()
-                        activePlaylistTitle = name
-                        activePlaylistUri = uri
+                        active.playlistTitle = name
+                        active.playlistUri = uri
                         currentScreen = ShellScreen.PLAYLIST
                         if (onLoadPlaylist != null) onLoadPlaylist?.invoke(uri) else playerListener?.onLoadPlaylist(uri)
-                        if (activeFolderUri.isNotBlank()) {
-                            onMoveToFolder?.invoke(uri, activeFolderUri)
+                        if (active.folderUri.isNotBlank()) {
+                            onMoveToFolder?.invoke(uri, active.folderUri)
                         }
                     }
                 }
             },
-            onDismiss = { isCreatePlaylistOpen = false }
+            onDismiss = { flags.isCreatePlaylistOpen = false }
         )
 
         ShellPlaylistEditSheets(
@@ -1673,7 +1818,7 @@ fun SpotifyAppShell(
             FolderOptionsSheet(
                 isOpen = true,
                 folderTitle = folderItem.title,
-                playlistCount = if (folderItem.uri == activeFolderUri) folderItems?.size ?: 0 else 0,
+                playlistCount = if (folderItem.uri == active.folderUri) folderItems?.size ?: 0 else 0,
                 onMoveToFolder = {
                     val targetUri = folderItem.uri
                     val targetTitle = folderItem.title
@@ -1704,7 +1849,7 @@ fun SpotifyAppShell(
                     val targetUri = folderItem.uri
                     activeFolderOptionsItem = null
                     onDeleteFolder?.invoke(targetUri)
-                    if (currentScreen == ShellScreen.FOLDER && activeFolderUri == targetUri) {
+                    if (currentScreen == ShellScreen.FOLDER && active.folderUri == targetUri) {
                         handleBack()
                     }
                 },
@@ -1713,23 +1858,24 @@ fun SpotifyAppShell(
         }
 
         SpotifyCreateNameDialog(
-            isOpen = isRenamePlaylistDialogOpen,
+            isOpen = flags.isRenamePlaylistDialogOpen,
             title = "Give your playlist a name",
-            initialName = activePlaylistTitle,
+            initialName = active.playlistTitle,
             confirmLabel = "Save",
             cancelLabel = "Cancel",
             onConfirm = { newTitle ->
-                isRenamePlaylistDialogOpen = false
-                val uri = activePlaylistUri
+                flags.isRenamePlaylistDialogOpen = false
+                val uri = active.playlistUri
                 if (uri.isNotBlank()) {
-                    activePlaylistTitle = newTitle
+                    active.playlistTitle = newTitle
                     shellScope.launch {
                         onEditPlaylistDetails?.invoke(uri, newTitle, "", null, false)
                     }
                 }
             },
-            onDismiss = { isRenamePlaylistDialogOpen = false }
+            onDismiss = { flags.isRenamePlaylistDialogOpen = false }
         )
+        }
     }
 }
 
@@ -1795,6 +1941,12 @@ private fun ShellScreenSlot(content: @Composable () -> Unit) {
     content()
 }
 
+/** Same trick as [ShellScreenSlot], for the overlay sheets and dialogs layer. */
+@Composable
+private fun ShellOverlaySlot(content: @Composable () -> Unit) {
+    content()
+}
+
 /**
  * Explicit "No Track" identity for the mini player and the NPV while no song
  * has loaded, so the bars never sit on blank lines after a fresh app open.
@@ -1819,19 +1971,43 @@ private fun playerIdentityOf(
     artist = artist.ifBlank { "No Artist" },
 )
 
+/** The context a play was started from, so the NPV header can name the queue's origin. */
+private data class PlaybackOrigin(
+    val screen: ShellScreen,
+    val label: String,
+)
+
 /** What the NPV header should say, including the explicit nothing-loaded state. */
 private fun nowPlayingContext(
     trackLoaded: Boolean,
+    origin: PlaybackOrigin?,
     screen: ShellScreen,
     playlistTitle: String,
     albumTitle: String,
     artistName: String,
-): Pair<String, String> = when {
-    !trackLoaded -> "Nothing playing" to "Pick a song to get started"
-    screen == ShellScreen.PLAYLIST -> "Playing from playlist" to playlistTitle
-    screen == ShellScreen.ALBUM -> "Playing from album" to albumTitle
-    screen == ShellScreen.ARTIST -> "Playing from artist" to artistName
-    else -> "Playing from playlist" to playlistTitle
+    searchQuery: String,
+): Pair<String, String> {
+    fun searchSub(query: String): String {
+        val q = query.trim()
+        return if (q.isBlank()) "Search" else "$q in Search"
+    }
+    return when {
+        !trackLoaded -> "Nothing playing" to "Pick a song to get started"
+        // The header follows where the playing queue came from, not the
+        // screen the user happens to be on right now.
+        origin != null -> when (origin.screen) {
+            ShellScreen.SEARCH -> "Playing from search" to searchSub(origin.label)
+            ShellScreen.ALBUM -> "Playing from album" to origin.label
+            ShellScreen.ARTIST -> "Playing from artist" to origin.label
+            ShellScreen.HOME -> "Playing from home" to origin.label
+            else -> "Playing from playlist" to origin.label
+        }
+        screen == ShellScreen.SEARCH -> "Playing from search" to searchSub(searchQuery)
+        screen == ShellScreen.PLAYLIST -> "Playing from playlist" to playlistTitle
+        screen == ShellScreen.ALBUM -> "Playing from album" to albumTitle
+        screen == ShellScreen.ARTIST -> "Playing from artist" to artistName
+        else -> "Playing from playlist" to playlistTitle
+    }
 }
 
 /** Settings branch of the shell, extracted to keep [SpotifyAppShell] under the jvm method limit. */
@@ -1916,7 +2092,8 @@ private fun ShellAlbumPane(
     handleTrackOptions: (TrackItem) -> Unit,
     openArtist: (String, String) -> Unit,
     openAlbum: (String, String, String) -> Unit,
-    onAlbumOptions: () -> Unit
+    onAlbumOptions: () -> Unit,
+    onPlaybackOrigin: (PlaybackOrigin?) -> Unit = {}
 ) {
     androidx.compose.runtime.key(activeAlbumTitle, activeAlbumArtist) {
         val albumDominantColor by rememberDominantColor(
@@ -1948,6 +2125,7 @@ private fun ShellAlbumPane(
             onBackClick = handleBack,
             onPlayPauseClick = handlePlayPause,
             onTrackSelect = { track ->
+                onPlaybackOrigin(PlaybackOrigin(ShellScreen.ALBUM, activeAlbumTitle))
                 if (playerListener != null) {
                     if (track.uri.isNotEmpty()) {
                         val index = albumTracks.orEmpty().indexOfFirst { it.uri == track.uri }
@@ -1967,6 +2145,226 @@ private fun ShellAlbumPane(
             onAlbumClick = { release -> openAlbum(release.title, activeAlbumArtist, release.uri) }
         )
     }
+}
+
+/** Search branch of the shell: the search screen plus its section routing. */
+@Composable
+private fun ShellSearchPane(
+    searchResults: List<TrackItem>?,
+    searchData: SearchResults?,
+    searchRecent: List<SearchHistoryItem>,
+    searchSuggestions: List<TrackItem>,
+    searchSuggestionHits: List<SearchHit>,
+    searchLoading: Boolean,
+    searchFailed: Boolean,
+    searchSavedOverrides: Map<String, Boolean>,
+    browseCategories: List<BrowseCard>?,
+    userDisplayName: String,
+    userAvatarUrl: String,
+    currentTrackTitle: String,
+    currentTrackUri: String,
+    isPlaying: Boolean,
+    searchFieldFocusRequester: FocusRequester,
+    playerListener: ComposePlayerListener?,
+    onSearchQueryChange: ((String) -> Unit)?,
+    onRetrySearch: () -> Unit,
+    onClearRecentSearches: () -> Unit,
+    onRemoveRecentSearch: (SearchHistoryItem) -> Unit,
+    onToggleSaved: (String, Boolean) -> Unit,
+    onLoadSearchSection: (suspend (SearchKind, Int) -> List<SearchHit>)?,
+    onCategoryClick: (CategoryCard) -> Unit,
+    onAlbumClick: (String, String, String) -> Unit,
+    onArtistClick: (String, String) -> Unit,
+    onPodcastClick: (String, String) -> Unit,
+    onOpenEpisode: (String) -> Unit,
+    onOpenShow: (String) -> Unit,
+    onOpenPlaylist: (String, String) -> Unit,
+    onTrackSelect: (TrackItem) -> Unit,
+    onTrackOptionsClick: (TrackItem) -> Unit,
+    onProfileClick: () -> Unit,
+) {
+    SpotifySearchScreen(
+        onCategoryClick = onCategoryClick,
+        onAlbumClick = onAlbumClick,
+        onArtistClick = onArtistClick,
+        onPodcastClick = onPodcastClick,
+        onEpisodeClick = { _, uri -> if (uri.isNotEmpty()) onOpenEpisode(uri) },
+        onShowClick = { _, uri -> if (uri.isNotEmpty()) onOpenShow(uri) },
+        onPlaylistClick = onOpenPlaylist,
+        onTrackSelect = onTrackSelect,
+        onTrackOptionsClick = onTrackOptionsClick,
+        onProfileClick = onProfileClick,
+        searchFieldFocusRequester = searchFieldFocusRequester,
+        searchResults = searchResults,
+        searchData = searchData,
+        onSearchQueryChange = { query ->
+            onSearchQueryChange?.invoke(query) ?: playerListener?.onSearch(query)
+        },
+        recentSearches = searchRecent,
+        suggestions = searchSuggestions,
+        suggestionHits = searchSuggestionHits,
+        loading = searchLoading,
+        loadFailed = searchFailed,
+        onRetry = onRetrySearch,
+        onClearRecent = onClearRecentSearches,
+        onRemoveRecent = onRemoveRecentSearch,
+        onToggleSaved = onToggleSaved,
+        savedOverrides = searchSavedOverrides,
+        onLoadSection = onLoadSearchSection,
+        browseCategories = remember(browseCategories) {
+            browseCategories.orEmpty().map { card ->
+                CategoryCard(
+                    title = card.title,
+                    color = parseHexColor(card.colorHex) ?: getCategoryColor(card.title),
+                    uri = card.uri,
+                    imageUrl = card.imageUrl.takeIf { it.isNotBlank() },
+                    subtitle = card.subtitle
+                )
+            }
+        },
+        userDisplayName = userDisplayName,
+        userAvatarUrl = userAvatarUrl,
+        currentTrackTitle = currentTrackTitle,
+        currentTrackUri = currentTrackUri,
+        isPlaying = isPlaying
+    )
+}
+
+/** Artist branch of the shell: the artist screen fed by the loaded overview. */
+@Composable
+private fun ShellArtistPane(
+    artistName: String,
+    artistAvatarUrl: String?,
+    artistUri: String,
+    artistDetail: ArtistDetail?,
+    artistTracks: List<PopularTrack>?,
+    artistReleases: List<ArtistRelease>?,
+    artistMonthlyListeners: String?,
+    artistLoading: Boolean,
+    artistFollowed: Boolean?,
+    currentTrackTitle: String,
+    isPlaying: Boolean,
+    onBackClick: () -> Unit,
+    onPlayPauseClick: () -> Unit,
+    onTrackSelect: (TrackItem) -> Unit,
+    onTrackOptionsClick: (TrackItem) -> Unit,
+    onFollowToggle: (String, Boolean) -> Unit,
+    onReleaseClick: (ArtistRelease) -> Unit,
+    onAboutClick: () -> Unit,
+    onDiscographyClick: () -> Unit,
+    onOptionsClick: () -> Unit,
+) {
+    androidx.compose.runtime.key(artistName) {
+        SpotifyArtistScreen(
+            artistName = artistName,
+            monthlyListeners = artistMonthlyListeners?.takeIf { it.isNotBlank() }.orEmpty(),
+            heroColor = artistDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card,
+            headerImageUrl = artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() }
+                ?: artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
+                ?: artistAvatarUrl,
+            popularTracks = artistTracks.orEmpty(),
+            releases = artistReleases.orEmpty(),
+            // Dedicated discography groups for the "Albums" and
+            // "Singles & EPs" shelves (the screen falls back to
+            // splitting the popular releases when these are thin).
+            albums = artistDetail?.albums.orEmpty().map { it.toArtistRelease() },
+            singles = artistDetail?.singles.orEmpty().map { it.toArtistRelease() },
+            currentTrackTitle = currentTrackTitle,
+            isPlaying = isPlaying,
+            biography = artistDetail?.biography.orEmpty(),
+            verified = artistDetail?.verified == true,
+            followers = artistDetail?.followers ?: 0L,
+            worldRank = artistDetail?.worldRank ?: 0,
+            topCities = artistDetail?.topCities.orEmpty(),
+            gallery = artistDetail?.gallery.orEmpty(),
+            isLoading = artistLoading,
+            onBackClick = onBackClick,
+            onPlayPauseClick = onPlayPauseClick,
+            onTrackSelect = onTrackSelect,
+            onTrackOptionsClick = onTrackOptionsClick,
+            onArtistOptionsClick = onOptionsClick,
+            isFollowing = artistFollowed == true,
+            onFollowToggle = { follow ->
+                if (artistUri.startsWith("spotify:artist:")) {
+                    onFollowToggle(artistUri, follow)
+                }
+            },
+            onReleaseClick = onReleaseClick,
+            onAboutClick = onAboutClick,
+            onDiscographyClick = onDiscographyClick
+        )
+    }
+}
+
+/** Home branch of the shell: the feed screen plus the card routing of its grid and shelves. */
+@Composable
+private fun ShellHomePane(
+    quickAccessItems: List<QuickAccessItem>?,
+    recommendations: List<RecommendationCard>?,
+    shelves: List<HomeShelf>?,
+    chips: List<HomeChip>,
+    selectedFacet: String,
+    greeting: String,
+    loading: Boolean,
+    libraryItems: List<LibraryItem>?,
+    notifications: List<SpotifyNotification>,
+    userDisplayName: String,
+    userAvatarUrl: String,
+    onFacetSelected: (String) -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
+    onArtistClick: (String, String) -> Unit,
+    onCoverResolved: (String?) -> Unit,
+    /** A Recently played shortcut on a single song: (track uri, title). */
+    onPlayTrackShortcut: (String, String) -> Unit,
+    onOpenAlbum: (String, String, String) -> Unit,
+    onOpenShow: (String) -> Unit,
+    onOpenEpisode: (String) -> Unit,
+    onOpenPlaylist: (String, String) -> Unit,
+) {
+    SpotifyHomeScreen(
+        onPlaylistClick = { playlist, uri ->
+            val foundItem = quickAccessItems?.find { it.uri == uri || it.title == playlist }
+            val foundRec = recommendations?.find { it.uri == uri || it.title == playlist }
+            val foundLib = libraryItems?.find { it.uri == uri || it.title == playlist }
+            onCoverResolved(foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl)
+            if (uri.startsWith("spotify:album:")) {
+                onOpenAlbum(playlist, "", uri)
+            } else if (uri.startsWith("spotify:show:")) {
+                onOpenShow(uri)
+            } else if (uri.startsWith("spotify:episode:")) {
+                onOpenEpisode(uri)
+            } else if (uri.startsWith("spotify:artist:")) {
+                // Artist shortcut (e.g. the favorites shelf): the card itself
+                // is the navigation, nothing plays.
+                onArtistClick(foundItem?.title ?: playlist, uri)
+            } else if (uri.startsWith("spotify:track:")) {
+                // Recently played shortcut on a single song: play it straight
+                // away, the way Spotify's home grid does.
+                onPlayTrackShortcut(uri, foundItem?.title ?: playlist)
+            } else {
+                onOpenPlaylist(playlist, uri)
+            }
+        },
+        onProfileClick = onOpenProfile,
+        onNotificationsClick = onOpenNotifications,
+        onHistoryClick = onOpenHistory,
+        onSettingsClick = onOpenSettings,
+        quickAccessItems = quickAccessItems,
+        recommendations = recommendations,
+        shelves = shelves,
+        loading = loading,
+        chips = chips,
+        selectedFacet = selectedFacet,
+        onFacetSelected = onFacetSelected,
+        greeting = greeting,
+        whatsNewCount = notifications.count { it.isNew },
+        onArtistClick = onArtistClick,
+        userDisplayName = userDisplayName,
+        userAvatarUrl = userAvatarUrl
+    )
 }
 
 /** Playlist branch of the shell. */
@@ -2002,7 +2400,8 @@ private fun ShellPlaylistPane(
     onEditModeChange: (Boolean) -> Unit = {},
     onChangeTitle: (() -> Unit)? = null,
     onAddTracksClick: (() -> Unit)? = null,
-    onEditCoverClick: (() -> Unit)? = null
+    onEditCoverClick: (() -> Unit)? = null,
+    onPlaybackOrigin: (PlaybackOrigin?) -> Unit = {}
 ) {
     androidx.compose.runtime.key(activePlaylistUri.ifEmpty { activePlaylistTitle }) {
         LaunchedEffect(playlistTracks, activePlaylistUri) {
@@ -2051,6 +2450,8 @@ private fun ShellPlaylistPane(
             onPlayPauseClick = {
                 if (playerListener != null) {
                     if (activePlaylistUri.isNotEmpty() && !isPlaying) {
+                        // Starting this playlist's queue names it in the NPV.
+                        onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
                         val firstTrack = playlistTracks
                             ?.firstOrNull { it.uri.startsWith("spotify:track:") }
                         if (firstTrack != null && activePlaylistUri.startsWith("spotify:playlist:")) {
@@ -2062,10 +2463,12 @@ private fun ShellPlaylistPane(
                         playerListener.onPlayPause()
                     }
                 } else {
+                    onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
                     onLocalPlayPause()
                 }
             },
             onTrackSelect = { track ->
+                onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
                 if (playerListener != null) {
                     if (track.uri.isNotEmpty()) {
                         val index = playlistTracks.orEmpty().indexOfFirst { it.uri == track.uri }

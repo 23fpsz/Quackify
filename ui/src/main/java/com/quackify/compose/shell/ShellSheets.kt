@@ -43,6 +43,9 @@ internal fun ShellSheets(
     connectedDevice: String,
     userQueue: List<TrackItem>,
     queueFromContext: List<TrackItem>,
+    /** null while the taste-profile contains check is loading. */
+    trackTasteExcluded: Boolean? = null,
+    onToggleTasteExclusion: (Boolean) -> Unit = {},
     queueSourceContext: String,
     currentTrackTitle: String,
     currentTrackArtist: String,
@@ -55,8 +58,13 @@ internal fun ShellSheets(
     albumTitle: String,
     albumArtist: String,
     albumCoverUrl: String?,
+    albumUri: String = "",
     artistName: String,
     artistAvatarUrl: String?,
+    artistUri: String = "",
+    artistFollowing: Boolean = false,
+    onArtistFollowToggle: () -> Unit = {},
+    onArtistRadio: () -> Unit = {},
     sortOption: LibrarySortOption,
     sleepTimer: SleepTimerOption?,
     userDisplayName: String,
@@ -149,7 +157,9 @@ internal fun ShellSheets(
         onShowCredits = onShowCredits,
         canvasAvailable = canvasAvailable,
         isCanvasEnabled = isCanvasEnabled,
-        onCanvasToggle = onCanvasToggle
+        onCanvasToggle = onCanvasToggle,
+        isTasteExcluded = trackTasteExcluded,
+        onToggleTasteExclusion = onToggleTasteExclusion
     )
 
     EntityOptionsSheet(
@@ -176,14 +186,19 @@ internal fun ShellSheets(
         coverUrl = albumCoverUrl,
         isOpen = flags.albumOptions,
         onDismiss = onDismissAlbumOptions,
-        onGoToArtist = onGoToArtist
+        onGoToArtist = onGoToArtist,
+        onShare = { albumUri.takeIf { it.startsWith("spotify:album:") }?.let(onShare) }
     )
 
     ArtistOptionsSheet(
         artistName = artistName,
         avatarUrl = artistAvatarUrl,
         isOpen = flags.artistOptions,
-        onDismiss = onDismissArtistOptions
+        onDismiss = onDismissArtistOptions,
+        isFollowing = artistFollowing,
+        onFollowToggle = onArtistFollowToggle,
+        onGoToRadio = onArtistRadio,
+        onShare = { artistUri.takeIf { it.startsWith("spotify:artist:") }?.let(onShare) }
     )
 
     LibrarySortSheet(

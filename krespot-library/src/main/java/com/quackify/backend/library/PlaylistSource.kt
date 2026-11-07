@@ -24,6 +24,12 @@ object PlaylistSource {
 
     private const val APP_VERSION = "9.1.92.3058"
 
+    /** How long a fetched song count stays fresh; a sheet reopen inside it never re-reads. */
+    private const val COUNT_TTL_MS = 5 * 60_000L
+
+    /** uri -> (fetched at, count); -1 counts are not cached. */
+    private val countCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Int>>()
+
     private suspend fun headers(context: Context): Map<String, String> = buildMap {
         put("Authorization", "Bearer ${SpotifyAuth.token(context)}")
         put("Accept", "application/json")
@@ -38,7 +44,11 @@ object PlaylistSource {
     private suspend fun protoHeaders(context: Context): Map<String, String> =
         headers(context) + mapOf("Content-Type" to "application/json;charset=UTF-8")
 
-    suspend fun editable(context: Context, trackUri: String): List<PlaylistChoice> {
+    suspend fun editable(
+        context: Context,
+        trackUri: String,
+        folderUri: String? = null,
+    ): List<PlaylistChoice> {
         val token = SpotifyAuth.token(context)
         if (token.isBlank()) {
             log.w("editable: no token")
@@ -46,53 +56,142 @@ object PlaylistSource {
         }
         val uris = JSONArray()
         if (trackUri.isNotBlank()) uris.put(trackUri)
-        val variables = JSONObject()
-            .put("offset", 0)
-            .put("limit", 50)
-            .put("textFilter", "")
-            .put("folderUri", JSONObject.NULL)
-            .put("uris", uris)
-            .toString()
-        val json = Pathfinder.queryPost(context, token, OP_EDITABLE, variables) ?: return emptyList()
-        val page = json.optJSONObject("data")
-            ?.optJSONObject("me")
-            ?.optJSONObject("editablePlaylists")
-        if (page == null) {
-            log.w("editable: no data.me.editablePlaylists, keys=" +
-                    json.optJSONObject("data")?.keys()?.asSequence()?.toList()
-            )
-            return emptyList()
-        }
-        val items = page.optJSONArray("items") ?: return emptyList()
-        val out = ArrayList<PlaylistChoice>(items.length())
+        val out = ArrayList<PlaylistChoice>()
         var skipped = 0
-        for (i in 0 until items.length()) {
-            val entry = items.optJSONObject(i) ?: continue
-            val wrapper = entry.optJSONObject("item") ?: continue
-            val data = wrapper.optJSONObject("data") ?: continue
-            val uri = data.optString("uri")
-            val name = data.optString("name")
-            val type = data.optString("__typename")
-            if (type != "Playlist" || !uri.startsWith("spotify:playlist:") || name.isBlank()) {
-                skipped += 1
-                continue
+        var offset = 0
+        // The answer pages by 50 rows; keep pulling until the library or the
+        // folder is exhausted so big collections never silently drop rows.
+        while (offset < 500) {
+            val variables = JSONObject()
+                .put("offset", offset)
+                .put("limit", 50)
+                .put("textFilter", "")
+                .put("folderUri", folderUri ?: JSONObject.NULL)
+                .put("uris", uris)
+                .toString()
+            val json = Pathfinder.queryPost(context, token, OP_EDITABLE, variables) ?: break
+            val page = json.optJSONObject("data")
+                ?.optJSONObject("me")
+                ?.optJSONObject("editablePlaylists")
+            if (page == null) {
+                log.w("editable: no data.me.editablePlaylists, keys=" +
+                        json.optJSONObject("data")?.keys()?.asSequence()?.toList()
+                )
+                break
             }
-            out += PlaylistChoice(
-                uri = uri,
-                name = name,
-                imageUrl = GraphQl.largestSource(
-                    data.optJSONObject("images")?.optJSONArray("items")?.optJSONObject(0),
-                ),
-            )
+            val items = page.optJSONArray("items") ?: break
+            if (items.length() == 0) break
+            for (i in 0 until items.length()) {
+                val entry = items.optJSONObject(i) ?: continue
+                val wrapper = entry.optJSONObject("item") ?: continue
+                val data = wrapper.optJSONObject("data") ?: continue
+                // "curates" is the answer's per-row flag for the uris the request
+                // carried: true when that playlist already holds the track.
+                val contains = entry.optBoolean("curates", false)
+                val parsed = when (wrapper.optString("__typename")) {
+                    "PlaylistResponseWrapper" -> {
+                        val uri = data.optString("uri")
+                        val name = data.optString("name")
+                        if (uri.startsWith("spotify:playlist:") && name.isNotBlank()) {
+                            PlaylistChoice(
+                                uri = uri,
+                                name = name,
+                                imageUrl = GraphQl.largestSource(
+                                    data.optJSONObject("images")?.optJSONArray("items")?.optJSONObject(0),
+                                ),
+                                containsTrack = contains,
+                            )
+                        } else null
+                    }
+                    // The pinned pseudo playlist at the root: Liked Songs.
+                    "LibraryPseudoPlaylistResponseWrapper" -> {
+                        if (data.optString("uri") == PlaylistChoice.LIKED_SONGS_URI) {
+                            PlaylistChoice(
+                                uri = PlaylistChoice.LIKED_SONGS_URI,
+                                name = data.optString("name").ifBlank { "Liked Songs" },
+                                imageUrl = GraphQl.largestSource(data.optJSONObject("image")),
+                                kind = PlaylistChoice.Kind.LIKED_SONGS,
+                                containsTrack = contains,
+                            )
+                        } else null
+                    }
+                    // A library folder: picking it drills into its playlists.
+                    "LibraryFolderResponseWrapper" -> {
+                        val uri = data.optString("uri")
+                        val name = data.optString("name")
+                        if (uri.isNotBlank() && name.isNotBlank()) {
+                            PlaylistChoice(uri = uri, name = name, kind = PlaylistChoice.Kind.FOLDER)
+                        } else null
+                    }
+                    else -> null
+                }
+                if (parsed != null) out += parsed else skipped += 1
+            }
+            offset += items.length()
+            val total = page.optInt("totalCount", offset)
+            if (offset >= total || items.length() < 50) break
         }
-        log.i("editable: ${out.size} playlist(s), $skipped skipped (folders and pseudo playlists " +
-                "cannot hold a track) for $trackUri"
+        log.i(
+            "editable: ${out.count { it.kind == PlaylistChoice.Kind.PLAYLIST }} playlist(s), " +
+                    "${out.count { it.kind == PlaylistChoice.Kind.FOLDER }} folder(s), " +
+                    "${out.count { it.kind == PlaylistChoice.Kind.LIKED_SONGS }} liked songs, " +
+                    "$skipped skipped, ${out.count { it.containsTrack }} already hold the track" +
+                    (folderUri?.let { " inside $it" } ?: "") + " for $trackUri"
         )
         return out
     }
 
+    /**
+     * How many tracks a collection holds, for the add-to-playlist sheet's rows.
+     * A playlist reads the playlist/v2 length decoration in one small GET; the
+     * pinned Liked Songs pseudo playlist has no playlist/v2 entry, so its count
+     * comes from the library page's PseudoPlaylist node (a cached read when the
+     * library was already listed). Answers sit in [countCache] for [COUNT_TTL_MS]
+     * so paging in and out of folders never re-reads a playlist twice.
+     */
+    suspend fun trackCount(context: Context, uri: String): Int {
+        if (uri == PlaylistChoice.LIKED_SONGS_URI) return likedCount(context)
+        val playlist = id(uri)
+        if (playlist.isBlank()) return -1
+        countCache[uri]?.let { (at, count) ->
+            if (System.currentTimeMillis() - at < COUNT_TTL_MS) {
+                log.i("trackCount $uri -> $count (cached)")
+                return count
+            }
+        }
+        val response = Net.get(
+            "$BASE/playlist/$playlist?decorate=revision,length",
+            headers(context),
+            "playlist/length",
+        ) ?: return -1
+        val json = response.json()
+        // length sits at the top of the playlist/v2 answer next to revision.
+        val count = json?.optInt("length", -1) ?: -1
+        log.i("trackCount $uri -> $count http=${response.code}")
+        if (count >= 0) countCache[uri] = System.currentTimeMillis() to count
+        return count
+    }
+
+    private suspend fun likedCount(context: Context): Int {
+        val page = LibraryPageSource.page(context) ?: return -1
+        val count = page.items
+            .firstOrNull { it.uri == PlaylistChoice.LIKED_SONGS_URI && it.count > 0 }
+            ?.count ?: -1
+        log.i("trackCount liked songs -> $count of ${page.items.size} library row(s)")
+        return count
+    }
+
+    /** Keeps a cached count honest after a write the app itself performed. */
+    private fun bumpCount(playlistUri: String, delta: Int) {
+        countCache[playlistUri]?.let { (at, count) ->
+            countCache[playlistUri] = at to (count + delta).coerceAtLeast(0)
+        }
+    }
+
     suspend fun defaultName(context: Context): String {
-        val taken = editable(context, "").size
+        // Only real playlists number the default name; folders and the liked
+        // songs entry ride along in the answer but never create one.
+        val taken = editable(context, "").count { it.kind == PlaylistChoice.Kind.PLAYLIST }
         val name = "My Playlist #${taken + 1}"
         log.i("defaultName: $taken writable playlist(s), picking '$name'")
         return name
@@ -189,6 +288,7 @@ object PlaylistSource {
         log.i("removeTrack $trackUri from $playlistUri ok=$ok http=${response?.code ?: -1} " +
                 response?.body?.take(160).orEmpty()
         )
+        if (ok) bumpCount(playlistUri, -1)
         return ok
     }
 
@@ -414,7 +514,10 @@ object PlaylistSource {
         log.i("addTrack $trackUri -> $playlistUri ok=$ok errors=$errors " +
                 "keys=${data?.keys()?.asSequence()?.toList()}"
         )
-        if (ok) LibraryPageSource.invalidate()
+        if (ok) {
+            LibraryPageSource.invalidate()
+            bumpCount(playlistUri, +1)
+        }
         return ok
     }
 }
