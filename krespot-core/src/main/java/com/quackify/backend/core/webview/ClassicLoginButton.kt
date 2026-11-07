@@ -1,51 +1,14 @@
 package com.quackify.backend.core.webview
 
-/**
- * Injects an "Email + Password Classic Login" pill into Spotify's accounts
- * login page, right above the first alternative sign-in anchor. The link
- * reloads the page with ?allow_password=1, the flag that reveals Spotify's
- * classic email + password form.
- *
- * Like [BrowserSpoof] the script lives in a constant and is injected at
- * document start for the accounts origin (plus an onPageFinished fallback in
- * [LoginWebViewHost] for devices without DOCUMENT_START_SCRIPT support).
- * The pill is DOM-dependent, so the installer is retried from a
- * MutationObserver until the sign-in anchors render — and re-inserted if a
- * React re-render drops it. The .fuckd guard inside the installer keeps a
- * second pill from ever stacking.
- *
- * The script is handed to every accounts.spotify.com page (the document-start
- * API only filters by origin, not path), so it guards itself: it bails unless
- * the page really is the login form — /login or its locale variants like
- * /en/login and /id/login. The pill must never show up on the OTP pages
- * (subpaths such as /login/ott/v2) or the signup page.
- */
 object ClassicLoginButton {
 
     const val CONTENT = """
         (function(){
-            if (window.__classicLoginButton) return;
-            // Only the login form itself. accounts.spotify.com redirects
-            // /login to a locale path like /en/login or /id/login, so both
-            // shapes are allowed. The OTP pages live UNDER /login/ (e.g.
-            // /login/ott/v2) and signup is /signup — those must never grow
-            // a classic-login button, and they don't match this pattern.
-            if (!/^\/(?:[a-z]{2}(?:-[A-Za-z]{2})?\/)?login\/?$/.test(location.pathname)) return;
-            window.__classicLoginButton = true;
-
-            function install(){
-                const gl = document.querySelector(
-                    'section>div>div>div>div>a:first-child:not(.fuckd)'
-                );
-
-                if (!gl || document.querySelector('.fuckd')) return;
-
-                const cl = document.createElement('a');
-
+            var gl = document.querySelector('section>div>div>div>div>a:first-child:not(.fuckd)');
+            if(gl) {
+                var cl = document.createElement('a');
                 cl.className = 'fuckd';
                 cl.textContent = 'Email + Password Classic Login';
-                cl.href = '?allow_password=1';
-
                 cl.style.cssText = `
                     display: flex;
                     align-items: center;
@@ -89,24 +52,9 @@ object ClassicLoginButton {
                     cl.style.transform = 'translateY(0) scale(1)';
                     cl.style.boxShadow = '0 0 0 rgba(29,185,84,0)';
                 });
-
+                cl.href = '?allow_password=1';
                 gl.parentNode.insertBefore(cl, gl);
             }
-
-            install();
-
-            // The login page renders its sign-in anchors after this script
-            // first runs, and a re-render can drop the pill again; retry the
-            // (guarded) installer on every DOM change.
-            const mo = new MutationObserver(() => { install(); });
-            function watch(){
-                if (document.documentElement) {
-                    mo.observe(document.documentElement, { childList: true, subtree: true });
-                } else {
-                    setTimeout(watch, 25);
-                }
-            }
-            watch();
         })();
     """
 }

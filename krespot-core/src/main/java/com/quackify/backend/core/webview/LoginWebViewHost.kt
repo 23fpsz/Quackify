@@ -41,9 +41,7 @@ private const val SPOTIFY_ORIGIN = "https://open.spotify.com"
 private const val ACCOUNTS_ORIGIN = "https://accounts.spotify.com"
 private const val GOOGLE_ORIGIN = "https://accounts.google.com"
 
-/** Login form paths: /login itself plus locale variants like /en/login or
- * /pt-BR/login. OTP subpaths (/login/ott/v2) and /signup stay out. */
-private val LOGIN_PATH = Regex("^/(?:[a-z]{2}(?:-[A-Za-z]{2})?/)?login/?$")
+private val LOGIN_PATH = Regex("^/(?:[a-zA-Z0-9]{2,8}(?:-[a-zA-Z0-9]{2,8})?/)?login/?$")
 
 class LoginWebViewHost(val context: Context, private val startUrl: String = LOGIN_URL) {
 
@@ -66,14 +64,10 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
         onPlayerReached?.invoke()
     }
 
-    /** Whether [url] is the accounts login form itself (the page the
-     * classic-login pill belongs on), not OTP/signup/other accounts pages.
-     * /login redirects to locale paths like /en/login or /id/login, so both
-     * shapes pass; the OTP pages are subpaths such as /login/ott/v2 and must
-     * not match. */
-    private fun isLoginPage(url: String): Boolean {
-        if (!url.startsWith(ACCOUNTS_ORIGIN)) return false
-        val path = runCatching { Uri.parse(url).path }.getOrNull() ?: return false
+    private fun isLoginPageUrl(url: String): Boolean {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
+        if (uri.host?.lowercase() != "accounts.spotify.com") return false
+        val path = uri.path ?: return false
         return LOGIN_PATH.matches(path)
     }
 
@@ -165,15 +159,15 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 log.i("onPageFinished $url progress=${view?.progress}")
+                view?.evaluateJavascript(
+                    """
+                    document.querySelectorAll('a.fuckd').forEach(el => el.remove());
+                    """.trimIndent(),
+                    null
+                )
                 notifyPlayerReached(url)
                 notifyBackAvailable()
-                // Fallback for the classic-login pill: document start covers
-                // DOCUMENT_START_SCRIPT devices, this covers the rest. The
-                // window.__classicLoginButton guard inside makes the re-run a
-                // no-op when the pill observer is already live. Only the real
-                // login page gets it — the same origin also serves the OTP
-                // and signup pages, and the pill has no business there.
-                if (url != null && isLoginPage(url)) {
+                if (url != null && isLoginPageUrl(url)) {
                     log.d("classic login pill fallback injected")
                     view?.evaluateJavascript(ClassicLoginButton.CONTENT, null)
                 }
@@ -461,10 +455,6 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
             WebViewCompat.addDocumentStartJavaScript(view, BrowserSpoof.CONTENT, setOf(ACCOUNTS_ORIGIN))
             WebViewCompat.addDocumentStartJavaScript(view, BrowserSpoof.GOOGLE_CONTENT, setOf(GOOGLE_ORIGIN))
             WebViewCompat.addDocumentStartJavaScript(view, BrowserSpoof.CONTENT, setOf(SPOTIFY_ORIGIN))
-            // The pill needs the page DOM, so this script installs a
-            // MutationObserver at document start and inserts the pill as
-            // soon as the sign-in anchors exist.
-            WebViewCompat.addDocumentStartJavaScript(view, ClassicLoginButton.CONTENT, setOf(ACCOUNTS_ORIGIN))
         }.onFailure { log.e("installSpoofScripts failed", it) }
     }
 
