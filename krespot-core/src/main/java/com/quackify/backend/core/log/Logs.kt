@@ -16,6 +16,10 @@ object Logs {
     /** How many log lines the in-app viewer keeps before the oldest fall off. */
     const val MAX_LINES = 3000
 
+    /** SharedPreferences file + key used to persist [capturing] across restarts. */
+    const val PREFS_NAME = "quackify.client"
+    const val CAPTURE_PREF_KEY = "logCaptureEnabled"
+
     enum class Module(val label: String) {
         AUTH("auth"),
         LOGIN("login"),
@@ -109,6 +113,15 @@ object Logs {
     @Volatile
     var floor: Level = Level.VERBOSE
 
+    /**
+     * Master switch for log capture. When false every write is dropped before it
+     * reaches the ring buffer or logcat, so continuous logging cannot cost any
+     * performance. The app persists this in [PREFS_NAME]/[CAPTURE_PREF_KEY] and the
+     * log viewer exposes it as the "Logging" toggle.
+     */
+    @Volatile
+    var capturing: Boolean = true
+
     private val modules = ConcurrentHashMap<Module, Level>()
 
     private val buffer = ArrayDeque<Entry>(MAX_LINES)
@@ -155,6 +168,7 @@ object Logs {
     fun dump(): String = snapshot().joinToString("\n") { format(it) }
 
     internal fun write(module: Module, level: Level, message: String, error: Throwable?) {
+        if (!capturing) return
         record(module, level, message, error)
         val line = "[${module.label}] $message"
         when (level) {

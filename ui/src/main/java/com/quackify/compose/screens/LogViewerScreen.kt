@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -90,8 +91,10 @@ private val LevelError = Color(0xFFFF5A5F)
 
 /**
  * Hidden logcat-style viewer over the in-memory ring buffer kept by [Logs].
- * Opened by tapping the Version row in Settings five times. Newest lines sit
- * at the top, like the modern logcat panel.
+ * Opened by tapping the Version row in Settings five times. Lines read top to
+ * bottom (oldest first, like a chat transcript) and new lines land at the
+ * bottom, where the Auto-scroll toggle can follow them. The Logging toggle
+ * pauses capture entirely so continuous logging cannot cost performance.
  */
 @Composable
 fun LogViewerScreen(
@@ -106,6 +109,9 @@ fun LogViewerScreen(
     var selected by remember { mutableStateOf<Logs.Entry?>(null) }
     var clearAsk by remember { mutableStateOf(false) }
     var deviceInfoOpen by remember { mutableStateOf(false) }
+    var captureOn by remember { mutableStateOf(Logs.capturing) }
+    var autoScroll by remember { mutableStateOf(true) }
+    val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
         Logs.of(Logs.Module.SHELL).i("log viewer opened, ${Logs.size()} lines buffered")
@@ -120,6 +126,34 @@ fun LogViewerScreen(
                     entry.message.contains(needle, ignoreCase = true) ||
                     entry.module.label.contains(needle, ignoreCase = true) ||
                     (entry.error?.contains(needle, ignoreCase = true) == true))
+        }
+    }
+    // reverseLayout renders index 0 at the bottom, so feeding the list
+    // newest-first puts the oldest line at the top and lets fresh lines grow
+    // downward — the top-to-bottom reading order the viewer promises.
+    val newestFirst = remember(entries) { entries.asReversed() }
+
+    // While Auto-scroll is on, keep the newest line pinned to the bottom as
+    // fresh entries stream in. Turn it off to browse older lines undisturbed.
+    LaunchedEffect(revision, autoScroll) {
+        if (autoScroll && entries.isNotEmpty()) {
+            listState.scrollToItem(0)
+        }
+    }
+
+    fun setCapture(next: Boolean) {
+        if (next == captureOn) return
+        val prefs = context.getSharedPreferences(Logs.PREFS_NAME, Context.MODE_PRIVATE)
+        if (next) {
+            Logs.capturing = true
+            prefs.edit().putBoolean(Logs.CAPTURE_PREF_KEY, true).apply()
+            captureOn = true
+            Logs.of(Logs.Module.SHELL).i("log capture resumed, ${Logs.size()} lines kept")
+        } else {
+            Logs.of(Logs.Module.SHELL).i("log capture paused by user")
+            prefs.edit().putBoolean(Logs.CAPTURE_PREF_KEY, false).apply()
+            Logs.capturing = false
+            captureOn = false
         }
     }
 
@@ -154,7 +188,11 @@ fun LogViewerScreen(
                     style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp)
                 )
                 Text(
-                    text = "${all.size}/${Logs.MAX_LINES} lines kept · newest first",
+                    text = if (captureOn) {
+                        "${all.size}/${Logs.MAX_LINES} lines kept · oldest first"
+                    } else {
+                        "capture paused · ${all.size}/${Logs.MAX_LINES} lines kept"
+                    },
                     style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     fontSize = 11.sp
                 )
@@ -234,6 +272,25 @@ fun LogViewerScreen(
             LevelChip(label = "E", selected = levelFilter == Logs.Level.ERROR) { levelFilter = Logs.Level.ERROR }
         }
 
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ToggleChip(
+                label = "Logging",
+                active = captureOn,
+                onClick = { setCapture(!captureOn) }
+            )
+            ToggleChip(
+                label = "Auto-scroll",
+                active = autoScroll,
+                onClick = { autoScroll = !autoScroll }
+            )
+        }
+
         HorizontalDivider(color = Color(0xFF1F1F1F), thickness = 1.dp, modifier = Modifier.padding(top = 6.dp))
 
         if (entries.isEmpty()) {
@@ -252,7 +309,11 @@ fun LogViewerScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = if (all.isEmpty()) {
-                            "Lines appear as the app runs.\nOpen this screen again by tapping Version five times in Settings."
+                            if (captureOn) {
+                                "Lines appear as the app runs.\nOpen this screen again by tapping Version five times in Settings."
+                            } else {
+                                "Capture is paused.\nTurn the Logging chip back on to start recording again."
+                            }
                         } else {
                             "Loosen the level filter or the search text."
                         },
@@ -263,33 +324,26 @@ fun LogViewerScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(vertical = 4.dp),
                 contentPadding = PaddingValues(bottom = bottomPadding),
                 reverseLayout = true
             ) {
-                item(key = "footer") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "oldest of ${entries.size}",
-                            color = Color(0xFF555555),
-                            fontFamily = DmMono,
-                            fontSize = 10.sp
-                        )
-                    }
+                // Index 0 renders at the bottom of the screen.
+                item(key = "newest") {
+                    LogEdgeMarker(text = "newest of ${entries.size}")
                 }
-                items(entries, key = { it.seq }, contentType = { "log" }) { entry ->
+                items(newestFirst, key = { it.seq }, contentType = { "log" }) { entry ->
                     LogRow(
                         entry = entry,
                         onClick = { selected = entry },
                         onLongClick = { copy(Logs.format(entry), "Line copied") }
                     )
+                }
+                item(key = "oldest") {
+                    LogEdgeMarker(text = "oldest of ${entries.size}")
                 }
             }
         }
@@ -400,6 +454,55 @@ private fun LevelChip(
             fontFamily = DmMono,
             fontSize = 11.sp,
             color = if (selected) Color(0xFF000000) else EncoreColors.TextSecondary
+        )
+    }
+}
+
+/** Pill toggle with a status dot: green means on, dark gray means off. */
+@Composable
+private fun ToggleChip(
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (active) EncoreColors.Green else EncoreColors.Card)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(if (active) Color(0xFF000000) else EncoreColors.TextSecondary)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            fontFamily = DmMono,
+            fontSize = 11.sp,
+            color = if (active) Color(0xFF000000) else EncoreColors.TextSecondary
+        )
+    }
+}
+
+/** Small centered caption marking either end of the buffered stream. */
+@Composable
+private fun LogEdgeMarker(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = Color(0xFF555555),
+            fontFamily = DmMono,
+            fontSize = 10.sp
         )
     }
 }
