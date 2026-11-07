@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -698,6 +699,10 @@ fun SpotifyAppShell(
         )
     }
 
+    // A double-tap on the Search tab hands this requester to the search screen's
+    // field; the plain single tap stays exactly the navigation it always was.
+    val searchFieldFocusRequester = remember { FocusRequester() }
+
     // System Back Handler
     BackHandler(
         enabled = isPlayerExpanded ||
@@ -882,6 +887,7 @@ fun SpotifyAppShell(
                     onTrackSelect = handleTrackPlay,
                     onTrackOptionsClick = handleTrackOptions,
                     onProfileClick = openProfileDrawer,
+                    searchFieldFocusRequester = searchFieldFocusRequester,
                     searchResults = searchResults,
                     searchData = searchData,
                     onSearchQueryChange = { query ->
@@ -1248,6 +1254,11 @@ fun SpotifyAppShell(
                         1 -> if (currentScreen != ShellScreen.SEARCH) { navBackStack.clear(); currentScreen = ShellScreen.SEARCH }
                         2 -> if (currentScreen != ShellScreen.LIBRARY) { navBackStack.clear(); currentScreen = ShellScreen.LIBRARY }
                     }
+                },
+                onSearchDoubleTap = {
+                    // The first tap of the pair already switched to Search; focus
+                    // once the field is attached, or swallow it if it is not yet.
+                    runCatching { searchFieldFocusRequester.requestFocus() }
                 },
                 onPlayPause = handlePlayPause,
                 onLike = { if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = !localIsLiked },
