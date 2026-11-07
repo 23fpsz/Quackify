@@ -179,7 +179,7 @@ internal data class ShellInputs(
     val suggestions: List<SearchHit>,
     val recent: List<SearchHit>,
     val onClearRecent: () -> Unit,
-    val onToggleSaved: (String) -> Unit,
+    val onToggleSaved: (String, Boolean) -> Unit,
     val onLoadSection: suspend (SearchKind, Int) -> List<SearchHit>,
     val searchLoading: Boolean,
     val playlistTracks: List<TrackItem>?,
@@ -294,7 +294,8 @@ fun SpotifyAppShell(
     onClearRecentSearches: (() -> Unit)? = null,
     onRemoveRecentSearch: ((String) -> Unit)? = null,
     onLoadSearchSection: (suspend (SearchKind, Int) -> List<SearchHit>)? = null,
-    onToggleSaved: ((String) -> Unit)? = null,
+    onToggleSaved: ((uri: String, currentlySaved: Boolean) -> Unit)? = null,
+    searchSavedOverrides: Map<String, Boolean> = emptyMap(),
     homeLoading: Boolean = false,
     onLogout: (() -> Unit)? = null,
     settingsSwitches: SettingsSwitches = SettingsSwitches(),
@@ -901,7 +902,8 @@ fun SpotifyAppShell(
                     onRetry = { onRetrySearch?.invoke() },
                     onClearRecent = { onClearRecentSearches?.invoke() },
                     onRemoveRecent = { item -> onRemoveRecentSearch?.invoke(item.title) },
-                    onToggleSaved = { uri -> onToggleSaved?.invoke(uri) },
+                    onToggleSaved = { uri, currentlySaved -> onToggleSaved?.invoke(uri, currentlySaved) },
+                    savedOverrides = searchSavedOverrides,
                     onLoadSection = onLoadSearchSection,
                     browseCategories = remember(browseCategories) {
                         browseCategories.orEmpty().map { card ->
