@@ -24,7 +24,6 @@ import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.api.HomeFeed
 import com.quackify.backend.model.HomeSection
 import com.quackify.backend.model.HomeChip
-import com.quackify.backend.model.HomeItem
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
@@ -65,9 +64,6 @@ import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.compose.home.toQuickAccess
 import com.quackify.compose.home.toShelves
-import com.quackify.compose.home.toArtistCardItem
-import com.quackify.compose.home.ArtistCardItem
-import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.screens.LoginScreen
@@ -175,10 +171,6 @@ class MainActivity : ComponentActivity() {
                         var homeGreeting by remember { mutableStateOf("") }
                         var homeFacet by remember { mutableStateOf("") }
                         var loading by remember { mutableStateOf(true) }
-                        // The web player's "Your favorite artists" shelf is its
-                        // own fixed homeSection the main home query never answers,
-                        // so it rides along and loads next to the feed.
-                        var favoriteArtists by remember { mutableStateOf<List<HomeItem>>(emptyList()) }
                         var playHistory by remember { mutableStateOf(PlayHistory.all(context)) }
                         LaunchedEffect(resumeSignal, homeFacet) {
                             if (resumeSignal == 0) loading = true
@@ -195,30 +187,9 @@ class MainActivity : ComponentActivity() {
                         }
                         LaunchedEffect(resumeSignal) {
                             if (resumeSignal > 0) SilentTokenRefresh.maybeRefresh(context)
-                            // Facet-independent: load once per resume and keep
-                            // the last answer if a retry comes back empty.
-                            val artists = HomeFeed.favoriteArtists(context)
-                            if (artists.isNotEmpty() || resumeSignal == 0) {
-                                favoriteArtists = artists
-                            }
-                            log.i("favorite artists=${artists.size}")
                         }
                         val account = remember(loggedIn) { SpotifyAuth.account(context) }
-                        // The shortcut grid is the account's own Recently played:
-                        // the newest distinct songs from the listening history,
-                        // falling back to the server's shortcut shelf only while
-                        // the history on this device is still empty.
-                        val quick = remember(playHistory, feed) {
-                            val recent = playHistory.take(8).map { played ->
-                                QuickAccessItem(
-                                    title = played.item.title,
-                                    coverColor = Color(0xFF535353),
-                                    uri = played.item.uri,
-                                    imageUrl = played.item.imageUrl,
-                                )
-                            }
-                            if (recent.isNotEmpty()) recent else feed.toQuickAccess()
-                        }
+                        val quick = remember(feed) { feed.toQuickAccess() }
                         val shelves = remember(feed) { feed.toShelves() }
                         LaunchedEffect(shelves) {
                             log.i("home shelves=${shelves.size} " +
@@ -780,9 +751,6 @@ class MainActivity : ComponentActivity() {
                             expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
                                 homeQuickAccessItems = quick,
                             homeShelves = shelves,
-                            homeFavoriteArtists = remember(favoriteArtists) {
-                                favoriteArtists.map { it.toArtistCardItem() }
-                            },
                             homeChips = homeChips,
                             homeFacet = homeFacet,
                             homeGreeting = homeGreeting,
