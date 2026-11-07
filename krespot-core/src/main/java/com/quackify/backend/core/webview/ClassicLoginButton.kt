@@ -13,12 +13,21 @@ package com.quackify.backend.core.webview
  * MutationObserver until the sign-in anchors render — and re-inserted if a
  * React re-render drops it. The .fuckd guard inside the installer keeps a
  * second pill from ever stacking.
+ *
+ * The script is handed to every accounts.spotify.com page (the document-start
+ * API only filters by origin, not path), so it guards itself: it bails unless
+ * the page really is the login form — the pill must never show up on the OTP
+ * or signup pages that live under the same origin.
  */
 object ClassicLoginButton {
 
     const val CONTENT = """
         (function(){
             if (window.__classicLoginButton) return;
+            // Only the login form itself. The pill's own ?allow_password=1
+            // reload stays on /login, but OTP/signup/other accounts pages
+            // must never grow a classic-login button.
+            if (location.pathname !== '/login') return;
             window.__classicLoginButton = true;
 
             function install(){
