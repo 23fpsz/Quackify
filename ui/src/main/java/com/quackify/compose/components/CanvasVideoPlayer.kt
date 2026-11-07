@@ -132,6 +132,15 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
     }
     private var gradient: LinearGradient? = null
 
+    // onSurfaceTextureUpdated fires for every decoded frame and AndroidView's
+    // update block runs on every recomposition. Both used to re-apply the
+    // video transform / fade effect unconditionally, and setTransform +
+    // setRenderEffect each invalidate the view — on low-end GPUs that doubled
+    // the per-frame composition work and the canvas visibly stuttered. Both
+    // are now cached by key and become no-ops when nothing actually changed.
+    private var transformKey = Long.MIN_VALUE
+    private var fadeKey = Long.MIN_VALUE
+
     init {
         addView(texture)
     }
@@ -145,9 +154,15 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
 
     fun applyVideoSize() {
         if (videoWidth <= 0 || videoHeight <= 0) return
-        val viewWidth = texture.width.toFloat()
-        val viewHeight = texture.height.toFloat()
-        if (viewWidth <= 0f || viewHeight <= 0f) return
+        val viewWidth = texture.width
+        val viewHeight = texture.height
+        if (viewWidth <= 0 || viewHeight <= 0) return
+        val key = (videoWidth.toLong() and 0xFFFFL).shl(48) or
+            (videoHeight.toLong() and 0xFFFFL).shl(32) or
+            (viewWidth.toLong() and 0xFFFFL).shl(16) or
+            (viewHeight.toLong() and 0xFFFFL)
+        if (key == transformKey) return
+        transformKey = key
         val videoAspect = videoWidth.toFloat() / videoHeight
         val viewAspect = viewWidth / viewHeight
         val matrix = Matrix()
@@ -162,10 +177,18 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
 
     fun applyFade() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Rebuilding the RenderEffect on every call also reallocated the
+            // shader on each frame; keep one alive until (height, fraction)
+            // actually changes.
+            val key = (height.toLong() and 0xFFFFFFFFL).shl(32) or
+                (fadeFraction.toRawBits().toLong() and 0xFFFFFFFFL)
+            if (key == fadeKey) return
+            fadeKey = key
             texture.setRenderEffect(fadeEffect(height, fadeFraction))
-        } else {
-            invalidate()
         }
+        // The pre-S fallback paints the mask in dispatchDraw, and every
+        // caller that can change what it draws already invalidates (the
+        // fadeFraction setter and onSizeChanged), so nothing to do here.
     }
 
     override fun dispatchDraw(canvas: Canvas) {
