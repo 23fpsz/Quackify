@@ -42,9 +42,18 @@ data class PlaylistChoice(
     val uri: String,
     val name: String,
     val imageUrl: String = "",
+    val kind: Kind = Kind.PLAYLIST,
     // The add-to-playlist answer flags, per playlist, whether the track the
     // sheet was opened for already sits in it (editablePlaylists' "curates"
     // when the request carries the track's uri). The sheet turns it into the
     // green check the web player shows.
     val containsTrack: Boolean = false,
-)
+) {
+    enum class Kind { PLAYLIST, LIKED_SONGS, FOLDER }
+
+    companion object {
+        // The rootlist's pinned pseudo playlist standing in for the liked
+        // songs collection inside editablePlaylists answers.
+        const val LIKED_SONGS_URI = "spotify:collection:tracks"
+    }
+}
