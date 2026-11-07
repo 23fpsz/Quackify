@@ -3,6 +3,7 @@ package com.quackify.backend.core.webview
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
 import android.net.http.SslError
 import android.os.SystemClock
 import android.view.View
@@ -59,6 +60,14 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     private fun notifyPlayerReached(url: String?) {
         if (url == null || !url.startsWith(SPOTIFY_ORIGIN)) return
         onPlayerReached?.invoke()
+    }
+
+    /** Whether [url] is the accounts login form itself (the page the
+     * classic-login pill belongs on), not OTP/signup/other accounts pages. */
+    private fun isLoginPage(url: String): Boolean {
+        if (!url.startsWith(ACCOUNTS_ORIGIN)) return false
+        val path = runCatching { Uri.parse(url).path }.getOrNull()
+        return path == "/login"
     }
 
     private fun notifyBackAvailable() {
@@ -154,8 +163,10 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 // Fallback for the classic-login pill: document start covers
                 // DOCUMENT_START_SCRIPT devices, this covers the rest. The
                 // window.__classicLoginButton guard inside makes the re-run a
-                // no-op when the pill observer is already live.
-                if (url != null && url.startsWith(ACCOUNTS_ORIGIN)) {
+                // no-op when the pill observer is already live. Only the real
+                // login page gets it — the same origin also serves the OTP
+                // and signup pages, and the pill has no business there.
+                if (url != null && isLoginPage(url)) {
                     log.d("classic login pill fallback injected")
                     view?.evaluateJavascript(ClassicLoginButton.CONTENT, null)
                 }
