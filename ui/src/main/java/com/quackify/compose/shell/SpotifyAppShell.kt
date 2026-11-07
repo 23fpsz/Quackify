@@ -1300,7 +1300,14 @@ fun SpotifyAppShell(
                     selectedNavIndex = index
                     when (index) {
                         0 -> if (currentScreen != ShellScreen.HOME) { navBackStack.clear(); currentScreen = ShellScreen.HOME }
-                        1 -> if (currentScreen != ShellScreen.SEARCH) { navBackStack.clear(); currentScreen = ShellScreen.SEARCH }
+                        1 -> if (currentScreen != ShellScreen.SEARCH) {
+                            navBackStack.clear(); currentScreen = ShellScreen.SEARCH
+                        } else {
+                            // Already on Search: retapping the tab focuses the field —
+                            // the second focus path besides the double tap. A no-op when
+                            // the field already holds focus.
+                            runCatching { searchFieldFocusRequester.requestFocus() }
+                        }
                         2 -> if (currentScreen != ShellScreen.LIBRARY) { navBackStack.clear(); currentScreen = ShellScreen.LIBRARY }
                     }
                 },
