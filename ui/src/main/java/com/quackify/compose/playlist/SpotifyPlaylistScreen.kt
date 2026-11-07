@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncorePlayButton
+import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreTrackRow
 import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.TrackListSkeleton
@@ -1118,21 +1119,10 @@ fun SpotifyPlaylistScreen(
                                 )
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     if (recTrack.isExplicit) {
-                                        Box(
-                                            modifier = Modifier
-                                                .padding(end = 4.dp)
-                                                .size(13.dp)
-                                                .clip(RoundedCornerShape(2.dp))
-                                                .background(Color.White.copy(alpha = 0.6f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "E",
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.Black
-                                            )
-                                        }
+                                        EncoreExplicitTag(
+                                            modifier = Modifier.padding(end = 4.dp),
+                                            background = Color.White.copy(alpha = 0.6f)
+                                        )
                                     }
                                     Text(
                                         text = recTrack.artist,
