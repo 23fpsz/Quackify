@@ -83,10 +83,14 @@ object PlaylistSource {
                 imageUrl = GraphQl.largestSource(
                     data.optJSONObject("images")?.optJSONArray("items")?.optJSONObject(0),
                 ),
+                // "curates" is the answer's per-row flag for the uris the request
+                // carried: true when that playlist already holds the track.
+                containsTrack = entry.optBoolean("curates", false),
             )
         }
         log.i("editable: ${out.size} playlist(s), $skipped skipped (folders and pseudo playlists " +
-                "cannot hold a track) for $trackUri"
+                "cannot hold a track), ${out.count { it.containsTrack }} already hold the track " +
+                "for $trackUri"
         )
         return out
     }
