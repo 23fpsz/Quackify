@@ -1,7 +1,9 @@
 package com.quackify.compose.screens
 
+import android.app.Activity
 import android.content.Context
 import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -53,17 +55,27 @@ private sealed interface Resolve {
  * moment the resolved account matches one already saved on this device the
  * login is refused and [onDuplicateLogin] fires instead — the same account
  * cannot be added twice.
+ *
+ * System back walks the webview back through its history first (a wrong
+ * Google account pick goes back to the chooser instead of restarting the
+ * flow). Only when no earlier page is left does [onBackExhausted] run; when
+ * it is null the login is left the ordinary way (back out of the app).
  */
 @Composable
 fun LoginScreen(
     onLoggedIn: () -> Unit,
     isDuplicateAccount: ((SpotifyAuth.Account) -> Boolean)? = null,
     onDuplicateLogin: ((SpotifyAuth.Account) -> Unit)? = null,
+    onBackExhausted: (() -> Unit)? = null,
 ) {
 
     val context = LocalContext.current
     val host = remember { LoginWebViewHost(context) }
     var splash by remember { mutableStateOf(false) }
+    // Whether back has an earlier webview page to walk to; the host bumps it
+    // on every navigation so the BackHandler below enables and disables with
+    // the history instead of swallowing backs it cannot serve.
+    var canGoBack by remember { mutableStateOf(false) }
     val navSignal = remember { Channel<Unit>(Channel.CONFLATED) }
     val webAlpha by animateFloatAsState(
         targetValue = if (splash) 0f else 1f,
@@ -76,10 +88,28 @@ fun LoginScreen(
 
     DisposableEffect(Unit) {
         host.onPlayerReached = { navSignal.trySend(Unit) }
+        host.onBackAvailableChanged = { canGoBack = it }
+        canGoBack = host.goBackAvailable()
         onDispose {
             host.onPlayerReached = null
+            host.onBackAvailableChanged = null
             host.destroy()
         }
+    }
+
+    // Registered before the goBack handler: it only runs once the webview's
+    // own history is exhausted, so a wrong login turn still walks back page
+    // by page first.
+    BackHandler {
+        if (onBackExhausted != null) {
+            onBackExhausted()
+        } else {
+            log.i("login back exhausted, leaving the app")
+            (context as? Activity)?.finish()
+        }
+    }
+    BackHandler(enabled = canGoBack) {
+        host.goBack()
     }
 
     LaunchedEffect(Unit) {

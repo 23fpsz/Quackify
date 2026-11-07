@@ -1197,11 +1197,6 @@ class MainActivity : ComponentActivity() {
                         // An account that is already saved is refused: the login
                         // is torn down and the previous session restored.
                         if (addingAccount) {
-                            BackHandler {
-                                log.i("add account cancelled, restoring the active session")
-                                SpotifyAuth.applySession(context)
-                                addingAccount = false
-                            }
                             LoginScreen(
                                 onLoggedIn = {
                                     log.i("add account completed")
@@ -1232,18 +1227,46 @@ class MainActivity : ComponentActivity() {
                                         "'${duplicate.name.ifBlank { "This account" }}' is already added",
                                         Toast.LENGTH_LONG
                                     ).show()
+                                },
+                                // Back walked the login webview's history dry
+                                // (handled inside LoginScreen): return to the
+                                // app with the previous session restored.
+                                onBackExhausted = {
+                                    log.i("add account cancelled, restoring the active session")
+                                    SpotifyAuth.applySession(context)
+                                    addingAccount = false
                                 }
                             )
                         }
                     }
                 } else {
-                    LoginScreen(onLoggedIn = {
-                        log.i("login completed")
-                        SpotifyAuth.storeCurrentAccount(context)
-                        PlaybackHost.reset(context)
-                        Krespot.library.invalidate()
-                        loggedIn = true
-                    })
+                    LoginScreen(
+                        onLoggedIn = {
+                            log.i("login completed")
+                            SpotifyAuth.storeCurrentAccount(context)
+                            PlaybackHost.reset(context)
+                            Krespot.library.invalidate()
+                            loggedIn = true
+                        },
+                        // Back walked the login webview's history dry: with an
+                        // account already saved on this device, return to the
+                        // app on its stored session; a fresh install leaves
+                        // the app the ordinary way.
+                        onBackExhausted = {
+                            if (SpotifyAuth.savedAccounts(context).isNotEmpty()) {
+                                log.i("login backed out with a saved account, restoring its session")
+                                SpotifyAuth.applySession(context)
+                                if (SpotifyAuth.token(context).isNotBlank()) {
+                                    loggedIn = true
+                                } else {
+                                    (context as? Activity)?.finish()
+                                }
+                            } else {
+                                log.i("login backed out, leaving the app")
+                                (context as? Activity)?.finish()
+                            }
+                        }
+                    )
                 }
             }
         }
