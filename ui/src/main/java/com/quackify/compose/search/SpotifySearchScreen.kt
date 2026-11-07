@@ -728,21 +728,35 @@ fun SpotifySearchScreen(
                 }
             }
         } else if (showSuggestions) {
+            // As-you-type dropdown. The rows mirror the saved-state overlay the
+            // activity keeps, so a heart pressed here flips in place too.
+            val dropHits = remember(suggestionHits, savedOverrides) {
+                suggestionHits.map { hit -> savedOverrides[hit.uri]?.let { hit.copy(saved = it) } ?: hit }
+            }
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(EncoreColors.Background),
                 contentPadding = PaddingValues(top = 4.dp, bottom = bottomPadding)
             ) {
-                items(suggestionHits, key = { it.uri.ifBlank { it.title } }) { hit ->
+                items(dropHits, key = { it.uri.ifBlank { it.title } }) { hit ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                isSearchBarFocused = false
-                                searchQuery = hit.title
-                                focusManager.clearFocus()
-                                onSearchQueryChange(hit.title)
+                                if (hit.kind == SearchKind.QUERY) {
+                                    isSearchBarFocused = false
+                                    searchQuery = hit.title
+                                    focusManager.clearFocus()
+                                    onSearchQueryChange(hit.title)
+                                } else {
+                                    // Pressing an entity opens it straight from the
+                                    // dropdown — a song plays — instead of re-running
+                                    // the search on its name.
+                                    isSearchBarFocused = false
+                                    focusManager.clearFocus()
+                                    openHit(hit)
+                                }
                             }
                             .padding(horizontal = 16.dp)
                             .height(56.dp),
@@ -777,12 +791,17 @@ fun SpotifySearchScreen(
                                 )
                             }
                         }
-                        if (hit.kind != SearchKind.QUERY) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.encore_icon_search_24),
-                                contentDescription = null,
-                                tint = EncoreColors.TextSecondary,
-                                modifier = Modifier.size(18.dp)
+                        if (hit.kind == SearchKind.TRACK) {
+                            // Like a song straight from the dropdown, playing it optional.
+                            EncoreIconButton(
+                                iconRes = if (hit.saved) R.drawable.encore_icon_heart_active_24
+                                else R.drawable.encore_icon_heart_24,
+                                contentDescription = if (hit.saved) "Remove ${hit.title} from Liked Songs"
+                                else "Save ${hit.title} to Liked Songs",
+                                onClick = { onToggleSaved(hit.uri, hit.saved) },
+                                size = 36.dp,
+                                iconSize = 20.dp,
+                                tint = if (hit.saved) EncoreColors.Green else EncoreColors.TextSecondary
                             )
                         }
                     }
