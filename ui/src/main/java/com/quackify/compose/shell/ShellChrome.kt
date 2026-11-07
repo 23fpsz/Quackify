@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -21,11 +22,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -60,6 +66,7 @@ internal fun ShellBottomBar(
     navItems: List<NavItem>,
     currentNavIndex: Int,
     onNavSelect: (Int) -> Unit,
+    onSearchDoubleTap: (() -> Unit)? = null,
     onPlayPause: () -> Unit,
     onLike: () -> Unit,
     onDeviceClick: () -> Unit,
@@ -143,6 +150,7 @@ internal fun ShellBottomBar(
                     item = item,
                     isSelected = currentNavIndex == index,
                     onClick = { onNavSelect(index) },
+                    onDoubleTap = if (item.title == "Search") onSearchDoubleTap else null,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -155,11 +163,23 @@ private fun SpotifyBottomNavItem(
     item: NavItem,
     isSelected: Boolean,
     onClick: () -> Unit,
+    onDoubleTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    // A single tap behaves exactly like before; a second tap inside the system
+    // double-tap window also fires the double-tap action on top of it, so the
+    // search tab can focus its field without delaying every plain tap.
+    val doubleTapTimeoutMillis = LocalViewConfiguration.current.doubleTapTimeoutMillis
+    var lastTapAtMillis by remember { mutableLongStateOf(0L) }
     Column(
         modifier = modifier
-            .clickable(onClick = onClick)
+            .clickable {
+                val now = SystemClock.elapsedRealtime()
+                val isDoubleTap = now - lastTapAtMillis <= doubleTapTimeoutMillis
+                lastTapAtMillis = now
+                if (isDoubleTap) onDoubleTap?.invoke()
+                onClick()
+            }
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

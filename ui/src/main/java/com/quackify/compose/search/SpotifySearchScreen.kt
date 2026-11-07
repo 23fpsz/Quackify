@@ -60,6 +60,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
@@ -190,6 +192,7 @@ fun SpotifySearchScreen(
     currentTrackTitle: String = "",
     currentTrackUri: String = "",
     isPlaying: Boolean = false,
+    searchFieldFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -538,6 +541,11 @@ fun SpotifySearchScreen(
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
+                        .then(
+                            // The shell's nav bar focuses this field through the
+                            // requester when the Search tab is double-tapped.
+                            searchFieldFocusRequester?.let { Modifier.focusRequester(it) } ?: Modifier
+                        )
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isSearching) Color(0xFF282828) else Color.White)
                         .onFocusChanged { isSearchBarFocused = it.isFocused }
