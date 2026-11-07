@@ -82,7 +82,8 @@ private const val SURFACE_BLUE = 0x12 / 255f
 data class ArtistCardItem(
     val name: String,
     val color: Color,
-    val uri: String = ""
+    val uri: String = "",
+    val imageUrl: String? = null
 )
 
 /**
@@ -112,6 +113,8 @@ fun SpotifyHomeScreen(
     loading: Boolean = false,
     quickAccessItems: List<QuickAccessItem>? = null,
     recommendations: List<RecommendationCard>? = null,
+    /** "Your favorite artists", rendered right under the Recently played grid. */
+    favoriteArtists: List<ArtistCardItem> = emptyList(),
     chips: List<HomeChip> = emptyList(),
     selectedFacet: String = "",
     onFacetSelected: (String) -> Unit = {},
@@ -282,6 +285,19 @@ fun SpotifyHomeScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // "Your favorite artists" — the fixed homeSection shelf, shown
+            // right below the Recently played grid whenever the account has
+            // any favorite artists to show.
+            if (selectedFacet.isEmpty() && favoriteArtists.isNotEmpty()) {
+                item(key = "home_favorite_artists") {
+                    ArtistShelfSection(
+                        title = "Your favorite artists",
+                        artists = favoriteArtists,
+                        onArtistClick = onArtistClick
+                    )
                 }
             }
         }
@@ -639,11 +655,20 @@ private fun ArtistShelfSection(
                             .background(artist.color),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "★",
-                            color = Color.White,
-                            fontSize = 38.sp
-                        )
+                        if (artist.imageUrl != null) {
+                            SpotifyArtworkImage(
+                                imageUrl = artist.imageUrl,
+                                contentDescription = artist.name,
+                                shape = CircleShape,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Text(
+                                text = "★",
+                                color = Color.White,
+                                fontSize = 38.sp
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(

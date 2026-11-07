@@ -41,6 +41,7 @@ import com.quackify.compose.R
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.components.DetailPageSkeleton
+import com.quackify.compose.home.ArtistCardItem
 import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.home.RecommendationCard
 import com.quackify.compose.home.SpotifyHomeScreen
@@ -276,6 +277,7 @@ fun SpotifyAppShell(
     homeQuickAccessItems: List<QuickAccessItem>? = null,
     homeRecommendations: List<RecommendationCard>? = null,
     homeShelves: List<HomeShelf>? = null,
+    homeFavoriteArtists: List<ArtistCardItem> = emptyList(),
     homeChips: List<HomeChip> = emptyList(),
     homeFacet: String = "",
     homeGreeting: String = "",
@@ -391,6 +393,11 @@ fun SpotifyAppShell(
     artistTracks: List<PopularTrack>? = null,
     artistReleases: List<ArtistRelease>? = null,
     artistMonthlyListeners: String? = null,
+    /** null while the library contains-check for the open artist is loading. */
+    artistFollowed: Boolean? = null,
+    onArtistFollowToggle: ((artistUri: String, follow: Boolean) -> Unit)? = null,
+    /** Resolves the artist's radio playlist uri (null when it cannot be built). */
+    onArtistRadio: (suspend (artistUri: String) -> String?)? = null,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = ""
 ) {
@@ -447,6 +454,9 @@ fun SpotifyAppShell(
     // follows this instead of the screen the user is on, so a search play keeps
     // saying "Playing from search" after the user browses elsewhere.
     var playbackOrigin by remember { mutableStateOf<PlaybackOrigin?>(null) }
+    // The playlist uri whose page should start playing the moment its tracks
+    // arrive — set when "Go to artist radio" resolves the radio playlist.
+    var pendingAutoPlayUri by remember { mutableStateOf("") }
     var libraryItemOptions by remember { mutableStateOf<EntityOptions?>(null) }
     var activeFolderOptionsItem by remember { mutableStateOf<LibraryItem?>(null) }
     var isRenamePlaylistDialogOpen by remember { mutableStateOf(false) }
@@ -858,112 +868,100 @@ fun SpotifyAppShell(
         val playlistLoadFailed = !playlistLoading && playlistTracks == null
         ShellScreenSlot {
         when (currentScreen) {
-            ShellScreen.HOME -> {
-                SpotifyHomeScreen(
-                    onPlaylistClick = { playlist, uri ->
-                        val foundItem = homeQuickAccessItems?.find { it.uri == uri || it.title == playlist }
-                        val foundRec = homeRecommendations?.find { it.uri == uri || it.title == playlist }
-                        val foundLib = libraryItems?.find { it.uri == uri || it.title == playlist }
-                        val cover = foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl
-                        activePlaylistCoverUrl = cover
-                        activeAlbumCoverUrl = cover
-                        if (uri.startsWith("spotify:album:")) {
-                            openAlbum(playlist, "", uri)
-                        } else if (uri.startsWith("spotify:show:")) {
-                            openShow(uri)
-                        } else if (uri.startsWith("spotify:episode:")) {
-                            openEpisode(uri)
-                        } else {
-                            openPlaylist(playlist, uri)
-                        }
-                    },
-                    onProfileClick = openProfileDrawer,
-                    onNotificationsClick = {
-                        pushCurrentState()
-                        currentScreen = ShellScreen.NOTIFICATIONS
-                    },
-                    onHistoryClick = {
-                        pushCurrentState()
-                        currentScreen = ShellScreen.HISTORY
-                        onOpenHistory?.invoke()
-                    },
-                    onSettingsClick = handleOpenSettings,
-                    quickAccessItems = homeQuickAccessItems,
-                    recommendations = homeRecommendations,
-                    shelves = homeShelves,
-                    loading = homeLoading,
-                    chips = homeChips,
-                    selectedFacet = homeFacet,
-                    onFacetSelected = onHomeFacetSelected,
-                    greeting = homeGreeting,
-                    whatsNewCount = notifications.count { it.isNew },
-                    onArtistClick = openArtist,
-                    userDisplayName = userDisplayName,
-                    userAvatarUrl = userAvatarUrl
-                )
-            }
-            ShellScreen.SEARCH -> {
-                SpotifySearchScreen(
-                    onCategoryClick = { category ->
-                        pushCurrentState()
-                        activeCategoryTitle = category.title
-                        activeCategoryColor = category.color
-                        // Only a spotify:page uri resolves through browsePage. Client
-                        // features (Live Events -> spotify:concerts) and any other
-                        // scheme have no browsable section tree, so they fall back to
-                        // the local category screen instead of an empty page.
-                        if (category.uri.startsWith("spotify:page:")) {
-                            currentScreen = ShellScreen.BROWSE
-                            onOpenBrowse?.invoke(category.uri)
-                        } else {
-                            currentScreen = ShellScreen.CATEGORY
-                            onOpenCategory?.invoke(category.title)
-                        }
-                    },
-                    onAlbumClick = openAlbum,
-                    onArtistClick = openArtist,
-                    onPodcastClick = handlePodcastOpen,
-                    onEpisodeClick = { _, uri -> if (uri.isNotEmpty()) openEpisode(uri) },
-                    onShowClick = { _, uri -> if (uri.isNotEmpty()) openShow(uri) },
-                    onPlaylistClick = openPlaylist,
-                    onTrackSelect = handleTrackPlay,
-                    onTrackOptionsClick = handleTrackOptions,
-                    onProfileClick = openProfileDrawer,
-                    searchFieldFocusRequester = searchFieldFocusRequester,
-                    searchResults = searchResults,
-                    searchData = searchData,
-                    onSearchQueryChange = { query ->
-                        onSearchQueryChange?.invoke(query) ?: playerListener?.onSearch(query)
-                    },
-                    recentSearches = searchRecent,
-                    suggestions = searchSuggestions,
-                    suggestionHits = searchSuggestionHits,
-                    loading = searchLoading,
-                    loadFailed = searchFailed,
-                    onRetry = { onRetrySearch?.invoke() },
-                    onClearRecent = { onClearRecentSearches?.invoke() },
-                    onRemoveRecent = { item -> onRemoveRecentSearch?.invoke(item.title) },
-                    onToggleSaved = { uri, currentlySaved -> onToggleSaved?.invoke(uri, currentlySaved) },
-                    savedOverrides = searchSavedOverrides,
-                    onLoadSection = onLoadSearchSection,
-                    browseCategories = remember(browseCategories) {
-                        browseCategories.orEmpty().map { card ->
-                            CategoryCard(
-                                title = card.title,
-                                color = parseHexColor(card.colorHex) ?: getCategoryColor(card.title),
-                                uri = card.uri,
-                                imageUrl = card.imageUrl.takeIf { it.isNotBlank() },
-                                subtitle = card.subtitle
-                            )
-                        }
-                    },
-                    userDisplayName = userDisplayName,
-                    userAvatarUrl = userAvatarUrl,
-                    currentTrackTitle = currentTrackTitle,
-                    currentTrackUri = playbackState?.trackUri.orEmpty(),
-                    isPlaying = isPlaying
-                )
-            }
+            ShellScreen.HOME -> ShellHomePane(
+                quickAccessItems = homeQuickAccessItems,
+                recommendations = homeRecommendations,
+                shelves = homeShelves,
+                favoriteArtists = homeFavoriteArtists,
+                chips = homeChips,
+                selectedFacet = homeFacet,
+                greeting = homeGreeting,
+                loading = homeLoading,
+                libraryItems = libraryItems,
+                notifications = notifications,
+                userDisplayName = userDisplayName,
+                userAvatarUrl = userAvatarUrl,
+                onFacetSelected = onHomeFacetSelected,
+                onOpenNotifications = {
+                    pushCurrentState()
+                    currentScreen = ShellScreen.NOTIFICATIONS
+                },
+                onOpenHistory = {
+                    pushCurrentState()
+                    currentScreen = ShellScreen.HISTORY
+                    onOpenHistory?.invoke()
+                },
+                onOpenSettings = handleOpenSettings,
+                onOpenProfile = openProfileDrawer,
+                onArtistClick = openArtist,
+                onCoverResolved = { cover ->
+                    activePlaylistCoverUrl = cover
+                    activeAlbumCoverUrl = cover
+                },
+                onPlayTrackShortcut = { uri, title ->
+                    playbackOrigin = PlaybackOrigin(ShellScreen.HOME, "Recently played")
+                    if (playerListener != null) {
+                        playerListener.onPlayUri(uri)
+                    } else {
+                        localTrackTitle = title
+                        localIsPlaying = true
+                        localProgress = 0.05f
+                    }
+                },
+                onOpenAlbum = openAlbum,
+                onOpenShow = openShow,
+                onOpenEpisode = openEpisode,
+                onOpenPlaylist = openPlaylist,
+            )
+            ShellScreen.SEARCH -> ShellSearchPane(
+                searchResults = searchResults,
+                searchData = searchData,
+                searchRecent = searchRecent,
+                searchSuggestions = searchSuggestions,
+                searchSuggestionHits = searchSuggestionHits,
+                searchLoading = searchLoading,
+                searchFailed = searchFailed,
+                searchSavedOverrides = searchSavedOverrides,
+                browseCategories = browseCategories,
+                userDisplayName = userDisplayName,
+                userAvatarUrl = userAvatarUrl,
+                currentTrackTitle = currentTrackTitle,
+                currentTrackUri = playbackState?.trackUri.orEmpty(),
+                isPlaying = isPlaying,
+                searchFieldFocusRequester = searchFieldFocusRequester,
+                playerListener = playerListener,
+                onSearchQueryChange = onSearchQueryChange,
+                onRetrySearch = { onRetrySearch?.invoke() },
+                onClearRecentSearches = { onClearRecentSearches?.invoke() },
+                onRemoveRecentSearch = { item -> onRemoveRecentSearch?.invoke(item.title) },
+                onToggleSaved = { uri, currentlySaved -> onToggleSaved?.invoke(uri, currentlySaved) },
+                onLoadSearchSection = onLoadSearchSection,
+                onCategoryClick = { category ->
+                    pushCurrentState()
+                    activeCategoryTitle = category.title
+                    activeCategoryColor = category.color
+                    // Only a spotify:page uri resolves through browsePage. Client
+                    // features (Live Events -> spotify:concerts) and any other
+                    // scheme have no browsable section tree, so they fall back to
+                    // the local category screen instead of an empty page.
+                    if (category.uri.startsWith("spotify:page:")) {
+                        currentScreen = ShellScreen.BROWSE
+                        onOpenBrowse?.invoke(category.uri)
+                    } else {
+                        currentScreen = ShellScreen.CATEGORY
+                        onOpenCategory?.invoke(category.title)
+                    }
+                },
+                onAlbumClick = openAlbum,
+                onArtistClick = openArtist,
+                onPodcastClick = handlePodcastOpen,
+                onOpenEpisode = openEpisode,
+                onOpenShow = openShow,
+                onOpenPlaylist = openPlaylist,
+                onTrackSelect = handleTrackPlay,
+                onTrackOptionsClick = handleTrackOptions,
+                onProfileClick = openProfileDrawer,
+            )
             ShellScreen.LIBRARY -> {
                 SpotifyLibraryScreen(
                     onItemClick = { itemTitle, itemUri ->
@@ -998,6 +996,9 @@ fun SpotifyAppShell(
                 onLoadMorePlaylistTracks = onLoadMorePlaylistTracks,
                 playlistLoadFailed = playlistLoadFailed,
                 onRetryPlaylist = onRetryPlaylist,
+                autoPlay = activePlaylistUri.isNotEmpty() &&
+                    pendingAutoPlayUri == activePlaylistUri,
+                onAutoPlayHandled = { pendingAutoPlayUri = "" },
                 currentTrackTitle = currentTrackTitle,
                 isPlaying = isPlaying,
                 userDisplayName = userDisplayName,
@@ -1056,44 +1057,32 @@ fun SpotifyAppShell(
                 onAlbumOptions = { isAlbumOptionsOpen = true },
                 onPlaybackOrigin = { playbackOrigin = it }
             )
-            ShellScreen.ARTIST -> {
-                androidx.compose.runtime.key(activeArtistName) {
-                    SpotifyArtistScreen(
-                        artistName = activeArtistName,
-                        monthlyListeners = artistMonthlyListeners?.takeIf { it.isNotBlank() }.orEmpty(),
-                        heroColor = artistDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card,
-                        headerImageUrl = artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() }
-                            ?: artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
-                            ?: activeArtistAvatarUrl,
-                        popularTracks = artistTracks.orEmpty(),
-                        releases = artistReleases.orEmpty(),
-                        // Dedicated discography groups for the "Albums" and
-                        // "Singles & EPs" shelves (the screen falls back to
-                        // splitting the popular releases when these are thin).
-                        albums = artistDetail?.albums.orEmpty().map { it.toArtistRelease() },
-                        singles = artistDetail?.singles.orEmpty().map { it.toArtistRelease() },
-                        currentTrackTitle = currentTrackTitle,
-                        isPlaying = isPlaying,
-                        biography = artistDetail?.biography.orEmpty(),
-                        verified = artistDetail?.verified == true,
-                        followers = artistDetail?.followers ?: 0L,
-                        worldRank = artistDetail?.worldRank ?: 0,
-                        topCities = artistDetail?.topCities.orEmpty(),
-                        gallery = artistDetail?.gallery.orEmpty(),
-                        isLoading = artistLoading,
-                        onBackClick = handleBack,
-                        onPlayPauseClick = handlePlayPause,
-                        onTrackSelect = handleTrackPlay,
-                        onTrackOptionsClick = handleTrackOptions,
-                        onArtistOptionsClick = { isArtistOptionsOpen = true },
-                        onReleaseClick = { release ->
-                            openAlbum(release.title, activeArtistName, release.uri)
-                        },
-                        onAboutClick = { isArtistAboutOpen = true },
-                        onDiscographyClick = { isDiscographyOpen = true }
-                    )
-                }
-            }
+            ShellScreen.ARTIST -> ShellArtistPane(
+                artistName = activeArtistName,
+                artistAvatarUrl = activeArtistAvatarUrl,
+                artistUri = activeArtistUri,
+                artistDetail = artistDetail,
+                artistTracks = artistTracks,
+                artistReleases = artistReleases,
+                artistMonthlyListeners = artistMonthlyListeners,
+                artistLoading = artistLoading,
+                artistFollowed = artistFollowed,
+                currentTrackTitle = currentTrackTitle,
+                isPlaying = isPlaying,
+                onBackClick = handleBack,
+                onPlayPauseClick = handlePlayPause,
+                onTrackSelect = handleTrackPlay,
+                onTrackOptionsClick = handleTrackOptions,
+                onFollowToggle = { uri, follow ->
+                    onArtistFollowToggle?.invoke(uri, follow)
+                },
+                onReleaseClick = { release ->
+                    openAlbum(release.title, activeArtistName, release.uri)
+                },
+                onAboutClick = { isArtistAboutOpen = true },
+                onDiscographyClick = { isDiscographyOpen = true },
+                onOptionsClick = { isArtistOptionsOpen = true }
+            )
             ShellScreen.CATEGORY -> {
                 SpotifyCategoryScreen(
                     categoryTitle = activeCategoryTitle,
@@ -1402,6 +1391,11 @@ fun SpotifyAppShell(
             }
         )
 
+        // Every overlay below (options sheets, dialogs, pickers) is lifted into
+        // its own composable lambda: [SpotifyAppShell] sits at the JVM 64KB
+        // method limit and this keeps the generated shell method small while
+        // leaving the sheet code exactly as is.
+        ShellOverlaySlot {
         val isPlaylistUri = activePlaylistUri.startsWith("spotify:playlist:")
         val playlistEntity = if (activePlaylistUri.isBlank() && activePlaylistTitle.isBlank()) null
         else EntityOptions(
@@ -1446,6 +1440,29 @@ fun SpotifyAppShell(
             artistName = activeArtistName,
             artistAvatarUrl = activeArtistAvatarUrl,
             artistUri = activeArtistUri,
+            artistFollowing = artistFollowed == true,
+            onArtistFollowToggle = {
+                if (activeArtistUri.startsWith("spotify:artist:")) {
+                    onArtistFollowToggle?.invoke(activeArtistUri, !(artistFollowed == true))
+                }
+            },
+            onArtistRadio = {
+                isArtistOptionsOpen = false
+                val artistUriNow = activeArtistUri
+                if (artistUriNow.startsWith("spotify:artist:")) {
+                    shellScope.launch {
+                        // seed_to_playlist resolves the artist into its radio
+                        // playlist; opening that playlist page loads it through
+                        // the ordinary playlist path and the autoplay flag starts
+                        // the queue the moment the tracks land.
+                        val radio = onArtistRadio?.invoke(artistUriNow)
+                        if (radio != null && radio.startsWith("spotify:playlist:")) {
+                            pendingAutoPlayUri = radio
+                            openPlaylist(activeArtistName + " Radio", radio)
+                        }
+                    }
+                }
+            },
             sortOption = currentSortOption,
             sleepTimer = activeSleepTimer,
             userDisplayName = userDisplayName,
@@ -1842,6 +1859,7 @@ fun SpotifyAppShell(
             },
             onDismiss = { isRenamePlaylistDialogOpen = false }
         )
+        }
     }
 }
 
@@ -1907,6 +1925,12 @@ private fun ShellScreenSlot(content: @Composable () -> Unit) {
     content()
 }
 
+/** Same trick as [ShellScreenSlot], for the overlay sheets and dialogs layer. */
+@Composable
+private fun ShellOverlaySlot(content: @Composable () -> Unit) {
+    content()
+}
+
 /**
  * Explicit "No Track" identity for the mini player and the NPV while no song
  * has loaded, so the bars never sit on blank lines after a fresh app open.
@@ -1959,6 +1983,7 @@ private fun nowPlayingContext(
             ShellScreen.SEARCH -> "Playing from search" to searchSub(origin.label)
             ShellScreen.ALBUM -> "Playing from album" to origin.label
             ShellScreen.ARTIST -> "Playing from artist" to origin.label
+            ShellScreen.HOME -> "Playing from home" to origin.label
             else -> "Playing from playlist" to origin.label
         }
         screen == ShellScreen.SEARCH -> "Playing from search" to searchSub(searchQuery)
@@ -2106,6 +2131,228 @@ private fun ShellAlbumPane(
     }
 }
 
+/** Search branch of the shell: the search screen plus its section routing. */
+@Composable
+private fun ShellSearchPane(
+    searchResults: List<TrackItem>?,
+    searchData: SearchResults?,
+    searchRecent: List<SearchHistoryItem>,
+    searchSuggestions: List<TrackItem>,
+    searchSuggestionHits: List<SearchHit>,
+    searchLoading: Boolean,
+    searchFailed: Boolean,
+    searchSavedOverrides: Map<String, Boolean>,
+    browseCategories: List<BrowseCard>?,
+    userDisplayName: String,
+    userAvatarUrl: String,
+    currentTrackTitle: String,
+    currentTrackUri: String,
+    isPlaying: Boolean,
+    searchFieldFocusRequester: FocusRequester,
+    playerListener: ComposePlayerListener?,
+    onSearchQueryChange: ((String) -> Unit)?,
+    onRetrySearch: () -> Unit,
+    onClearRecentSearches: () -> Unit,
+    onRemoveRecentSearch: (SearchHistoryItem) -> Unit,
+    onToggleSaved: (String, Boolean) -> Unit,
+    onLoadSearchSection: (suspend (SearchKind, Int) -> List<SearchHit>)?,
+    onCategoryClick: (CategoryCard) -> Unit,
+    onAlbumClick: (String, String, String) -> Unit,
+    onArtistClick: (String, String) -> Unit,
+    onPodcastClick: (String, String) -> Unit,
+    onOpenEpisode: (String) -> Unit,
+    onOpenShow: (String) -> Unit,
+    onOpenPlaylist: (String, String) -> Unit,
+    onTrackSelect: (TrackItem) -> Unit,
+    onTrackOptionsClick: (TrackItem) -> Unit,
+    onProfileClick: () -> Unit,
+) {
+    SpotifySearchScreen(
+        onCategoryClick = onCategoryClick,
+        onAlbumClick = onAlbumClick,
+        onArtistClick = onArtistClick,
+        onPodcastClick = onPodcastClick,
+        onEpisodeClick = { _, uri -> if (uri.isNotEmpty()) onOpenEpisode(uri) },
+        onShowClick = { _, uri -> if (uri.isNotEmpty()) onOpenShow(uri) },
+        onPlaylistClick = onOpenPlaylist,
+        onTrackSelect = onTrackSelect,
+        onTrackOptionsClick = onTrackOptionsClick,
+        onProfileClick = onProfileClick,
+        searchFieldFocusRequester = searchFieldFocusRequester,
+        searchResults = searchResults,
+        searchData = searchData,
+        onSearchQueryChange = { query ->
+            onSearchQueryChange?.invoke(query) ?: playerListener?.onSearch(query)
+        },
+        recentSearches = searchRecent,
+        suggestions = searchSuggestions,
+        suggestionHits = searchSuggestionHits,
+        loading = searchLoading,
+        loadFailed = searchFailed,
+        onRetry = onRetrySearch,
+        onClearRecent = onClearRecentSearches,
+        onRemoveRecent = onRemoveRecentSearch,
+        onToggleSaved = onToggleSaved,
+        savedOverrides = searchSavedOverrides,
+        onLoadSection = onLoadSearchSection,
+        browseCategories = remember(browseCategories) {
+            browseCategories.orEmpty().map { card ->
+                CategoryCard(
+                    title = card.title,
+                    color = parseHexColor(card.colorHex) ?: getCategoryColor(card.title),
+                    uri = card.uri,
+                    imageUrl = card.imageUrl.takeIf { it.isNotBlank() },
+                    subtitle = card.subtitle
+                )
+            }
+        },
+        userDisplayName = userDisplayName,
+        userAvatarUrl = userAvatarUrl,
+        currentTrackTitle = currentTrackTitle,
+        currentTrackUri = currentTrackUri,
+        isPlaying = isPlaying
+    )
+}
+
+/** Artist branch of the shell: the artist screen fed by the loaded overview. */
+@Composable
+private fun ShellArtistPane(
+    artistName: String,
+    artistAvatarUrl: String?,
+    artistUri: String,
+    artistDetail: ArtistDetail?,
+    artistTracks: List<PopularTrack>?,
+    artistReleases: List<ArtistRelease>?,
+    artistMonthlyListeners: String?,
+    artistLoading: Boolean,
+    artistFollowed: Boolean?,
+    currentTrackTitle: String,
+    isPlaying: Boolean,
+    onBackClick: () -> Unit,
+    onPlayPauseClick: () -> Unit,
+    onTrackSelect: (TrackItem) -> Unit,
+    onTrackOptionsClick: (TrackItem) -> Unit,
+    onFollowToggle: (String, Boolean) -> Unit,
+    onReleaseClick: (ArtistRelease) -> Unit,
+    onAboutClick: () -> Unit,
+    onDiscographyClick: () -> Unit,
+    onOptionsClick: () -> Unit,
+) {
+    androidx.compose.runtime.key(artistName) {
+        SpotifyArtistScreen(
+            artistName = artistName,
+            monthlyListeners = artistMonthlyListeners?.takeIf { it.isNotBlank() }.orEmpty(),
+            heroColor = artistDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card,
+            headerImageUrl = artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() }
+                ?: artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
+                ?: artistAvatarUrl,
+            popularTracks = artistTracks.orEmpty(),
+            releases = artistReleases.orEmpty(),
+            // Dedicated discography groups for the "Albums" and
+            // "Singles & EPs" shelves (the screen falls back to
+            // splitting the popular releases when these are thin).
+            albums = artistDetail?.albums.orEmpty().map { it.toArtistRelease() },
+            singles = artistDetail?.singles.orEmpty().map { it.toArtistRelease() },
+            currentTrackTitle = currentTrackTitle,
+            isPlaying = isPlaying,
+            biography = artistDetail?.biography.orEmpty(),
+            verified = artistDetail?.verified == true,
+            followers = artistDetail?.followers ?: 0L,
+            worldRank = artistDetail?.worldRank ?: 0,
+            topCities = artistDetail?.topCities.orEmpty(),
+            gallery = artistDetail?.gallery.orEmpty(),
+            isLoading = artistLoading,
+            onBackClick = onBackClick,
+            onPlayPauseClick = onPlayPauseClick,
+            onTrackSelect = onTrackSelect,
+            onTrackOptionsClick = onTrackOptionsClick,
+            onArtistOptionsClick = onOptionsClick,
+            isFollowing = artistFollowed == true,
+            onFollowToggle = { follow ->
+                if (artistUri.startsWith("spotify:artist:")) {
+                    onFollowToggle(artistUri, follow)
+                }
+            },
+            onReleaseClick = onReleaseClick,
+            onAboutClick = onAboutClick,
+            onDiscographyClick = onDiscographyClick
+        )
+    }
+}
+
+/** Home branch of the shell: the feed screen plus the card routing of its grid and shelves. */
+@Composable
+private fun ShellHomePane(
+    quickAccessItems: List<QuickAccessItem>?,
+    recommendations: List<RecommendationCard>?,
+    shelves: List<HomeShelf>?,
+    favoriteArtists: List<ArtistCardItem>,
+    chips: List<HomeChip>,
+    selectedFacet: String,
+    greeting: String,
+    loading: Boolean,
+    libraryItems: List<LibraryItem>?,
+    notifications: List<SpotifyNotification>,
+    userDisplayName: String,
+    userAvatarUrl: String,
+    onFacetSelected: (String) -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
+    onArtistClick: (String, String) -> Unit,
+    onCoverResolved: (String?) -> Unit,
+    /** A Recently played shortcut on a single song: (track uri, title). */
+    onPlayTrackShortcut: (String, String) -> Unit,
+    onOpenAlbum: (String, String, String) -> Unit,
+    onOpenShow: (String) -> Unit,
+    onOpenEpisode: (String) -> Unit,
+    onOpenPlaylist: (String, String) -> Unit,
+) {
+    SpotifyHomeScreen(
+        onPlaylistClick = { playlist, uri ->
+            val foundItem = quickAccessItems?.find { it.uri == uri || it.title == playlist }
+            val foundRec = recommendations?.find { it.uri == uri || it.title == playlist }
+            val foundLib = libraryItems?.find { it.uri == uri || it.title == playlist }
+            onCoverResolved(foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl)
+            if (uri.startsWith("spotify:album:")) {
+                onOpenAlbum(playlist, "", uri)
+            } else if (uri.startsWith("spotify:show:")) {
+                onOpenShow(uri)
+            } else if (uri.startsWith("spotify:episode:")) {
+                onOpenEpisode(uri)
+            } else if (uri.startsWith("spotify:artist:")) {
+                // Artist shortcut (e.g. the favorites shelf): the card itself
+                // is the navigation, nothing plays.
+                onArtistClick(foundItem?.title ?: playlist, uri)
+            } else if (uri.startsWith("spotify:track:")) {
+                // Recently played shortcut on a single song: play it straight
+                // away, the way Spotify's home grid does.
+                onPlayTrackShortcut(uri, foundItem?.title ?: playlist)
+            } else {
+                onOpenPlaylist(playlist, uri)
+            }
+        },
+        onProfileClick = onOpenProfile,
+        onNotificationsClick = onOpenNotifications,
+        onHistoryClick = onOpenHistory,
+        onSettingsClick = onOpenSettings,
+        quickAccessItems = quickAccessItems,
+        recommendations = recommendations,
+        shelves = shelves,
+        favoriteArtists = favoriteArtists,
+        loading = loading,
+        chips = chips,
+        selectedFacet = selectedFacet,
+        onFacetSelected = onFacetSelected,
+        greeting = greeting,
+        whatsNewCount = notifications.count { it.isNew },
+        onArtistClick = onArtistClick,
+        userDisplayName = userDisplayName,
+        userAvatarUrl = userAvatarUrl
+    )
+}
+
 /** Playlist branch of the shell. */
 @Composable
 private fun ShellPlaylistPane(
@@ -2120,6 +2367,10 @@ private fun ShellPlaylistPane(
     onLoadMorePlaylistTracks: (() -> Unit)?,
     playlistLoadFailed: Boolean,
     onRetryPlaylist: (() -> Unit)?,
+    /** True while this playlist page was opened through "Go to artist radio"
+     *  and its queue should start the moment the first page of tracks lands. */
+    autoPlay: Boolean = false,
+    onAutoPlayHandled: () -> Unit = {},
     currentTrackTitle: String,
     isPlaying: Boolean,
     userDisplayName: String,
@@ -2146,6 +2397,19 @@ private fun ShellPlaylistPane(
         LaunchedEffect(playlistTracks, activePlaylistUri) {
             if (!playlistTracks.isNullOrEmpty()) {
                 playerListener?.onListRendered(playlistTracks.map { it.uri })
+            }
+        }
+        // The radio autoplay: the flag is cleared before the play call so a
+        // failed play cannot loop, and the queue starts from the first track
+        // exactly like tapping the playlist's own play button would.
+        LaunchedEffect(playlistTracks, activePlaylistUri, autoPlay) {
+            if (autoPlay && !playlistTracks.isNullOrEmpty()) {
+                onAutoPlayHandled()
+                val firstTrack = playlistTracks.firstOrNull { it.uri.startsWith("spotify:track:") }
+                if (firstTrack != null && playerListener != null) {
+                    onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
+                    playerListener.onPlayTrack(firstTrack.uri, activePlaylistUri, 0)
+                }
             }
         }
         val resolvedPlaylistCover = activePlaylistCoverUrl ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl

@@ -135,3 +135,11 @@ fun ShelfItem.toArtistRelease(): ArtistRelease {
         uri = uri
     )
 }
+
+/** A homeSection artist node becomes one round-avatar card of the favorites shelf. */
+fun HomeItem.toArtistCardItem(): ArtistCardItem = ArtistCardItem(
+    name = title,
+    color = parseHexColor(colorHex) ?: Color(0xFF535353),
+    uri = uri,
+    imageUrl = imageUrl.takeIf { it.isNotBlank() },
+)
