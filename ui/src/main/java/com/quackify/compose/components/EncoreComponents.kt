@@ -47,7 +47,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
@@ -331,6 +333,39 @@ fun EncorePlayIndicator(
 }
 
 /**
+ * Compact explicit-content tag matching Spotify's ContentRestrictionBadgeView:
+ * a small rounded gray square with a tiny bold "E". Kept deliberately smaller
+ * than the surrounding text so it never visually outweighs the track title.
+ */
+@Composable
+fun EncoreExplicitTag(
+    modifier: Modifier = Modifier,
+    size: Dp = 14.dp,
+    cornerRadius: Dp = 2.dp,
+    fontSize: TextUnit = 9.sp,
+    background: Color = EncoreColors.TextSecondary,
+    tint: Color = EncoreColors.PureBlack
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(background),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "E",
+            style = SpotifyTheme.typography.tagLabel.copy(
+                fontSize = fontSize,
+                lineHeight = fontSize,
+                letterSpacing = 0.sp,
+                color = tint
+            )
+        )
+    }
+}
+
+/**
  * Reusable Track Item Row matching Spotify's album_track_row_layout.xml.
  */
 @Composable
@@ -422,21 +457,7 @@ fun EncoreTrackRow(
             Spacer(modifier = Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isExplicit) {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(EncoreColors.TextSecondary)
-                            .padding(horizontal = 3.dp, vertical = 1.dp)
-                    ) {
-                        Text(
-                            text = "E",
-                            style = SpotifyTheme.typography.tagLabel.copy(
-                                color = EncoreColors.PureBlack,
-                                fontSize = androidx.compose.ui.unit.TextUnit.Unspecified
-                            )
-                        )
-                    }
+                    EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
                 }
                 Text(
                     text = artist,
