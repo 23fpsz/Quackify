@@ -114,10 +114,12 @@ object Logs {
     var floor: Level = Level.VERBOSE
 
     /**
-     * Master switch for log capture. Off by default: a fresh install stays
-     * quiet (nothing reaches the ring buffer or logcat) until the user turns
-     * the "Logging" toggle in the log viewer on; continuous logging must not
-     * cost any performance unasked. The app persists this in
+     * Master switch for the *in-app* log capture (the LogViewer ring
+     * buffer). Off by default: a fresh install keeps the viewer empty until
+     * the user turns the "Logging" toggle in the log viewer on, so continuous
+     * capture cannot cost any performance unasked. Logcat output is NOT
+     * gated by this switch — it always flows so Android Studio can show
+     * what is going on even while capture is off. The app persists this in
      * [PREFS_NAME]/[CAPTURE_PREF_KEY].
      */
     @Volatile
@@ -169,8 +171,10 @@ object Logs {
     fun dump(): String = snapshot().joinToString("\n") { format(it) }
 
     internal fun write(module: Module, level: Level, message: String, error: Throwable?) {
-        if (!capturing) return
-        record(module, level, message, error)
+        // The in-app ring buffer follows the LogViewer toggle, but logcat
+        // always receives the line: the whole point is being able to see in
+        // Android Studio what happened while capture was off.
+        if (capturing) record(module, level, message, error)
         val line = "[${module.label}] $message"
         when (level) {
             Level.VERBOSE -> Log.v(TAG, line, error)
