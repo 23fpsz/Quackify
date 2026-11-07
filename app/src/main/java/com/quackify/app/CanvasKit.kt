@@ -1,6 +1,10 @@
 package com.quackify.app
 
 import android.content.Context
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMuxer
 import com.quackify.backend.connect.dealer.DealerHost
 import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.core.log.Logs
@@ -8,6 +12,7 @@ import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.Net
 import org.json.JSONObject
 import java.io.File
+import java.nio.ByteBuffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -39,7 +44,13 @@ private val log = Logs.of(Logs.Module.TRACKS)
  * stride) the +1/+4 probe stepper still applies.
  *
  * We download the init plus the available segments and stitch them into one
- * playable file; a concatenated fMP4 is a valid progressive mp4.
+ * playable file; a concatenated fMP4 is a valid progressive mp4. The CDN
+ * fragments can, however, carry their master's media timeline — sample
+ * timestamps near 1e9 ms have been seen — which plays fine until a fragment
+ * boundary breaks the timeline; from there every frame lands "hours late",
+ * the decoder drops it and the looping restart turns into a flush storm that
+ * freezes the canvas mid-video. The stitched file is therefore remuxed with
+ * normalized (0-based, monotonic) sample timestamps before it is cached.
  */
 object CanvasKit {
 
@@ -179,8 +190,9 @@ object CanvasKit {
     suspend fun download(context: Context, trackUri: String): String? = withContext(Dispatchers.IO) {
         val id = trackUri.substringAfterLast(":")
         val dir = File(context.cacheDir, "canvas")
-        // v2: renditions from the manifest ladder; v1 files predate it
-        val cache = File(dir, "v2-$id.mp4")
+        // v3: stitched and remuxed with a normalized timeline; v2 files kept
+        // the CDN's raw timestamps and could freeze mid-loop.
+        val cache = File(dir, "v3-$id.mp4")
         if (cache.isFile && cache.length() > 0L) return@withContext cache.absolutePath
 
         val target = resolve(context, trackUri) ?: return@withContext null
@@ -251,12 +263,119 @@ object CanvasKit {
         runCatching {
             dir.mkdirs()
             cache.outputStream().use { out -> parts.forEach(out::write) }
+            normalizeTimestamps(cache)
             trim(dir)
             log.i("canvas $id stitched ${parts.size} part(s) ${total}B -> ${cache.name}")
             cache.absolutePath
         }.onFailure {
             log.w("canvas $id write failed: ${it.message}")
         }.getOrNull()
+    }
+
+    /** Longest inter-sample step kept as-is; longer hops (and any backwards
+     * jump) are replaced with the previous sane step. */
+    private const val MAX_GAP_US = 1_000_000L
+
+    /** Step assumed between samples when the raw timeline offers no sane one
+     * at all (a ~30fps canvas frame). */
+    private const val DEFAULT_GAP_US = 33_333L
+
+    /** Per-track timeline rewriter: the first sample lands at 0, every sane
+     * inter-frame gap is kept as-is, broken steps fall back to the previous
+     * sane one, so the output grows monotonically frame by frame. */
+    private class Rebase {
+        private var lastRaw = Long.MIN_VALUE
+        private var lastOut = 0L
+        private var lastGap = -1L
+
+        fun next(raw: Long): Long {
+            if (lastRaw == Long.MIN_VALUE) {
+                lastRaw = raw
+                return 0L
+            }
+            val gap = raw - lastRaw
+            val step = when {
+                gap in 1..MAX_GAP_US -> gap.also { lastGap = it }
+                lastGap in 1..MAX_GAP_US -> lastGap
+                else -> DEFAULT_GAP_US.also { lastGap = it }
+            }
+            lastOut += step
+            lastRaw = raw
+            return lastOut
+        }
+    }
+
+    /**
+     * Remux the stitched canvas through MediaExtractor + MediaMuxer while
+     * rewriting every sample's presentation time to a clean 0-based,
+     * monotonically increasing timeline (see [Rebase]). On any failure the
+     * original stitched file is kept untouched, which plays exactly like the
+     * previous behavior.
+     */
+    private fun normalizeTimestamps(cache: File) {
+        val tmp = File(cache.parentFile, cache.name + ".tmp")
+        val ok = runCatching {
+            val extractor = MediaExtractor()
+            var muxer: MediaMuxer? = null
+            var started = false
+            try {
+                extractor.setDataSource(cache.absolutePath)
+                muxer = MediaMuxer(tmp.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+                val tracks = HashMap<Int, Pair<Int, Rebase>>()
+                for (track in 0 until extractor.trackCount) {
+                    val format = extractor.getTrackFormat(track)
+                    if (format.getString(MediaFormat.KEY_MIME) == null) continue
+                    val muxTrack = muxer.addTrack(format)
+                    extractor.selectTrack(track)
+                    tracks[track] = muxTrack to Rebase()
+                }
+                check(tracks.isNotEmpty()) { "no tracks to remux" }
+                muxer.start()
+                started = true
+                val buffer = ByteBuffer.allocateDirect(1 shl 20)
+                val info = MediaCodec.BufferInfo()
+                while (true) {
+                    val size = extractor.readSampleData(buffer, 0)
+                    if (size < 0) break
+                    val mapped = tracks[extractor.sampleTrackIndex]
+                    if (mapped != null) {
+                        info.offset = 0
+                        info.size = size
+                        info.presentationTimeUs = mapped.second.next(extractor.sampleTime)
+                        info.flags = if (extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
+                            MediaCodec.BUFFER_FLAG_KEY_FRAME
+                        } else {
+                            0
+                        }
+                        muxer.writeSampleData(mapped.first, buffer, info)
+                    }
+                    extractor.advance()
+                }
+            } finally {
+                runCatching { extractor.release() }
+                if (started) runCatching { muxer?.stop() }
+                runCatching { muxer?.release() }
+            }
+            check(started && tmp.isFile && tmp.length() > 0L) { "muxer produced nothing" }
+            true
+        }.getOrElse {
+            log.w("canvas remux failed, keeping the raw stitch: ${it.message}")
+            false
+        }
+        if (ok && cache.delete()) {
+            if (tmp.renameTo(cache)) {
+                log.i("canvas ${cache.name} remuxed onto a normalized timeline")
+            } else {
+                // rename across a mount point never happens in one cache dir,
+                // but a plain copy keeps the file alive if it somehow does
+                runCatching {
+                    tmp.inputStream().use { input -> cache.outputStream().use { input.copyTo(it) } }
+                }.onFailure { log.w("canvas remux replace failed: ${it.message}") }
+                tmp.delete()
+            }
+        } else {
+            tmp.delete()
+        }
     }
 
     /** Keep the canvas cache small: drop the oldest files beyond [MAX_CACHED]. */
