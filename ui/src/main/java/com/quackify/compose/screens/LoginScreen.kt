@@ -14,9 +14,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -24,13 +29,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.core.auth.LoginFlow
 import com.quackify.compose.theme.EncoreColors
+import com.quackify.compose.theme.SpotifyTheme
 import com.quackify.backend.core.webview.LOGIN_URL
 import com.quackify.backend.core.webview.LoginWebViewHost
 import com.quackify.backend.core.webview.PLAYER_URL
@@ -72,6 +82,10 @@ fun LoginScreen(
     val context = LocalContext.current
     val host = remember { LoginWebViewHost(context) }
     var splash by remember { mutableStateOf(false) }
+    // Native escape hatch for the login webview: it cannot reach Settings, so
+    // a translucent LOGS pill in the corner opens the log viewer directly —
+    // tiny and out of the way so it never disturbs actually signing in.
+    var viewerOpen by remember { mutableStateOf(false) }
     // Whether back has an earlier webview page to walk to; the host bumps it
     // on every navigation so the BackHandler below enables and disables with
     // the history instead of swallowing backs it cannot serve.
@@ -193,6 +207,32 @@ fun LoginScreen(
             factory = { host.container },
         )
 
+        if (!viewerOpen) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 14.dp, bottom = 14.dp)
+                    .alpha(0.5f)
+                    .clip(RoundedCornerShape(50))
+                    .background(EncoreColors.Background)
+                    .clickable {
+                        log.i("log viewer opened from login")
+                        viewerOpen = true
+                    }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "LOGS",
+                    style = SpotifyTheme.typography.marginal.copy(
+                        color = EncoreColors.TextSecondary,
+                        letterSpacing = 1.2.sp,
+                    ),
+                )
+            }
+        }
+
         AnimatedVisibility(
             visible = splash,
             enter = fadeIn(
@@ -209,6 +249,14 @@ fun LoginScreen(
             ),
         ) {
             SplashScreen()
+        }
+
+        // The log viewer rides on top of everything (webview, pill, splash)
+        // and its back handler is composed last, so system back closes the
+        // viewer before the webview's own history back gets a turn.
+        if (viewerOpen) {
+            BackHandler { viewerOpen = false }
+            LogViewerScreen(onBackClick = { viewerOpen = false })
         }
     }
 }
