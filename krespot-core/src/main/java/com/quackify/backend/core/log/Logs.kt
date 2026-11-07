@@ -114,13 +114,14 @@ object Logs {
     var floor: Level = Level.VERBOSE
 
     /**
-     * Master switch for log capture. When false every write is dropped before it
-     * reaches the ring buffer or logcat, so continuous logging cannot cost any
-     * performance. The app persists this in [PREFS_NAME]/[CAPTURE_PREF_KEY] and the
-     * log viewer exposes it as the "Logging" toggle.
+     * Master switch for log capture. Off by default: a fresh install stays
+     * quiet (nothing reaches the ring buffer or logcat) until the user turns
+     * the "Logging" toggle in the log viewer on; continuous logging must not
+     * cost any performance unasked. The app persists this in
+     * [PREFS_NAME]/[CAPTURE_PREF_KEY].
      */
     @Volatile
-    var capturing: Boolean = true
+    var capturing: Boolean = false
 
     private val modules = ConcurrentHashMap<Module, Level>()
 
