@@ -94,6 +94,14 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 super.onPageFinished(view, url)
                 log.i("onPageFinished $url progress=${view?.progress}")
                 notifyPlayerReached(url)
+                // Fallback for the classic-login pill: document start covers
+                // DOCUMENT_START_SCRIPT devices, this covers the rest. The
+                // window.__classicLoginButton guard inside makes the re-run a
+                // no-op when the pill observer is already live.
+                if (url != null && url.startsWith(ACCOUNTS_ORIGIN)) {
+                    log.d("classic login pill fallback injected")
+                    view?.evaluateJavascript(ClassicLoginButton.CONTENT, null)
+                }
             }
 
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
@@ -372,6 +380,10 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
             WebViewCompat.addDocumentStartJavaScript(view, BrowserSpoof.CONTENT, setOf(ACCOUNTS_ORIGIN))
             WebViewCompat.addDocumentStartJavaScript(view, BrowserSpoof.GOOGLE_CONTENT, setOf(GOOGLE_ORIGIN))
             WebViewCompat.addDocumentStartJavaScript(view, BrowserSpoof.CONTENT, setOf(SPOTIFY_ORIGIN))
+            // The pill needs the page DOM, so this script installs a
+            // MutationObserver at document start and inserts the pill as
+            // soon as the sign-in anchors exist.
+            WebViewCompat.addDocumentStartJavaScript(view, ClassicLoginButton.CONTENT, setOf(ACCOUNTS_ORIGIN))
         }.onFailure { log.e("installSpoofScripts failed", it) }
     }
 
