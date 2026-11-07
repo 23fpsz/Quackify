@@ -42,4 +42,9 @@ data class PlaylistChoice(
     val uri: String,
     val name: String,
     val imageUrl: String = "",
+    // The add-to-playlist answer flags, per playlist, whether the track the
+    // sheet was opened for already sits in it (editablePlaylists' "curates"
+    // when the request carries the track's uri). The sheet turns it into the
+    // green check the web player shows.
+    val containsTrack: Boolean = false,
 )

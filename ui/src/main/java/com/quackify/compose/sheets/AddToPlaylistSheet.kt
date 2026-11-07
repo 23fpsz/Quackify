@@ -198,6 +198,16 @@ fun AddToPlaylistSheet(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
+                            if (choice.containsTrack) {
+                                // The web player's green check: this playlist
+                                // already holds the track being added.
+                                Icon(
+                                    painter = painterResource(id = R.drawable.encore_icon_check_24),
+                                    contentDescription = "Already in ${choice.name}",
+                                    tint = EncoreColors.Green,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.width(4.dp))
                         }
                     }
