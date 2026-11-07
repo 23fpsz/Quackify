@@ -51,9 +51,65 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     @Volatile
     var onPlayerReached: (() -> Unit)? = null
 
+    /** Fired on every navigation with whether system back has an earlier
+     * page to walk to now (see [goBack]). */
+    @Volatile
+    var onBackAvailableChanged: ((Boolean) -> Unit)? = null
+
     private fun notifyPlayerReached(url: String?) {
         if (url == null || !url.startsWith(SPOTIFY_ORIGIN)) return
         onPlayerReached?.invoke()
+    }
+
+    private fun notifyBackAvailable() {
+        onBackAvailableChanged?.invoke(goBackAvailable())
+    }
+
+    /** The top-most popup (SSO window) when one is open, else null. */
+    private fun topPopup(): WebView? {
+        for (index in (0 until container.childCount).reversed()) {
+            val child = container.getChildAt(index)
+            if (child is WebView && child !== webView) return child
+        }
+        return null
+    }
+
+    private fun closePopup(popup: WebView) {
+        log.i("back closed popup")
+        container.removeView(popup)
+        runCatching { popup.destroy() }
+    }
+
+    /** Whether system back would do anything inside the login webview. */
+    fun goBackAvailable(): Boolean = topPopup() != null || webView.canGoBack()
+
+    /**
+     * System back for the login flow. A wrong turn (say, logging in with the
+     * wrong Google account) walks the top-most webview — an SSO popup when
+     * one is open — back through its history, closing the popup once its own
+     * history runs out; the main webview goes back one page otherwise.
+     *
+     * Returns false when there is no earlier page left, so the caller can
+     * fall back to its own back behavior (leave the login, exit the app).
+     */
+    fun goBack(): Boolean {
+        val popup = topPopup()
+        if (popup != null) {
+            if (popup.canGoBack()) {
+                log.i("back inside popup ${popup.url}")
+                popup.goBack()
+            } else {
+                closePopup(popup)
+            }
+            notifyBackAvailable()
+            return true
+        }
+        if (webView.canGoBack()) {
+            log.i("back to ${webView.url}")
+            webView.goBack()
+            return true
+        }
+        return false
     }
 
     private val bridge = object {
@@ -94,6 +150,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 super.onPageFinished(view, url)
                 log.i("onPageFinished $url progress=${view?.progress}")
                 notifyPlayerReached(url)
+                notifyBackAvailable()
                 // Fallback for the classic-login pill: document start covers
                 // DOCUMENT_START_SCRIPT devices, this covers the rest. The
                 // window.__classicLoginButton guard inside makes the re-run a
@@ -108,6 +165,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 super.doUpdateVisitedHistory(view, url, isReload)
                 log.d("history $url reload=$isReload")
                 notifyPlayerReached(url)
+                notifyBackAvailable()
             }
 
             override fun onReceivedError(
@@ -167,6 +225,11 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                     override fun onPageFinished(v: WebView?, url: String?) {
                         super.onPageFinished(v, url)
                         log.i("popup.onPageFinished $url")
+                    }
+
+                    override fun doUpdateVisitedHistory(v: WebView?, url: String?, isReload: Boolean) {
+                        super.doUpdateVisitedHistory(v, url, isReload)
+                        notifyBackAvailable()
                     }
                 }
                 child.webChromeClient = object : WebChromeClient() {
