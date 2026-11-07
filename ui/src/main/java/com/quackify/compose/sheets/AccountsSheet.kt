@@ -38,7 +38,9 @@ import com.quackify.compose.theme.SpotifyTheme
 /**
  * Account switcher sheet opened from the profile drawer: lists every account
  * saved on this device, marks the active one, offers adding another account
- * and removing the saved ones.
+ * and deleting the saved ones. The delete control only appears while more
+ * than one account exists — a single remaining account has nothing to switch
+ * to after a delete, so it stays undeletable from here.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +57,8 @@ fun AccountsSheet(
     if (!isOpen) return
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Deleting is only offered with another account left to fall back on.
+    val canDelete = accounts.size > 1
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -146,10 +150,17 @@ fun AccountsSheet(
                             tint = EncoreColors.Green,
                             modifier = Modifier.size(22.dp)
                         )
-                    } else {
+                    }
+
+                    // Delete appears on every row — the active one included —
+                    // but only while another account remains to take over.
+                    if (canDelete) {
+                        if (isActive) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
                         Icon(
-                            painter = painterResource(id = R.drawable.encore_icon_x_24),
-                            contentDescription = "Remove ${account.name}",
+                            painter = painterResource(id = R.drawable.encore_icon_trash_24),
+                            contentDescription = "Delete ${account.name}",
                             tint = EncoreColors.TextSecondary,
                             modifier = Modifier
                                 .size(22.dp)
