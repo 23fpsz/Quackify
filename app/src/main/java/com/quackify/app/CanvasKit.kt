@@ -30,14 +30,16 @@ private val log = Logs.of(Logs.Module.TRACKS)
  *
  * The direct url points at a canvaz.scdn.co single file whose resolution
  * depends on what was uploaded for that canvas (720p or 1080p in practice),
- * so the ladder is preferred: we take the best `mp4` profile it offers,
- * which is the top rendition. The manifest is scoped per encoding, so its
+ * so the ladder is preferred: we take the best `mp4` profile it offers at
+ * or under 720p, which is where the web player's own canvas ABR settles —
+ * the 1080p top rung decodes at ~9 Mbps into a card-sized view and
+ * visibly stutters. The manifest is scoped per encoding, so its
  * init url derives numbered segment urls exactly like the legacy segmented
  * ones did:
  *
- *   .../profiles/4/inits/mp4?fauth=...   (init)
- *   .../profiles/4/0.mp4?fauth=...       (media segments)
- *   .../profiles/4/4.mp4?fauth=...
+ *   .../profiles/5/inits/mp4?fauth=...   (init)
+ *   .../profiles/5/0.mp4?fauth=...       (media segments)
+ *   .../profiles/5/4.mp4?fauth=...
  *
  * When the manifest is unreachable we fall back to the direct file, and when
  * even that url is segmented (an older delivery format without a manifest
@@ -61,6 +63,14 @@ object CanvasKit {
     private const val MAX_BYTES = 12 * 1024 * 1024
     private const val MAX_CACHED = 16
 
+    /** Playback pick: the web player's canvas ABR settles at 720p; the
+     * 1080p top rung (~9 Mbps) stutters in the card-sized artwork slot. */
+    private const val PLAYBACK_RESOLUTION_CAP = 720
+
+    /** Hard ceiling for degenerate ladders with no rung at or under the
+     * playback cap. */
+    private const val MAX_RESOLUTION = 1080
+
     /** A canvas to download: its init url plus the segment stride when known. */
     private class Target(val initUrl: String, val stride: Int?)
 
@@ -70,7 +80,7 @@ object CanvasKit {
 
     /**
      * Ask the canvas query, then upgrade to the manifest ladder: the direct
-     * canvaz file varies in quality, the ladder always tops out at 1080p.
+     * canvaz file varies in quality, the ladder offers a capped 720p pick.
      */
     private suspend fun resolve(context: Context, trackUri: String): Target? {
         val id = trackUri.substringAfterLast(":")
@@ -131,9 +141,10 @@ object CanvasKit {
 
     /**
      * manifests/v9 knows every rendition of a canvas source. Pick the best
-     * mp4 profile and rebuild its init url from the signed template. The
-     * template tokens are scoped to the whole encoding, so segment urls
-     * follow from the init url by name like the legacy segmented ones.
+     * mp4 profile at or under the playback cap and rebuild its init url
+     * from the signed template. The template tokens are scoped to the whole
+     * encoding, so segment urls follow from the init url by name like the
+     * legacy segmented ones.
      */
     private suspend fun manifestTarget(
         context: Context,
@@ -158,31 +169,45 @@ object CanvasKit {
         val encodingId = initTemplate.substringAfter("/encodings/", "").substringBefore("/")
         val contents = root.optJSONArray("contents") ?: return null
         var best: JSONObject? = null
+        var fallback: JSONObject? = null
         var stride = 0
         for (i in 0 until contents.length()) {
             val content = contents.optJSONObject(i) ?: continue
             if (content.optString("encoding_id") != encodingId) continue
+            // the endpoint only speaks options/supports_drm: renditions of a
+            // drm-scoped encoding arrive ciphered and the stitcher cannot
+            // decrypt, so such manifests fall back to the direct canvaz file
+            if ((content.optJSONArray("encryption_infos")?.length() ?: 0) > 0) continue
             stride = content.optInt("segment_length", 0)
             val profiles = content.optJSONArray("profiles") ?: continue
             for (j in 0 until profiles.length()) {
                 val profile = profiles.optJSONObject(j) ?: continue
                 if (profile.optString("file_type") != "mp4") continue
                 val resolution = profile.optInt("video_resolution", 0)
-                if (resolution !in 1..1080) continue
-                if (best == null ||
-                    resolution > best.optInt("video_resolution")
+                if (resolution <= 0) continue
+                if (resolution <= PLAYBACK_RESOLUTION_CAP) {
+                    if (best == null ||
+                        resolution > best.optInt("video_resolution")
+                    ) {
+                        best = profile
+                    }
+                } else if (resolution <= MAX_RESOLUTION &&
+                    (fallback == null ||
+                        resolution < fallback.optInt("video_resolution"))
                 ) {
-                    best = profile
+                    fallback = profile
                 }
             }
         }
-        if (best == null) return null
+        // degenerate ladders with no rung at or under the cap take their
+        // lowest rung above it instead of nothing
+        val chosen = best ?: fallback ?: return null
         val initUrl = baseUrl.trimEnd('/') + "/" + initTemplate.trimStart('/')
-            .replace("{{profile_id}}", best.optString("id"))
+            .replace("{{profile_id}}", chosen.optString("id"))
             .replace("{{file_type}}", "mp4")
         log.i(
-            "canvas $fileId manifest ${best.optInt("video_resolution")}p " +
-                "profile ${best.optString("id")} stride $stride",
+            "canvas $fileId manifest ${chosen.optInt("video_resolution")}p " +
+                "profile ${chosen.optString("id")} stride $stride",
         )
         return Target(initUrl, stride.takeIf { it > 0 })
     }
@@ -191,7 +216,8 @@ object CanvasKit {
     suspend fun download(context: Context, trackUri: String): String? = withContext(Dispatchers.IO) {
         val id = trackUri.substringAfterLast(":")
         val dir = File(context.cacheDir, "canvas")
-        val cache = File(dir, "$id.mp4")
+        // v4: 720p-capped ladder picks; plain-name files cached the 1080p rung
+        val cache = File(dir, "v4-$id.mp4")
         if (cache.isFile && cache.length() > 0L) return@withContext cache.absolutePath
 
         val target = resolve(context, trackUri) ?: return@withContext null
