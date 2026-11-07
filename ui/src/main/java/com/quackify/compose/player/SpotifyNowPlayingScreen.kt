@@ -1532,7 +1532,11 @@ private fun NowPlayingAboutArtistCard(
                                 text = artist,
                                 style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                // weight(fill = false) caps the name at the space left over
+                                // after the badge, so a long artist can never squeeze the
+                                // 16dp verified icon down to nothing.
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                             Spacer(modifier = Modifier.width(EncoreSpacers.Tighter4))
                             Icon(
