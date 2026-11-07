@@ -201,6 +201,12 @@ fun SpotifySearchScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedSearchTab by remember { mutableIntStateOf(0) }
     var isSearchBarFocused by remember { mutableStateOf(false) }
+    // A play from the suggestion dropdown keeps the overlay on screen (with the
+    // keyboard folded) so the tap never reads like an autocomplete pick: the
+    // typed text is not committed and the results page does not slide in
+    // behind the play. Any other interaction (typing, focusing, picking a
+    // query row, a chip, back/clear) drops the pin again.
+    var suggestionsPinned by remember { mutableStateOf(false) }
     val searchTabs = listOf("Top", "Songs", "Artists", "Playlists", "Albums", "Podcasts")
     val focusManager = LocalFocusManager.current
     val bottomPadding = rememberBottomPadding()
@@ -228,6 +234,7 @@ fun SpotifySearchScreen(
             ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             ?.firstOrNull().orEmpty()
         if (heard.isNotBlank()) {
+            suggestionsPinned = false
             searchQuery = heard
             onSearchQueryChange(heard)
         }
@@ -366,7 +373,8 @@ fun SpotifySearchScreen(
 
     val isSearching = searchQuery.isNotBlank() || isSearchBarFocused
     val showRecentSearches = isSearchBarFocused && searchQuery.isEmpty() && recentSearches.isNotEmpty()
-    val showSuggestions = isSearchBarFocused && searchQuery.isNotBlank() && suggestionHits.isNotEmpty()
+    val showSuggestions = (isSearchBarFocused || suggestionsPinned) &&
+            searchQuery.isNotBlank() && suggestionHits.isNotEmpty()
 
     var sectionHits by remember { mutableStateOf<List<SearchHit>>(emptyList()) }
     var sectionExhausted by remember { mutableStateOf(false) }
@@ -410,10 +418,10 @@ fun SpotifySearchScreen(
         }
     }
 
-    // Playing a song is the ONLY thing a tap does: fold the keyboard and the
-    // as-you-type overlay away with the play so the field cannot stay focused
-    // and pop the suggestion dropdown back open over the list when the next
-    // suggestion page lands.
+    // Playing a song is the ONLY thing a tap does: the keyboard folds so the
+    // field cannot stay focused and keep popping the keyboard over the list.
+    // (The suggestion dropdown pins its overlay separately before playing, so
+    // a play from it also leaves the typed text and its overlay untouched.)
     val playFromSearch: (TrackItem) -> Unit = { track ->
         if (isSearchBarFocused) {
             isSearchBarFocused = false
@@ -488,6 +496,7 @@ fun SpotifySearchScreen(
                         onClick = {
                             searchQuery = ""
                             selectedSearchTab = 0
+                            suggestionsPinned = false
                             isSearchBarFocused = false
                             focusManager.clearFocus()
                             // Tell the activity too, so its stale results and
@@ -504,6 +513,7 @@ fun SpotifySearchScreen(
                 BasicTextField(
                     value = searchQuery,
                     onValueChange = {
+                        suggestionsPinned = false
                         searchQuery = it
                         onSearchQueryChange(it)
                     },
@@ -552,6 +562,7 @@ fun SpotifySearchScreen(
                                         .clickable {
                                             searchQuery = ""
                                             selectedSearchTab = 0
+                                            suggestionsPinned = false
                                             onSearchQueryChange("")
                                             focusManager.clearFocus()
                                         }
@@ -582,7 +593,12 @@ fun SpotifySearchScreen(
                         )
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isSearching) Color(0xFF282828) else Color.White)
-                        .onFocusChanged { isSearchBarFocused = it.isFocused }
+                        .onFocusChanged {
+                            isSearchBarFocused = it.isFocused
+                            // Tapping back into the field returns it to the
+                            // ordinary focused overlay; the pin (if any) is over.
+                            if (it.isFocused) suggestionsPinned = false
+                        }
                         .padding(horizontal = 12.dp)
                 )
             }
@@ -601,6 +617,7 @@ fun SpotifySearchScreen(
                                 // for more typing: fold the keyboard and the
                                 // as-you-type overlay so the tab's content takes
                                 // their place right away (the field keeps its text).
+                                suggestionsPinned = false
                                 if (isSearchBarFocused) {
                                     isSearchBarFocused = false
                                     focusManager.clearFocus()
@@ -646,6 +663,7 @@ fun SpotifySearchScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
+                                suggestionsPinned = false
                                 searchQuery = searchItem.title
                                 onSearchQueryChange(searchItem.title)
                             }
@@ -778,6 +796,7 @@ fun SpotifySearchScreen(
                             .fillMaxWidth()
                             .clickable {
                                 if (hit.kind == SearchKind.QUERY) {
+                                    suggestionsPinned = false
                                     isSearchBarFocused = false
                                     searchQuery = hit.title
                                     focusManager.clearFocus()
@@ -785,7 +804,12 @@ fun SpotifySearchScreen(
                                 } else {
                                     // Pressing an entity opens it straight from the
                                     // dropdown — a song plays — instead of re-running
-                                    // the search on its name.
+                                    // the search on its name. A play also pins the
+                                    // overlay: the keyboard folds but the suggestions
+                                    // stay on screen, so the tap is nothing more than
+                                    // the play — no autocomplete-style commit of the
+                                    // text, no results page sliding in behind it.
+                                    if (hit.kind == SearchKind.TRACK) suggestionsPinned = true
                                     isSearchBarFocused = false
                                     focusManager.clearFocus()
                                     openHit(hit)
