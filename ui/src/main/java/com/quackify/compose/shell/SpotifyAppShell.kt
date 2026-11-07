@@ -368,6 +368,7 @@ fun SpotifyAppShell(
     onPickPlaylist: ((PlaylistChoice, TrackItem) -> Unit)? = null,
     onCreatePlaylistWith: ((TrackItem) -> Unit)? = null,
     onLoadPlaylistFolder: (suspend (trackUri: String, folderUri: String) -> List<PlaylistChoice>)? = null,
+    onLoadTrackCount: (suspend (playlistUri: String) -> Int)? = null,
     onPlaylistDefaultName: (suspend () -> String)? = null,
     onCreatePlaylist: (suspend (name: String, description: String, cover: ByteArray?) -> String?)? = null,
     playlistSaved: Boolean? = null,
@@ -1555,6 +1556,8 @@ fun SpotifyAppShell(
                 onLoadFolder = onLoadPlaylistFolder?.let { loader ->
                     { folderUri -> loader(addTrackTarget?.uri.orEmpty(), folderUri) }
                 },
+                // Song counts for the rows it is showing, root list or folder.
+                onLoadTrackCount = onLoadTrackCount,
                 onCreateNew = {
                     addTrackTarget?.let { track -> onCreatePlaylistWith?.invoke(track) }
                     isAddToPlaylistOpen = false
