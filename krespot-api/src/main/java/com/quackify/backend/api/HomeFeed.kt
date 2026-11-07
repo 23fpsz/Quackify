@@ -26,9 +26,6 @@ object HomeFeed {
     const val MUSIC_VIDEOS = "HomeMusicVideosSectionData"
     const val PODCAST_VIDEOS = "HomePodcastVideosCarouselSectionData"
 
-    /** The web player's "Your favorite artists" shelf, a fixed home section uri. */
-    const val FAVORITE_ARTISTS_SECTION = "spotify:section:0JQ5DAnM3wGh0gz1MXnu3z"
-
     private val SILENT = setOf(
         "HomeOnboardingSectionData",
         "HomeOnboardingSectionDataV2",
@@ -75,38 +72,6 @@ object HomeFeed {
             }
         }
         return payload
-    }
-
-    /**
-     * The "Your favorite artists" shelf under Recently played: the same
-     * homeSection operation the web player runs for the fixed section uri,
-     * answered with bare artist nodes (name + avatar + extracted color).
-     */
-    suspend fun favoriteArtists(context: Context): List<HomeItem> {
-        val token = SpotifyAuth.token(context)
-        if (token.isBlank()) {
-            log.w("no token, cannot load the favorite artists")
-            return emptyList()
-        }
-        val variables = JSONObject()
-            .put("includeHomeChapterVideoCards", false)
-            .put("uri", FAVORITE_ARTISTS_SECTION)
-            .put("homeEndUserIntegration", "INTEGRATION_WEB_PLAYER")
-            .put("timeZone", java.util.TimeZone.getDefault().id)
-            .put("sp_t", Pathfinder.sessionToken())
-            .put("sectionItemsOffset", 0)
-            .put("sectionItemsLimit", 20)
-            .put("includeEpisodeContentRatingsV2", true)
-            .toString()
-        val json = Pathfinder.queryPost(context, token, "homeSection", variables) ?: return emptyList()
-        val items = withContext(Dispatchers.Default) {
-            val sections = json.optJSONObject("data")?.optJSONObject("homeSections")?.optJSONArray("sections")
-            val nodes = sections?.optJSONObject(0)?.optJSONObject("sectionItems")?.optJSONArray("items")
-            (0 until (nodes?.length() ?: 0)).mapNotNull { item(nodes?.optJSONObject(it), null) }
-        }
-        log.i("favorite artists -> ${items.size} artist(s)" +
-                items.take(3).joinToString(", ", prefix = " ") { it.title })
-        return items
     }
 
     fun parse(json: JSONObject): HomeFeedPayload {

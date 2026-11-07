@@ -87,7 +87,12 @@ fun List<HomeSection>.toShelves(): List<HomeShelf> {
             cards = if (artistsOnly) emptyList() else cards,
             artists = if (artistsOnly) {
                 section.items.map { item ->
-                    ArtistCardItem(name = item.title, color = colorOf(item), uri = item.uri)
+                    ArtistCardItem(
+                        name = item.title,
+                        color = colorOf(item),
+                        uri = item.uri,
+                        imageUrl = item.imageUrl.takeIf { it.isNotBlank() },
+                    )
                 }
             } else {
                 emptyList()
@@ -135,11 +140,3 @@ fun ShelfItem.toArtistRelease(): ArtistRelease {
         uri = uri
     )
 }
-
-/** A homeSection artist node becomes one round-avatar card of the favorites shelf. */
-fun HomeItem.toArtistCardItem(): ArtistCardItem = ArtistCardItem(
-    name = title,
-    color = parseHexColor(colorHex) ?: Color(0xFF535353),
-    uri = uri,
-    imageUrl = imageUrl.takeIf { it.isNotBlank() },
-)

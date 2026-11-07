@@ -113,8 +113,6 @@ fun SpotifyHomeScreen(
     loading: Boolean = false,
     quickAccessItems: List<QuickAccessItem>? = null,
     recommendations: List<RecommendationCard>? = null,
-    /** "Your favorite artists", rendered right under the Recently played grid. */
-    favoriteArtists: List<ArtistCardItem> = emptyList(),
     chips: List<HomeChip> = emptyList(),
     selectedFacet: String = "",
     onFacetSelected: (String) -> Unit = {},
@@ -287,23 +285,7 @@ fun SpotifyHomeScreen(
                     }
                 }
             }
-
-            // "Your favorite artists" — the fixed homeSection shelf, shown
-            // right below the Recently played grid whenever the account has
-            // any favorite artists to show.
-            if (selectedFacet.isEmpty() && favoriteArtists.isNotEmpty()) {
-                item(key = "home_favorite_artists") {
-                    ArtistShelfSection(
-                        title = "Your favorite artists",
-                        artists = favoriteArtists,
-                        onArtistClick = onArtistClick
-                    )
-                }
-            }
         }
-
-        // Nothing from the feed yet: a quiet spinner while it loads, or a hint
-        // that it could not be fetched. No made-up shelves or shortcuts.
         if (quickItems.isEmpty() && shelfSections.isEmpty()) {
             item(key = "home_feed_status") {
                 if (loading) {
