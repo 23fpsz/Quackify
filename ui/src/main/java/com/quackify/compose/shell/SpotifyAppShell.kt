@@ -367,6 +367,7 @@ fun SpotifyAppShell(
     onAddToPlaylist: ((TrackItem) -> Unit)? = null,
     onPickPlaylist: ((PlaylistChoice, TrackItem) -> Unit)? = null,
     onCreatePlaylistWith: ((TrackItem) -> Unit)? = null,
+    onLoadPlaylistFolder: (suspend (trackUri: String, folderUri: String) -> List<PlaylistChoice>)? = null,
     onPlaylistDefaultName: (suspend () -> String)? = null,
     onCreatePlaylist: (suspend (name: String, description: String, cover: ByteArray?) -> String?)? = null,
     playlistSaved: Boolean? = null,
@@ -1548,6 +1549,11 @@ fun SpotifyAppShell(
                 onPick = { choice ->
                     addTrackTarget?.let { track -> onPickPlaylist?.invoke(choice, track) }
                     isAddToPlaylistOpen = false
+                },
+                // The sheet owns the folder drill-down; this feeds it the rows
+                // of the folder it entered, checks and all, for the same track.
+                onLoadFolder = onLoadPlaylistFolder?.let { loader ->
+                    { folderUri -> loader(addTrackTarget?.uri.orEmpty(), folderUri) }
                 },
                 onCreateNew = {
                     addTrackTarget?.let { track -> onCreatePlaylistWith?.invoke(track) }

@@ -38,7 +38,11 @@ object PlaylistSource {
     private suspend fun protoHeaders(context: Context): Map<String, String> =
         headers(context) + mapOf("Content-Type" to "application/json;charset=UTF-8")
 
-    suspend fun editable(context: Context, trackUri: String): List<PlaylistChoice> {
+    suspend fun editable(
+        context: Context,
+        trackUri: String,
+        folderUri: String? = null,
+    ): List<PlaylistChoice> {
         val token = SpotifyAuth.token(context)
         if (token.isBlank()) {
             log.w("editable: no token")
@@ -46,57 +50,95 @@ object PlaylistSource {
         }
         val uris = JSONArray()
         if (trackUri.isNotBlank()) uris.put(trackUri)
-        val variables = JSONObject()
-            .put("offset", 0)
-            .put("limit", 50)
-            .put("textFilter", "")
-            .put("folderUri", JSONObject.NULL)
-            .put("uris", uris)
-            .toString()
-        val json = Pathfinder.queryPost(context, token, OP_EDITABLE, variables) ?: return emptyList()
-        val page = json.optJSONObject("data")
-            ?.optJSONObject("me")
-            ?.optJSONObject("editablePlaylists")
-        if (page == null) {
-            log.w("editable: no data.me.editablePlaylists, keys=" +
-                    json.optJSONObject("data")?.keys()?.asSequence()?.toList()
-            )
-            return emptyList()
-        }
-        val items = page.optJSONArray("items") ?: return emptyList()
-        val out = ArrayList<PlaylistChoice>(items.length())
+        val out = ArrayList<PlaylistChoice>()
         var skipped = 0
-        for (i in 0 until items.length()) {
-            val entry = items.optJSONObject(i) ?: continue
-            val wrapper = entry.optJSONObject("item") ?: continue
-            val data = wrapper.optJSONObject("data") ?: continue
-            val uri = data.optString("uri")
-            val name = data.optString("name")
-            val type = data.optString("__typename")
-            if (type != "Playlist" || !uri.startsWith("spotify:playlist:") || name.isBlank()) {
-                skipped += 1
-                continue
+        var offset = 0
+        // The answer pages by 50 rows; keep pulling until the library or the
+        // folder is exhausted so big collections never silently drop rows.
+        while (offset < 500) {
+            val variables = JSONObject()
+                .put("offset", offset)
+                .put("limit", 50)
+                .put("textFilter", "")
+                .put("folderUri", folderUri ?: JSONObject.NULL)
+                .put("uris", uris)
+                .toString()
+            val json = Pathfinder.queryPost(context, token, OP_EDITABLE, variables) ?: break
+            val page = json.optJSONObject("data")
+                ?.optJSONObject("me")
+                ?.optJSONObject("editablePlaylists")
+            if (page == null) {
+                log.w("editable: no data.me.editablePlaylists, keys=" +
+                        json.optJSONObject("data")?.keys()?.asSequence()?.toList()
+                )
+                break
             }
-            out += PlaylistChoice(
-                uri = uri,
-                name = name,
-                imageUrl = GraphQl.largestSource(
-                    data.optJSONObject("images")?.optJSONArray("items")?.optJSONObject(0),
-                ),
+            val items = page.optJSONArray("items") ?: break
+            if (items.length() == 0) break
+            for (i in 0 until items.length()) {
+                val entry = items.optJSONObject(i) ?: continue
+                val wrapper = entry.optJSONObject("item") ?: continue
+                val data = wrapper.optJSONObject("data") ?: continue
                 // "curates" is the answer's per-row flag for the uris the request
                 // carried: true when that playlist already holds the track.
-                containsTrack = entry.optBoolean("curates", false),
-            )
+                val contains = entry.optBoolean("curates", false)
+                val parsed = when (wrapper.optString("__typename")) {
+                    "PlaylistResponseWrapper" -> {
+                        val uri = data.optString("uri")
+                        val name = data.optString("name")
+                        if (uri.startsWith("spotify:playlist:") && name.isNotBlank()) {
+                            PlaylistChoice(
+                                uri = uri,
+                                name = name,
+                                imageUrl = GraphQl.largestSource(
+                                    data.optJSONObject("images")?.optJSONArray("items")?.optJSONObject(0),
+                                ),
+                                containsTrack = contains,
+                            )
+                        } else null
+                    }
+                    // The pinned pseudo playlist at the root: Liked Songs.
+                    "LibraryPseudoPlaylistResponseWrapper" -> {
+                        if (data.optString("uri") == PlaylistChoice.LIKED_SONGS_URI) {
+                            PlaylistChoice(
+                                uri = PlaylistChoice.LIKED_SONGS_URI,
+                                name = data.optString("name").ifBlank { "Liked Songs" },
+                                imageUrl = GraphQl.largestSource(data.optJSONObject("image")),
+                                kind = PlaylistChoice.Kind.LIKED_SONGS,
+                                containsTrack = contains,
+                            )
+                        } else null
+                    }
+                    // A library folder: picking it drills into its playlists.
+                    "LibraryFolderResponseWrapper" -> {
+                        val uri = data.optString("uri")
+                        val name = data.optString("name")
+                        if (uri.isNotBlank() && name.isNotBlank()) {
+                            PlaylistChoice(uri = uri, name = name, kind = PlaylistChoice.Kind.FOLDER)
+                        } else null
+                    }
+                    else -> null
+                }
+                if (parsed != null) out += parsed else skipped += 1
+            }
+            offset += items.length()
+            val total = page.optInt("totalCount", offset)
+            if (offset >= total || items.length() < 50) break
         }
-        log.i("editable: ${out.size} playlist(s), $skipped skipped (folders and pseudo playlists " +
-                "cannot hold a track), ${out.count { it.containsTrack }} already hold the track " +
-                "for $trackUri"
+        log.i(
+            "editable: ${out.count { it.kind == PlaylistChoice.Kind.PLAYLIST }} playlist(s), " +
+                    "${out.count { it.kind == PlaylistChoice.Kind.FOLDER }} folder(s), " +
+                    "${out.count { it.kind == PlaylistChoice.Kind.LIKED_SONGS }} liked songs, " +
+                    "$skipped skipped, ${out.count { it.containsTrack }} already hold the track" +
+                    (folderUri?.let { " inside $it" } ?: "") + " for $trackUri"
         )
         return out
     }
 
     suspend fun defaultName(context: Context): String {
-        val taken = editable(context, "").size
+        // Only real playlists number the default name; folders and the liked
+        // songs entry ride along in the answer but never create one.
+        val taken = editable(context, "").count { it.kind == PlaylistChoice.Kind.PLAYLIST }
         val name = "My Playlist #${taken + 1}"
         log.i("defaultName: $taken writable playlist(s), picking '$name'")
         return name
