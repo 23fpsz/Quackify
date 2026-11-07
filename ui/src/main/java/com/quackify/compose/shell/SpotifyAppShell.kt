@@ -1067,6 +1067,11 @@ fun SpotifyAppShell(
                             ?: activeArtistAvatarUrl,
                         popularTracks = artistTracks.orEmpty(),
                         releases = artistReleases.orEmpty(),
+                        // Dedicated discography groups for the "Albums" and
+                        // "Singles & EPs" shelves (the screen falls back to
+                        // splitting the popular releases when these are thin).
+                        albums = artistDetail?.albums.orEmpty().map { it.toArtistRelease() },
+                        singles = artistDetail?.singles.orEmpty().map { it.toArtistRelease() },
                         currentTrackTitle = currentTrackTitle,
                         isPlaying = isPlaying,
                         biography = artistDetail?.biography.orEmpty(),
