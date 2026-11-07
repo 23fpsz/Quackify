@@ -711,6 +711,13 @@ class MainActivity : ComponentActivity() {
                             searchLoading = true
                             searchFailed = false
                             delay(280)
+                            // Record the moment the term settles, not only once
+                            // the network round-trip agrees: re-searching a
+                            // keyword must move it to the very top of the
+                            // recents right away, even while the results are
+                            // still loading (or never come back).
+                            RecentQueries.record(context, term)
+                            recentQueries = RecentQueries.all(context)
                             searchHits = Search.suggest(context, term)
                             val results = Search.query(context, term)
                             searchData = results?.let { decorateSearchTracks(context, it) }
@@ -719,9 +726,7 @@ class MainActivity : ComponentActivity() {
                             searchFailed = results == null
                             searchLoading = false
                             if (results != null) {
-                                withContext(Dispatchers.Default) { RecentQueries.record(context, term) }
-                                recentQueries = withContext(Dispatchers.Default) { RecentQueries.all(context) }
-                                log.i("recorded search '$term' into ${recentQueries.size} client recents")
+                                log.i("searched '$term', recents now ${recentQueries.size}")
                             }
                         }
                         SpotifyAppShell(
