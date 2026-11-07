@@ -798,9 +798,19 @@ class MainActivity : ComponentActivity() {
                             },
                             onPickPlaylist = { choice, track ->
                                 scope.launch {
-                                    val ok = Krespot.playlists.addTrack(context, choice.uri, track.uri)
-                                    log.i("add '${track.title}' to '${choice.name}' ok=$ok")
+                                    // The sheet's first row is the liked songs
+                                    // pseudo playlist; adding to it is a like.
+                                    if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
+                                        val ok = Library.setSaved(context, listOf(track.uri), true)
+                                        log.i("add '${track.title}' to Liked Songs ok=$ok")
+                                    } else {
+                                        val ok = Krespot.playlists.addTrack(context, choice.uri, track.uri)
+                                        log.i("add '${track.title}' to '${choice.name}' ok=$ok")
+                                    }
                                 }
+                            },
+                            onLoadPlaylistFolder = { trackUri, folderUri ->
+                                Krespot.playlists.editable(context, trackUri, folderUri)
                             },
                             onCreatePlaylistWith = { track ->
                                 scope.launch {
