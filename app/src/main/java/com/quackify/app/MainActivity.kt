@@ -512,7 +512,15 @@ class MainActivity : ComponentActivity() {
                                     } else ""
                                     PopularTrack(row.toTrackItem(), countFormatted)
                                 }
-                                artistReleases = detail?.albums?.map { it.toArtistRelease() }
+                                // Popular releases prefers the overview's ranked list and
+                                // falls back through albums/singles/compilations; if the
+                                // artist still has nothing to show (overview came back
+                                // thin), pull the same discography page the sheet uses.
+                                var releaseRows = detail?.releases.orEmpty()
+                                if (releaseRows.isEmpty()) {
+                                    releaseRows = Krespot.artists.discography(context, uri, "all")?.rows.orEmpty()
+                                }
+                                artistReleases = releaseRows.map { it.toArtistRelease() }
                                 artistListeners = detail?.monthlyListeners?.takeIf { it > 0L }?.let { formatCount(it) }
                             } finally {
                                 artistLoading = false

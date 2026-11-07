@@ -57,11 +57,13 @@ import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
+import com.quackify.backend.model.CityStat
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.ShimmerBlock
 import com.quackify.compose.components.ShimmerHost
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
+import com.quackify.compose.format.formatCount
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
@@ -116,6 +118,10 @@ fun SpotifyArtistScreen(
     headerImageUrl: String? = null,
     biography: String = "",
     verified: Boolean = false,
+    followers: Long = 0L,
+    worldRank: Int = 0,
+    topCities: List<CityStat> = emptyList(),
+    gallery: List<String> = emptyList(),
     isLoading: Boolean = false
 ) {
     val density = LocalDensity.current
@@ -596,7 +602,13 @@ fun SpotifyArtistScreen(
             }
 
             // About Section (Bio Card)
-            if (monthlyListeners.isNotBlank() || !biography.isNullOrBlank()) {
+            val aboutStatLine = listOfNotNull(
+                followers.takeIf { it > 0L }?.let { formatCount(it) + " followers" },
+                worldRank.takeIf { it > 0 }?.let { "#$it in the world" },
+            ).joinToString(" • ")
+            if (monthlyListeners.isNotBlank() || biography.isNotBlank() ||
+                aboutStatLine.isNotBlank() || topCities.isNotEmpty()
+            ) {
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
@@ -612,28 +624,57 @@ fun SpotifyArtistScreen(
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF242424))
                             .clickable { onAboutClick() }
-                            .padding(16.dp)
                     ) {
                         Column {
-                            if (monthlyListeners.isNotBlank()) {
-                                Text(
-                                    text = "$monthlyListeners monthly listeners",
-                                    style = SpotifyTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
+                            // Photo banner like Spotify's About card; the card clip
+                            // rounds the top corners for free.
+                            gallery.firstOrNull()?.let { photo ->
+                                SpotifyArtworkImage(
+                                    imageUrl = photo,
+                                    contentDescription = artistName,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(132.dp),
+                                    cornerRadius = 0.dp
                                 )
                             }
-                            if (biography.isNotBlank()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 if (monthlyListeners.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "$monthlyListeners monthly listeners",
+                                        style = SpotifyTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    )
                                 }
-                                Text(
-                                    text = biography,
-                                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                if (aboutStatLine.isNotBlank()) {
+                                    if (monthlyListeners.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                    }
+                                    Text(
+                                        text = aboutStatLine,
+                                        style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                                    )
+                                }
+                                if (topCities.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Popular in " + topCities.take(3).joinToString(", ") { it.city },
+                                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (biography.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = biography,
+                                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
