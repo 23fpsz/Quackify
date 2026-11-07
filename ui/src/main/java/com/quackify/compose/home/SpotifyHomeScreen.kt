@@ -82,7 +82,8 @@ private const val SURFACE_BLUE = 0x12 / 255f
 data class ArtistCardItem(
     val name: String,
     val color: Color,
-    val uri: String = ""
+    val uri: String = "",
+    val imageUrl: String? = null
 )
 
 /**
@@ -285,9 +286,6 @@ fun SpotifyHomeScreen(
                 }
             }
         }
-
-        // Nothing from the feed yet: a quiet spinner while it loads, or a hint
-        // that it could not be fetched. No made-up shelves or shortcuts.
         if (quickItems.isEmpty() && shelfSections.isEmpty()) {
             item(key = "home_feed_status") {
                 if (loading) {
@@ -639,11 +637,20 @@ private fun ArtistShelfSection(
                             .background(artist.color),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "★",
-                            color = Color.White,
-                            fontSize = 38.sp
-                        )
+                        if (artist.imageUrl != null) {
+                            SpotifyArtworkImage(
+                                imageUrl = artist.imageUrl,
+                                contentDescription = artist.name,
+                                shape = CircleShape,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Text(
+                                text = "★",
+                                color = Color.White,
+                                fontSize = 38.sp
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(

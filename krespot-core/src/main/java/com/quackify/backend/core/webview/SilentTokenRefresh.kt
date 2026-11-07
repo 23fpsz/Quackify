@@ -3,7 +3,6 @@ package com.quackify.backend.core.webview
 import android.app.Activity
 import android.content.Context
 import android.view.ViewGroup
-import android.webkit.CookieManager
 import android.webkit.WebView
 import android.widget.FrameLayout
 import com.quackify.backend.core.auth.SpotifyAuth
@@ -67,7 +66,7 @@ object SilentTokenRefresh {
             log.i("cookies ready (${cookies.length}B names=${cookieNames(cookies)}) ($reason)")
             web = createWebView(context)
             holder = attach(host, web)
-            CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
+            cookieManagerOrNull()?.setAcceptThirdPartyCookies(web, true)
             web.loadUrl(START_URL)
             log.i("started ($reason) attached=${holder != null}")
             var reloaded = false
@@ -99,7 +98,10 @@ object SilentTokenRefresh {
 
     private suspend fun waitForCookies(context: Context): String? {
         SpotifyAuth.applySession(context)
-        val manager = CookieManager.getInstance()
+        val manager = cookieManagerOrNull() ?: run {
+            log.w("cookie jar unavailable, cannot seed a refresh")
+            return null
+        }
         manager.setAcceptCookie(true)
         repeat(COOKIE_TRIES) {
             val raw = manager.getCookie(START_URL).orEmpty()

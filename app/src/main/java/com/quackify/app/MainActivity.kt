@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -93,6 +94,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Honor the "Logging" toggle from the log viewer before anything else
+        // writes, so a paused capture stays paused across restarts. Fresh
+        // installs default to off: no capture until the viewer's Logging chip
+        // is switched on.
+        Logs.capturing = getSharedPreferences(Logs.PREFS_NAME, MODE_PRIVATE)
+            .getBoolean(Logs.CAPTURE_PREF_KEY, false)
         // A cold start launched by the notification carries the flag here;
         // later taps arrive through onNewIntent instead.
         if (intent?.getBooleanExtra(PlaybackService.EXTRA_OPEN_PLAYER, false) == true) {
@@ -164,6 +171,7 @@ class MainActivity : ComponentActivity() {
                         var homeGreeting by remember { mutableStateOf("") }
                         var homeFacet by remember { mutableStateOf("") }
                         var loading by remember { mutableStateOf(true) }
+                        var playHistory by remember { mutableStateOf(PlayHistory.all(context)) }
                         LaunchedEffect(resumeSignal, homeFacet) {
                             if (resumeSignal == 0) loading = true
                             val payload = HomeFeed.load(context, homeFacet)
@@ -198,6 +206,10 @@ class MainActivity : ComponentActivity() {
                         var searchFailed by remember { mutableStateOf(false) }
                         var searchFetch by remember { mutableStateOf(0) }
                         var searchDataFor by remember { mutableStateOf("") }
+                        // Every heart pressed on the search screen lands here first so
+                        // its row flips immediately; a freshly fetched answer for a
+                        // new term starts from a clean slate again.
+                        val searchSavedOverrides = remember { mutableStateMapOf<String, Boolean>() }
                         var recentQueries by remember { mutableStateOf(RecentQueries.all(context)) }
                         val scope = rememberCoroutineScope()
 
@@ -274,7 +286,6 @@ class MainActivity : ComponentActivity() {
                         var whatsNewLoading by remember { mutableStateOf(false) }
                         var whatsNewFailed by remember { mutableStateOf(false) }
                         var whatsNewFetch by remember { mutableStateOf(0) }
-                        var playHistory by remember { mutableStateOf(PlayHistory.all(context)) }
 
                         // Multi-account: the list of saved accounts plus the
                         // flag that flips the login webview over the shell to
@@ -338,6 +349,9 @@ class MainActivity : ComponentActivity() {
                         var artistTracks by remember { mutableStateOf<List<PopularTrack>?>(null) }
                         var artistReleases by remember { mutableStateOf<List<ArtistRelease>?>(null) }
                         var artistListeners by remember { mutableStateOf<String?>(null) }
+                        // The open artist's follow state: null until the
+                        // areEntitiesInLibrary check has answered.
+                        var artistFollowed by remember { mutableStateOf<Boolean?>(null) }
 
                         val libraryRevision by Krespot.library.revision.collectAsState()
 
@@ -485,6 +499,7 @@ class MainActivity : ComponentActivity() {
                                 artistTracks = null
                                 artistReleases = null
                                 artistListeners = null
+                                artistFollowed = null
                                 return@LaunchedEffect
                             }
                             val uri = artistUri
@@ -492,6 +507,7 @@ class MainActivity : ComponentActivity() {
                             artistTracks = null
                             artistReleases = null
                             artistListeners = null
+                            artistFollowed = null
                             artistLoading = true
                             try {
                                 val detail = Krespot.artists.artist(context, uri)
@@ -503,8 +519,25 @@ class MainActivity : ComponentActivity() {
                                     } else ""
                                     PopularTrack(row.toTrackItem(), countFormatted)
                                 }
-                                artistReleases = detail?.albums?.map { it.toArtistRelease() }
+                                // Popular releases prefers the overview's ranked list and
+                                // falls back through albums/singles/compilations; if the
+                                // artist still has nothing to show (overview came back
+                                // thin), pull the same discography page the sheet uses.
+                                var releaseRows = detail?.releases.orEmpty()
+                                if (releaseRows.isEmpty()) {
+                                    releaseRows = Krespot.artists.discography(context, uri, "all")?.rows.orEmpty()
+                                }
+                                artistReleases = releaseRows.map { it.toArtistRelease() }
                                 artistListeners = detail?.monthlyListeners?.takeIf { it > 0L }?.let { formatCount(it) }
+                                // Follow state: the dedicated library lookup is
+                                // the truth; the overview's own saved flag covers
+                                // a lookup that came back with nothing.
+                                val inLibrary = Library.saved(context, listOf(uri))
+                                artistFollowed = if (inLibrary.isEmpty()) {
+                                    detail?.saved == true
+                                } else {
+                                    uri in inLibrary
+                                }
                             } finally {
                                 artistLoading = false
                             }
@@ -671,6 +704,7 @@ class MainActivity : ComponentActivity() {
                                 searchHits = emptyList()
                                 searchLoading = false
                                 searchFailed = false
+                                searchSavedOverrides.clear()
                                 return@LaunchedEffect
                             }
                             if (offlineNow) {
@@ -691,16 +725,22 @@ class MainActivity : ComponentActivity() {
                             searchLoading = true
                             searchFailed = false
                             delay(280)
+                            // Record the moment the term settles, not only once
+                            // the network round-trip agrees: re-searching a
+                            // keyword must move it to the very top of the
+                            // recents right away, even while the results are
+                            // still loading (or never come back).
+                            RecentQueries.record(context, term)
+                            recentQueries = RecentQueries.all(context)
                             searchHits = Search.suggest(context, term)
                             val results = Search.query(context, term)
                             searchData = results?.let { decorateSearchTracks(context, it) }
                             searchDataFor = term
+                            searchSavedOverrides.clear()
                             searchFailed = results == null
                             searchLoading = false
                             if (results != null) {
-                                withContext(Dispatchers.Default) { RecentQueries.record(context, term) }
-                                recentQueries = withContext(Dispatchers.Default) { RecentQueries.all(context) }
-                                log.i("recorded search '$term' into ${recentQueries.size} client recents")
+                                log.i("searched '$term', recents now ${recentQueries.size}")
                             }
                         }
                         SpotifyAppShell(
@@ -791,16 +831,42 @@ class MainActivity : ComponentActivity() {
                             },
                             onPickPlaylist = { choice, track ->
                                 scope.launch {
-                                    val ok = Krespot.playlists.addTrack(context, choice.uri, track.uri)
-                                    log.i("add '${track.title}' to '${choice.name}' ok=$ok")
+                                    val name = choice.name
+                                    // The sheet's first row is the liked songs
+                                    // pseudo playlist; adding to it is a like.
+                                    val ok = if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
+                                        val saved = Library.setSaved(context, listOf(track.uri), true)
+                                        log.i("add '${track.title}' to Liked Songs ok=$saved")
+                                        saved
+                                    } else {
+                                        val added = Krespot.playlists.addTrack(context, choice.uri, track.uri)
+                                        log.i("add '${track.title}' to '$name' ok=$added")
+                                        added
+                                    }
+                                    Toast.makeText(
+                                        context,
+                                        if (ok) "Added to $name" else "Couldn't add to $name",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
+                            },
+                            onLoadPlaylistFolder = { trackUri, folderUri ->
+                                Krespot.playlists.editable(context, trackUri, folderUri)
+                            },
+                            onLoadTrackCount = { playlistUri ->
+                                Krespot.playlists.trackCount(context, playlistUri)
                             },
                             onCreatePlaylistWith = { track ->
                                 scope.launch {
                                     val name = Krespot.playlists.defaultName(context)
                                     val uri = Krespot.playlists.create(context, name, track.uri)
                                     log.i("create playlist '$name' ok=${uri != null}")
-                                    if (uri != null) Krespot.library.invalidate()
+                                    if (uri != null) {
+                                        Krespot.library.invalidate()
+                                        Toast.makeText(context, "Added to $name", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Couldn't create playlist", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             },
                             onPlaylistDefaultName = { Krespot.playlists.defaultName(context) },
@@ -927,6 +993,33 @@ class MainActivity : ComponentActivity() {
                             artistTracks = artistTracks,
                             artistReleases = artistReleases,
                             artistMonthlyListeners = artistListeners,
+                            artistFollowed = artistFollowed,
+                            onArtistFollowToggle = { uri, follow ->
+                                scope.launch {
+                                    // addToLibrary / removeFromLibrary are the
+                                    // same mutations the Follow pill and the
+                                    // three-dot menu share; the pill only flips
+                                    // once the server has accepted the change.
+                                    val ok = Library.setSaved(context, listOf(uri), follow)
+                                    log.i("artist follow '$uri' -> $follow ok=$ok")
+                                    if (ok) artistFollowed = follow
+                                }
+                            },
+                            onArtistRadio = { uri ->
+                                // inspiredby-mix seed_to_playlist: the artist seed
+                                // resolves into its radio playlist; the shell opens
+                                // that playlist page and autoplays it.
+                                val radio = Krespot.artists.artistRadio(context, uri)
+                                log.i("artist radio '$uri' -> '$radio'")
+                                if (radio == null) {
+                                    Toast.makeText(
+                                        context,
+                                        "Couldn't load the radio",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                radio
+                            },
                             homeLoading = loading,
                             searchResults = remember(searchHits) {
                                 searchHits.map { hit ->
@@ -978,14 +1071,21 @@ class MainActivity : ComponentActivity() {
                             onLoadSearchSection = { kind, offset ->
                                 Search.section(context, kind, searchTerm, offset)
                             },
-                            onToggleSaved = { uri ->
+                            onToggleSaved = { uri, saved ->
                                 scope.launch {
-                                    val next = !(searchData?.tracks.orEmpty()
-                                        .firstOrNull { it.uri == uri }?.saved ?: false)
+                                    val next = !saved
                                     val ok = Library.setSaved(context, listOf(uri), next)
                                     log.i("search heart '$uri' -> $next ok=$ok")
+                                    if (ok) {
+                                        // Flip the pressed row right away (the override)
+                                        // and keep the fetched answer truthful for the
+                                        // rows this search never covered itself.
+                                        searchSavedOverrides[uri] = next
+                                        searchData = searchData?.withSaved(uri, next)
+                                    }
                                 }
                             },
+                            searchSavedOverrides = searchSavedOverrides.toMap(),
                             browsePage = browsePage,
                             categoryShelves = categoryShelves,
                             fullArtworkPlayer = fullArtworkPlayer,
@@ -1138,11 +1238,6 @@ class MainActivity : ComponentActivity() {
                         // An account that is already saved is refused: the login
                         // is torn down and the previous session restored.
                         if (addingAccount) {
-                            BackHandler {
-                                log.i("add account cancelled, restoring the active session")
-                                SpotifyAuth.applySession(context)
-                                addingAccount = false
-                            }
                             LoginScreen(
                                 onLoggedIn = {
                                     log.i("add account completed")
@@ -1173,18 +1268,46 @@ class MainActivity : ComponentActivity() {
                                         "'${duplicate.name.ifBlank { "This account" }}' is already added",
                                         Toast.LENGTH_LONG
                                     ).show()
+                                },
+                                // Back walked the login webview's history dry
+                                // (handled inside LoginScreen): return to the
+                                // app with the previous session restored.
+                                onBackExhausted = {
+                                    log.i("add account cancelled, restoring the active session")
+                                    SpotifyAuth.applySession(context)
+                                    addingAccount = false
                                 }
                             )
                         }
                     }
                 } else {
-                    LoginScreen(onLoggedIn = {
-                        log.i("login completed")
-                        SpotifyAuth.storeCurrentAccount(context)
-                        PlaybackHost.reset(context)
-                        Krespot.library.invalidate()
-                        loggedIn = true
-                    })
+                    LoginScreen(
+                        onLoggedIn = {
+                            log.i("login completed")
+                            SpotifyAuth.storeCurrentAccount(context)
+                            PlaybackHost.reset(context)
+                            Krespot.library.invalidate()
+                            loggedIn = true
+                        },
+                        // Back walked the login webview's history dry: with an
+                        // account already saved on this device, return to the
+                        // app on its stored session; a fresh install leaves
+                        // the app the ordinary way.
+                        onBackExhausted = {
+                            if (SpotifyAuth.savedAccounts(context).isNotEmpty()) {
+                                log.i("login backed out with a saved account, restoring its session")
+                                SpotifyAuth.applySession(context)
+                                if (SpotifyAuth.token(context).isNotBlank()) {
+                                    loggedIn = true
+                                } else {
+                                    (context as? Activity)?.finish()
+                                }
+                            } else {
+                                log.i("login backed out, leaving the app")
+                                (context as? Activity)?.finish()
+                            }
+                        }
+                    )
                 }
             }
         }

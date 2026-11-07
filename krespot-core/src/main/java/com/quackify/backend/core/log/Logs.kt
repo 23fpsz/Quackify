@@ -16,6 +16,10 @@ object Logs {
     /** How many log lines the in-app viewer keeps before the oldest fall off. */
     const val MAX_LINES = 3000
 
+    /** SharedPreferences file + key used to persist [capturing] across restarts. */
+    const val PREFS_NAME = "quackify.client"
+    const val CAPTURE_PREF_KEY = "logCaptureEnabled"
+
     enum class Module(val label: String) {
         AUTH("auth"),
         LOGIN("login"),
@@ -109,6 +113,18 @@ object Logs {
     @Volatile
     var floor: Level = Level.VERBOSE
 
+    /**
+     * Master switch for the *in-app* log capture (the LogViewer ring
+     * buffer). Off by default: a fresh install keeps the viewer empty until
+     * the user turns the "Logging" toggle in the log viewer on, so continuous
+     * capture cannot cost any performance unasked. Logcat output is NOT
+     * gated by this switch — it always flows so Android Studio can show
+     * what is going on even while capture is off. The app persists this in
+     * [PREFS_NAME]/[CAPTURE_PREF_KEY].
+     */
+    @Volatile
+    var capturing: Boolean = false
+
     private val modules = ConcurrentHashMap<Module, Level>()
 
     private val buffer = ArrayDeque<Entry>(MAX_LINES)
@@ -155,7 +171,10 @@ object Logs {
     fun dump(): String = snapshot().joinToString("\n") { format(it) }
 
     internal fun write(module: Module, level: Level, message: String, error: Throwable?) {
-        record(module, level, message, error)
+        // The in-app ring buffer follows the LogViewer toggle, but logcat
+        // always receives the line: the whole point is being able to see in
+        // Android Studio what happened while capture was off.
+        if (capturing) record(module, level, message, error)
         val line = "[${module.label}] $message"
         when (level) {
             Level.VERBOSE -> Log.v(TAG, line, error)
