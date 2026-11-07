@@ -23,8 +23,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,6 +46,9 @@ import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyTheme
 import com.quackify.backend.model.PlaylistChoice
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,6 +60,9 @@ fun AddToPlaylistSheet(
     isLoading: Boolean,
     onPick: (PlaylistChoice) -> Unit,
     onLoadFolder: (suspend (folderUri: String) -> List<PlaylistChoice>)? = null,
+    // Answers "how many songs does this playlist hold" for the rows in view;
+    // the sheet asks per uri so the counts work inside folders too.
+    onLoadTrackCount: (suspend (playlistUri: String) -> Int)? = null,
     onCreateNew: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -74,6 +82,29 @@ fun AddToPlaylistSheet(
 
     val rows = currentRows ?: choices
     val inFolder = currentFolder != null
+
+    // Song count per playlist row, hydrated while the list is on screen.
+    // Counts are remembered by uri, so drilling into a folder and back out
+    // shows the root's counts again without another round trip.
+    val trackCounts = remember { mutableStateMapOf<String, Int>() }
+    LaunchedEffect(rows) {
+        val loader = onLoadTrackCount ?: return@LaunchedEffect
+        rows.asSequence()
+            .filter { it.kind != PlaylistChoice.Kind.FOLDER && !trackCounts.containsKey(it.uri) }
+            .map { it.uri }
+            .toList()
+            .chunked(6)
+            .forEach { batch ->
+                coroutineScope {
+                    batch.map { uri ->
+                        async {
+                            val count = loader(uri)
+                            if (count >= 0) trackCounts[uri] = count
+                        }
+                    }.awaitAll()
+                }
+            }
+    }
 
     fun openFolder(folder: PlaylistChoice) {
         val loader = onLoadFolder
@@ -248,7 +279,11 @@ fun AddToPlaylistSheet(
                         if (choice.kind == PlaylistChoice.Kind.FOLDER) {
                             AddToFolderRow(folder = choice, onOpen = { openFolder(choice) })
                         } else {
-                            AddToPlaylistRow(choice = choice, onPick = { onPick(choice) })
+                            AddToPlaylistRow(
+                                choice = choice,
+                                songCount = trackCounts[choice.uri],
+                                onPick = { onPick(choice) }
+                            )
                         }
                     }
                 }
@@ -261,11 +296,13 @@ fun AddToPlaylistSheet(
 
 /**
  * A playlist (or the Liked Songs pseudo playlist) the track can be added to.
- * The green check marks the ones the answer flagged as already holding it.
+ * The green check marks the ones the answer flagged as already holding it,
+ * and the right-aligned count says how many songs it holds right now.
  */
 @Composable
 private fun AddToPlaylistRow(
     choice: PlaylistChoice,
+    songCount: Int?,
     onPick: () -> Unit,
 ) {
     Row(
@@ -290,6 +327,15 @@ private fun AddToPlaylistRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        if (songCount != null && songCount >= 0) {
+            Text(
+                text = "$songCount song" + if (songCount == 1) "" else "s",
+                style = SpotifyTheme.typography.bodySmall.copy(
+                    color = EncoreColors.TextSecondary
+                ),
+                maxLines = 1
+            )
+        }
         if (choice.containsTrack) {
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_check_24),

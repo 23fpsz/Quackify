@@ -368,6 +368,7 @@ fun SpotifyAppShell(
     onPickPlaylist: ((PlaylistChoice, TrackItem) -> Unit)? = null,
     onCreatePlaylistWith: ((TrackItem) -> Unit)? = null,
     onLoadPlaylistFolder: (suspend (trackUri: String, folderUri: String) -> List<PlaylistChoice>)? = null,
+    onLoadTrackCount: (suspend (playlistUri: String) -> Int)? = null,
     onPlaylistDefaultName: (suspend () -> String)? = null,
     onCreatePlaylist: (suspend (name: String, description: String, cover: ByteArray?) -> String?)? = null,
     playlistSaved: Boolean? = null,
@@ -434,6 +435,10 @@ fun SpotifyAppShell(
     var isDiscographyOpen by remember { mutableStateOf(false) }
     var isCreditsOpen by remember { mutableStateOf(false) }
     var isAddToPlaylistOpen by remember { mutableStateOf(false) }
+    // Where the queue that is playing was started from. The full NPV header
+    // follows this instead of the screen the user is on, so a search play keeps
+    // saying "Playing from search" after the user browses elsewhere.
+    var playbackOrigin by remember { mutableStateOf<PlaybackOrigin?>(null) }
     var libraryItemOptions by remember { mutableStateOf<EntityOptions?>(null) }
     var activeFolderOptionsItem by remember { mutableStateOf<LibraryItem?>(null) }
     var isRenamePlaylistDialogOpen by remember { mutableStateOf(false) }
@@ -619,6 +624,14 @@ fun SpotifyAppShell(
     }
 
     val handleTrackPlay: (TrackItem) -> Unit = { track ->
+        // Remember the context this play started from for the full NPV header.
+        playbackOrigin = when (currentScreen) {
+            ShellScreen.SEARCH -> PlaybackOrigin(ShellScreen.SEARCH, searchQuery.trim())
+            ShellScreen.PLAYLIST -> PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle)
+            ShellScreen.ALBUM -> PlaybackOrigin(ShellScreen.ALBUM, activeAlbumTitle)
+            ShellScreen.ARTIST -> PlaybackOrigin(ShellScreen.ARTIST, activeArtistName)
+            else -> null
+        }
         if (playerListener != null) {
             if (track.uri.isNotEmpty()) {
                 val rows = when (currentScreen) {
@@ -992,7 +1005,8 @@ fun SpotifyAppShell(
                     } else {
                         isPlaylistOptionsOpen = true
                     }
-                }
+                },
+                onPlaybackOrigin = { playbackOrigin = it }
             )
             ShellScreen.ALBUM -> ShellAlbumPane(
                 activeAlbumTitle = activeAlbumTitle,
@@ -1012,7 +1026,8 @@ fun SpotifyAppShell(
                 handleTrackOptions = handleTrackOptions,
                 openArtist = openArtist,
                 openAlbum = openAlbum,
-                onAlbumOptions = { isAlbumOptionsOpen = true }
+                onAlbumOptions = { isAlbumOptionsOpen = true },
+                onPlaybackOrigin = { playbackOrigin = it }
             )
             ShellScreen.ARTIST -> {
                 androidx.compose.runtime.key(activeArtistName) {
@@ -1277,10 +1292,12 @@ fun SpotifyAppShell(
         // Full Now Playing Screen
         val (contextHeader, contextSub) = nowPlayingContext(
             trackLoaded = playerIdentity.trackLoaded,
+            origin = playbackOrigin,
             screen = currentScreen,
             playlistTitle = activePlaylistTitle,
             albumTitle = activeAlbumTitle,
             artistName = activeArtistName,
+            searchQuery = searchQuery,
         )
         ShellNowPlaying(
             visible = isPlayerExpanded,
@@ -1555,6 +1572,8 @@ fun SpotifyAppShell(
                 onLoadFolder = onLoadPlaylistFolder?.let { loader ->
                     { folderUri -> loader(addTrackTarget?.uri.orEmpty(), folderUri) }
                 },
+                // Song counts for the rows it is showing, root list or folder.
+                onLoadTrackCount = onLoadTrackCount,
                 onCreateNew = {
                     addTrackTarget?.let { track -> onCreatePlaylistWith?.invoke(track) }
                     isAddToPlaylistOpen = false
@@ -1838,19 +1857,42 @@ private fun playerIdentityOf(
     artist = artist.ifBlank { "No Artist" },
 )
 
+/** The context a play was started from, so the NPV header can name the queue's origin. */
+private data class PlaybackOrigin(
+    val screen: ShellScreen,
+    val label: String,
+)
+
 /** What the NPV header should say, including the explicit nothing-loaded state. */
 private fun nowPlayingContext(
     trackLoaded: Boolean,
+    origin: PlaybackOrigin?,
     screen: ShellScreen,
     playlistTitle: String,
     albumTitle: String,
     artistName: String,
-): Pair<String, String> = when {
-    !trackLoaded -> "Nothing playing" to "Pick a song to get started"
-    screen == ShellScreen.PLAYLIST -> "Playing from playlist" to playlistTitle
-    screen == ShellScreen.ALBUM -> "Playing from album" to albumTitle
-    screen == ShellScreen.ARTIST -> "Playing from artist" to artistName
-    else -> "Playing from playlist" to playlistTitle
+    searchQuery: String,
+): Pair<String, String> {
+    fun searchSub(query: String): String {
+        val q = query.trim()
+        return if (q.isBlank()) "Search" else "$q in Search"
+    }
+    return when {
+        !trackLoaded -> "Nothing playing" to "Pick a song to get started"
+        // The header follows where the playing queue came from, not the
+        // screen the user happens to be on right now.
+        origin != null -> when (origin.screen) {
+            ShellScreen.SEARCH -> "Playing from search" to searchSub(origin.label)
+            ShellScreen.ALBUM -> "Playing from album" to origin.label
+            ShellScreen.ARTIST -> "Playing from artist" to origin.label
+            else -> "Playing from playlist" to origin.label
+        }
+        screen == ShellScreen.SEARCH -> "Playing from search" to searchSub(searchQuery)
+        screen == ShellScreen.PLAYLIST -> "Playing from playlist" to playlistTitle
+        screen == ShellScreen.ALBUM -> "Playing from album" to albumTitle
+        screen == ShellScreen.ARTIST -> "Playing from artist" to artistName
+        else -> "Playing from playlist" to playlistTitle
+    }
 }
 
 /** Settings branch of the shell, extracted to keep [SpotifyAppShell] under the jvm method limit. */
@@ -1935,7 +1977,8 @@ private fun ShellAlbumPane(
     handleTrackOptions: (TrackItem) -> Unit,
     openArtist: (String, String) -> Unit,
     openAlbum: (String, String, String) -> Unit,
-    onAlbumOptions: () -> Unit
+    onAlbumOptions: () -> Unit,
+    onPlaybackOrigin: (PlaybackOrigin?) -> Unit = {}
 ) {
     androidx.compose.runtime.key(activeAlbumTitle, activeAlbumArtist) {
         val albumDominantColor by rememberDominantColor(
@@ -1967,6 +2010,7 @@ private fun ShellAlbumPane(
             onBackClick = handleBack,
             onPlayPauseClick = handlePlayPause,
             onTrackSelect = { track ->
+                onPlaybackOrigin(PlaybackOrigin(ShellScreen.ALBUM, activeAlbumTitle))
                 if (playerListener != null) {
                     if (track.uri.isNotEmpty()) {
                         val index = albumTracks.orEmpty().indexOfFirst { it.uri == track.uri }
@@ -2021,7 +2065,8 @@ private fun ShellPlaylistPane(
     onEditModeChange: (Boolean) -> Unit = {},
     onChangeTitle: (() -> Unit)? = null,
     onAddTracksClick: (() -> Unit)? = null,
-    onEditCoverClick: (() -> Unit)? = null
+    onEditCoverClick: (() -> Unit)? = null,
+    onPlaybackOrigin: (PlaybackOrigin?) -> Unit = {}
 ) {
     androidx.compose.runtime.key(activePlaylistUri.ifEmpty { activePlaylistTitle }) {
         LaunchedEffect(playlistTracks, activePlaylistUri) {
@@ -2070,6 +2115,8 @@ private fun ShellPlaylistPane(
             onPlayPauseClick = {
                 if (playerListener != null) {
                     if (activePlaylistUri.isNotEmpty() && !isPlaying) {
+                        // Starting this playlist's queue names it in the NPV.
+                        onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
                         val firstTrack = playlistTracks
                             ?.firstOrNull { it.uri.startsWith("spotify:track:") }
                         if (firstTrack != null && activePlaylistUri.startsWith("spotify:playlist:")) {
@@ -2081,10 +2128,12 @@ private fun ShellPlaylistPane(
                         playerListener.onPlayPause()
                     }
                 } else {
+                    onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
                     onLocalPlayPause()
                 }
             },
             onTrackSelect = { track ->
+                onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
                 if (playerListener != null) {
                     if (track.uri.isNotEmpty()) {
                         val index = playlistTracks.orEmpty().indexOfFirst { it.uri == track.uri }
