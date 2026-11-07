@@ -91,10 +91,12 @@ private val LevelError = Color(0xFFFF5A5F)
 
 /**
  * Hidden logcat-style viewer over the in-memory ring buffer kept by [Logs].
- * Opened by tapping the Version row in Settings five times. Lines read top to
- * bottom (oldest first, like a chat transcript) and new lines land at the
- * bottom, where the Auto-scroll toggle can follow them. The Logging toggle
- * pauses capture entirely so continuous logging cannot cost performance.
+ * Opened by tapping the Version row in Settings five times, or from the
+ * small LOGS pill on the login screen. Lines read top to bottom (oldest
+ * first, like a chat transcript) and new lines land at the bottom, where
+ * the Auto-scroll toggle can follow them. The Logging toggle only pauses
+ * the in-app capture (this screen's ring buffer); logcat output always
+ * flows, so Android Studio keeps showing logs either way.
  */
 @Composable
 fun LogViewerScreen(
