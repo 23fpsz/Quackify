@@ -167,9 +167,10 @@ object CanvasKit {
             for (j in 0 until profiles.length()) {
                 val profile = profiles.optJSONObject(j) ?: continue
                 if (profile.optString("file_type") != "mp4") continue
-                if (profile.optInt("video_resolution", 0) <= 0) continue
+                val resolution = profile.optInt("video_resolution", 0)
+                if (resolution !in 1..1080) continue
                 if (best == null ||
-                    profile.optInt("video_resolution") > best.optInt("video_resolution")
+                    resolution > best.optInt("video_resolution")
                 ) {
                     best = profile
                 }
@@ -190,9 +191,7 @@ object CanvasKit {
     suspend fun download(context: Context, trackUri: String): String? = withContext(Dispatchers.IO) {
         val id = trackUri.substringAfterLast(":")
         val dir = File(context.cacheDir, "canvas")
-        // v3: stitched and remuxed with a normalized timeline; v2 files kept
-        // the CDN's raw timestamps and could freeze mid-loop.
-        val cache = File(dir, "v3-$id.mp4")
+        val cache = File(dir, "$id.mp4")
         if (cache.isFile && cache.length() > 0L) return@withContext cache.absolutePath
 
         val target = resolve(context, trackUri) ?: return@withContext null
@@ -230,28 +229,28 @@ object CanvasKit {
             } else {
                 // legacy numbering: not always contiguous (some canvases step by
                 // 4), so the stepper probes +1 first and falls back to +4
-                var index = 0
-                var step = 0 // 0 = numbering still unknown, probe both strides
-                while (parts.size - 1 < MAX_SEGMENTS && total < MAX_BYTES) {
-                    val candidates = when (step) {
-                        1 -> listOf(index + 1)
-                        4 -> listOf(index + 4)
-                        else -> listOf(index + 1, index + 4)
+            var index = 0
+            var step = 0 // 0 = numbering still unknown, probe both strides
+            while (parts.size - 1 < MAX_SEGMENTS && total < MAX_BYTES) {
+                val candidates = when (step) {
+                    1 -> listOf(index + 1)
+                    4 -> listOf(index + 4)
+                    else -> listOf(index + 1, index + 4)
+                }
+                var advanced = -1
+                for (candidate in candidates) {
+                    val segment = "$base/$candidate.mp4" + if (query.isBlank()) "" else "?$query"
+                    val blob = Net.blob(segment, headers, "canvas/seg") ?: continue
+                    if (blob.ok && blob.size > 0) {
+                        parts += blob.bytes
+                        total += blob.size
+                        advanced = candidate
+                        break
                     }
-                    var advanced = -1
-                    for (candidate in candidates) {
-                        val segment = "$base/$candidate.mp4" + if (query.isBlank()) "" else "?$query"
-                        val blob = Net.blob(segment, headers, "canvas/seg") ?: continue
-                        if (blob.ok && blob.size > 0) {
-                            parts += blob.bytes
-                            total += blob.size
-                            advanced = candidate
-                            break
-                        }
-                    }
-                    if (advanced < 0) break
-                    step = advanced - index
-                    index = advanced
+                }
+                if (advanced < 0) break
+                step = advanced - index
+                index = advanced
                 }
             }
             if (parts.size < 2) {
