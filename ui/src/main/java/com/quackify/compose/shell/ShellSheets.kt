@@ -39,6 +39,7 @@ internal data class SheetFlags(
 internal fun ShellSheets(
     flags: SheetFlags,
     selectedTrack: TrackItem?,
+    canAddToQueue: Boolean = true,
     devices: List<ConnectDevice>,
     connectedDevice: String,
     userQueue: List<TrackItem>,
@@ -150,6 +151,7 @@ internal fun ShellSheets(
         onLikeToggle = onLikeToggle,
         onAddToPlaylist = onAddToPlaylist,
         onAddToQueue = { selectedTrack?.let(onAddToQueue) },
+        canAddToQueue = canAddToQueue,
         onViewArtist = onViewArtist,
         onViewAlbum = onViewAlbum,
         onShare = { selectedTrack?.uri?.takeIf { it.isNotBlank() }?.let(onShare) },
