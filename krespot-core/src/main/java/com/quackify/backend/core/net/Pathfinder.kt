@@ -44,6 +44,8 @@ object Pathfinder {
             "9e1c0e056c46239dd1956ea915b988913c87c04ce3dadccdb537774490266f46",
         "recentSearches" to
             "ece96d7b82c820fb9938dd1df50dee3e53737d808c3883e3d01c467c423601b0",
+        "homeSection" to
+            "5fb7da7a03ee2776c0670856609cb85a189a3cecc36cc160b91cde79063b9cf1",
         "areEntitiesInLibrary" to
             "134337999233cc6fdd6b1e6dbf94841409f04a946c5c7b744b09ba0dfe5a85ed",
         "decorateContextTracks" to

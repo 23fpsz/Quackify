@@ -24,6 +24,7 @@ import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.api.HomeFeed
 import com.quackify.backend.model.HomeSection
 import com.quackify.backend.model.HomeChip
+import com.quackify.backend.model.HomeItem
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
@@ -64,6 +65,9 @@ import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.compose.home.toQuickAccess
 import com.quackify.compose.home.toShelves
+import com.quackify.compose.home.toArtistCardItem
+import com.quackify.compose.home.ArtistCardItem
+import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.screens.LoginScreen
@@ -171,6 +175,11 @@ class MainActivity : ComponentActivity() {
                         var homeGreeting by remember { mutableStateOf("") }
                         var homeFacet by remember { mutableStateOf("") }
                         var loading by remember { mutableStateOf(true) }
+                        // The web player's "Your favorite artists" shelf is its
+                        // own fixed homeSection the main home query never answers,
+                        // so it rides along and loads next to the feed.
+                        var favoriteArtists by remember { mutableStateOf<List<HomeItem>>(emptyList()) }
+                        var playHistory by remember { mutableStateOf(PlayHistory.all(context)) }
                         LaunchedEffect(resumeSignal, homeFacet) {
                             if (resumeSignal == 0) loading = true
                             val payload = HomeFeed.load(context, homeFacet)
@@ -186,9 +195,30 @@ class MainActivity : ComponentActivity() {
                         }
                         LaunchedEffect(resumeSignal) {
                             if (resumeSignal > 0) SilentTokenRefresh.maybeRefresh(context)
+                            // Facet-independent: load once per resume and keep
+                            // the last answer if a retry comes back empty.
+                            val artists = HomeFeed.favoriteArtists(context)
+                            if (artists.isNotEmpty() || resumeSignal == 0) {
+                                favoriteArtists = artists
+                            }
+                            log.i("favorite artists=${artists.size}")
                         }
                         val account = remember(loggedIn) { SpotifyAuth.account(context) }
-                        val quick = remember(feed) { feed.toQuickAccess() }
+                        // The shortcut grid is the account's own Recently played:
+                        // the newest distinct songs from the listening history,
+                        // falling back to the server's shortcut shelf only while
+                        // the history on this device is still empty.
+                        val quick = remember(playHistory, feed) {
+                            val recent = playHistory.take(8).map { played ->
+                                QuickAccessItem(
+                                    title = played.item.title,
+                                    coverColor = Color(0xFF535353),
+                                    uri = played.item.uri,
+                                    imageUrl = played.item.imageUrl,
+                                )
+                            }
+                            if (recent.isNotEmpty()) recent else feed.toQuickAccess()
+                        }
                         val shelves = remember(feed) { feed.toShelves() }
                         LaunchedEffect(shelves) {
                             log.i("home shelves=${shelves.size} " +
@@ -285,7 +315,6 @@ class MainActivity : ComponentActivity() {
                         var whatsNewLoading by remember { mutableStateOf(false) }
                         var whatsNewFailed by remember { mutableStateOf(false) }
                         var whatsNewFetch by remember { mutableStateOf(0) }
-                        var playHistory by remember { mutableStateOf(PlayHistory.all(context)) }
 
                         // Multi-account: the list of saved accounts plus the
                         // flag that flips the login webview over the shell to
@@ -349,6 +378,9 @@ class MainActivity : ComponentActivity() {
                         var artistTracks by remember { mutableStateOf<List<PopularTrack>?>(null) }
                         var artistReleases by remember { mutableStateOf<List<ArtistRelease>?>(null) }
                         var artistListeners by remember { mutableStateOf<String?>(null) }
+                        // The open artist's follow state: null until the
+                        // areEntitiesInLibrary check has answered.
+                        var artistFollowed by remember { mutableStateOf<Boolean?>(null) }
 
                         val libraryRevision by Krespot.library.revision.collectAsState()
 
@@ -496,6 +528,7 @@ class MainActivity : ComponentActivity() {
                                 artistTracks = null
                                 artistReleases = null
                                 artistListeners = null
+                                artistFollowed = null
                                 return@LaunchedEffect
                             }
                             val uri = artistUri
@@ -503,6 +536,7 @@ class MainActivity : ComponentActivity() {
                             artistTracks = null
                             artistReleases = null
                             artistListeners = null
+                            artistFollowed = null
                             artistLoading = true
                             try {
                                 val detail = Krespot.artists.artist(context, uri)
@@ -524,6 +558,15 @@ class MainActivity : ComponentActivity() {
                                 }
                                 artistReleases = releaseRows.map { it.toArtistRelease() }
                                 artistListeners = detail?.monthlyListeners?.takeIf { it > 0L }?.let { formatCount(it) }
+                                // Follow state: the dedicated library lookup is
+                                // the truth; the overview's own saved flag covers
+                                // a lookup that came back with nothing.
+                                val inLibrary = Library.saved(context, listOf(uri))
+                                artistFollowed = if (inLibrary.isEmpty()) {
+                                    detail?.saved == true
+                                } else {
+                                    uri in inLibrary
+                                }
                             } finally {
                                 artistLoading = false
                             }
@@ -737,6 +780,9 @@ class MainActivity : ComponentActivity() {
                             expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
                                 homeQuickAccessItems = quick,
                             homeShelves = shelves,
+                            homeFavoriteArtists = remember(favoriteArtists) {
+                                favoriteArtists.map { it.toArtistCardItem() }
+                            },
                             homeChips = homeChips,
                             homeFacet = homeFacet,
                             homeGreeting = homeGreeting,
@@ -979,6 +1025,33 @@ class MainActivity : ComponentActivity() {
                             artistTracks = artistTracks,
                             artistReleases = artistReleases,
                             artistMonthlyListeners = artistListeners,
+                            artistFollowed = artistFollowed,
+                            onArtistFollowToggle = { uri, follow ->
+                                scope.launch {
+                                    // addToLibrary / removeFromLibrary are the
+                                    // same mutations the Follow pill and the
+                                    // three-dot menu share; the pill only flips
+                                    // once the server has accepted the change.
+                                    val ok = Library.setSaved(context, listOf(uri), follow)
+                                    log.i("artist follow '$uri' -> $follow ok=$ok")
+                                    if (ok) artistFollowed = follow
+                                }
+                            },
+                            onArtistRadio = { uri ->
+                                // inspiredby-mix seed_to_playlist: the artist seed
+                                // resolves into its radio playlist; the shell opens
+                                // that playlist page and autoplays it.
+                                val radio = Krespot.artists.artistRadio(context, uri)
+                                log.i("artist radio '$uri' -> '$radio'")
+                                if (radio == null) {
+                                    Toast.makeText(
+                                        context,
+                                        "Couldn't load the radio",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                radio
+                            },
                             homeLoading = loading,
                             searchResults = remember(searchHits) {
                                 searchHits.map { hit ->

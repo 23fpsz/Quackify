@@ -126,10 +126,13 @@ fun SpotifyArtistScreen(
     worldRank: Int = 0,
     topCities: List<CityStat> = emptyList(),
     gallery: List<String> = emptyList(),
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    /** The artist's real follow state from the library; the pill only flips
+     *  once addToLibrary/removeFromLibrary has answered. */
+    isFollowing: Boolean = false,
+    onFollowToggle: (Boolean) -> Unit = {}
 ) {
     val density = LocalDensity.current
-    var isFollowing by remember { mutableStateOf(false) }
     var isShuffle by remember { mutableStateOf(false) }
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
@@ -376,7 +379,7 @@ fun SpotifyArtistScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(EncoreCornerRadii.FollowPill))
                                 .border(1.dp, followBorderColor, RoundedCornerShape(EncoreCornerRadii.FollowPill))
-                                .clickable { isFollowing = !isFollowing }
+                                .clickable { onFollowToggle(!isFollowing) }
                                 .padding(horizontal = 16.dp, vertical = 6.dp)
                         ) {
                             Text(

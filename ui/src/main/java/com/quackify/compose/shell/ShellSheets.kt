@@ -62,6 +62,9 @@ internal fun ShellSheets(
     artistName: String,
     artistAvatarUrl: String?,
     artistUri: String = "",
+    artistFollowing: Boolean = false,
+    onArtistFollowToggle: () -> Unit = {},
+    onArtistRadio: () -> Unit = {},
     sortOption: LibrarySortOption,
     sleepTimer: SleepTimerOption?,
     userDisplayName: String,
@@ -192,6 +195,9 @@ internal fun ShellSheets(
         avatarUrl = artistAvatarUrl,
         isOpen = flags.artistOptions,
         onDismiss = onDismissArtistOptions,
+        isFollowing = artistFollowing,
+        onFollowToggle = onArtistFollowToggle,
+        onGoToRadio = onArtistRadio,
         onShare = { artistUri.takeIf { it.startsWith("spotify:artist:") }?.let(onShare) }
     )
 
