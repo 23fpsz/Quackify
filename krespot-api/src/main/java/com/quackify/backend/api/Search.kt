@@ -60,12 +60,17 @@ object Search {
         if (trimmed.isEmpty()) return emptyList()
         val json = call(context, OP_SUGGESTIONS, suggestionVariables(trimmed, limit)) ?: return emptyList()
         val hits = topHits(json).take(limit)
+        // The dropdown rows carry hearts now: ask the library which entities are
+        // already in it so the first press toggles the right way around.
+        val entities = hits.filter { it.kind != SearchKind.QUERY && it.uri.isNotBlank() }
+        val saved = if (entities.isEmpty()) emptySet() else Library.saved(context, entities.map { it.uri })
+        val marked = if (saved.isEmpty()) hits else hits.map { if (it.uri in saved) it.copy(saved = true) else it }
         log.i("suggest '$trimmed' -> ${hits.size} hits " +
                 "queries=${hits.count { it.kind == SearchKind.QUERY }} " +
                 "entities=${hits.count { it.kind != SearchKind.QUERY }} " +
                 hits.map { it.title }.take(4)
         )
-        return hits
+        return marked
     }
 
     private val SECTION_OPS = mapOf(

@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -198,6 +199,10 @@ class MainActivity : ComponentActivity() {
                         var searchFailed by remember { mutableStateOf(false) }
                         var searchFetch by remember { mutableStateOf(0) }
                         var searchDataFor by remember { mutableStateOf("") }
+                        // Every heart pressed on the search screen lands here first so
+                        // its row flips immediately; a freshly fetched answer for a
+                        // new term starts from a clean slate again.
+                        val searchSavedOverrides = remember { mutableStateMapOf<String, Boolean>() }
                         var recentQueries by remember { mutableStateOf(RecentQueries.all(context)) }
                         val scope = rememberCoroutineScope()
 
@@ -671,6 +676,7 @@ class MainActivity : ComponentActivity() {
                                 searchHits = emptyList()
                                 searchLoading = false
                                 searchFailed = false
+                                searchSavedOverrides.clear()
                                 return@LaunchedEffect
                             }
                             if (offlineNow) {
@@ -695,6 +701,7 @@ class MainActivity : ComponentActivity() {
                             val results = Search.query(context, term)
                             searchData = results?.let { decorateSearchTracks(context, it) }
                             searchDataFor = term
+                            searchSavedOverrides.clear()
                             searchFailed = results == null
                             searchLoading = false
                             if (results != null) {
@@ -978,14 +985,21 @@ class MainActivity : ComponentActivity() {
                             onLoadSearchSection = { kind, offset ->
                                 Search.section(context, kind, searchTerm, offset)
                             },
-                            onToggleSaved = { uri ->
+                            onToggleSaved = { uri, saved ->
                                 scope.launch {
-                                    val next = !(searchData?.tracks.orEmpty()
-                                        .firstOrNull { it.uri == uri }?.saved ?: false)
+                                    val next = !saved
                                     val ok = Library.setSaved(context, listOf(uri), next)
                                     log.i("search heart '$uri' -> $next ok=$ok")
+                                    if (ok) {
+                                        // Flip the pressed row right away (the override)
+                                        // and keep the fetched answer truthful for the
+                                        // rows this search never covered itself.
+                                        searchSavedOverrides[uri] = next
+                                        searchData = searchData?.withSaved(uri, next)
+                                    }
                                 }
                             },
+                            searchSavedOverrides = searchSavedOverrides.toMap(),
                             browsePage = browsePage,
                             categoryShelves = categoryShelves,
                             fullArtworkPlayer = fullArtworkPlayer,

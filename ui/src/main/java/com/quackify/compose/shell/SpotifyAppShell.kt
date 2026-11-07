@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -178,7 +179,7 @@ internal data class ShellInputs(
     val suggestions: List<SearchHit>,
     val recent: List<SearchHit>,
     val onClearRecent: () -> Unit,
-    val onToggleSaved: (String) -> Unit,
+    val onToggleSaved: (String, Boolean) -> Unit,
     val onLoadSection: suspend (SearchKind, Int) -> List<SearchHit>,
     val searchLoading: Boolean,
     val playlistTracks: List<TrackItem>?,
@@ -293,7 +294,8 @@ fun SpotifyAppShell(
     onClearRecentSearches: (() -> Unit)? = null,
     onRemoveRecentSearch: ((String) -> Unit)? = null,
     onLoadSearchSection: (suspend (SearchKind, Int) -> List<SearchHit>)? = null,
-    onToggleSaved: ((String) -> Unit)? = null,
+    onToggleSaved: ((uri: String, currentlySaved: Boolean) -> Unit)? = null,
+    searchSavedOverrides: Map<String, Boolean> = emptyMap(),
     homeLoading: Boolean = false,
     onLogout: (() -> Unit)? = null,
     settingsSwitches: SettingsSwitches = SettingsSwitches(),
@@ -698,6 +700,10 @@ fun SpotifyAppShell(
         )
     }
 
+    // A double-tap on the Search tab hands this requester to the search screen's
+    // field; the plain single tap stays exactly the navigation it always was.
+    val searchFieldFocusRequester = remember { FocusRequester() }
+
     // System Back Handler
     BackHandler(
         enabled = isPlayerExpanded ||
@@ -882,6 +888,7 @@ fun SpotifyAppShell(
                     onTrackSelect = handleTrackPlay,
                     onTrackOptionsClick = handleTrackOptions,
                     onProfileClick = openProfileDrawer,
+                    searchFieldFocusRequester = searchFieldFocusRequester,
                     searchResults = searchResults,
                     searchData = searchData,
                     onSearchQueryChange = { query ->
@@ -895,7 +902,8 @@ fun SpotifyAppShell(
                     onRetry = { onRetrySearch?.invoke() },
                     onClearRecent = { onClearRecentSearches?.invoke() },
                     onRemoveRecent = { item -> onRemoveRecentSearch?.invoke(item.title) },
-                    onToggleSaved = { uri -> onToggleSaved?.invoke(uri) },
+                    onToggleSaved = { uri, currentlySaved -> onToggleSaved?.invoke(uri, currentlySaved) },
+                    savedOverrides = searchSavedOverrides,
                     onLoadSection = onLoadSearchSection,
                     browseCategories = remember(browseCategories) {
                         browseCategories.orEmpty().map { card ->
@@ -1248,6 +1256,11 @@ fun SpotifyAppShell(
                         1 -> if (currentScreen != ShellScreen.SEARCH) { navBackStack.clear(); currentScreen = ShellScreen.SEARCH }
                         2 -> if (currentScreen != ShellScreen.LIBRARY) { navBackStack.clear(); currentScreen = ShellScreen.LIBRARY }
                     }
+                },
+                onSearchDoubleTap = {
+                    // The first tap of the pair already switched to Search; focus
+                    // once the field is attached, or swallow it if it is not yet.
+                    runCatching { searchFieldFocusRequester.requestFocus() }
                 },
                 onPlayPause = handlePlayPause,
                 onLike = { if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = !localIsLiked },

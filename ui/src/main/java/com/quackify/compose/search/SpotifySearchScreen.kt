@@ -60,6 +60,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
@@ -180,16 +182,18 @@ fun SpotifySearchScreen(
     loading: Boolean = false,
     loadFailed: Boolean = false,
     onRetry: () -> Unit = {},
-    onToggleSaved: (String) -> Unit = {},
     onClearRecent: () -> Unit = {},
     onRemoveRecent: (SearchHistoryItem) -> Unit = {},
     onLoadSection: (suspend (SearchKind, Int) -> List<SearchHit>)? = null,
+    onToggleSaved: (uri: String, currentlySaved: Boolean) -> Unit = { _, _ -> },
+    savedOverrides: Map<String, Boolean> = emptyMap(),
     browseCategories: List<CategoryCard> = emptyList(),
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
     currentTrackTitle: String = "",
     currentTrackUri: String = "",
     isPlaying: Boolean = false,
+    searchFieldFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -245,11 +249,21 @@ fun SpotifySearchScreen(
         }
     }
 
-    val allSearchableTracks = remember(searchData) {
-        searchData?.tracks.orEmpty().map { it.toTrackItem() }
+    // The activity folds every heart press into an overlay on top of the fetched
+    // answer, so each row keeps showing what the user last pressed while the
+    // write round-trips, and the rows the fetch never covered (the paged-in
+    // section lists, the as-you-type suggestions) stay in step too.
+    val displaySearchData = remember(searchData, savedOverrides) {
+        savedOverrides.entries.fold(searchData) { acc, (uri, saved) ->
+            acc?.withSaved(uri, saved)
+        }
     }
-    val allSearchableArtists = remember(searchData) {
-        searchData?.artists.orEmpty().map { hit ->
+
+    val allSearchableTracks = remember(displaySearchData) {
+        displaySearchData?.tracks.orEmpty().map { it.toTrackItem() }
+    }
+    val allSearchableArtists = remember(displaySearchData) {
+        displaySearchData?.artists.orEmpty().map { hit ->
             SearchArtistItem(
                 name = hit.title,
                 monthlyListeners = hit.subtitle,
@@ -260,8 +274,8 @@ fun SpotifySearchScreen(
             )
         }
     }
-    val allSearchableAlbums = remember(searchData) {
-        searchData?.albums.orEmpty().map { hit ->
+    val allSearchableAlbums = remember(displaySearchData) {
+        displaySearchData?.albums.orEmpty().map { hit ->
             SearchAlbumItem(
                 title = hit.title,
                 artist = hit.subtitle,
@@ -273,8 +287,8 @@ fun SpotifySearchScreen(
             )
         }
     }
-    val allSearchablePlaylists = remember(searchData) {
-        searchData?.playlists.orEmpty().map { hit ->
+    val allSearchablePlaylists = remember(displaySearchData) {
+        displaySearchData?.playlists.orEmpty().map { hit ->
             SearchPlaylistItem(
                 title = hit.title,
                 creator = hit.subtitle,
@@ -286,8 +300,8 @@ fun SpotifySearchScreen(
         }
     }
 
-    val allSearchablePodcasts = remember(searchData) {
-        searchData?.others.orEmpty()
+    val allSearchablePodcasts = remember(displaySearchData) {
+        displaySearchData?.others.orEmpty()
             .filter { it.kind == SearchKind.SHOW || it.kind == SearchKind.EPISODE }
             .map { hit ->
                 SearchPodcastItem(
@@ -301,13 +315,13 @@ fun SpotifySearchScreen(
             }
     }
 
-    val filteredTracks = remember(searchQuery, searchResults, suggestions, loading, searchData) {
+    val filteredTracks = remember(searchQuery, searchResults, suggestions, loading, displaySearchData) {
         when {
             searchQuery.isBlank() -> emptyList()
             // The full search knows the covers and artist lines; the
             // as-you-type suggestions only carry names, so once the real
             // results land they take over the list.
-            !searchData?.tracks.isNullOrEmpty() -> searchData!!.tracks.map { it.toTrackItem() }
+            !displaySearchData?.tracks.isNullOrEmpty() -> displaySearchData!!.tracks.map { it.toTrackItem() }
             !searchResults.isNullOrEmpty() -> searchResults
             !loading && suggestions.isNotEmpty() -> suggestions
             else -> allSearchableTracks.filter {
@@ -317,14 +331,14 @@ fun SpotifySearchScreen(
         }
     }
 
-    val filteredArtists = remember(searchData, searchQuery) {
+    val filteredArtists = remember(displaySearchData, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
         else allSearchableArtists.filter {
             it.name.contains(searchQuery, ignoreCase = true)
         }
     }
 
-    val filteredAlbums = remember(searchData, searchQuery) {
+    val filteredAlbums = remember(displaySearchData, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
         else allSearchableAlbums.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
@@ -332,7 +346,7 @@ fun SpotifySearchScreen(
         }
     }
 
-    val filteredPlaylists = remember(searchData, searchQuery) {
+    val filteredPlaylists = remember(displaySearchData, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
         else allSearchablePlaylists.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
@@ -340,7 +354,7 @@ fun SpotifySearchScreen(
         }
     }
 
-    val filteredPodcasts = remember(searchData, searchQuery) {
+    val filteredPodcasts = remember(displaySearchData, searchQuery) {
         if (searchQuery.isBlank()) emptyList()
         else allSearchablePodcasts.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
@@ -382,11 +396,11 @@ fun SpotifySearchScreen(
         }
     }
 
-    val tabHits = remember(selectedSearchTab, sectionHits, searchData) {
+    val tabHits = remember(selectedSearchTab, sectionHits, displaySearchData, savedOverrides) {
         if (sectionHits.isNotEmpty()) {
-            sectionHits
+            sectionHits.map { hit -> savedOverrides[hit.uri]?.let { hit.copy(saved = it) } ?: hit }
         } else {
-            tabKind?.let { searchData?.of(it).orEmpty() }.orEmpty()
+            tabKind?.let { displaySearchData?.of(it).orEmpty() }.orEmpty()
         }
     }
 
@@ -538,6 +552,11 @@ fun SpotifySearchScreen(
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
+                        .then(
+                            // The shell's nav bar focuses this field through the
+                            // requester when the Search tab is double-tapped.
+                            searchFieldFocusRequester?.let { Modifier.focusRequester(it) } ?: Modifier
+                        )
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isSearching) Color(0xFF282828) else Color.White)
                         .onFocusChanged { isSearchBarFocused = it.isFocused }
@@ -709,21 +728,35 @@ fun SpotifySearchScreen(
                 }
             }
         } else if (showSuggestions) {
+            // As-you-type dropdown. The rows mirror the saved-state overlay the
+            // activity keeps, so a heart pressed here flips in place too.
+            val dropHits = remember(suggestionHits, savedOverrides) {
+                suggestionHits.map { hit -> savedOverrides[hit.uri]?.let { hit.copy(saved = it) } ?: hit }
+            }
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(EncoreColors.Background),
                 contentPadding = PaddingValues(top = 4.dp, bottom = bottomPadding)
             ) {
-                items(suggestionHits, key = { it.uri.ifBlank { it.title } }) { hit ->
+                items(dropHits, key = { it.uri.ifBlank { it.title } }) { hit ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                isSearchBarFocused = false
-                                searchQuery = hit.title
-                                focusManager.clearFocus()
-                                onSearchQueryChange(hit.title)
+                                if (hit.kind == SearchKind.QUERY) {
+                                    isSearchBarFocused = false
+                                    searchQuery = hit.title
+                                    focusManager.clearFocus()
+                                    onSearchQueryChange(hit.title)
+                                } else {
+                                    // Pressing an entity opens it straight from the
+                                    // dropdown — a song plays — instead of re-running
+                                    // the search on its name.
+                                    isSearchBarFocused = false
+                                    focusManager.clearFocus()
+                                    openHit(hit)
+                                }
                             }
                             .padding(horizontal = 16.dp)
                             .height(56.dp),
@@ -758,12 +791,17 @@ fun SpotifySearchScreen(
                                 )
                             }
                         }
-                        if (hit.kind != SearchKind.QUERY) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.encore_icon_search_24),
-                                contentDescription = null,
-                                tint = EncoreColors.TextSecondary,
-                                modifier = Modifier.size(18.dp)
+                        if (hit.kind == SearchKind.TRACK) {
+                            // Like a song straight from the dropdown, playing it optional.
+                            EncoreIconButton(
+                                iconRes = if (hit.saved) R.drawable.encore_icon_heart_active_24
+                                else R.drawable.encore_icon_heart_24,
+                                contentDescription = if (hit.saved) "Remove ${hit.title} from Liked Songs"
+                                else "Save ${hit.title} to Liked Songs",
+                                onClick = { onToggleSaved(hit.uri, hit.saved) },
+                                size = 36.dp,
+                                iconSize = 20.dp,
+                                tint = if (hit.saved) EncoreColors.Green else EncoreColors.TextSecondary
                             )
                         }
                     }
@@ -775,7 +813,7 @@ fun SpotifySearchScreen(
                     filteredAlbums.isNotEmpty() ||
                     filteredPlaylists.isNotEmpty() ||
                     filteredPodcasts.isNotEmpty() ||
-                    searchData?.sections?.isNotEmpty() == true
+                    displaySearchData?.sections?.isNotEmpty() == true
 
             if (loading && !isOffline) {
                 TrackListSkeleton(
@@ -848,7 +886,7 @@ fun SpotifySearchScreen(
                     // TAB 0: "Top" (Composite: Top Result + Songs + Artists + Albums + Playlists)
                     if (selectedSearchTab == 0) {
                         // Top Result Card
-                        val topHit = searchData?.top
+                        val topHit = displaySearchData?.top
                         val topTrack = if (topHit == null) filteredTracks.firstOrNull() else null
                         if (topHit != null || topTrack != null) {
                             item {
@@ -956,7 +994,7 @@ fun SpotifySearchScreen(
                                     isPlaying = isThisPlaying,
                                     onClick = { onTrackSelect(track) },
                                     onMoreClick = { onTrackOptionsClick(track) },
-                                    onLikeClick = { onToggleSaved(track.uri) }
+                                    onLikeClick = { onToggleSaved(track.uri, track.saved == true) }
                                 )
                             }
 
@@ -979,7 +1017,7 @@ fun SpotifySearchScreen(
                                 ArtistRow(
                                     artist = artist,
                                     onArtistClick = { onArtistClick(artist.name, artist.uri) },
-                                    onFollowToggle = { onToggleSaved(artist.uri) }
+                                    onFollowToggle = { onToggleSaved(artist.uri, artist.saved) }
                                 )
                             }
 
@@ -1002,7 +1040,7 @@ fun SpotifySearchScreen(
                                 AlbumRow(
                                     album = album,
                                     onClick = { onAlbumClick(album.title, album.artist, album.uri) },
-                                    onToggleSaved = { onToggleSaved(album.uri) }
+                                    onToggleSaved = { onToggleSaved(album.uri, album.saved) }
                                 )
                             }
 
@@ -1057,7 +1095,7 @@ fun SpotifySearchScreen(
 
                         // Server shelves interleaved in topResultsV2 ("Featuring …",
                         // "Music videos", …): the web player gives each its own block.
-                        searchData?.sections.orEmpty().forEach { section ->
+                        displaySearchData?.sections.orEmpty().forEach { section ->
                             if (section.items.isNotEmpty()) {
                                 item(key = "section_${section.title}") {
                                     Text(
@@ -1603,7 +1641,7 @@ private fun SearchHitRow(
     onAlbumClick: (String, String, String) -> Unit,
     onArtistClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
-    onToggleSaved: (String) -> Unit,
+    onToggleSaved: (uri: String, currentlySaved: Boolean) -> Unit,
     onOpen: () -> Unit,
 ) {
     when (hit.kind) {
@@ -1614,7 +1652,7 @@ private fun SearchHitRow(
                 isPlaying = isPlaying && matchesCurrent(item.uri, currentTrackUri, item.title, currentTrackTitle),
                 onClick = { onTrackSelect(item) },
                 onMoreClick = { onTrackOptionsClick(item) },
-                onLikeClick = { onToggleSaved(item.uri) }
+                onLikeClick = { onToggleSaved(item.uri, item.saved == true) }
             )
         }
         SearchKind.PLAYLIST -> PlaylistRow(
@@ -1624,12 +1662,12 @@ private fun SearchHitRow(
         SearchKind.ALBUM -> AlbumRow(
             album = hit.toAlbumItem(),
             onClick = { onAlbumClick(hit.title, hit.subtitle, hit.uri) },
-            onToggleSaved = { onToggleSaved(hit.uri) }
+            onToggleSaved = { onToggleSaved(hit.uri, hit.saved) }
         )
         SearchKind.ARTIST -> ArtistRow(
             artist = hit.toArtistItem(),
             onArtistClick = { onArtistClick(hit.title, hit.uri) },
-            onFollowToggle = { onToggleSaved(hit.uri) }
+            onFollowToggle = { onToggleSaved(hit.uri, hit.saved) }
         )
         else -> GenericHitRow(hit = hit, onClick = onOpen)
     }
