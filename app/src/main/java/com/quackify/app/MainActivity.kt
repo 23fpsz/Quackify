@@ -62,7 +62,9 @@ import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.TrackLyrics
+import com.quackify.compose.home.toFavoriteArtistsShelf
 import com.quackify.compose.home.toQuickAccess
+import com.quackify.compose.home.toRecentlyPlayedShelf
 import com.quackify.compose.home.toShelves
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.format.formatCount
@@ -191,6 +193,14 @@ class MainActivity : ComponentActivity() {
                         val account = remember(loggedIn) { SpotifyAuth.account(context) }
                         val quick = remember(feed) { feed.toQuickAccess() }
                         val shelves = remember(feed) { feed.toShelves() }
+                        // The listening history owns the first two shelves:
+                        // Recently played and the favorite artists ranked by it.
+                        val historyShelves = remember(playHistory) {
+                            listOfNotNull(
+                                playHistory.map { it.item }.toRecentlyPlayedShelf(),
+                                favoriteArtistsOf(playHistory).toFavoriteArtistsShelf(),
+                            )
+                        }
                         LaunchedEffect(shelves) {
                             log.i("home shelves=${shelves.size} " +
                                     "grids=${shelves.count { it.grid }} " +
@@ -750,7 +760,9 @@ class MainActivity : ComponentActivity() {
                             playerListener = bridge.listener,
                             expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
                                 homeQuickAccessItems = quick,
-                            homeShelves = shelves,
+                            // The history shelves are personal sections of the
+                            // unfiltered feed; a facet answer is all its own.
+                            homeShelves = if (homeFacet.isBlank()) historyShelves + shelves else shelves,
                             homeChips = homeChips,
                             homeFacet = homeFacet,
                             homeGreeting = homeGreeting,
@@ -1395,3 +1407,32 @@ private suspend fun decorateSearchTracks(
         tracks = results.tracks.map(::fill),
     )
 }
+
+private const val FAVORITE_ARTIST_LIMIT = 10
+
+private data class ArtistStanding(
+    val plays: Int,
+    val lastPlayedAtMs: Long,
+    val latestTrack: TrackItem,
+)
+
+/**
+ * The history's favorite artists: every artist uri ranked by total plays,
+ * the most recent play breaking ties. Each artist is represented by its
+ * newest track so the shelf card carries a cover.
+ */
+private fun favoriteArtistsOf(history: List<PlayedTrack>): List<TrackItem> =
+    history
+        .filter { it.item.artistUri.startsWith("spotify:artist:") && it.item.artist.isNotBlank() }
+        .groupBy { it.item.artistUri }
+        .values
+        .map { plays ->
+            ArtistStanding(
+                plays = plays.sumOf { it.plays },
+                lastPlayedAtMs = plays.maxOf { it.playedAtMs },
+                latestTrack = plays.maxByOrNull { it.playedAtMs }!!.item,
+            )
+        }
+        .sortedWith(compareByDescending<ArtistStanding> { it.plays }.thenByDescending { it.lastPlayedAtMs })
+        .take(FAVORITE_ARTIST_LIMIT)
+        .map { it.latestTrack }
