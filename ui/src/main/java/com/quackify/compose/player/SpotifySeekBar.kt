@@ -8,14 +8,13 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -42,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -103,8 +103,8 @@ fun SpotifySeekBar(
 
     // Smooth continuous progress interpolation between periodic player ticks (120fps / 60fps)
     val smoothProgress by animateFloatAsState(
-        targetValue = if (isDragging) dragProgress else progress.coerceIn(0f, 1f),
-        animationSpec = if (isDragging) snap() else tween(durationMillis = 250, easing = LinearEasing),
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 250, easing = LinearEasing),
         label = "smoothProgress"
     )
     val displayProgress = when {
@@ -136,39 +136,27 @@ fun SpotifySeekBar(
                 .fillMaxWidth()
                 .height(24.dp)
                 .pointerInput(widthPx) {
-                    detectTapGestures(
-                        onPress = { offset ->
-                            val newProgress = (offset.x / widthPx).coerceIn(0f, 1f)
-                            dragProgress = newProgress
-                            isDragging = true
-                            // A scrub cancels this press: only a real release
-                            // may seek, otherwise every drag fires an extra
-                            // seek to the press point mid-gesture.
-                            val released = tryAwaitRelease()
-                            isDragging = false
-                            if (released) commit(dragProgress)
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        isDragging = true
+                        dragProgress = (down.position.x / widthPx).coerceIn(0f, 1f)
+                        var released = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (change.changedToUpIgnoreConsumed()) {
+                                change.consume()
+                                released = true
+                                break
+                            }
+                            if (change.pressed) {
+                                change.consume()
+                                dragProgress = (change.position.x / widthPx).coerceIn(0f, 1f)
+                            }
                         }
-                    )
-                }
-                .pointerInput(widthPx) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            isDragging = true
-                            dragProgress = (offset.x / widthPx).coerceIn(0f, 1f)
-                        },
-                        onDragEnd = {
-                            isDragging = false
-                            commit(dragProgress)
-                        },
-                        onDragCancel = {
-                            isDragging = false
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            val newProgress = (change.position.x / widthPx).coerceIn(0f, 1f)
-                            dragProgress = newProgress
-                        }
-                    )
+                        isDragging = false
+                        if (released) commit(dragProgress)
+                    }
                 },
             contentAlignment = Alignment.CenterStart
         ) {
