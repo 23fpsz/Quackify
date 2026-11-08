@@ -7,6 +7,7 @@ import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.Net
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -54,6 +55,15 @@ private val log = Logs.of(Logs.Module.TRACKS)
  * reconstructs stays exactly the CDN's (a previous sample-level rewrite
  * rearranged PTS along the decode order and stuttered every B-framed
  * canvas, no matter the resolution).
+ *
+ * The segments also arrive fronted by their own sidx (segment index) boxes,
+ * and those cannot stay in the stitch: media3's FragmentedMp4Extractor
+ * emits a fresh seek map for every top-level sidx it parses, so a stitched
+ * file's timeline duration flips between one segment's length and the
+ * merged length while the loader walks it — and every flip that lands under
+ * a renderer already reading past the phantom boundary forces a seek back
+ * to the current position with the renderers torn down, i.e. a codec flush,
+ * over and over. They are stripped below (see stripSegmentIndexes).
  */
 object CanvasKit {
 
@@ -217,14 +227,17 @@ object CanvasKit {
     suspend fun download(context: Context, trackUri: String): String? = withContext(Dispatchers.IO) {
         val id = trackUri.substringAfterLast(":")
         val dir = File(context.cacheDir, "canvas")
-        // v6: fragment timelines rebased AND the moov header durations (mvhd/
-        // tkhd/mdhd) rewritten to the true stitched length; v5 and older files
-        // carry the CDN init's master-scale header durations and are stale
-        val cache = File(dir, "v6-$id.mp4")
+        // v7: per-segment sidx boxes stripped from the stitch. v6 and older
+        // files carry them, and each one makes FragmentedMp4Extractor emit a
+        // fresh seek map, so the timeline's duration keeps flipping and every
+        // flip hammers the renderer with a forced flush (the ~300 ms storm:
+        // FLUSHING/FLUSHED/STARTED cycling, most frames decode-only)
+        val cache = File(dir, "v7-$id.mp4")
         if (cache.isFile && cache.length() > 0L) return@withContext cache.absolutePath
-        // one-time: v5 files play the CDN's master timeline in their headers,
-        // which derails ExoPlayer's loop/repeat logic; drop them
-        dir.listFiles()?.filter { it.isFile && it.name.startsWith("v5-") }?.forEach {
+        // one-time: v6 files still carry the CDN's per-segment sidx boxes,
+        // whose repeated seek maps drive the duration flip behind the flush
+        // storm; drop them
+        dir.listFiles()?.filter { it.isFile && it.name.startsWith("v6-") }?.forEach {
             if (it.delete()) log.i("canvas cache dropped ${it.name}")
         }
 
@@ -295,9 +308,18 @@ object CanvasKit {
 
         runCatching {
             dir.mkdirs()
-            val stitched = ByteArray(total)
-            var at = 0
+            var stripped = 0
+            var size = 0
+            val cleaned = ArrayList<ByteArray>(parts.size)
             for (part in parts) {
+                val pair = stripSegmentIndexes(part)
+                stripped += pair.second
+                cleaned += pair.first
+                size += pair.first.size
+            }
+            val stitched = ByteArray(size)
+            var at = 0
+            for (part in cleaned) {
                 part.copyInto(stitched, at)
                 at += part.size
             }
@@ -308,8 +330,8 @@ object CanvasKit {
                 rebased > 0 -> ", $rebased fragment(s) rebased"
                 rebased == 0 -> "" // plain single file, nothing to rebase
                 else -> ", raw timeline kept" // box layout not recognized
-            }
-            log.i("canvas $id stitched ${parts.size} part(s) ${total}B -> ${cache.name}$note")
+            } + if (stripped > 0) ", $stripped sidx stripped" else ""
+            log.i("canvas $id stitched ${parts.size} part(s) ${size}B -> ${cache.name}$note")
             cache.absolutePath
         }.onFailure {
             log.w("canvas $id write failed: ${it.message}")
@@ -379,6 +401,48 @@ object CanvasKit {
     private fun writeUint(data: ByteArray, offset: Int, length: Int, value: Long) {
         for (i in 0 until length) {
             data[offset + i] = (value ushr ((length - 1 - i) * 8)).toByte()
+        }
+    }
+
+    /** Copy [part] minus its top-level sidx boxes, returning the bytes and
+     *  how many were dropped; anything unparsable comes back untouched.
+     *
+     *  Why: the CDN fronts every media segment with its own sidx, and a naive
+     *  stitch therefore carries several of them. FragmentedMp4Extractor
+     *  (media3 1.11.1) emits a fresh SeekMap for each top-level sidx it
+     *  parses, so the timeline's duration flips from one segment's length to
+     *  the merged length as the loader walks the file (in-app logs show
+     *  player.duration alternating 4000/8000 ms on a 2-segment canvas). Every
+     *  flip routes through MediaPeriodQueue.updateQueuedPeriods'
+     *  duration-change branch, and because the video renderer reads ahead
+     *  past the phantom first-segment boundary, the reading period counts as
+     *  beyond the new duration: the queue reports the reading period altered,
+     *  ExoPlayer seeks back to the current position with the renderers forced
+     *  off — a MediaCodec flush — and the re-created repeat period re-parses
+     *  the file, flipping the duration again. The cycle spins at ~300 ms and
+     *  burns most frames (render 109 / dropped 262 in one capture).
+     *
+     *  Stripped, the extractor emits exactly one Unseekable seek map whose
+     *  duration comes from the moov track headers — which the v6 rewrite keeps
+     *  true to the stitch — so the timeline settles once and looping advances
+     *  without a single extra flush. */
+    private fun stripSegmentIndexes(part: ByteArray): Pair<ByteArray, Int> {
+        return try {
+            var dropped = 0
+            var covered = 0
+            val out = ByteArrayOutputStream(part.size)
+            for (box in boxes(part, 0, part.size)) {
+                covered += box.size
+                if (box.type == "sidx") {
+                    dropped++
+                } else {
+                    out.write(part, box.start, box.size)
+                }
+            }
+            if (dropped == 0 || covered != part.size) part to 0
+            else out.toByteArray() to dropped
+        } catch (e: Exception) {
+            part to 0 // not worth losing the canvas over a malformed index
         }
     }
 
