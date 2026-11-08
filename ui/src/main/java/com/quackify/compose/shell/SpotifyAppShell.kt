@@ -195,6 +195,7 @@ data class ComposePlaybackState(
     val artist: String = "",
     val coverUrl: String = "",
     val isPlaying: Boolean = false,
+    val isBuffering: Boolean = false,
     val progress: Float = 0.0f,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
@@ -623,6 +624,7 @@ fun SpotifyAppShell(
     val currentTrackTitle = playbackState?.title ?: localTrackTitle
     val currentArtist = playbackState?.artist ?: localArtist
     val isPlaying = playbackState?.isPlaying ?: localIsPlaying
+    val isBuffering = playbackState?.isBuffering ?: false
     val currentProgress = playbackState?.progress ?: localProgress
     val currentPositionMs = playbackState?.positionMs ?: localPositionMs
     val durationMs = if ((playbackState?.durationMs ?: 0L) > 0L) playbackState!!.durationMs else localDurationMs
@@ -1334,6 +1336,7 @@ fun SpotifyAppShell(
                 title = playerIdentity.title,
                 artist = playerIdentity.artist,
                 isPlaying = isPlaying,
+                isBuffering = isBuffering,
                 progress = currentProgress,
                 isLiked = isLiked,
                 coverUrl = currentCoverUrl,
@@ -1390,6 +1393,7 @@ fun SpotifyAppShell(
             contextHeader = contextHeader,
             contextSub = contextSub,
             isPlaying = isPlaying,
+            isBuffering = isBuffering,
             progress = currentProgress,
             durationMs = durationMs,
             positionMs = currentPositionMs,

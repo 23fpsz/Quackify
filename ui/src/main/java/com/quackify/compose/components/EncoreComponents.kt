@@ -81,6 +81,7 @@ fun EncorePlayButton(
         ),
         label = "playBtnScale"
     )
+    val effectiveBackground = if (isLoading) backgroundColor.copy(alpha = 0.32f) else backgroundColor
 
     Box(
         modifier = modifier
@@ -88,8 +89,9 @@ fun EncorePlayButton(
             .scale(scale)
             .shadow(elevation = 8.dp, shape = CircleShape)
             .clip(CircleShape)
-            .background(backgroundColor)
+            .background(effectiveBackground)
             .clickable(
+                enabled = !isLoading,
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
@@ -99,7 +101,7 @@ fun EncorePlayButton(
         if (isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(iconSize),
-                color = iconColor,
+                color = iconColor.copy(alpha = 0.45f),
                 strokeWidth = 2.5.dp,
                 strokeCap = StrokeCap.Round
             )
@@ -154,7 +156,8 @@ fun EncoreIconButton(
     size: Dp = 40.dp,
     iconSize: Dp = 24.dp,
     isActive: Boolean = false,
-    activeTint: Color = EncoreColors.Green
+    activeTint: Color = EncoreColors.Green,
+    isLoading: Boolean = false
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -174,23 +177,33 @@ fun EncoreIconButton(
             .scale(scale)
             .clip(CircleShape)
             .clickable(
+                enabled = !isLoading,
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
     ) {
-        Crossfade(
-            targetState = iconRes,
-            animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
-            label = "iconButtonCrossfade"
-        ) { targetIcon ->
-            Icon(
-                painter = painterResource(id = targetIcon),
-                contentDescription = contentDescription,
-                tint = effectiveTint,
-                modifier = Modifier.size(iconSize)
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(iconSize * 0.8f),
+                color = EncoreColors.TextDisabled,
+                strokeWidth = 2.dp,
+                strokeCap = StrokeCap.Round
             )
+        } else {
+            Crossfade(
+                targetState = iconRes,
+                animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                label = "iconButtonCrossfade"
+            ) { targetIcon ->
+                Icon(
+                    painter = painterResource(id = targetIcon),
+                    contentDescription = contentDescription,
+                    tint = effectiveTint,
+                    modifier = Modifier.size(iconSize)
+                )
+            }
         }
     }
 }
