@@ -84,6 +84,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.library.Krespot
+import com.quackify.compose.home.toQuickAccessFallback
 
 private val log = Logs.of(Logs.Module.MAIN)
 
@@ -195,7 +196,20 @@ class MainActivity : ComponentActivity() {
                             if (resumeSignal > 0) SilentTokenRefresh.maybeRefresh(context)
                         }
                         val account = remember(loggedIn) { SpotifyAuth.account(context) }
-                        val quick = remember(feed) { feed.toQuickAccess() }
+                        val quick = remember(feed, playHistory, loading) {
+                            val fromFeed = feed.toQuickAccess()
+                            when {
+                                fromFeed.isNotEmpty() -> fromFeed
+                                loading -> emptyList()
+                                else -> {
+                                    log.i("feed has no shorts section, deriving the shortcut grid from history")
+                                    playHistory.map { it.item }.toQuickAccessFallback()
+                                }
+                            }
+                        }
+                        LaunchedEffect(quick) {
+                            log.i("home quick access tiles=${quick.size}")
+                        }
                         val shelves = remember(feed) { feed.toShelves() }
                         // The listening history owns the first two shelves:
                         // Recently played and the favorite artists ranked by it.

@@ -14,6 +14,11 @@ private val FallbackCardColor = Color(0xFF535353)
 
 private const val RECENT_SHELF_SIZE = 20
 
+private const val QUICK_ACCESS_SIZE = 8
+
+private const val LIKED_SONGS_URI = "spotify:collection:tracks"
+private val LikedSongsColor = Color(0xFF5038A0)
+
 // The 'local:' prefix can never collide with the feed's spotify: section ids,
 // which the LazyColumn uses as keys.
 private const val LOCAL_RECENT_SHELF_ID = "local:recently-played"
@@ -120,6 +125,32 @@ fun List<HomeSection>.toQuickAccess(): List<QuickAccessItem> =
             imageUrl = item.imageUrl.takeIf { it.isNotBlank() },
         )
     }.orEmpty()
+
+fun List<TrackItem>.toQuickAccessFallback(): List<QuickAccessItem> {
+    val artists = LinkedHashMap<String, TrackItem>()
+    for (track in this) {
+        val uri = track.artistUri
+        if (!uri.startsWith("spotify:artist:")) continue
+        if (track.artist.isBlank() || uri in artists) continue
+        artists[uri] = track
+    }
+    val out = ArrayList<QuickAccessItem>(QUICK_ACCESS_SIZE)
+    out += QuickAccessItem(
+        title = "Liked Songs",
+        coverColor = LikedSongsColor,
+        uri = LIKED_SONGS_URI,
+    )
+    for ((uri, track) in artists) {
+        if (out.size >= QUICK_ACCESS_SIZE) break
+        out += QuickAccessItem(
+            title = track.artist.substringBefore(", "),
+            coverColor = FallbackCardColor,
+            uri = uri,
+            imageUrl = track.imageUrl,
+        )
+    }
+    return out
+}
 
 /** The listening history, newest distinct tracks first, as the home Recently played shelf. */
 fun List<TrackItem>.toRecentlyPlayedShelf(): HomeShelf? {
