@@ -243,8 +243,11 @@ fun SpotifyHomeScreen(
         }
 
         // The greeting and the shortcut grid belong to the unfiltered feed; a
-        // facet query answers with a different set of shelves entirely.
-        if (selectedFacet.isEmpty()) {
+        // facet query answers with a different set of shelves entirely. They
+        // also sit out the load: the skeleton already draws a greeting and a
+        // shortcut-grid placeholder, so rendering the real block on top of it
+        // stacks two greetings while the feed is in flight.
+        if (selectedFacet.isEmpty() && !(loading && quickItems.isEmpty())) {
             item {
                 Column(
                     modifier = Modifier
