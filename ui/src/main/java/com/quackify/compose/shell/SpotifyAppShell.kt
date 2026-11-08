@@ -265,6 +265,7 @@ private class ShellUiFlags {
     var isProfileDrawerOpen by mutableStateOf(false)
     var isAccountsSheetOpen by mutableStateOf(false)
     var isTrackOptionsOpen by mutableStateOf(false)
+    var isTrackOptionsFromPlayer by mutableStateOf(false)
     var isPlaylistOptionsOpen by mutableStateOf(false)
     var isPlaylistEditMode by mutableStateOf(false)
     var isAlbumOptionsOpen by mutableStateOf(false)
@@ -728,6 +729,7 @@ fun SpotifyAppShell(
 
     val handleTrackOptions: (TrackItem) -> Unit = { track ->
         selectedTrackForOptions = track
+        flags.isTrackOptionsFromPlayer = false
         flags.isTrackOptionsOpen = true
     }
 
@@ -1195,6 +1197,7 @@ fun SpotifyAppShell(
                 },
                 onTrackOptionsClick = { track ->
                     selectedTrackForOptions = track
+                    flags.isTrackOptionsFromPlayer = false
                     flags.isTrackOptionsOpen = true
                 },
                 todayTracks = historyToday,
@@ -1393,6 +1396,7 @@ fun SpotifyAppShell(
                     albumUri = resolvedAlbumUri,
                     artistUri = resolvedArtistUri,
                 )
+                flags.isTrackOptionsFromPlayer = true
                 flags.isTrackOptionsOpen = true
             },
             onQueue = { flags.isQueueSheetOpen = true },
@@ -1442,6 +1446,12 @@ fun SpotifyAppShell(
             devices = playbackState?.devices.orEmpty(),
             connectedDevice = connectedDevice,
             queueFromContext = playbackState?.queueFromContext.orEmpty(),
+            canAddToQueue = selectedTrackForOptions?.uri
+                ?.takeIf { it.isNotBlank() }
+                ?.let { uri ->
+                    uri != playbackState?.trackUri &&
+                        playbackState?.queue.orEmpty().none { it.uri == uri }
+                } ?: false,
             currentTrackTitle = currentTrackTitle,
             currentTrackArtist = currentArtist,
             currentTrackUri = playbackState?.trackUri.orEmpty(),
@@ -1486,7 +1496,7 @@ fun SpotifyAppShell(
             savedAccounts = savedAccounts,
             activeAccountId = activeAccountId,
             isFolder = currentScreen == ShellScreen.FOLDER,
-            canvasAvailable = isCanvasAllowed && canvasFilePath != null,
+            canvasAvailable = flags.isTrackOptionsFromPlayer && isCanvasAllowed && canvasFilePath != null,
             isCanvasEnabled = isCanvasEnabled,
             onCanvasToggle = { onCanvasToggle?.invoke(!isCanvasEnabled) },
             onDismissProfile = { flags.isProfileDrawerOpen = false },

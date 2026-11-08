@@ -69,6 +69,7 @@ fun TrackOptionsSheet(
     onLikeToggle: (Boolean) -> Unit = {},
     onAddToPlaylist: () -> Unit = {},
     onAddToQueue: () -> Unit = {},
+    canAddToQueue: Boolean = true,
     onViewArtist: (String, String) -> Unit = { _, _ -> },
     onViewAlbum: (String, String) -> Unit = { _, _ -> },
     onShare: () -> Unit = {},
@@ -230,11 +231,10 @@ fun TrackOptionsSheet(
                     )
                 }
 
-                // Add to Queue Button
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .clickable {
+                        .clickable(enabled = canAddToQueue) {
                             onDismiss()
                             onAddToQueue()
                         }
@@ -243,7 +243,7 @@ fun TrackOptionsSheet(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_add_to_queue_24),
                         contentDescription = "Add to queue",
-                        tint = EncoreColors.TextPrimary,
+                        tint = if (canAddToQueue) EncoreColors.TextPrimary else EncoreColors.TextPrimary.copy(alpha = 0.4f),
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -251,7 +251,7 @@ fun TrackOptionsSheet(
                         text = "Add to queue",
                         style = SpotifyTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
-                            color = EncoreColors.TextSecondary
+                            color = if (canAddToQueue) EncoreColors.TextSecondary else EncoreColors.TextSecondary.copy(alpha = 0.4f)
                         )
                     )
                 }
