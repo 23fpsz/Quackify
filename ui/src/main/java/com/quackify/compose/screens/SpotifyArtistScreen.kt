@@ -530,22 +530,21 @@ fun SpotifyArtistScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = popTrack.streamCount,
-                                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                                maxLines = 1
-                            )
-                            if (track.saved == true) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    painter = painterResource(R.drawable.encore_icon_heart_active_24),
-                                    contentDescription = "In Liked Songs",
-                                    tint = EncoreColors.Green,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
+                        Text(
+                            text = popTrack.streamCount,
+                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            maxLines = 1
+                        )
+                    }
+
+                    if (track.saved == true) {
+                        Icon(
+                            painter = painterResource(R.drawable.encore_icon_heart_active_24),
+                            contentDescription = "In Liked Songs",
+                            tint = EncoreColors.Green,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
                     }
 
                     // 3-dot context menu
