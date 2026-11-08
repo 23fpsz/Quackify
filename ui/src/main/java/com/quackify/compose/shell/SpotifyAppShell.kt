@@ -168,7 +168,8 @@ data class BackStackItem(
     val artistName: String = "",
     val artistUri: String = "",
     val artistAvatarUrl: String? = null,
-    val showUri: String = ""
+    val showUri: String = "",
+    val searchQuery: String = ""
 )
 
 internal data class ShellInputs(
@@ -534,7 +535,8 @@ fun SpotifyAppShell(
                 artistName = active.artistName,
                 artistUri = active.artistUri,
                 artistAvatarUrl = active.artistAvatarUrl,
-                showUri = active.showUri
+                showUri = active.showUri,
+                searchQuery = searchQuery
             )
         )
     }
@@ -543,6 +545,9 @@ fun SpotifyAppShell(
         if (navBackStack.isNotEmpty()) {
             val previous = navBackStack.removeAt(navBackStack.lastIndex)
             currentScreen = previous.screen
+            if (previous.searchQuery.isNotEmpty()) {
+                onSearchQueryChange?.invoke(previous.searchQuery) ?: playerListener?.onSearch(previous.searchQuery)
+            }
             if (previous.categoryTitle.isNotEmpty()) {
                 active.categoryTitle = previous.categoryTitle
                 active.categoryColor = getCategoryColor(previous.categoryTitle)
@@ -739,15 +744,24 @@ fun SpotifyAppShell(
 
     val openProfileDrawer: () -> Unit = { flags.isProfileDrawerOpen = true }
 
-    val openArtist: (String, String) -> Unit = { artist, uri ->
+    val openArtist: (String, String) -> Unit = openArtist@ { artist, uri ->
+        val artistUriToLoad = uri.takeIf { it.startsWith("spotify:artist:") }
+            ?: libraryItems?.find { it.title.equals(artist, ignoreCase = true) }
+                ?.uri?.takeIf { it.startsWith("spotify:artist:") }
+            ?: searchData?.artists?.find { it.title.equals(artist, ignoreCase = true) }
+                ?.uri?.takeIf { it.startsWith("spotify:artist:") }
+        if (artistUriToLoad == null) {
+            // No uri means no artist page: staying put beats an empty screen
+            // with no request behind it and a back stack pointing at nothing.
+            Toast.makeText(context, "Couldn't open $artist", Toast.LENGTH_SHORT).show()
+            return@openArtist
+        }
+
         active.artistName = artist
-        active.artistUri = uri
+        active.artistUri = artistUriToLoad
         active.artistAvatarUrl = libraryItems?.find { it.title.equals(artist, ignoreCase = true) }?.imageUrl
             ?: nowPlayingArtistImageUrl?.takeIf { artist.equals(currentArtist, ignoreCase = true) }
 
-        val artistUriToLoad = uri.takeIf { it.startsWith("spotify:artist:") }
-            ?: libraryItems?.find { it.title.equals(artist, ignoreCase = true) }
-                ?.uri?.takeIf { it.startsWith("spotify:artist:") }.orEmpty()
         if (onLoadArtist != null) onLoadArtist?.invoke(artistUriToLoad, artist) else playerListener?.onLoadArtist(artistUriToLoad, artist)
 
         pushCurrentState()
@@ -951,6 +965,7 @@ fun SpotifyAppShell(
                 currentTrackUri = playbackState?.trackUri.orEmpty(),
                 isPlaying = isPlaying,
                 searchFieldFocusRequester = searchFieldFocusRequester,
+                initialQuery = searchQuery,
                 playerListener = playerListener,
                 onSearchQueryChange = onSearchQueryChange,
                 onRetrySearch = { onRetrySearch?.invoke() },
@@ -2174,6 +2189,7 @@ private fun ShellSearchPane(
     currentTrackUri: String,
     isPlaying: Boolean,
     searchFieldFocusRequester: FocusRequester,
+    initialQuery: String,
     playerListener: ComposePlayerListener?,
     onSearchQueryChange: ((String) -> Unit)?,
     onRetrySearch: () -> Unit,
@@ -2204,6 +2220,7 @@ private fun ShellSearchPane(
         onTrackOptionsClick = onTrackOptionsClick,
         onProfileClick = onProfileClick,
         searchFieldFocusRequester = searchFieldFocusRequester,
+        initialQuery = initialQuery,
         searchResults = searchResults,
         searchData = searchData,
         onSearchQueryChange = { query ->
