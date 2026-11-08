@@ -16,8 +16,6 @@ private const val RECENT_SHELF_SIZE = 20
 
 private const val QUICK_ACCESS_SIZE = 8
 
-// The shortcut grid's Liked Songs tile; the collection uri opens the liked
-// tracks through the same loader the playlist screen uses.
 private const val LIKED_SONGS_URI = "spotify:collection:tracks"
 private val LikedSongsColor = Color(0xFF5038A0)
 
@@ -128,12 +126,6 @@ fun List<HomeSection>.toQuickAccess(): List<QuickAccessItem> =
         )
     }.orEmpty()
 
-/**
- * The shortcut grid when the feed ships no shorts section, which happens on
- * accounts the server experiments on: Liked Songs plus the newest distinct
- * artists in the listening history, the way Spotify composes its own grid
- * locally instead of trusting a server section.
- */
 fun List<TrackItem>.toQuickAccessFallback(): List<QuickAccessItem> {
     val artists = LinkedHashMap<String, TrackItem>()
     for (track in this) {
