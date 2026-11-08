@@ -11,6 +11,7 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Build
+import android.os.Handler
 import android.view.TextureView
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -23,11 +24,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
+import androidx.media3.exoplayer.video.VideoRendererEventListener
+import com.quackify.backend.core.log.Logs
 import java.io.File
+
+private val log = Logs.of(Logs.Module.PLAYER)
 
 @Composable
 fun CanvasVideoPlayer(
@@ -58,10 +67,10 @@ fun CanvasVideoPlayer(
     val player = remember(filePath) {
         ExoPlayer.Builder(
             context,
-            // a decoder that fails to initialize or dies mid-loop falls
-            // through to the next one the device offers instead of failing
-            // playback outright
-            DefaultRenderersFactory(context).setEnableDecoderFallback(true),
+            // the canvas video renderer: the same decoder fallback as before,
+            // plus the drop-to-keyframe catch-up disabled - see
+            // CanvasVideoRenderer for why that one matters so much here
+            CanvasRenderersFactory(context).setEnableDecoderFallback(true),
         ).build().apply {
             setMediaItem(MediaItem.fromUri(File(filePath).toUri()))
             repeatMode = Player.REPEAT_MODE_ONE
@@ -79,6 +88,29 @@ fun CanvasVideoPlayer(
                 frame.videoWidth = videoSize.width
                 frame.videoHeight = videoSize.height
                 frame.applyVideoSize()
+            }
+
+            // Diagnostics for the boundary-stutter hunt: a healthy canvas
+            // loop logs nothing here. Dropped frames or a mid-loop decoder
+            // (re)initialization is the signature of whatever still makes
+            // the renderer fall behind, and lands in the in-app LOGS viewer.
+            override fun onDroppedVideoFrames(count: Int, elapsedMs: Long) {
+                log.w(
+                    "canvas dropped $count video frame(s) over ${elapsedMs}ms " +
+                        "(${File(filePath).name})"
+                )
+            }
+
+            override fun onVideoDecoderInitialized(
+                decoderName: String,
+                initializedTimestampMs: Long,
+                initializationDurationMs: Int,
+            ) {
+                log.i("canvas decoder $decoderName initialized in ${initializationDurationMs}ms")
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                log.w("canvas playback error ${error.errorCodeName}")
             }
         }
         player.addListener(listener)
@@ -98,6 +130,78 @@ fun CanvasVideoPlayer(
         },
         modifier = modifier
     )
+}
+
+/**
+ * Renderers factory swapping the stock video renderer for [CanvasVideoRenderer].
+ *
+ * Everything else - audio, text, metadata renderers - still comes from the
+ * stock factory; only the video pipeline is canvas-specific.
+ */
+private class CanvasRenderersFactory(context: Context) : DefaultRenderersFactory(context) {
+
+    override fun buildVideoRenderers(
+        context: Context,
+        extensionRendererMode: Int,
+        mediaCodecSelector: MediaCodecSelector,
+        enableDecoderFallback: Boolean,
+        eventHandler: Handler?,
+        eventListener: VideoRendererEventListener?,
+        allowedVideoJoiningTimeMs: Long,
+        renderers: ArrayList<Renderer>,
+    ) {
+        renderers.add(
+            CanvasVideoRenderer(
+                MediaCodecVideoRenderer.Builder(context)
+                    .setCodecAdapterFactory(getCodecAdapterFactory())
+                    .setMediaCodecSelector(mediaCodecSelector)
+                    .setAllowedJoiningTimeMs(allowedVideoJoiningTimeMs)
+                    .setEnableDecoderFallback(enableDecoderFallback)
+                    .setEventHandler(eventHandler)
+                    .setEventListener(eventListener)
+                    // batches of 5 keep the dropped-frame diagnostics in the
+                    // player logs meaningful without spamming healthy playback
+                    .setMaxDroppedFramesToNotify(5)
+            )
+        )
+        // extension renderers are deliberately not added: this player only
+        // ever feeds one local fMP4 file
+    }
+}
+
+/**
+ * The canvas video renderer: identical to media3's stock
+ * [MediaCodecVideoRenderer] except that the drop-to-keyframe catch-up is off.
+ *
+ * When a decoded frame is more than 500ms late
+ * (MediaCodecVideoRenderer.MIN_EARLY_US_VERY_LATE_THRESHOLD), the stock
+ * renderer discards every buffered sample up to the next sync frame and
+ * flushes the codec (shouldDropBuffersToKeyframe -> maybeDropBuffersToKeyframe
+ * -> skipSource + flushOrReinitializeCodec). A canvas file carries exactly
+ * two sync samples - one at 0 and one at the ~4s fragment boundary - so any
+ * transient stall in the first half of the loop (a slow 200KB IDR decode, a
+ * compositing hiccup, a GC pause) does not cost a few dropped frames: the
+ * video freezes and jumps the whole chunk to the boundary keyframe. That is
+ * the on-device "stutter at second 4" that survived the tfdt rebase while
+ * the same file played clean on a desktop - its frames.csv is a perfect
+ * 33.4ms ladder and its only irregularity is the 200KB IDR at 4.004s.
+ *
+ * Returning false here degrades the same event the way desktop players do:
+ * VideoFrameReleaseControl falls through to shouldDropFrame, the late frame
+ * is dropped on its own and playback catches up frame by frame, without the
+ * codec flush that the skip path triggers. The loop seam is unaffected -
+ * onPositionReset resets the source to a keyframe on its own and never
+ * consults this hook.
+ */
+private class CanvasVideoRenderer(
+    builder: MediaCodecVideoRenderer.Builder,
+) : MediaCodecVideoRenderer(builder) {
+
+    override fun shouldDropBuffersToKeyframe(
+        earlyUs: Long,
+        elapsedRealtimeUs: Long,
+        isLastBuffer: Boolean,
+    ): Boolean = false
 }
 
 private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
