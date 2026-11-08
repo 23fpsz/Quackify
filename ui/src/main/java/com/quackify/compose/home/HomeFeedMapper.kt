@@ -12,6 +12,13 @@ import com.quackify.backend.model.HomeSection
 
 private val FallbackCardColor = Color(0xFF535353)
 
+private const val RECENT_SHELF_SIZE = 20
+
+// The 'local:' prefix can never collide with the feed's spotify: section ids,
+// which the LazyColumn uses as keys.
+private const val LOCAL_RECENT_SHELF_ID = "local:recently-played"
+private const val LOCAL_FAVORITE_ARTISTS_SHELF_ID = "local:favorite-artists"
+
 private fun colorOf(item: HomeItem): Color {
     val hex = item.colorHex
     if (hex.length != 7 || hex[0] != '#') return FallbackCardColor
@@ -57,7 +64,9 @@ fun List<HomeSection>.toShelves(): List<HomeShelf> {
     var run: MutableList<HomeItem>? = null
     var runIndex = -1
     for (section in this) {
-        if (section.kind == HomeFeed.SHORTS) continue
+        // SHORTS feeds the shortcut grid and Recently played is owned by the
+        // local listening history, so neither renders as a feed shelf.
+        if (section.kind == HomeFeed.SHORTS || section.kind == HomeFeed.RECENT) continue
         if (section.kind == HomeFeed.BASELINE) {
             if (section.items.isEmpty()) continue
             val open = run
@@ -111,6 +120,44 @@ fun List<HomeSection>.toQuickAccess(): List<QuickAccessItem> =
             imageUrl = item.imageUrl.takeIf { it.isNotBlank() },
         )
     }.orEmpty()
+
+/** The listening history, newest distinct tracks first, as the home Recently played shelf. */
+fun List<TrackItem>.toRecentlyPlayedShelf(): HomeShelf? {
+    if (isEmpty()) return null
+    return HomeShelf(
+        id = LOCAL_RECENT_SHELF_ID,
+        title = "Recently played",
+        cards = take(RECENT_SHELF_SIZE).map { track ->
+            RecommendationCard(
+                title = track.title,
+                subtitle = track.artist,
+                coverColor = FallbackCardColor,
+                uri = track.uri,
+                imageUrl = track.imageUrl,
+                tag = "SONG",
+            )
+        },
+    )
+}
+
+/** The history's favorite artists, each as its most recent track, as the home favorites shelf. */
+fun List<TrackItem>.toFavoriteArtistsShelf(): HomeShelf? {
+    if (isEmpty()) return null
+    return HomeShelf(
+        id = LOCAL_FAVORITE_ARTISTS_SHELF_ID,
+        title = "Your favorite artist",
+        cards = map { track ->
+            RecommendationCard(
+                title = track.artist.substringBefore(", "),
+                subtitle = "Artist",
+                coverColor = FallbackCardColor,
+                uri = track.artistUri,
+                imageUrl = track.imageUrl,
+                tag = "ARTIST",
+            )
+        },
+    )
+}
 
 fun TrackRow.toTrackItem(): TrackItem = TrackItem(
     title = title,

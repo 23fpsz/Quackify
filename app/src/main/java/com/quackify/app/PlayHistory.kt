@@ -9,6 +9,7 @@ import org.json.JSONObject
 data class PlayedTrack(
     val item: TrackItem,
     val playedAtMs: Long,
+    val plays: Int = 1,
 )
 
 object PlayHistory {
@@ -46,6 +47,7 @@ object PlayHistory {
                     durationMs = node.optLong("durationMs", 0L),
                 ),
                 playedAtMs = node.optLong("at", 0L),
+                plays = node.optInt("plays", 1).coerceAtLeast(1),
             )
 
             // The list is stored newest-first: collapse re-plays of the same
@@ -81,8 +83,9 @@ object PlayHistory {
             track
         }
 
+        val plays = previous.firstOrNull { sameSong(it.item, track) }?.plays ?: 0
         val next = (
-                listOf(PlayedTrack(enriched, playedAtMs)) +
+                listOf(PlayedTrack(enriched, playedAtMs, plays + 1)) +
                         previous.filterNot {
                             sameSong(it.item, track)
                         }
@@ -122,6 +125,7 @@ object PlayHistory {
                     .put("explicit", played.item.isExplicit)
                     .put("durationMs", played.item.durationMs)
                     .put("at", played.playedAtMs)
+                    .put("plays", played.plays)
             )
         }
 
