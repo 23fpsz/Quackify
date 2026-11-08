@@ -44,7 +44,8 @@ private val log = Logs.of(Logs.Module.PLAYER)
 fun CanvasVideoPlayer(
     filePath: String,
     modifier: Modifier = Modifier,
-    fadeFraction: Float = 0f
+    fadeFraction: Float = 0f,
+    zoom: Float = 1f
 ) {
     val context = LocalContext.current
     // One frame for the whole lifetime here; the player is rebuilt whenever
@@ -162,6 +163,7 @@ fun CanvasVideoPlayer(
         factory = { frame },
         update = { view ->
             view.fadeFraction = fadeFraction
+            view.zoom = zoom
             view.applyVideoSize()
             view.applyFade()
         },
@@ -284,6 +286,18 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
             invalidate()
         }
 
+    // Overscan of the video inside its own frame: the canvas is drawn from the
+    // very top of the screen, so the picture is scaled around the top edge
+    // (never around the centre) and any fractional rounding of the frame
+    // height shows video instead of a bare strip of background.
+    var zoom: Float = 1f
+        set(value) {
+            val clamped = value.coerceAtLeast(1f)
+            if (clamped == field) return
+            field = clamped
+            applyVideoSize()
+        }
+
     private val maskPaint = Paint().apply {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
     }
@@ -296,6 +310,7 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
     // the per-frame composition work and the canvas visibly stuttered. Both
     // are now cached by key and become no-ops when nothing actually changed.
     private var transformKey = Long.MIN_VALUE
+    private var transformZoom = -1f
     private var fadeKey = Long.MIN_VALUE
 
     init {
@@ -318,17 +333,32 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
             (videoHeight.toLong() and 0xFFFFL).shl(32) or
             (viewWidth.toLong() and 0xFFFFL).shl(16) or
             (viewHeight.toLong() and 0xFFFFL)
-        if (key == transformKey) return
+        if (key == transformKey && zoom == transformZoom) return
         transformKey = key
+        transformZoom = zoom
         val videoAspect = videoWidth.toFloat() / videoHeight
         val viewAspect = viewWidth.toFloat() / viewHeight
+        // Anchored on the top edge, never the centre: the canvas sits against
+        // the status bar, so any overscan has to grow downwards and keep row
+        // zero of the video at row zero of the frame.
         val matrix = Matrix()
+        val scaleX: Float
+        val scaleY: Float
         when {
-            videoAspect > viewAspect ->
-                matrix.setScale(videoAspect / viewAspect, 1f, viewWidth / 2f, viewHeight / 2f)
-            videoAspect < viewAspect ->
-                matrix.setScale(1f, viewAspect / videoAspect, viewWidth / 2f, viewHeight / 2f)
+            videoAspect > viewAspect -> {
+                scaleX = videoAspect / viewAspect
+                scaleY = 1f
+            }
+            videoAspect < viewAspect -> {
+                scaleX = 1f
+                scaleY = viewAspect / videoAspect
+            }
+            else -> {
+                scaleX = 1f
+                scaleY = 1f
+            }
         }
+        matrix.setScale(scaleX * zoom, scaleY * zoom, viewWidth / 2f, 0f)
         texture.setTransform(matrix)
     }
 

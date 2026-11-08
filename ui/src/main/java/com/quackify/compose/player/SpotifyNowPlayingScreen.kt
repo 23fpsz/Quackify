@@ -133,6 +133,10 @@ private const val REVEAL_RISE_FRACTION = 0.06f
 private const val ARTWORK_FADE_FRACTION = 0.42f
 private const val ARTWORK_ASPECT_RATIO = 0.90f
 private const val ARTWORK_TOP_DROP = 0.05f
+
+/** Canvas banners are glued to the status bar and zoomed to hide the seam. */
+private const val CANVAS_FADE_FRACTION = 0.30f
+private const val CANVAS_ZOOM = 1.06f
 private val HEADER_ROW_HEIGHT = 60.dp
 
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
@@ -275,6 +279,7 @@ fun SpotifyNowPlayingScreen(
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = screenHeightPx * 0.5f
     val artworkTopDrop = (configuration.screenWidthDp / ARTWORK_ASPECT_RATIO * ARTWORK_TOP_DROP).dp
+    val artworkHeight = (configuration.screenWidthDp / ARTWORK_ASPECT_RATIO).dp
 
     // Reset translation whenever the screen is composed
     LaunchedEffect(Unit) {
@@ -524,7 +529,7 @@ fun SpotifyNowPlayingScreen(
                                     .fillMaxWidth()
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
                             ) {
-                                Spacer(modifier = Modifier.height(artworkTopDrop))
+                                Spacer(modifier = Modifier.height(if (canvasActive) 0.dp else artworkTopDrop))
                                 NowPlayingArtworkCard(
                                     title = title,
                                     coverUrl = coverUrl,
@@ -534,10 +539,17 @@ fun SpotifyNowPlayingScreen(
                                     isCanvasEnabled = canvasActive,
                                     gestureModifier = artworkGestureModifier,
                                     fullBleed = true,
-                                    fadeFraction = ARTWORK_FADE_FRACTION,
+                                    fadeFraction = if (canvasActive) CANVAS_FADE_FRACTION else ARTWORK_FADE_FRACTION,
+                                    canvasZoom = CANVAS_ZOOM,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .aspectRatio(ARTWORK_ASPECT_RATIO)
+                                        .then(
+                                            if (canvasActive) {
+                                                Modifier.height(artworkHeight + artworkTopDrop)
+                                            } else {
+                                                Modifier.aspectRatio(ARTWORK_ASPECT_RATIO)
+                                            }
+                                        )
                                         .graphicsLayer { translationX = artworkOffsetX.value }
                                 )
                             }
@@ -999,6 +1011,7 @@ private fun NowPlayingArtworkCard(
     gestureModifier: Modifier = Modifier,
     fullBleed: Boolean = false,
     fadeFraction: Float = 0f,
+    canvasZoom: Float = 1f,
     modifier: Modifier = Modifier
 ) {
     val corner = if (fullBleed) 0.dp else EncoreCornerRadii.Larger2
@@ -1028,6 +1041,7 @@ private fun NowPlayingArtworkCard(
             CanvasVideoPlayer(
                 filePath = canvasFilePath,
                 fadeFraction = fadeFraction,
+                zoom = canvasZoom,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
