@@ -1712,7 +1712,7 @@ fun SpotifyAppShell(
                 artistUri = active.artistUri,
                 artistName = active.artistName,
                 onDismiss = { flags.isDiscographyOpen = false },
-                onOpenRelease = { title, uri -> openAlbum(title, active.artistName, uri) }
+                onOpenRelease = { uri, title -> openAlbum(title, active.artistName, uri) }
             )
         }
 
