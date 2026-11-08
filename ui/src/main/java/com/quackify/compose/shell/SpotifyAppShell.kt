@@ -6,7 +6,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -878,11 +877,6 @@ fun SpotifyAppShell(
         context.startActivity(Intent.createChooser(send, null))
     }
 
-    fun openEntityInBrowser(uri: String) {
-        val url = entityUrl(uri) ?: return
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    }
-
     val libraryFolderChoices = remember(libraryItems) {
         libraryItems.orEmpty()
             .filter { it.type == LibraryItemType.FOLDER }
@@ -1585,7 +1579,6 @@ fun SpotifyAppShell(
             },
             onCopyLink = { uri -> copyEntityLink(uri) },
             onShare = { uri -> shareEntity(uri) },
-            onOpenInBrowser = { uri -> openEntityInBrowser(uri) },
             onWhatsNew = { pushCurrentState(); currentScreen = ShellScreen.NOTIFICATIONS },
             onHistory = {
                 pushCurrentState()
@@ -1819,8 +1812,7 @@ fun SpotifyAppShell(
                     }
                     else -> null
                 },
-                onShare = { shareEntity(entity.uri) },
-                onOpenInBrowser = { openEntityInBrowser(entity.uri) }
+                onShare = { shareEntity(entity.uri) }
             )
         }
 
