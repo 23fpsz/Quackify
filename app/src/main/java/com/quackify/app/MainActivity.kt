@@ -196,14 +196,6 @@ class MainActivity : ComponentActivity() {
                             if (resumeSignal > 0) SilentTokenRefresh.maybeRefresh(context)
                         }
                         val account = remember(loggedIn) { SpotifyAuth.account(context) }
-                        // The shortcut grid is server-driven through the feed's
-                        // shorts section, but some accounts no longer get one
-                        // from the server's experiments. Fall back to a locally
-                        // composed grid — Liked Songs plus the newest artists
-                        // in the history — so the tiles never vanish. The
-                        // fallback waits out the load with everything else,
-                        // otherwise it would fill the grid mid-fetch and mask
-                        // the skeleton.
                         val quick = remember(feed, playHistory, loading) {
                             val fromFeed = feed.toQuickAccess()
                             when {
