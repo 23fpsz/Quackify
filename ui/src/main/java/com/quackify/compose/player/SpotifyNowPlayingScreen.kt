@@ -141,16 +141,16 @@ private val HEADER_ROW_HEIGHT = 60.dp
 
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
-/** Spotify's dark ink, for lyrics that sit on light artwork. */
-private val LyricsInkDark = Color(0xFF191414)
+/** Spotify's dark ink, for content that sits on light artwork. */
+private val InkDark = Color(0xFF191414)
 
 /**
- * The lyrics panels sit straight on the album's dominant color, so white text
- * disappears on light covers (and dark text on dark ones). Pick the ink from
- * the background's luminance.
+ * The lyrics panels and the header row sit straight on the album's dominant
+ * color, so white content disappears on light covers (and dark content on
+ * dark ones). Pick the ink from the background's luminance.
  */
-private fun lyricsInk(background: Color): Color =
-    if (background.luminance() > 0.4f) LyricsInkDark else Color.White
+private fun contrastInk(background: Color): Color =
+    if (background.luminance() > 0.4f) InkDark else Color.White
 
 /**
  * Staggered entrance for the player's blocks: each one rises a little and
@@ -426,6 +426,7 @@ fun SpotifyNowPlayingScreen(
                             contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
                             onCollapseClick = onCollapseClick,
                             onMoreClick = onMoreClick,
+                            dominantColor = animatedDominantColor,
                             dragModifier = headerDragModifier
                         )
 
@@ -564,6 +565,7 @@ fun SpotifyNowPlayingScreen(
                                     contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
                                     onCollapseClick = onCollapseClick,
                                     onMoreClick = onMoreClick,
+                                    dominantColor = animatedDominantColor,
                                     dragModifier = headerDragModifier
                                 )
                             }
@@ -580,6 +582,7 @@ fun SpotifyNowPlayingScreen(
                                 contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
                                 onCollapseClick = onCollapseClick,
                                 onMoreClick = onMoreClick,
+                                dominantColor = animatedDominantColor,
                                 dragModifier = headerDragModifier
                             )
                         }
@@ -935,8 +938,10 @@ private fun NowPlayingHeaderRow(
     contextSubtitle: String?,
     onCollapseClick: () -> Unit,
     onMoreClick: () -> Unit,
+    dominantColor: Color,
     dragModifier: Modifier = Modifier
 ) {
+    val ink = contrastInk(dominantColor)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -949,7 +954,7 @@ private fun NowPlayingHeaderRow(
             iconRes = R.drawable.encore_icon_chevron_down_24,
             contentDescription = "Collapse player",
             onClick = onCollapseClick,
-            tint = Color.White,
+            tint = ink,
             size = 48.dp,
             iconSize = 24.dp
         )
@@ -965,7 +970,7 @@ private fun NowPlayingHeaderRow(
                 style = SpotifyTheme.typography.marginal.copy(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Normal,
-                    color = Color.White
+                    color = ink
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -976,7 +981,7 @@ private fun NowPlayingHeaderRow(
                     style = SpotifyTheme.typography.bodySmallBold.copy(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = ink
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -988,7 +993,7 @@ private fun NowPlayingHeaderRow(
             iconRes = R.drawable.encore_icon_more_android_24,
             contentDescription = "More options",
             onClick = onMoreClick,
-            tint = Color.White,
+            tint = ink,
             size = 48.dp,
             iconSize = 24.dp
         )
@@ -1386,7 +1391,7 @@ private fun NowPlayingLyricsPeekCard(
     modifier: Modifier = Modifier,
     peekHeight: Dp = 360.dp
 ) {
-    val ink = lyricsInk(dominantColor)
+    val ink = contrastInk(dominantColor)
     AnimatedVisibility(
         visible = visible,
         enter = slideInVertically(
@@ -1626,7 +1631,7 @@ private fun FullscreenLyricsView(
 ) {
     val activeIndex = lyrics.indexOfLast { currentPositionMs >= it.startTimeMs }.coerceAtLeast(0)
     val listState = rememberLazyListState()
-    val ink = lyricsInk(dominantColor)
+    val ink = contrastInk(dominantColor)
 
     LaunchedEffect(activeIndex) {
         listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
