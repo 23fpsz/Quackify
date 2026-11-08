@@ -783,7 +783,14 @@ class MainActivity : ComponentActivity() {
                                 homeQuickAccessItems = quick,
                             // The history shelves are personal sections of the
                             // unfiltered feed; a facet answer is all its own.
-                            homeShelves = if (homeFacet.isBlank()) historyShelves + shelves else shelves,
+                            // They also wait out the initial fetch: the history
+                            // reads locally and renders instantly, so ungated
+                            // it beats the network feed to the screen. Holding
+                            // it until loading clears makes the whole home land
+                            // in one frame. A resume refresh never re-enters
+                            // loading, so the shelves stay put while the feed
+                            // quietly swaps in.
+                            homeShelves = if (homeFacet.isBlank() && !loading) historyShelves + shelves else shelves,
                             homeChips = homeChips,
                             homeFacet = homeFacet,
                             homeGreeting = homeGreeting,
