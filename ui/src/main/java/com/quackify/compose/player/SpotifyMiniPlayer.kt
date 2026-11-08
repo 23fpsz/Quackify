@@ -95,6 +95,7 @@ fun SpotifyMiniPlayer(
     title: String,
     artist: String,
     isPlaying: Boolean,
+    isBuffering: Boolean = false,
     progress: Float, // 0.0f to 1.0f
     isLiked: Boolean,
     onPlayPauseClick: () -> Unit,
@@ -308,6 +309,7 @@ fun SpotifyMiniPlayer(
                     size = EncoreControlSizes.FloatingPlayerButtonSize,
                     iconSize = 24.dp,
                     tint = if (hasTrack) EncoreColors.TextPrimary else EncoreColors.TextSecondary,
+                    isLoading = isBuffering,
                     modifier = Modifier.padding(end = 4.dp)
                 )
             }
