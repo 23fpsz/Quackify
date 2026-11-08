@@ -355,9 +355,14 @@ class MainActivity : ComponentActivity() {
                         var albumUri by remember { mutableStateOf("") }
                         var albumDetail by remember { mutableStateOf<AlbumDetail?>(null) }
                         var albumTracks by remember { mutableStateOf<List<TrackItem>?>(null) }
+                        var albumLoading by remember { mutableStateOf(false) }
+                        var albumFailed by remember { mutableStateOf(false) }
+                        var albumRetry by remember { mutableStateOf(0) }
                         var artistUri by remember { mutableStateOf("") }
                         var artistDetail by remember { mutableStateOf<ArtistDetail?>(null) }
                         var artistLoading by remember { mutableStateOf(false) }
+                        var artistFailed by remember { mutableStateOf(false) }
+                        var artistRetry by remember { mutableStateOf(0) }
                         var trackCredits by remember { mutableStateOf<Credits?>(null) }
                         var addToPlaylistChoices by remember { mutableStateOf<List<PlaylistChoice>?>(null) }
                         var artistTracks by remember { mutableStateOf<List<PopularTrack>?>(null) }
@@ -512,24 +517,39 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        LaunchedEffect(albumUri) {
-                            if (albumUri.isBlank()) return@LaunchedEffect
+                        LaunchedEffect(albumUri, albumRetry) {
+                            if (albumUri.isBlank()) {
+                                albumDetail = null
+                                albumTracks = null
+                                albumLoading = false
+                                albumFailed = false
+                                return@LaunchedEffect
+                            }
                             val uri = albumUri
                             albumDetail = null
                             albumTracks = null
-                            val detail = Krespot.albums.album(context, uri)
-                            if (uri != albumUri) return@LaunchedEffect
-                            albumDetail = detail
-                            albumTracks = detail?.tracks?.map { it.toTrackItem() }
+                            albumFailed = false
+                            albumLoading = true
+                            try {
+                                val detail = Krespot.albums.album(context, uri)
+                                if (uri != albumUri) return@LaunchedEffect
+                                albumDetail = detail
+                                albumTracks = detail?.tracks?.map { it.toTrackItem() }
+                                albumFailed = detail == null
+                            } finally {
+                                if (uri == albumUri) albumLoading = false
+                            }
                         }
 
-                        LaunchedEffect(artistUri) {
+                        LaunchedEffect(artistUri, artistRetry) {
                             if (artistUri.isBlank()) {
                                 artistDetail = null
                                 artistTracks = null
                                 artistReleases = null
                                 artistListeners = null
                                 artistFollowed = null
+                                artistLoading = false
+                                artistFailed = false
                                 return@LaunchedEffect
                             }
                             val uri = artistUri
@@ -538,11 +558,13 @@ class MainActivity : ComponentActivity() {
                             artistReleases = null
                             artistListeners = null
                             artistFollowed = null
+                            artistFailed = false
                             artistLoading = true
                             try {
                                 val detail = Krespot.artists.artist(context, uri)
                                 if (uri != artistUri) return@LaunchedEffect
                                 artistDetail = detail
+                                artistFailed = detail == null
                                 artistTracks = detail?.topTracks?.map { row ->
                                     val countFormatted = if (row.plays > 0L) {
                                         java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(row.plays)
@@ -825,6 +847,9 @@ class MainActivity : ComponentActivity() {
                             },
                             albumTracks = albumTracks,
                             albumDetail = albumDetail,
+                            albumLoading = albumLoading,
+                            albumFailed = albumFailed,
+                            onRetryAlbum = { albumRetry++ },
                             nowPlayingArtistBio = nowPlayingArtist?.biography.orEmpty(),
                             nowPlayingMonthlyListeners = nowPlayingArtist?.monthlyListeners
                                 ?.takeIf { it > 0L }?.let { formatCount(it) + " monthly listeners" }.orEmpty(),
@@ -844,6 +869,8 @@ class MainActivity : ComponentActivity() {
                             },
                             artistDetail = artistDetail,
                             artistLoading = artistLoading,
+                            artistFailed = artistFailed,
+                            onRetryArtist = { artistRetry++ },
                             trackCredits = trackCredits,
                             addToPlaylistChoices = addToPlaylistChoices,
                             onShowCredits = { uri ->
