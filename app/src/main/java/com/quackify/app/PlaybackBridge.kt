@@ -4,6 +4,16 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.quackify.app.bridge.QueueNavigatorState
+import com.quackify.app.bridge.QueueTarget
+import com.quackify.app.bridge.UriSources
+import com.quackify.app.bridge.albumUriOf
+import com.quackify.app.bridge.artistUriOf
+import com.quackify.app.bridge.asCommandTrack
+import com.quackify.app.bridge.asTrackItem
+import com.quackify.app.bridge.playingUri
+import com.quackify.app.bridge.progressOf
+import com.quackify.app.bridge.targetFrom
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
@@ -15,7 +25,6 @@ import com.quackify.backend.connect.cluster.ClusterTrack
 import com.quackify.backend.model.ConnectDevice
 import com.quackify.backend.model.DeviceKind
 import com.quackify.backend.connect.command.CommandTrack
-import com.quackify.backend.connect.command.ContentType
 import com.quackify.backend.connect.command.PlaybackCommand
 import com.quackify.backend.connect.command.TrackUid
 import com.quackify.backend.connect.state.DebugSource
@@ -1736,9 +1745,6 @@ class PlaybackBridge(private val context: Context) {
         )
     }
 
-    private fun progressOf(position: Long, duration: Long): Float =
-        if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-
     /**
      * Settings "Autoplay on startup": the first track the cluster names after
      * the app opens starts playing here right away — exactly what pressing
@@ -1813,31 +1819,16 @@ class PlaybackBridge(private val context: Context) {
         }
     }
 
-    private fun artistUriOf(uri: String): String {
-        if (uri.isBlank()) return ""
-        val at = cluster
-        if (at != null) {
-            if (at.track.uri == uri && at.track.artistUri.isNotBlank()) return at.track.artistUri
-            at.window().firstOrNull { it.uri == uri && it.artistUri.isNotBlank() }?.let { return it.artistUri }
-        }
-        decorated[uri]?.let { if (it.artistUri.isNotBlank()) return it.artistUri }
-        (state.queue + state.queueFromContext).firstOrNull { it.uri == uri && it.artistUri.isNotBlank() }
-            ?.let { return it.artistUri }
-        return ""
-    }
+    private fun artistUriOf(uri: String): String = artistUriOf(uri, uriSources())
 
-    private fun albumUriOf(uri: String): String {
-        if (uri.isBlank()) return ""
-        val at = cluster
-        if (at != null) {
-            if (at.track.uri == uri && at.track.albumUri.isNotBlank()) return at.track.albumUri
-            at.window().firstOrNull { it.uri == uri && it.albumUri.isNotBlank() }?.let { return it.albumUri }
-        }
-        decorated[uri]?.let { if (it.albumUri.isNotBlank()) return it.albumUri }
-        (state.queue + state.queueFromContext).firstOrNull { it.uri == uri && it.albumUri.isNotBlank() }
-            ?.let { return it.albumUri }
-        return ""
-    }
+    private fun albumUriOf(uri: String): String = albumUriOf(uri, uriSources())
+
+    private fun uriSources(): UriSources = UriSources(
+        cluster = cluster,
+        decorated = decorated,
+        queue = state.queue,
+        queueFromContext = state.queueFromContext,
+    )
 
     private fun mirror(cluster: ClusterState?) {
         if (cluster == null) return
@@ -2178,12 +2169,12 @@ class PlaybackBridge(private val context: Context) {
                 clusterContext.startsWith("spotify:episode:")
         val follows = clusterContext.isNotBlank() &&
                 (clusterContext == context || (single && context.isBlank()))
-        val serverRows = if (server && follows) cluster!!.fromContext.map(::row) else emptyList()
+        val serverRows = if (server && follows) cluster!!.fromContext.map { it.asTrackItem() } else emptyList()
         val radio = server && follows &&
                 cluster!!.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
         val label = if (server && follows && !radio && !single) cluster!!.contextDescription else ""
         val queued = if (server) {
-            val onServer = cluster!!.queued.map(::row)
+            val onServer = cluster!!.queued.map { it.asTrackItem() }
             val known = onServer.mapTo(HashSet()) { it.uri }
             (onServer + queuedTail.filterNot { it.uri in known })
                 .map { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
@@ -2416,32 +2407,6 @@ class PlaybackBridge(private val context: Context) {
         log.i("chain: ${rows.size} rows in '${chainContext.ifBlank { "one track per row" }}' " +
                 "from '${rows.first().takeLast(12)}'")
     }
-
-    private fun ClusterTrack.asCommandTrack(): CommandTrack = CommandTrack(
-        uri = uri,
-        name = title,
-        artists = artistName,
-        album = "",
-        albumUri = albumUri,
-        durationMs = durationMs,
-        imageUrl = imageUrl,
-        explicit = explicit,
-        contentType = ContentType.TRACK,
-        files = emptyList(),
-        dualFiles = emptyList(),
-        directFiles = emptyList(),
-    )
-
-    private fun row(track: ClusterTrack): TrackItem = TrackItem(
-        title = track.title,
-        artist = track.artistName,
-        uri = track.uri,
-        imageUrl = track.imageUrl.takeIf { it.isNotBlank() },
-        durationMs = track.durationMs,
-        isExplicit = track.explicit,
-        albumUri = track.albumUri,
-        artistUri = track.artistUri,
-    )
 
     private fun mirrorState(command: PlaybackCommand?) {
         if (command == null) return
@@ -2946,29 +2911,16 @@ class PlaybackBridge(private val context: Context) {
         if (accepted) settleCluster(track.uri, -1)
     }
 
-    private class Target(val track: ClusterTrack, val index: Int, val anchor: Int)
+    private fun playingUri(cluster: ClusterState): String =
+        playingUri(cluster, navigatorState())
 
-    private fun playingUri(cluster: ClusterState): String {
-        val engine = player.state.value.trackUri
-        if (engine.isNotBlank() && cluster.window().any { it.uri == engine }) return engine
-        val commanded = connect.playback?.currentTrack?.uri.orEmpty()
-        if (commanded.isNotBlank()) return commanded
-        return cluster.track.uri
-    }
+    private fun targetFrom(cluster: ClusterState, offset: Int): QueueTarget? =
+        targetFrom(cluster, offset, navigatorState())
 
-    private fun targetFrom(cluster: ClusterState, offset: Int): Target? {
-        val window = cluster.window()
-        val anchor = cluster.anchorOf(playingUri(cluster))
-        var seen = -1
-        for (position in (anchor + 1) until window.size) {
-            val row = window[position]
-            if (!row.isVisible) continue
-            seen++
-            if (seen != offset) continue
-            return Target(row, if (row.isQueued) -1 else cluster.indexOf(position), anchor)
-        }
-        return null
-    }
+    private fun navigatorState(): QueueNavigatorState = QueueNavigatorState(
+        engineUri = player.state.value.trackUri,
+        commandedUri = connect.playback?.currentTrack?.uri.orEmpty(),
+    )
 
     private companion object {
         const val KEY_LOOKAHEAD = 6
