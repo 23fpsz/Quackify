@@ -207,6 +207,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                        LaunchedEffect(quick) {
+                            log.i("home quick access tiles=${quick.size}")
+                        }
                         val shelves = remember(feed) { feed.toShelves() }
                         // The listening history owns the first two shelves:
                         // Recently played and the favorite artists ranked by it.
