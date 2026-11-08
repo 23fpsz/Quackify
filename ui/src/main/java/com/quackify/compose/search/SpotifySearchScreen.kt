@@ -196,9 +196,10 @@ fun SpotifySearchScreen(
     currentTrackUri: String = "",
     isPlaying: Boolean = false,
     searchFieldFocusRequester: FocusRequester? = null,
+    initialQuery: String = "",
     modifier: Modifier = Modifier
 ) {
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf(initialQuery) }
     var selectedSearchTab by remember { mutableIntStateOf(0) }
     var isSearchBarFocused by remember { mutableStateOf(false) }
     // A play from the suggestion dropdown keeps the overlay on screen (with the
