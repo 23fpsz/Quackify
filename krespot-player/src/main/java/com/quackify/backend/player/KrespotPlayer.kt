@@ -28,7 +28,13 @@ private const val MANIFEST_CACHE = 8
 
 private const val FILE_ID_CACHE = 64
 
-private const val KEY_SETTLE_MS = 1_500L
+private const val SOURCE_CACHE = 8
+
+private const val DEEP_LOOKAHEAD = 2
+
+// Only meant to absorb an accidental double tap before the key request;
+// anything longer sits on the critical path of every play.
+private const val KEY_SETTLE_MS = 300L
 
 private const val DUCK_LEVEL = 0.2f
 
@@ -122,6 +128,14 @@ class KrespotPlayer(private val context: Context) {
 
     private val fileIdOrder = java.util.ArrayDeque<String>()
 
+    private val sources = java.util.LinkedHashMap<String, AudioSource>()
+
+    @Volatile
+    private var deepJob: Job? = null
+
+    @Volatile
+    private var deepTarget: String = ""
+
     fun rememberFile(trackUri: String, fileId: String) {
         if (trackUri.isBlank() || fileId.length < 32) return
         // prefetchAhead parks one of these per track on Dispatchers.IO while
@@ -158,7 +172,65 @@ class KrespotPlayer(private val context: Context) {
                 rememberFile(track.uri, file.fileId)
             }
         }
+        val target = tracks.firstOrNull { track ->
+            !track.isAd && !track.isMeta && track.isVisible && track.uri.startsWith("spotify:track:")
+        }?.uri.orEmpty()
+        if (target.isBlank()) {
+            deepJob?.cancel()
+            deepTarget = ""
+            return
+        }
+        if (deepJob?.isActive == true && deepTarget == target) return
+        deepJob?.cancel()
+        deepTarget = target
+        deepJob = scope.launch { deepWarm(tracks, spclient) }
     }
+
+    /**
+     * Resolves, licenses and preloads the next couple of tracks so advancing
+     * the queue starts from warm bytes instead of a cold pipeline.
+     */
+    private suspend fun deepWarm(
+        tracks: List<com.quackify.backend.connect.cluster.ClusterTrack>,
+        spclient: String,
+    ) {
+        tracks.asSequence()
+            .filter { !it.isAd && !it.isMeta && it.isVisible && it.uri.startsWith("spotify:track:") }
+            .take(DEEP_LOOKAHEAD)
+            .forEach { track ->
+                if (sourceFor(track.uri) != null) return@forEach
+                val known = fileIds[track.uri]
+                val file = manifestFor(track.uri)
+                if (known == null && file == null) return@forEach
+                if (file != null) rememberFile(track.uri, file.fileId)
+                val source = SourceResolver.resolve(
+                    context,
+                    spclient,
+                    track.uri,
+                    fileId = known ?: file!!.fileId,
+                    format = file?.format ?: 0,
+                    prefetched = file,
+                ) ?: return@forEach
+                rememberSource(track.uri, source)
+                widevine.open(source.seektable.pssh)
+                SegmentStore.warm(source, 0L)
+                log.i("deep warm '${track.title}' file=${source.fileId.take(8)}")
+            }
+    }
+
+    private fun rememberSource(trackUri: String, source: AudioSource) {
+        if (trackUri.isBlank()) return
+        synchronized(sources) {
+            sources.remove(trackUri)
+            sources[trackUri] = source
+            while (sources.size > SOURCE_CACHE) {
+                val oldest = sources.keys.firstOrNull() ?: break
+                sources.remove(oldest)
+            }
+        }
+    }
+
+    private fun sourceFor(trackUri: String): AudioSource? = synchronized(sources) { sources[trackUri] }
 
     private suspend fun manifestFor(trackUri: String): AudioFile? {
         val pending = manifests[trackUri] ?: return null
@@ -265,28 +337,24 @@ class KrespotPlayer(private val context: Context) {
         job = scope.launch {
             var player: PlayerEngine? = null
             try {
-                val source = SourceResolver.resolve(
-                    context,
-                    spclient,
-                    track.uri,
-                    file?.fileId.orEmpty(),
-                    file?.format ?: 0,
-                    prefetched = if (file == null) manifestFor(track.uri) else null,
-                )
+                val source = sourceFor(track.uri)
+                    ?: SourceResolver.resolve(
+                        context,
+                        spclient,
+                        track.uri,
+                        file?.fileId.orEmpty(),
+                        file?.format ?: 0,
+                        prefetched = if (file == null) manifestFor(track.uri) else null,
+                    )?.also { rememberSource(track.uri, it) }
                 if (source == null) {
                     _events.emit(PlayerEvent.Failed("no source"))
                     return@launch
                 }
                 rememberFile(track.uri, source.fileId)
-                val initBytes = Net.fetch(source.url, 0, source.seektable.offset - 1)
-                if (initBytes == null) {
-                    _events.emit(PlayerEvent.Failed("no init range"))
-                    return@launch
-                }
-                if (id != generation) {
-                    log.i("play was skipped while its init segment was in flight, no key asked")
-                    return@launch
-                }
+                // The key only needs the pssh from the seektable and the
+                // segments only need the resolved url, so both overlap the
+                // init segment fetch instead of queueing behind it.
+                val warmed = async(Dispatchers.IO) { SegmentStore.warm(source, fromMs) }
                 val drm = async(Dispatchers.IO) {
                     val left = KEY_SETTLE_MS - (SystemClock.elapsedRealtime() - startedAt)
                     if (left > 0L) delay(left)
@@ -296,13 +364,25 @@ class KrespotPlayer(private val context: Context) {
                     }
                     widevine.open(source.seektable.pssh)
                 }
+                val entry = warmed.await()
+                val initBytes = entry.init
+                    ?: Net.fetch(source.url, 0, source.seektable.offset - 1)?.also { entry.init = it }
+                if (initBytes == null) {
+                    drm.cancel()
+                    _events.emit(PlayerEvent.Failed("no init range"))
+                    return@launch
+                }
+                if (id != generation) {
+                    log.i("play was skipped while its media was warming up")
+                    return@launch
+                }
                 val parsed = Mp4.parseInit(initBytes)
                 val init = if (parsed.mediaDuration > 0) {
                     parsed
                 } else {
                     parsed.copy(mediaDuration = source.seektable.totalDuration + parsed.priming)
                 }
-                player = PlayerEngine(source, init, widevine, file?.gainDb ?: 0.0, drm, scope) { event ->
+                player = PlayerEngine(source, init, widevine, file?.gainDb ?: 0.0, drm, scope, entry.segments) { event ->
                     if (id == generation) {
                         mirror(event, init.playableMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
@@ -461,6 +541,8 @@ class KrespotPlayer(private val context: Context) {
         // this a late gate-open would stop whatever is playing (or wake a
         // released player) to restart a track nobody asked for.
         refused = null
+        deepJob?.cancel()
+        deepTarget = ""
         engine?.stop()
         engine = null
         mp3?.stop()

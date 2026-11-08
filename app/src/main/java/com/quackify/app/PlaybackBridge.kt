@@ -730,6 +730,19 @@ class PlaybackBridge(private val context: Context) {
     private fun pendingActive(): Boolean =
         pendingTrack.isNotBlank() && System.currentTimeMillis() - pendingAt < PENDING_MS
 
+    /** Speculative manifests for playlist rows, so a tap skips that round trip. */
+    fun prefetchUris(uris: List<String>) {
+        if (uris.isEmpty()) return
+        var wanted = 0
+        uris.forEach { uri ->
+            if (uri.startsWith("spotify:track:") || uri.startsWith("spotify:episode:")) {
+                wanted++
+                player.prefetch(uri, connect.spclientHost)
+            }
+        }
+        if (wanted > 0) log.i("prefetch $wanted playlist row(s)")
+    }
+
     suspend fun playFromCluster(offset: Int = 0): Boolean {
         val cluster = connect.cluster.value
         if (cluster == null) {

@@ -23,7 +23,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.Channel
 import com.quackify.backend.core.log.Logs
-import com.quackify.backend.core.net.Net
 
 private val log = Logs.of(Logs.Module.ENGINE)
 
@@ -42,6 +41,7 @@ internal class PlayerEngine(
     private val gainDb: Double,
     private val openedCrypto: Deferred<MediaCrypto?>,
     private val scope: CoroutineScope,
+    private val cache: ConcurrentHashMap<Int, ByteArray>,
     private val emit: (PlayerEvent) -> Unit,
 ) {
 
@@ -88,7 +88,6 @@ internal class PlayerEngine(
     private var underrunsAt = -1
     private var cryptoLogged = false
 
-    private val cache = ConcurrentHashMap<Int, ByteArray>()
     private val bufferInfo = MediaCodec.BufferInfo()
 
     val durationMs: Long get() = init.playableMs
@@ -292,10 +291,8 @@ internal class PlayerEngine(
         val queue = Channel<ByteArray>(LOOKAHEAD)
         val loader = launch(Dispatchers.IO) {
             var index = startSegment
-            var offset = table.offsetOf(startSegment)
             try {
                 while (isActive && index < table.count && !stopped) {
-                    val size = table.sizes[index]
                     var bytes = cache[index]
                     if (bytes == null) {
                         // One dropped segment used to freeze the track forever
@@ -303,13 +300,10 @@ internal class PlayerEngine(
                         // a couple of times before giving up on the track.
                         for (attempt in 1..SEGMENT_ATTEMPTS) {
                             if (attempt > 1) delay(500L * (attempt - 1))
+                            // ensure() joins a download the prefetch already
+                            // started instead of repeating it.
                             bytes = runCatching {
-                                Net.fetch(
-                                    source.url,
-                                    offset,
-                                    offset + size - 1,
-                                    mapOf("referer" to "https://open.spotify.com/"),
-                                )
+                                SegmentStore.ensure(source, index)
                             }.getOrElse {
                                 log.w("segment $index fetch ${it.javaClass.simpleName}: ${it.message} " +
                                         "(attempt $attempt/$SEGMENT_ATTEMPTS)"
@@ -325,7 +319,6 @@ internal class PlayerEngine(
                         break
                     }
                     remember(index, bytes)
-                    offset += size
                     index++
                     queue.send(bytes)
                 }
