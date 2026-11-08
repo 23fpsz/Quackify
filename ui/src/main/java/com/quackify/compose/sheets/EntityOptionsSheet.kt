@@ -48,7 +48,6 @@ fun EntityOptionsSheet(
     onDismiss: () -> Unit,
     onCopyLink: () -> Unit = {},
     onShare: () -> Unit = {},
-    onOpenInBrowser: () -> Unit = {},
     canEditPlaylist: Boolean = false,
     onEditPlaylist: () -> Unit = {},
     isSaved: Boolean? = null,
@@ -229,15 +228,6 @@ fun EntityOptionsSheet(
                 onClick = {
                     onDismiss()
                     onShare()
-                }
-            )
-
-            EntityRow(
-                title = "Open in browser",
-                iconRes = R.drawable.encore_icon_more_android_24,
-                onClick = {
-                    onDismiss()
-                    onOpenInBrowser()
                 }
             )
 
