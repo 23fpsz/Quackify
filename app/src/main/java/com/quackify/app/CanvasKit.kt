@@ -1,10 +1,6 @@
 package com.quackify.app
 
 import android.content.Context
-import android.media.MediaCodec
-import android.media.MediaExtractor
-import android.media.MediaFormat
-import android.media.MediaMuxer
 import com.quackify.backend.connect.dealer.DealerHost
 import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.core.log.Logs
@@ -12,7 +8,6 @@ import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.Net
 import org.json.JSONObject
 import java.io.File
-import java.nio.ByteBuffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -47,12 +42,18 @@ private val log = Logs.of(Logs.Module.TRACKS)
  *
  * We download the init plus the available segments and stitch them into one
  * playable file; a concatenated fMP4 is a valid progressive mp4. The CDN
- * fragments can, however, carry their master's media timeline — sample
- * timestamps near 1e9 ms have been seen — which plays fine until a fragment
- * boundary breaks the timeline; from there every frame lands "hours late",
- * the decoder drops it and the looping restart turns into a flush storm that
- * freezes the canvas mid-video. The stitched file is therefore remuxed with
- * normalized (0-based, monotonic) sample timestamps before it is cached.
+ * fragments, however, can carry their master's media timeline — non-zero
+ * starts, sub-second holes and multi-hour jumps between fragments have all
+ * been seen — and a progressive player renders those literally: the canvas
+ * stalls at every hole and freezes outright on the jumps. The stitch is
+ * therefore normalized at the fragment level: every movie-fragment's tfdt
+ * (baseMediaDecodeTime) is rewritten so the first fragment starts at 0 and
+ * each later one starts exactly when the previous one's samples end. Sample
+ * bytes, order and — critically — the trun composition offsets that carry
+ * B-frame reordering are untouched, so the presentation order the decoder
+ * reconstructs stays exactly the CDN's (a previous sample-level rewrite
+ * rearranged PTS along the decode order and stuttered every B-framed
+ * canvas, no matter the resolution).
  */
 object CanvasKit {
 
@@ -216,9 +217,14 @@ object CanvasKit {
     suspend fun download(context: Context, trackUri: String): String? = withContext(Dispatchers.IO) {
         val id = trackUri.substringAfterLast(":")
         val dir = File(context.cacheDir, "canvas")
-        // v4: 720p-capped ladder picks; plain-name files cached the 1080p rung
-        val cache = File(dir, "v4-$id.mp4")
+        // v5: fragment timelines rebased at the tfdt level; v4 files were
+        // written through the broken sample-level rewriter and are stale
+        val cache = File(dir, "v5-$id.mp4")
         if (cache.isFile && cache.length() > 0L) return@withContext cache.absolutePath
+        // one-time: v4 files hold mangled B-frame timelines, drop them
+        dir.listFiles()?.filter { it.isFile && it.name.startsWith("v4-") }?.forEach {
+            if (it.delete()) log.i("canvas cache dropped ${it.name}")
+        }
 
         val target = resolve(context, trackUri) ?: return@withContext null
         val initUrl = target.initUrl
@@ -287,120 +293,235 @@ object CanvasKit {
 
         runCatching {
             dir.mkdirs()
-            cache.outputStream().use { out -> parts.forEach(out::write) }
-            normalizeTimestamps(cache)
+            val stitched = ByteArray(total)
+            var at = 0
+            for (part in parts) {
+                part.copyInto(stitched, at)
+                at += part.size
+            }
+            val rebased = rebaseFragmentTimelines(stitched)
+            cache.outputStream().use { it.write(stitched) }
             trim(dir)
-            log.i("canvas $id stitched ${parts.size} part(s) ${total}B -> ${cache.name}")
+            val note = when {
+                rebased > 0 -> ", $rebased fragment(s) rebased"
+                rebased == 0 -> "" // plain single file, nothing to rebase
+                else -> ", raw timeline kept" // box layout not recognized
+            }
+            log.i("canvas $id stitched ${parts.size} part(s) ${total}B -> ${cache.name}$note")
             cache.absolutePath
         }.onFailure {
             log.w("canvas $id write failed: ${it.message}")
         }.getOrNull()
     }
 
-    /** Longest inter-sample step kept as-is; longer hops (and any backwards
-     * jump) are replaced with the previous sane step. */
-    private const val MAX_GAP_US = 1_000_000L
+    /** tfhd flags whose extra fields must be skipped while walking the box. */
+    private const val TFHD_BASE_DATA_OFFSET = 0x000001
+    private const val TFHD_SAMPLE_DESC_INDEX = 0x000002
+    private const val TFHD_DEFAULT_DURATION = 0x000008
 
-    /** Step assumed between samples when the raw timeline offers no sane one
-     * at all (a ~30fps canvas frame). */
-    private const val DEFAULT_GAP_US = 33_333L
+    /** trun flags marking which per-sample fields every entry carries. */
+    private const val TRUN_DATA_OFFSET = 0x000001
+    private const val TRUN_FIRST_SAMPLE_FLAGS = 0x000004
+    private const val TRUN_SAMPLE_DURATION = 0x000100
+    private const val TRUN_SAMPLE_SIZE = 0x000200
+    private const val TRUN_SAMPLE_FLAGS = 0x000400
+    private const val TRUN_SAMPLE_CTS = 0x000800
 
-    /** Per-track timeline rewriter: the first sample lands at 0, every sane
-     * inter-frame gap is kept as-is, broken steps fall back to the previous
-     * sane one, so the output grows monotonically frame by frame. */
-    private class Rebase {
-        private var lastRaw = Long.MIN_VALUE
-        private var lastOut = 0L
-        private var lastGap = -1L
+    /** One parsed ISO-BMFF box: start offset, total size, header size, fourcc. */
+    private class Box(val start: Int, val size: Int, val header: Int, val type: String)
 
-        fun next(raw: Long): Long {
-            if (lastRaw == Long.MIN_VALUE) {
-                lastRaw = raw
-                return 0L
+    /** One parsed trun: sample count and, when present, the summed
+     *  per-sample durations (negative when the box relies on defaults). */
+    private class Trun(val count: Int, val durations: Long)
+
+    private fun u32(data: ByteArray, off: Int): Long {
+        var v = 0L
+        for (i in 0..3) v = (v shl 8) or (data[off + i].toLong() and 0xFF)
+        return v
+    }
+
+    private fun u64(data: ByteArray, off: Int): Long =
+        (u32(data, off) shl 32) or u32(data, off + 4)
+
+    /** Boxes of a container spanning [from, until); throws when malformed. */
+    private fun boxes(data: ByteArray, from: Int, until: Int): ArrayList<Box> {
+        val out = ArrayList<Box>()
+        var off = from
+        while (off + 8 <= until) {
+            val rawSize = u32(data, off)
+            var size: Int
+            var header = 8
+            when {
+                rawSize == 1L -> {
+                    if (off + 16 > until) throw IllegalStateException("truncated largesize")
+                    val large = u64(data, off + 8)
+                    if (large > until - off) throw IllegalStateException("largesize past container")
+                    size = large.toInt()
+                    header = 16
+                }
+                rawSize == 0L -> size = until - off
+                else -> {
+                    if (rawSize > Int.MAX_VALUE) throw IllegalStateException("oversized box")
+                    size = rawSize.toInt()
+                }
             }
-            val gap = raw - lastRaw
-            val step = when {
-                gap in 1..MAX_GAP_US -> gap.also { lastGap = it }
-                lastGap in 1..MAX_GAP_US -> lastGap
-                else -> DEFAULT_GAP_US.also { lastGap = it }
+            if (size < header || off + size > until) {
+                throw IllegalStateException("box past its container")
             }
-            lastOut += step
-            lastRaw = raw
-            return lastOut
+            out.add(Box(off, size, header, String(data, off + 4, 4, Charsets.US_ASCII)))
+            off += size
+        }
+        return out
+    }
+
+    private fun writeUint(data: ByteArray, offset: Int, length: Int, value: Long) {
+        for (i in 0 until length) {
+            data[offset + i] = (value ushr ((length - 1 - i) * 8)).toByte()
         }
     }
 
     /**
-     * Remux the stitched canvas through MediaExtractor + MediaMuxer while
-     * rewriting every sample's presentation time to a clean 0-based,
-     * monotonically increasing timeline (see [Rebase]). On any failure the
-     * original stitched file is kept untouched, which plays exactly like the
-     * previous behavior.
+     * Rewrite every movie fragment's tfdt (baseMediaDecodeTime) onto a clean
+     * 0-based, gap-free timeline: the first fragment of a track starts at 0
+     * and every later one starts exactly when the previous fragment's samples
+     * end, accumulated from the trun/tfhd/trex sample durations. Only those
+     * bytes change — sample order, sizes and the trun composition offsets
+     * (B-frame ctts) are untouched, so the decoder still reconstructs the
+     * CDN's presentation order. Non-zero starts, sub-second holes between
+     * segments and huge master-timeline jumps all disappear, unlike the old
+     * sample-level rewrite, which reordered PTS along the decode order and
+     * destroyed the pacing of every B-framed canvas.
+     *
+     * Returns the number of fragments rebased, or -1 when the box layout is
+     * not what we expect — the caller then keeps the raw stitch, which still
+     * plays correctly whenever the CDN timeline happens to be sound.
      */
-    private fun normalizeTimestamps(cache: File) {
-        val tmp = File(cache.parentFile, cache.name + ".tmp")
-        val ok = runCatching {
-            val extractor = MediaExtractor()
-            var muxer: MediaMuxer? = null
-            var started = false
-            try {
-                extractor.setDataSource(cache.absolutePath)
-                muxer = MediaMuxer(tmp.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-                val tracks = HashMap<Int, Pair<Int, Rebase>>()
-                for (track in 0 until extractor.trackCount) {
-                    val format = extractor.getTrackFormat(track)
-                    if (format.getString(MediaFormat.KEY_MIME) == null) continue
-                    val muxTrack = muxer.addTrack(format)
-                    extractor.selectTrack(track)
-                    tracks[track] = muxTrack to Rebase()
-                }
-                check(tracks.isNotEmpty()) { "no tracks to remux" }
-                muxer.start()
-                started = true
-                val buffer = ByteBuffer.allocateDirect(1 shl 20)
-                val info = MediaCodec.BufferInfo()
-                while (true) {
-                    val size = extractor.readSampleData(buffer, 0)
-                    if (size < 0) break
-                    val mapped = tracks[extractor.sampleTrackIndex]
-                    if (mapped != null) {
-                        info.offset = 0
-                        info.size = size
-                        info.presentationTimeUs = mapped.second.next(extractor.sampleTime)
-                        info.flags = if (extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
-                            MediaCodec.BUFFER_FLAG_KEY_FRAME
-                        } else {
-                            0
+    private fun rebaseFragmentTimelines(data: ByteArray): Int {
+        return try {
+            val trex = HashMap<Int, Long>()
+            val nextBase = HashMap<Int, Long>()
+            var rebased = 0
+            for (box in boxes(data, 0, data.size)) {
+                if (box.type == "moov") {
+                    for (mvex in boxes(data, box.start + box.header, box.start + box.size)) {
+                        if (mvex.type != "mvex") continue
+                        for (child in boxes(data, mvex.start + mvex.header, mvex.start + mvex.size)) {
+                            if (child.type == "trex" && child.size >= 24) {
+                                trex[u32(data, child.start + 12).toInt()] =
+                                    u32(data, child.start + 20)
+                            }
                         }
-                        muxer.writeSampleData(mapped.first, buffer, info)
                     }
-                    extractor.advance()
+                } else if (box.type == "moof") {
+                    for (traf in boxes(data, box.start + box.header, box.start + box.size)) {
+                        if (traf.type == "traf") rebased += rebaseTraf(data, traf, trex, nextBase)
+                    }
                 }
-            } finally {
-                runCatching { extractor.release() }
-                if (started) runCatching { muxer?.stop() }
-                runCatching { muxer?.release() }
             }
-            check(started && tmp.isFile && tmp.length() > 0L) { "muxer produced nothing" }
-            true
-        }.getOrElse {
-            log.w("canvas remux failed, keeping the raw stitch: ${it.message}")
-            false
+            rebased
+        } catch (e: Exception) {
+            log.w("canvas fragment rebase skipped: ${e.message}")
+            -1
         }
-        if (ok && cache.delete()) {
-            if (tmp.renameTo(cache)) {
-                log.i("canvas ${cache.name} remuxed onto a normalized timeline")
+    }
+
+    /** Rewrite one traf's tfdt onto the accumulated timeline; throws when
+     *  the fragment's structure or durations cannot be resolved. */
+    private fun rebaseTraf(
+        data: ByteArray,
+        traf: Box,
+        trex: Map<Int, Long>,
+        nextBase: HashMap<Int, Long>,
+    ): Int {
+        var trackId = -1
+        var tfhdDefaultDuration = 0L
+        var tfdtOffset = -1
+        var tfdtLength = 0
+        val truns = ArrayList<Trun>()
+        for (child in boxes(data, traf.start + traf.header, traf.start + traf.size)) {
+            when (child.type) {
+                "tfhd" -> {
+                    if (child.size < 16) throw IllegalStateException("short tfhd")
+                    val flags = (u32(data, child.start + 8) and 0xFFFFFF).toInt()
+                    trackId = u32(data, child.start + 12).toInt()
+                    var cursor = child.start + 16
+                    if (flags and TFHD_BASE_DATA_OFFSET != 0) cursor += 8
+                    if (flags and TFHD_SAMPLE_DESC_INDEX != 0) cursor += 4
+                    if (flags and TFHD_DEFAULT_DURATION != 0) {
+                        if (cursor + 4 > child.start + child.size) {
+                            throw IllegalStateException("tfhd default duration past box")
+                        }
+                        tfhdDefaultDuration = u32(data, cursor)
+                    }
+                }
+                "tfdt" -> {
+                    if (child.size < 12) throw IllegalStateException("short tfdt")
+                    when (val version = data[child.start + 8].toInt() and 0xFF) {
+                        0 -> {
+                            if (child.size < 16) throw IllegalStateException("short tfdt v0")
+                            tfdtOffset = child.start + 12
+                            tfdtLength = 4
+                        }
+                        1 -> {
+                            if (child.size < 20) throw IllegalStateException("short tfdt v1")
+                            tfdtOffset = child.start + 12
+                            tfdtLength = 8
+                        }
+                        else -> throw IllegalStateException("tfdt version $version")
+                    }
+                }
+                "trun" -> {
+                    if (child.size < 16) throw IllegalStateException("short trun")
+                    val flags = (u32(data, child.start + 8) and 0xFFFFFF).toInt()
+                    val count = u32(data, child.start + 12).toInt()
+                    var cursor = child.start + 16
+                    if (flags and TRUN_DATA_OFFSET != 0) cursor += 4
+                    if (flags and TRUN_FIRST_SAMPLE_FLAGS != 0) cursor += 4
+                    var stride = 0
+                    for (marker in intArrayOf(
+                        TRUN_SAMPLE_DURATION, TRUN_SAMPLE_SIZE,
+                        TRUN_SAMPLE_FLAGS, TRUN_SAMPLE_CTS,
+                    )) {
+                        if (flags and marker != 0) stride += 4
+                    }
+                    if (flags and TRUN_SAMPLE_DURATION != 0) {
+                        var total = 0L
+                        repeat(count) {
+                            if (cursor + 4 > child.start + child.size) {
+                                throw IllegalStateException("trun samples past box")
+                            }
+                            total += u32(data, cursor)
+                            cursor += stride
+                        }
+                        truns.add(Trun(count, total))
+                    } else {
+                        truns.add(Trun(count, -1L))
+                    }
+                }
+            }
+        }
+        if (trackId < 0 || tfdtOffset < 0) {
+            throw IllegalStateException("traf without tfhd/tfdt")
+        }
+        var fragmentDuration = 0L
+        for (trun in truns) {
+            if (trun.durations >= 0) {
+                fragmentDuration += trun.durations
             } else {
-                // rename across a mount point never happens in one cache dir,
-                // but a plain copy keeps the file alive if it somehow does
-                runCatching {
-                    tmp.inputStream().use { input -> cache.outputStream().use { input.copyTo(it) } }
-                }.onFailure { log.w("canvas remux replace failed: ${it.message}") }
-                tmp.delete()
+                val default = if (tfhdDefaultDuration > 0) tfhdDefaultDuration
+                    else trex[trackId] ?: 0L
+                if (default <= 0) throw IllegalStateException("no sample durations to accumulate")
+                fragmentDuration += default * trun.count
             }
-        } else {
-            tmp.delete()
         }
+        if (fragmentDuration <= 0) throw IllegalStateException("zero fragment duration")
+        val base = nextBase[trackId] ?: 0L
+        if (tfdtLength == 4 && base > 0xFFFFFFFFL) {
+            throw IllegalStateException("rebased tfdt overflows v0 field")
+        }
+        writeUint(data, tfdtOffset, tfdtLength, base)
+        nextBase[trackId] = base + fragmentDuration
+        return 1
     }
 
     /** Keep the canvas cache small: drop the oldest files beyond [MAX_CACHED]. */
