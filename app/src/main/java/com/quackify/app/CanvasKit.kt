@@ -217,12 +217,14 @@ object CanvasKit {
     suspend fun download(context: Context, trackUri: String): String? = withContext(Dispatchers.IO) {
         val id = trackUri.substringAfterLast(":")
         val dir = File(context.cacheDir, "canvas")
-        // v5: fragment timelines rebased at the tfdt level; v4 files were
-        // written through the broken sample-level rewriter and are stale
-        val cache = File(dir, "v5-$id.mp4")
+        // v6: fragment timelines rebased AND the moov header durations (mvhd/
+        // tkhd/mdhd) rewritten to the true stitched length; v5 and older files
+        // carry the CDN init's master-scale header durations and are stale
+        val cache = File(dir, "v6-$id.mp4")
         if (cache.isFile && cache.length() > 0L) return@withContext cache.absolutePath
-        // one-time: v4 files hold mangled B-frame timelines, drop them
-        dir.listFiles()?.filter { it.isFile && it.name.startsWith("v4-") }?.forEach {
+        // one-time: v5 files play the CDN's master timeline in their headers,
+        // which derails ExoPlayer's loop/repeat logic; drop them
+        dir.listFiles()?.filter { it.isFile && it.name.startsWith("v5-") }?.forEach {
             if (it.delete()) log.i("canvas cache dropped ${it.name}")
         }
 
@@ -392,6 +394,19 @@ object CanvasKit {
      * sample-level rewrite, which reordered PTS along the decode order and
      * destroyed the pacing of every B-framed canvas.
      *
+     * v6: the moov that rides along from the CDN init still describes the
+     * MASTER's timeline — mvhd/tkhd/mdhd durations of zero or master-scale
+     * garbage — while the samples now span 0..total. Players that trust the
+     * header (ExoPlayer builds its playback timeline, and therefore its
+     * repeat/loop behaviour, from it) end the period at the wrong spot:
+     * REPEAT_MODE_ONE then hammers the renderer with internal seeks, every
+     * reset flushes the codec, and the canvas plays as a ~3 fps slideshow
+     * (decoder logs: FLUSHING/FLUSHED/STARTED cycling every ~330 ms, 70% of
+     * frames skipped as decode-only). The true stitched duration, already
+     * accumulated per track while rebasing, is therefore also written back
+     * into those three header fields so the container finally describes the
+     * media it actually carries.
+     *
      * Returns the number of fragments rebased, or -1 when the box layout is
      * not what we expect — the caller then keeps the raw stitch, which still
      * plays correctly whenever the CDN timeline happens to be sound.
@@ -400,15 +415,41 @@ object CanvasKit {
         return try {
             val trex = HashMap<Int, Long>()
             val nextBase = HashMap<Int, Long>()
+            val timings = ArrayList<TrakTiming>()
             var rebased = 0
+            var mvhdTimescale = 0L
+            var mvhdDurationOffset = -1
+            var mvhdDurationLength = 0
             for (box in boxes(data, 0, data.size)) {
                 if (box.type == "moov") {
-                    for (mvex in boxes(data, box.start + box.header, box.start + box.size)) {
-                        if (mvex.type != "mvex") continue
-                        for (child in boxes(data, mvex.start + mvex.header, mvex.start + mvex.size)) {
-                            if (child.type == "trex" && child.size >= 24) {
-                                trex[u32(data, child.start + 12).toInt()] =
-                                    u32(data, child.start + 20)
+                    for (child in boxes(data, box.start + box.header, box.start + box.size)) {
+                        when (child.type) {
+                            "mvhd" -> {
+                                if (child.size < 16) throw IllegalStateException("short mvhd")
+                                when (val version = data[child.start + 8].toInt() and 0xFF) {
+                                    0 -> {
+                                        if (child.size < 32) throw IllegalStateException("short mvhd v0")
+                                        mvhdTimescale = u32(data, child.start + 20)
+                                        mvhdDurationOffset = child.start + 24
+                                        mvhdDurationLength = 4
+                                    }
+                                    1 -> {
+                                        if (child.size < 44) throw IllegalStateException("short mvhd v1")
+                                        mvhdTimescale = u32(data, child.start + 28)
+                                        mvhdDurationOffset = child.start + 32
+                                        mvhdDurationLength = 8
+                                    }
+                                    else -> throw IllegalStateException("mvhd version $version")
+                                }
+                            }
+                            "trak" -> trakTiming(data, child)?.let { timings.add(it) }
+                            "mvex" -> {
+                                for (trexBox in boxes(data, child.start + child.header, child.start + child.size)) {
+                                    if (trexBox.type == "trex" && trexBox.size >= 24) {
+                                        trex[u32(data, trexBox.start + 12).toInt()] =
+                                            u32(data, trexBox.start + 20)
+                                    }
+                                }
                             }
                         }
                     }
@@ -418,10 +459,121 @@ object CanvasKit {
                     }
                 }
             }
+            if (rebased > 0) {
+                rewriteHeaderDurations(
+                    data, timings, nextBase,
+                    mvhdTimescale, mvhdDurationOffset, mvhdDurationLength,
+                )
+            }
             rebased
         } catch (e: Exception) {
             log.w("canvas fragment rebase skipped: ${e.message}")
             -1
+        }
+    }
+
+    /** One parsed trak header: where its tkhd/mdhd duration fields live, the
+     * track's own mdhd timescale, and the track id the tfdt rebase keys on. */
+    private class TrakTiming(
+        val trackId: Int,
+        val trackTimescale: Long,
+        val mdhdDurationOffset: Int,
+        val mdhdDurationLength: Int,
+        val tkhdDurationOffset: Int,
+        val tkhdDurationLength: Int,
+    )
+
+    /** Locate a trak's duration fields (tkhd + mdhd) and its track id; null
+     *  when the layout is too unusual to edit safely. */
+    private fun trakTiming(data: ByteArray, trak: Box): TrakTiming? {
+        var trackId = -1
+        var tkhdDurationOffset = -1
+        var tkhdDurationLength = 0
+        var trackTimescale = 0L
+        var mdhdDurationOffset = -1
+        var mdhdDurationLength = 0
+        for (child in boxes(data, trak.start + trak.header, trak.start + trak.size)) {
+            when (child.type) {
+                "tkhd" -> {
+                    if (child.size < 16) throw IllegalStateException("short tkhd")
+                    when (val version = data[child.start + 8].toInt() and 0xFF) {
+                        0 -> {
+                            if (child.size < 32) throw IllegalStateException("short tkhd v0")
+                            trackId = u32(data, child.start + 20).toInt()
+                            tkhdDurationOffset = child.start + 28
+                            tkhdDurationLength = 4
+                        }
+                        1 -> {
+                            if (child.size < 44) throw IllegalStateException("short tkhd v1")
+                            trackId = u32(data, child.start + 28).toInt()
+                            tkhdDurationOffset = child.start + 36
+                            tkhdDurationLength = 8
+                        }
+                        else -> throw IllegalStateException("tkhd version $version")
+                    }
+                }
+                "mdia" -> {
+                    for (mdia in boxes(data, child.start + child.header, child.start + child.size)) {
+                        if (mdia.type != "mdhd") continue
+                        if (mdia.size < 16) throw IllegalStateException("short mdhd")
+                        when (val version = data[mdia.start + 8].toInt() and 0xFF) {
+                            0 -> {
+                                if (mdia.size < 28) throw IllegalStateException("short mdhd v0")
+                                trackTimescale = u32(data, mdia.start + 20)
+                                mdhdDurationOffset = mdia.start + 24
+                                mdhdDurationLength = 4
+                            }
+                            1 -> {
+                                if (mdia.size < 40) throw IllegalStateException("short mdhd v1")
+                                trackTimescale = u32(data, mdia.start + 28)
+                                mdhdDurationOffset = mdia.start + 32
+                                mdhdDurationLength = 8
+                            }
+                            else -> throw IllegalStateException("mdhd version $version")
+                        }
+                    }
+                }
+            }
+        }
+        if (trackId < 0 || mdhdDurationOffset < 0 || trackTimescale <= 0) return null
+        return TrakTiming(
+            trackId, trackTimescale,
+            mdhdDurationOffset, mdhdDurationLength,
+            tkhdDurationOffset, tkhdDurationLength,
+        )
+    }
+
+    /** Write the true per-track stitched duration into mdhd (track timescale)
+     *  and tkhd/mvhd (movie timescale), using the totals the tfdt rebase
+     *  accumulated. tkhd/mvhd are skipped when their fields were not found. */
+    private fun rewriteHeaderDurations(
+        data: ByteArray,
+        timings: List<TrakTiming>,
+        nextBase: Map<Int, Long>,
+        mvhdTimescale: Long,
+        mvhdDurationOffset: Int,
+        mvhdDurationLength: Int,
+    ) {
+        for (timing in timings) {
+            val totalTicks = nextBase[timing.trackId] ?: continue
+            if (totalTicks <= 0) continue
+            writeUint(data, timing.mdhdDurationOffset, timing.mdhdDurationLength, totalTicks)
+            if (timing.tkhdDurationOffset >= 0 && mvhdTimescale > 0) {
+                writeUint(
+                    data, timing.tkhdDurationOffset, timing.tkhdDurationLength,
+                    totalTicks * mvhdTimescale / timing.trackTimescale,
+                )
+            }
+        }
+        if (mvhdDurationOffset >= 0 && mvhdTimescale > 0 && timings.isNotEmpty()) {
+            val first = timings.first()
+            val totalTicks = nextBase[first.trackId] ?: return
+            if (totalTicks > 0) {
+                writeUint(
+                    data, mvhdDurationOffset, mvhdDurationLength,
+                    totalTicks * mvhdTimescale / first.trackTimescale,
+                )
+            }
         }
     }
 

@@ -30,6 +30,7 @@ import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
@@ -38,6 +39,7 @@ import java.io.File
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun CanvasVideoPlayer(
     filePath: String,
@@ -90,33 +92,68 @@ fun CanvasVideoPlayer(
                 frame.applyVideoSize()
             }
 
-            // Diagnostics for the boundary-stutter hunt: a healthy canvas
-            // loop logs nothing here. Dropped frames or a mid-loop decoder
-            // (re)initialization is the signature of whatever still makes
-            // the renderer fall behind, and lands in the in-app LOGS viewer.
-            override fun onDroppedVideoFrames(count: Int, elapsedMs: Long) {
+            override fun onPlayerError(error: PlaybackException) {
+                log.w("canvas playback error ${error.errorCodeName}")
+            }
+
+            // Boundary-stutter hunt, part 2: the timeline ExoPlayer derives
+            // from the stitched file's moov. If the CDN init's header
+            // durations are garbage, `duration` here is NOT the canvas length
+            // and repeat/loop logic resets the renderer at the wrong spot —
+            // the flush-storm signature. One log line at STATE_READY settles
+            // it instantly.
+            override fun onPlaybackStateChanged(playbackState: Int) {
                 log.w(
-                    "canvas dropped $count video frame(s) over ${elapsedMs}ms " +
+                    "canvas state=$playbackState posMs=${player.currentPosition} " +
+                        "durMs=${player.duration}"
+                )
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int,
+            ) {
+                log.w(
+                    "canvas jump ${oldPosition.positionMs} -> ${newPosition.positionMs} " +
+                        "reason=$reason"
+                )
+            }
+        }
+        // Diagnostics for the boundary-stutter hunt: a healthy canvas loop
+        // logs nothing here. Dropped frames or a mid-loop decoder
+        // (re)initialization is the signature of whatever still makes the
+        // renderer fall behind, and lands in the in-app LOGS viewer.
+        // Player.Listener carries no renderer-level callbacks, so these two
+        // ride on a separate AnalyticsListener instead: both take an EventTime
+        // parameter first, and the init duration is a Long, not an Int.
+        val diagnostics = object : AnalyticsListener {
+            override fun onDroppedVideoFrames(
+                eventTime: AnalyticsListener.EventTime,
+                droppedFrames: Int,
+                elapsedMs: Long,
+            ) {
+                log.w(
+                    "canvas dropped $droppedFrames video frame(s) over ${elapsedMs}ms " +
                         "(${File(filePath).name})"
                 )
             }
 
             override fun onVideoDecoderInitialized(
+                eventTime: AnalyticsListener.EventTime,
                 decoderName: String,
                 initializedTimestampMs: Long,
-                initializationDurationMs: Int,
+                initializationDurationMs: Long,
             ) {
                 log.i("canvas decoder $decoderName initialized in ${initializationDurationMs}ms")
             }
-
-            override fun onPlayerError(error: PlaybackException) {
-                log.w("canvas playback error ${error.errorCodeName}")
-            }
         }
         player.addListener(listener)
+        player.addAnalyticsListener(diagnostics)
         player.prepare()
         onDispose {
             player.removeListener(listener)
+            player.removeAnalyticsListener(diagnostics)
             player.release()
         }
     }
@@ -138,19 +175,24 @@ fun CanvasVideoPlayer(
  * Everything else - audio, text, metadata renderers - still comes from the
  * stock factory; only the video pipeline is canvas-specific.
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private class CanvasRenderersFactory(context: Context) : DefaultRenderersFactory(context) {
 
+    // The parameter types must match the parent declaration exactly: in
+    // media3 1.11.1 the eventHandler/eventListener parameters are non-null,
+    // so declaring them Handler? / VideoRendererEventListener? here makes
+    // Kotlin report "overrides nothing".
     override fun buildVideoRenderers(
         context: Context,
         extensionRendererMode: Int,
         mediaCodecSelector: MediaCodecSelector,
         enableDecoderFallback: Boolean,
-        eventHandler: Handler?,
-        eventListener: VideoRendererEventListener?,
+        eventHandler: Handler,
+        eventListener: VideoRendererEventListener,
         allowedVideoJoiningTimeMs: Long,
-        renderers: ArrayList<Renderer>,
+        out: ArrayList<Renderer>,
     ) {
-        renderers.add(
+        out.add(
             CanvasVideoRenderer(
                 MediaCodecVideoRenderer.Builder(context)
                     .setCodecAdapterFactory(getCodecAdapterFactory())
@@ -193,6 +235,7 @@ private class CanvasRenderersFactory(context: Context) : DefaultRenderersFactory
  * onPositionReset resets the source to a keyframe on its own and never
  * consults this hook.
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private class CanvasVideoRenderer(
     builder: MediaCodecVideoRenderer.Builder,
 ) : MediaCodecVideoRenderer(builder) {
@@ -202,6 +245,25 @@ private class CanvasVideoRenderer(
         elapsedRealtimeUs: Long,
         isLastBuffer: Boolean,
     ): Boolean = false
+
+    // Boundary-stutter hunt, part 3: every renderer position reset goes
+    // through here, and a reset is exactly what triggers
+    // flushOrReinitializeCodec -> codec.flush(). A healthy looping canvas
+    // logs this once per loop (~7s); a flush storm logs it every few hundred
+    // milliseconds with the position it resets to. The stack names the
+    // caller, so one buggy run is enough to identify the loop driver.
+    override fun onPositionReset(
+        positionUs: Long,
+        joining: Boolean,
+        sampleStreamIsResetToKeyFrame: Boolean,
+    ) {
+        log.w(
+            "canvas position reset posUs=$positionUs joining=$joining " +
+                "toKeyFrame=$sampleStreamIsResetToKeyFrame",
+            Exception("canvas reset trace"),
+        )
+        super.onPositionReset(positionUs, joining, sampleStreamIsResetToKeyFrame)
+    }
 }
 
 private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
