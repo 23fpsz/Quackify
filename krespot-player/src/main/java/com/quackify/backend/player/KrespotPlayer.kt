@@ -43,6 +43,7 @@ sealed interface PlayerEvent {
 data class PlayerState(
     val playing: Boolean = false,
     val paused: Boolean = false,
+    val buffering: Boolean = false,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val fileId: String = "",
@@ -251,7 +252,12 @@ class KrespotPlayer(private val context: Context) {
         }
         val id = ++generation
         pendingPause = false
-        _state.value = PlayerState(playing = true, durationMs = track.durationMs, trackUri = track.uri)
+        _state.value = PlayerState(
+            playing = true,
+            buffering = true,
+            durationMs = track.durationMs,
+            trackUri = track.uri,
+        )
         log.i("play '${track.name}' ${track.uri} " +
                 "file=${file?.fileId ?: "by uri"} fmt=${file?.format ?: 0} ${file?.bitrate ?: 0}b"
         )
@@ -306,6 +312,7 @@ class KrespotPlayer(private val context: Context) {
                 _state.value = PlayerState(
                     playing = !pendingPause,
                     paused = pendingPause,
+                    buffering = !pendingPause,
                     durationMs = init.playableMs,
                     fileId = source.fileId,
                     format = source.format,
@@ -357,7 +364,7 @@ class KrespotPlayer(private val context: Context) {
         val id = ++generation
         pendingPause = false
         pendingSeekMs = -1L
-        _state.value = PlayerState(playing = true, trackUri = track.uri)
+        _state.value = PlayerState(playing = true, buffering = true, trackUri = track.uri)
         log.i("play direct '${track.name.ifBlank { track.uri }}' ${file?.bitrate ?: 0}b ${url.take(72)}")
         job = scope.launch {
             var player: Mp3Engine? = null
@@ -369,7 +376,7 @@ class KrespotPlayer(private val context: Context) {
                     }
                 }
                 mp3 = player
-                _state.value = PlayerState(playing = true, trackUri = track.uri)
+                _state.value = PlayerState(playing = true, buffering = true, trackUri = track.uri)
                 player.run()
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -392,7 +399,7 @@ class KrespotPlayer(private val context: Context) {
         pendingPause = true
         engine?.pause()
         mp3?.pause()
-        _state.update { it.copy(playing = false, paused = true) }
+        _state.update { it.copy(playing = false, paused = true, buffering = false) }
     }
 
     fun resume() {
@@ -408,7 +415,7 @@ class KrespotPlayer(private val context: Context) {
         pendingPause = false
         engine?.resume()
         mp3?.resume()
-        _state.update { it.copy(playing = true, paused = false) }
+        _state.update { it.copy(playing = true, paused = false, buffering = false) }
     }
 
     fun duck(level: Float) {
@@ -461,7 +468,7 @@ class KrespotPlayer(private val context: Context) {
         job?.cancel()
         job = null
         focus.abandon()
-        _state.update { it.copy(playing = false, paused = false) }
+        _state.update { it.copy(playing = false, paused = false, buffering = false) }
     }
 
     fun release() {
@@ -488,12 +495,12 @@ class KrespotPlayer(private val context: Context) {
                 // paused stream): keep the hold, or the button and the
                 // published state say playing while the engine sits silent.
                 PlayerEvent.Started -> if (current.paused) {
-                    current.copy(durationMs = durationMs)
+                    current.copy(buffering = false, durationMs = durationMs)
                 } else {
-                    current.copy(playing = true, paused = false, durationMs = durationMs)
+                    current.copy(playing = true, paused = false, buffering = false, durationMs = durationMs)
                 }
-                PlayerEvent.Ended -> current.copy(playing = false, positionMs = durationMs)
-                is PlayerEvent.Failed -> current.copy(playing = false, trackUri = "")
+                PlayerEvent.Ended -> current.copy(playing = false, buffering = false, positionMs = durationMs)
+                is PlayerEvent.Failed -> current.copy(playing = false, buffering = false, trackUri = "")
             }
         }
     }
