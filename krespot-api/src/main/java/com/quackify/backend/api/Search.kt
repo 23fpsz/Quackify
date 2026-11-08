@@ -351,6 +351,9 @@ object Search {
             durationMs = data.optJSONObject("duration")?.optLong("totalMilliseconds", 0L) ?: 0L,
             explicit = data.optJSONObject("contentRating")?.optString("label") == "EXPLICIT",
             video = video,
+            albumUri = album?.optString("uri").orEmpty(),
+            artistUri = GraphQl.artistUri(data),
+            albumName = album?.optString("name").orEmpty(),
         )
     }
 

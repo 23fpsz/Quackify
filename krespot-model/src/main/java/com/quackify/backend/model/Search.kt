@@ -13,6 +13,9 @@ data class SearchHit(
     val explicit: Boolean = false,
     val saved: Boolean = false,
     val video: Boolean = false,
+    val albumUri: String = "",
+    val artistUri: String = "",
+    val albumName: String = "",
 )
 
 data class SearchSection(

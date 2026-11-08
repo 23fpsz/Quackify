@@ -314,7 +314,7 @@ fun TrackOptionsSheet(
                 iconRes = R.drawable.encore_icon_album_24,
                 onClick = {
                     onDismiss()
-                    onViewAlbum(track.title, track.albumUri)
+                    onViewAlbum(track.albumName.ifBlank { track.title }, track.albumUri)
                 }
             )
 
