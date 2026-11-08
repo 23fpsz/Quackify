@@ -63,7 +63,9 @@ import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.TrackLyrics
+import com.quackify.compose.home.toFavoriteArtistsShelf
 import com.quackify.compose.home.toQuickAccess
+import com.quackify.compose.home.toRecentlyPlayedShelf
 import com.quackify.compose.home.toShelves
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.format.formatCount
@@ -74,6 +76,9 @@ import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.util.rememberIsOffline
 import com.quackify.backend.core.webview.SilentTokenRefresh
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -192,6 +197,14 @@ class MainActivity : ComponentActivity() {
                         val account = remember(loggedIn) { SpotifyAuth.account(context) }
                         val quick = remember(feed) { feed.toQuickAccess() }
                         val shelves = remember(feed) { feed.toShelves() }
+                        // The listening history owns the first two shelves:
+                        // Recently played and the favorite artists ranked by it.
+                        val historyShelves = remember(playHistory) {
+                            listOfNotNull(
+                                playHistory.map { it.item }.toRecentlyPlayedShelf(),
+                                favoriteArtistsOf(playHistory).toFavoriteArtistsShelf(),
+                            )
+                        }
                         LaunchedEffect(shelves) {
                             log.i("home shelves=${shelves.size} " +
                                     "grids=${shelves.count { it.grid }} " +
@@ -410,9 +423,21 @@ class MainActivity : ComponentActivity() {
                             playlistSaved = Krespot.rootlist.saved(context, uri)
                             playlistPublished = null
                             playlistCanRemoveCover = false
-                            if (detail?.editable == true) {
-                                playlistPublished = Krespot.rootlist.published(context, uri)
-                                playlistCanRemoveCover = Krespot.playlists.hasCustomCover(context, uri)
+                            val editable = detail?.editable == true
+                            // The saved/published/cover lookups are independent
+                            // of each other; waiting for them one by one makes
+                            // opening a playlist as slow as their sum.
+                            coroutineScope {
+                                val saved = async { Krespot.rootlist.saved(context, uri) }
+                                val published = if (editable) {
+                                    async { Krespot.rootlist.published(context, uri) }
+                                } else null
+                                val cover = if (editable) {
+                                    async { Krespot.playlists.hasCustomCover(context, uri) }
+                                } else null
+                                playlistSaved = saved.await()
+                                playlistPublished = published?.await()
+                                playlistCanRemoveCover = cover?.await() ?: false
                             }
                         }
 
@@ -467,8 +492,12 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 val picks = LinkedHashMap<String, TrackItem>()
-                                for (artist in seedArtists) {
-                                    val detail = Krespot.artists.artist(context, artist) ?: continue
+                                val overviews = coroutineScope {
+                                    seedArtists.map { artist ->
+                                        async { Krespot.artists.artist(context, artist) }
+                                    }.awaitAll()
+                                }
+                                for (detail in overviews.filterNotNull()) {
                                     for (row in detail.topTracks) {
                                         if (row.uri in inPlaylist || picks.containsKey(row.uri)) continue
                                         picks[row.uri] = row.toTrackItem()
@@ -751,7 +780,7 @@ class MainActivity : ComponentActivity() {
                             playerListener = bridge.listener,
                             expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
                                 homeQuickAccessItems = quick,
-                            homeShelves = shelves,
+                            homeShelves = if (homeFacet.isBlank() && !loading) historyShelves + shelves else shelves,
                             homeChips = homeChips,
                             homeFacet = homeFacet,
                             homeGreeting = homeGreeting,
@@ -1359,3 +1388,69 @@ class MainActivity : ComponentActivity() {
         const val TOKEN_STILL_GOOD_MS = 60_000L
     }
 }
+
+/**
+ * The ranked search answer decorates only its first row fully: every track
+ * below the top result can arrive with a bare name and uri, which left the
+ * Songs list without covers or artist lines. One decorateContextTracks
+ * batch fills exactly those rows before the list reaches the screen.
+ */
+private suspend fun decorateSearchTracks(
+    context: android.content.Context,
+    results: com.quackify.backend.model.SearchResults,
+): com.quackify.backend.model.SearchResults {
+    fun thin(hit: com.quackify.backend.model.SearchHit) =
+        hit.kind == com.quackify.backend.model.SearchKind.TRACK &&
+                (hit.imageUrl.isBlank() || hit.subtitle.isBlank())
+    val missing = (listOfNotNull(results.top) + results.tracks)
+        .filter(::thin)
+        .map { it.uri }
+        .distinct()
+    if (missing.isEmpty()) return results
+    val rows = runCatching {
+        com.quackify.backend.library.TrackSource.decorate(context, missing)
+    }.getOrDefault(emptyMap())
+    if (rows.isEmpty()) return results
+    fun fill(hit: com.quackify.backend.model.SearchHit): com.quackify.backend.model.SearchHit {
+        val row = rows[hit.uri] ?: return hit
+        return hit.copy(
+            subtitle = hit.subtitle.ifBlank { row.artists },
+            imageUrl = hit.imageUrl.ifBlank { row.imageUrl },
+            durationMs = row.durationMs.takeIf { it > 0L } ?: hit.durationMs,
+            explicit = hit.explicit || row.explicit,
+        )
+    }
+    return results.copy(
+        top = results.top?.let(::fill),
+        tracks = results.tracks.map(::fill),
+    )
+}
+
+private const val FAVORITE_ARTIST_LIMIT = 10
+
+private data class ArtistStanding(
+    val plays: Int,
+    val lastPlayedAtMs: Long,
+    val latestTrack: TrackItem,
+)
+
+/**
+ * The history's favorite artists: every artist uri ranked by total plays,
+ * the most recent play breaking ties. Each artist is represented by its
+ * newest track so the shelf card carries a cover.
+ */
+private fun favoriteArtistsOf(history: List<PlayedTrack>): List<TrackItem> =
+    history
+        .filter { it.item.artistUri.startsWith("spotify:artist:") && it.item.artist.isNotBlank() }
+        .groupBy { it.item.artistUri }
+        .values
+        .map { plays ->
+            ArtistStanding(
+                plays = plays.sumOf { it.plays },
+                lastPlayedAtMs = plays.maxOf { it.playedAtMs },
+                latestTrack = plays.maxByOrNull { it.playedAtMs }!!.item,
+            )
+        }
+        .sortedWith(compareByDescending<ArtistStanding> { it.plays }.thenByDescending { it.lastPlayedAtMs })
+        .take(FAVORITE_ARTIST_LIMIT)
+        .map { it.latestTrack }

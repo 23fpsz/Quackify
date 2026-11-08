@@ -37,6 +37,29 @@ object SpotifyAuth {
     private const val KEY_CLIENT_TOKEN = "client_token"
     private const val KEY_CLIENT_TOKEN_EXP = "client_token_exp"
 
+    // ---- hot-path memos ----
+    // Every request needs these strings; an encrypted-prefs read is a keybox
+    // decrypt per call, so the values are mirrored in memory and every writer
+    // in this object keeps the mirror in step. Null still means "not loaded".
+    @Volatile
+    private var tokenMemo: String? = null
+
+    @Volatile
+    private var tokenExpMemo: Long? = null
+
+    @Volatile
+    private var clientTokenMemo: String? = null
+
+    @Volatile
+    private var clientTokenExpMemo: Long? = null
+
+    private fun clearTokenMemos() {
+        tokenMemo = ""
+        tokenExpMemo = 0L
+        clientTokenMemo = ""
+        clientTokenExpMemo = 0L
+    }
+
     // ---- multi-account store ----
     // Every logged-in account keeps a full snapshot (session cookies + profile)
     // under "multi.<id>.*" so the user can hop between accounts. The index
@@ -136,6 +159,7 @@ object SpotifyAuth {
             .remove(KEY_CLIENT_TOKEN)
             .remove(KEY_CLIENT_TOKEN_EXP)
             .apply()
+        clearTokenMemos()
         resolvedUserId = ""
         val manager = cookieManagerOrNull()
         if (manager != null) {
@@ -201,6 +225,8 @@ object SpotifyAuth {
             .putLong(KEY_TOKEN_AT, now)
             .putLong(KEY_TOKEN_EXP, exp)
             .apply()
+        tokenMemo = token
+        tokenExpMemo = exp
         val ttl = if (exp <= 0L) "opaque" else "${(exp - now) / 1000}s"
         log.i("saved access token (${token.length}B) expiry=$ttl jwt=${exp > 0L}")
     }
@@ -219,13 +245,23 @@ object SpotifyAuth {
             .remove(KEY_TOKEN_AT)
             .remove(KEY_TOKEN_EXP)
             .apply()
+        tokenMemo = ""
+        tokenExpMemo = 0L
     }
 
-    fun token(context: Context): String =
-        SecurePrefs.get(context).getString(KEY_TOKEN, "").orEmpty()
+    fun token(context: Context): String {
+        tokenMemo?.let { return it }
+        val value = SecurePrefs.get(context).getString(KEY_TOKEN, "").orEmpty()
+        tokenMemo = value
+        return value
+    }
 
-    fun tokenExpiresAt(context: Context): Long =
-        SecurePrefs.get(context).getLong(KEY_TOKEN_EXP, 0L)
+    fun tokenExpiresAt(context: Context): Long {
+        tokenExpMemo?.let { return it }
+        val value = SecurePrefs.get(context).getLong(KEY_TOKEN_EXP, 0L)
+        tokenExpMemo = value
+        return value
+    }
 
     fun tokenRemainingMs(context: Context): Long {
         val exp = tokenExpiresAt(context)
@@ -248,6 +284,8 @@ object SpotifyAuth {
                 .remove(KEY_CLIENT_TOKEN)
                 .remove(KEY_CLIENT_TOKEN_EXP)
                 .apply()
+            clientTokenMemo = ""
+            clientTokenExpMemo = 0L
             return
         }
         if (clientToken(context) == token && expiresAtMs <= 0L) return
@@ -256,16 +294,29 @@ object SpotifyAuth {
             .putString(KEY_CLIENT_TOKEN, token)
             .putLong(KEY_CLIENT_TOKEN_EXP, exp)
             .apply()
+        clientTokenMemo = token
+        clientTokenExpMemo = exp
         val ttl = if (exp <= 0L) "opaque" else "${(exp - System.currentTimeMillis()) / 1000}s"
         log.i("saved client-token (${token.length}B) expiry=$ttl")
     }
 
-    fun clientToken(context: Context): String =
-        SecurePrefs.get(context).getString(KEY_CLIENT_TOKEN, "").orEmpty()
+    fun clientToken(context: Context): String {
+        clientTokenMemo?.let { return it }
+        val value = SecurePrefs.get(context).getString(KEY_CLIENT_TOKEN, "").orEmpty()
+        clientTokenMemo = value
+        return value
+    }
 
     fun clientTokenRemainingMs(context: Context): Long {
-        val exp = SecurePrefs.get(context).getLong(KEY_CLIENT_TOKEN_EXP, 0L)
+        val exp = clientTokenExpiresAt(context)
         return if (exp <= 0L) -1L else exp - System.currentTimeMillis()
+    }
+
+    private fun clientTokenExpiresAt(context: Context): Long {
+        clientTokenExpMemo?.let { return it }
+        val value = SecurePrefs.get(context).getLong(KEY_CLIENT_TOKEN_EXP, 0L)
+        clientTokenExpMemo = value
+        return value
     }
 
     private fun jwtExpiryMs(token: String): Long {
@@ -513,6 +564,7 @@ object SpotifyAuth {
             .remove(KEY_CLIENT_TOKEN_EXP)
             .remove(KEY_MULTI_ACTIVE)
             .apply()
+        clearTokenMemos()
         resolvedUserId = ""
         val manager = cookieManagerOrNull()
         if (manager != null) {

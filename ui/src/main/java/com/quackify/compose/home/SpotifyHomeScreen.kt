@@ -243,8 +243,11 @@ fun SpotifyHomeScreen(
         }
 
         // The greeting and the shortcut grid belong to the unfiltered feed; a
-        // facet query answers with a different set of shelves entirely.
-        if (selectedFacet.isEmpty()) {
+        // facet query answers with a different set of shelves entirely. They
+        // also sit out the load: the skeleton already draws a greeting and a
+        // shortcut-grid placeholder, so rendering the real block on top of it
+        // stacks two greetings while the feed is in flight.
+        if (selectedFacet.isEmpty() && !(loading && quickItems.isEmpty())) {
             item {
                 Column(
                     modifier = Modifier
@@ -252,7 +255,7 @@ fun SpotifyHomeScreen(
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Text(
-                        text = greeting.ifBlank { getGreeting(userDisplayName) },
+                        text = getGreeting(userDisplayName, greeting),
                         style = SpotifyTheme.typography.headlineMedium.copy(
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
@@ -743,11 +746,14 @@ private fun BaselineGridSection(
     }
 }
 
-private fun getGreeting(name: String): String {    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    val base = when (hour) {
-        in 5..11 -> "Good morning"
-        in 12..17 -> "Good afternoon"
-        else -> "Good evening"
+private fun getGreeting(name: String, feedGreeting: String = ""): String {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    val base = feedGreeting.ifBlank {
+        when (hour) {
+            in 5..11 -> "Good morning"
+            in 12..17 -> "Good afternoon"
+            else -> "Good evening"
+        }
     }
     val who = name.trim()
     return if (who.isBlank()) base else "$base, $who"

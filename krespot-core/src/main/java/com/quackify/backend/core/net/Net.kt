@@ -5,10 +5,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionPool
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import com.quackify.backend.core.log.Logs
 
@@ -79,6 +84,47 @@ object Net {
     }
 
     private val counter = AtomicInteger(0)
+
+    // One shared engine for every call: https hosts negotiate h2 and multiplex
+    // their requests over a single connection, and the pool keeps idle sockets
+    // warm far beyond the JVM's five-socket keep-alive cap.
+    private val baseClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
+        .build()
+
+    // Blob traffic rides the same pool with the longer media timeouts.
+    private val longClient: OkHttpClient = baseClient.newBuilder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    private fun contentTypeOf(headers: Map<String, String>): MediaType? =
+        headers.entries
+            .firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
+            ?.value?.toMediaTypeOrNull()
+
+    private fun buildRequest(
+        method: String,
+        url: String,
+        headers: Map<String, String>,
+        body: ByteArray?,
+    ): Request {
+        val builder = Request.Builder().url(url)
+        if (body != null) {
+            builder.method(method, body.toRequestBody(contentTypeOf(headers)))
+        } else {
+            builder.method(method, null)
+        }
+        headers.forEach { (k, v) ->
+            // The request body already carries the content type.
+            if (body != null && k.equals("Content-Type", ignoreCase = true)) return@forEach
+            builder.header(k, v)
+        }
+        return builder.build()
+    }
 
     suspend fun get(
         url: String,
@@ -173,32 +219,12 @@ object Net {
         while (true) {
             val started = System.currentTimeMillis()
             val outcome = runCatching {
-                val conn = URL(url).openConnection() as HttpURLConnection
-                try {
-                    conn.requestMethod = method
-                    conn.connectTimeout = 15_000
-                    conn.readTimeout = 15_000
-                    conn.instanceFollowRedirects = true
-                    headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-                    if (body != null) {
-                        conn.doOutput = true
-                        conn.setFixedLengthStreamingMode(body.size)
-                        conn.outputStream.use { it.write(body) }
-                    }
-                    val code = conn.responseCode
-                    val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-                    val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                    val type = conn.contentType.orEmpty()
-                    // No disconnect() here: reading the whole body puts the
-                    // socket back in the JVM keep-alive pool, so the next call
-                    // to the same host skips the TCP + TLS handshake. Only a
-                    // failure below frees the broken socket explicitly.
+                baseClient.newCall(buildRequest(method, url, headers, body)).execute().use { raw ->
+                    val text = raw.body?.string().orEmpty()
+                    val type = raw.header("Content-Type").orEmpty()
                     val millis = System.currentTimeMillis() - started
-                    logResponse(label, code, millis, text, type)
-                    Response(code = code, body = text, contentType = type, millis = millis, url = url)
-                } catch (failure: Throwable) {
-                    runCatching { conn.disconnect() }
-                    throw failure
+                    logResponse(label, raw.code, millis, text, type)
+                    Response(code = raw.code, body = text, contentType = type, millis = millis, url = url)
                 }
             }
             outcome.onFailure {
@@ -231,26 +257,14 @@ object Net {
         log.i("$label → GET ${short(url)} ${headers.size} headers")
         val started = System.currentTimeMillis()
         val outcome = runCatching {
-            val conn = URL(url).openConnection() as HttpURLConnection
-            try {
-                conn.requestMethod = "GET"
-                conn.connectTimeout = 20_000
-                conn.readTimeout = 30_000
-                conn.instanceFollowRedirects = true
-                headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-                val code = conn.responseCode
-                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-                val bytes = stream?.use { it.readBytes() } ?: ByteArray(0)
-                val type = conn.contentType.orEmpty()
-                val fromServer = received(conn)
-                // Keep-alive: leave a fully read connection pooled.
+            longClient.newCall(buildRequest("GET", url, headers, null)).execute().use { raw ->
+                val bytes = raw.body?.bytes() ?: ByteArray(0)
+                val type = raw.header("Content-Type").orEmpty()
+                val fromServer = received(raw.headers)
                 val millis = System.currentTimeMillis() - started
-                val mark = if (code in 200..299) "←" else "✗"
-                log.i("$label $mark $code ${millis}ms ${bytes.size}B ${type.ifBlank { "?" }}")
-                Blob(code, bytes, type, millis, fromServer)
-            } catch (failure: Throwable) {
-                runCatching { conn.disconnect() }
-                throw failure
+                val mark = if (raw.code in 200..299) "←" else "✗"
+                log.i("$label $mark ${raw.code} ${millis}ms ${bytes.size}B ${type.ifBlank { "?" }}")
+                Blob(raw.code, bytes, type, millis, fromServer)
             }
         }
         outcome.onFailure {
@@ -296,30 +310,16 @@ object Net {
         if (enabled) headers.forEach { (k, v) -> log.i("$label   $k: ${redact(k, v)}") }
         val started = System.currentTimeMillis()
         val outcome = runCatching {
-            val conn = URL(url).openConnection() as HttpURLConnection
-            try {
-                conn.requestMethod = "POST"
-                conn.connectTimeout = 20_000
-                conn.readTimeout = 30_000
-                conn.instanceFollowRedirects = true
-                headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-                conn.setRequestProperty("Content-Type", contentType)
-                conn.doOutput = true
-                conn.setFixedLengthStreamingMode(body.size)
-                conn.outputStream.use { it.write(body) }
-                val code = conn.responseCode
-                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-                val bytes = stream?.use { it.readBytes() } ?: ByteArray(0)
-                val type = conn.contentType.orEmpty()
-                val fromServer = received(conn)
-                // Keep-alive: leave a fully read connection pooled.
+            longClient.newCall(
+                buildRequest("POST", url, headers + mapOf("Content-Type" to contentType), body)
+            ).execute().use { raw ->
+                val bytes = raw.body?.bytes() ?: ByteArray(0)
+                val type = raw.header("Content-Type").orEmpty()
+                val fromServer = received(raw.headers)
                 val millis = System.currentTimeMillis() - started
-                val mark = if (code in 200..299) "←" else "✗"
-                log.i("$label $mark $code ${millis}ms ${bytes.size}B ${type.ifBlank { "?" }}")
-                Blob(code, bytes, type, millis, fromServer)
-            } catch (failure: Throwable) {
-                runCatching { conn.disconnect() }
-                throw failure
+                val mark = if (raw.code in 200..299) "←" else "✗"
+                log.i("$label $mark ${raw.code} ${millis}ms ${bytes.size}B ${type.ifBlank { "?" }}")
+                Blob(raw.code, bytes, type, millis, fromServer)
             }
         }
         outcome.onFailure {
@@ -328,11 +328,13 @@ object Net {
         outcome.getOrNull()
     }
 
-    private fun received(conn: HttpURLConnection): Map<String, String> = runCatching {
-        conn.headerFields.entries
-            .mapNotNull { entry -> entry.key?.let { it.lowercase() to entry.value.firstOrNull().orEmpty() } }
-            .toMap()
-    }.getOrDefault(emptyMap())
+    private fun received(headers: okhttp3.Headers): Map<String, String> {
+        val out = LinkedHashMap<String, String>(headers.size)
+        for (i in 0 until headers.size) {
+            out[headers.name(i).lowercase()] = headers.value(i)
+        }
+        return out
+    }
 
     private fun logRequest(
         label: String,

@@ -24,9 +24,23 @@ object ClientToken {
 
     private val mutex = Mutex()
 
+    // Mirrors the refresh deadline stored in prefs so the hot path answers
+    // without a keybox decrypt; -1 means "not loaded yet". Written only by
+    // mint() and invalidate(), both under the mutex or single-threaded.
+    @Volatile
+    private var refreshAtMemo: Long = -1L
+
     suspend fun get(context: Context, force: Boolean = false): String {
+        // The valid-token path must not queue every caller behind the mint
+        // mutex: a burst of requests would serialize on a cache read.
+        if (!force) {
+            val stored = SpotifyAuth.clientToken(context)
+            if (stored.isNotBlank() && !stale(context)) return stored
+        }
         mutex.lock()
         try {
+            // Re-read under the lock: another caller may have minted while
+            // this one waited outside.
             val stored = SpotifyAuth.clientToken(context)
             if (!force && stored.isNotBlank() && !stale(context)) return stored
             val minted = mint(context)
@@ -55,6 +69,7 @@ object ClientToken {
             .remove(KEY_REFRESH)
             .remove(KEY_MINTED_AT)
             .apply()
+        refreshAtMemo = -1L
         SpotifyAuth.saveClientToken(context, "", 0L)
     }
 
@@ -71,9 +86,17 @@ object ClientToken {
     }
 
     private fun stale(context: Context): Boolean {
-        val refreshAt = SecurePrefs.get(context).getLong(KEY_REFRESH, 0L)
+        val refreshAt = refreshDeadline(context)
         if (refreshAt <= 0L) return SpotifyAuth.clientTokenRemainingMs(context) <= SKEW_MS
         return System.currentTimeMillis() >= refreshAt - SKEW_MS
+    }
+
+    private fun refreshDeadline(context: Context): Long {
+        val memo = refreshAtMemo
+        if (memo >= 0L) return memo
+        val value = SecurePrefs.get(context).getLong(KEY_REFRESH, 0L)
+        refreshAtMemo = value
+        return value
     }
 
     private suspend fun mint(context: Context): String {
@@ -128,6 +151,7 @@ object ClientToken {
             .putLong(KEY_REFRESH, refreshAt)
             .putLong(KEY_MINTED_AT, now)
             .apply()
+        refreshAtMemo = refreshAt
         log.i("minted ${token.length}B expires=${if (expires > 0L) "${expires}s" else "?"} " +
                 "refresh=${if (refresh > 0L) "${refresh}s" else "?"} device=${device.take(8)}…"
         )
