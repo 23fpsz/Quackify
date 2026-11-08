@@ -414,6 +414,7 @@ fun SpotifyAppShell(
     nowPlayingArtistBio: String = "",
     nowPlayingMonthlyListeners: String = "",
     nowPlayingArtistImageUrl: String? = null,
+    nowPlayingArtistFollowed: Boolean? = null,
     nowPlayingLyrics: List<TimeSyncedLyric> = emptyList(),
     canvasFilePath: String? = null,
     isCanvasAllowed: Boolean = true,
@@ -1403,6 +1404,12 @@ fun SpotifyAppShell(
             monthlyListeners = nowPlayingMonthlyListeners,
             artistBio = nowPlayingArtistBio,
             artistImageUrl = nowPlayingArtistImageUrl,
+            isArtistFollowing = nowPlayingArtistFollowed == true,
+            onArtistFollowToggle = { follow ->
+                if (resolvedArtistUri.startsWith("spotify:artist:")) {
+                    onArtistFollowToggle?.invoke(resolvedArtistUri, follow)
+                }
+            },
             lyrics = nowPlayingLyrics,
             canvasFilePath = canvasFilePath,
             isCanvasAllowed = isCanvasAllowed,
