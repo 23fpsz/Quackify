@@ -127,6 +127,8 @@ fun SpotifyArtistScreen(
     topCities: List<CityStat> = emptyList(),
     gallery: List<String> = emptyList(),
     isLoading: Boolean = false,
+    loadFailed: Boolean = false,
+    onRetry: () -> Unit = {},
     /** The artist's real follow state from the library; the pill only flips
      *  once addToLibrary/removeFromLibrary has answered. */
     isFollowing: Boolean = false,
@@ -459,6 +461,10 @@ fun SpotifyArtistScreen(
                 )
             }
 
+            if (isLoading && popularTracks.isEmpty()) {
+                item { ArtistLoadingRows() }
+            }
+
             // Popular Track Rows
             itemsIndexed(popularTracks) { index, popTrack ->
                 val track = popTrack.track
@@ -539,6 +545,15 @@ fun SpotifyArtistScreen(
                         tint = EncoreColors.TextSecondary,
                         size = 36.dp,
                         iconSize = 20.dp
+                    )
+                }
+            }
+
+            if (loadFailed && !isLoading) {
+                item {
+                    ArtistLoadError(
+                        title = "Couldn't load this artist",
+                        onRetry = onRetry
                     )
                 }
             }
@@ -885,6 +900,81 @@ private fun ArtistReleaseCarousel(
         items(releases) { release ->
             ArtistReleaseCard(release, onReleaseClick)
         }
+    }
+}
+
+@Composable
+private fun ArtistLoadingRows() {
+    ShimmerHost {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            repeat(5) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ShimmerBlock(
+                        modifier = Modifier
+                            .width(16.dp)
+                            .height(12.dp),
+                        shape = RoundedCornerShape(2.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    ShimmerBlock(
+                        modifier = Modifier.size(48.dp),
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        ShimmerBlock(
+                            modifier = Modifier
+                                .fillMaxWidth(0.6f)
+                                .height(12.dp),
+                            shape = RoundedCornerShape(2.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        ShimmerBlock(
+                            modifier = Modifier
+                                .fillMaxWidth(0.35f)
+                                .height(10.dp),
+                            shape = RoundedCornerShape(2.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtistLoadError(title: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = EncoreSpacers.Base, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = title,
+            style = SpotifyTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            ),
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Try again",
+            style = SpotifyTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = EncoreColors.Green
+            ),
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .clickable(onClick = onRetry)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        )
     }
 }
 

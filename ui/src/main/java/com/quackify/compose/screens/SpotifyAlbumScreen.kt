@@ -1,5 +1,7 @@
 package com.quackify.compose.screens
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +63,9 @@ import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
+import com.quackify.compose.components.ShimmerBlock
+import com.quackify.compose.components.ShimmerHost
+import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.format.formatCollectionDuration
 import com.quackify.backend.model.collectionDuration
 import com.quackify.compose.playlist.TrackItem
@@ -107,7 +112,10 @@ fun SpotifyAlbumScreen(
     onAlbumClick: (ArtistRelease) -> Unit = {},
     modifier: Modifier = Modifier,
     coverUrl: String? = null,
-    artistImageUrl: String? = null
+    artistImageUrl: String? = null,
+    isLoading: Boolean = false,
+    loadFailed: Boolean = false,
+    onRetry: () -> Unit = {}
 ) {
     val density = LocalDensity.current
     var isLiked by remember { mutableStateOf(false) }
@@ -165,6 +173,16 @@ fun SpotifyAlbumScreen(
         }
     }
 
+    // The gradient height above is measured from the layout, so it steps in
+    // whole pixels as the header scrolls. Feeding that straight into .height()
+    // re-laid the gradient every frame and the colour visibly blinked at each
+    // step. Easing the height keeps the same bound but moves it smoothly.
+    val gradientHeight by animateDpAsState(
+        targetValue = currentGradientHeightDp,
+        animationSpec = tween(durationMillis = 220, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "albumGradientHeight"
+    )
+
     // Dynamic Artwork Shrink Calculation
     val scrollOffset = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset else 500
     val shrinkFraction = (scrollOffset / with(density) { 200.dp.toPx() }).coerceIn(0f, 1f)
@@ -182,7 +200,7 @@ fun SpotifyAlbumScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(currentGradientHeightDp)
+                .height(gradientHeight)
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
@@ -482,6 +500,22 @@ fun SpotifyAlbumScreen(
                             onMoreClick = { onTrackOptionsClick(track) }
                         )
                     }
+                }
+            } else if (isLoading) {
+                item { AlbumLoadingRows() }
+            } else if (loadFailed) {
+                item {
+                    AlbumLoadError(
+                        title = "Couldn't load this album",
+                        onRetry = onRetry
+                    )
+                }
+            } else if (tracks.isEmpty()) {
+                item {
+                    AlbumLoadError(
+                        title = "No tracks in this album",
+                        onRetry = null
+                    )
                 }
             } else {
                 // Single disc: list all tracks
@@ -809,6 +843,81 @@ private fun calculateTotalDuration(durations: List<Long>): String {
     val total = collectionDuration(durations, durations.size)
     if (total <= 0L) return ""
     return formatCollectionDuration(total)
+}
+
+@Composable
+private fun AlbumLoadingRows() {
+    ShimmerHost {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            repeat(6) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ShimmerBlock(
+                        modifier = Modifier.size(16.dp),
+                        shape = RoundedCornerShape(2.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    ShimmerBlock(
+                        modifier = Modifier.size(44.dp),
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        ShimmerBlock(
+                            modifier = Modifier
+                                .fillMaxWidth(0.65f)
+                                .height(12.dp),
+                            shape = RoundedCornerShape(2.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        ShimmerBlock(
+                            modifier = Modifier
+                                .fillMaxWidth(0.4f)
+                                .height(10.dp),
+                            shape = RoundedCornerShape(2.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlbumLoadError(title: String, onRetry: (() -> Unit)?) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = title,
+            style = SpotifyTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = EncoreColors.TextPrimary
+            ),
+            textAlign = TextAlign.Center
+        )
+        if (onRetry != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Try again",
+                style = SpotifyTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = EncoreColors.Green
+                ),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .clickable(onClick = onRetry)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+    }
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)

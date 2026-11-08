@@ -98,7 +98,6 @@ internal fun ShellSheets(
     onDeletePlaylist: () -> Unit,
     onCopyLink: (String) -> Unit,
     onShare: (String) -> Unit,
-    onOpenInBrowser: (String) -> Unit,
     onWhatsNew: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
@@ -177,8 +176,7 @@ internal fun ShellSheets(
         canPublish = playlistEditable,
         onPublishToggle = onTogglePlaylistPublished,
         onCopyLink = { playlistEntity?.uri?.let(onCopyLink) },
-        onShare = { playlistEntity?.uri?.let(onShare) },
-        onOpenInBrowser = { playlistEntity?.uri?.let(onOpenInBrowser) }
+        onShare = { playlistEntity?.uri?.let(onShare) }
     )
 
     AlbumOptionsSheet(
