@@ -131,6 +131,8 @@ private const val REVEAL_CONTROLS_DELAY_MS = 160
 private const val REVEAL_REST_DELAY_MS = 220
 private const val REVEAL_RISE_FRACTION = 0.06f
 private const val ARTWORK_FADE_FRACTION = 0.42f
+private const val ARTWORK_ASPECT_RATIO = 0.90f
+private const val ARTWORK_TOP_DROP = 0.05f
 private val HEADER_ROW_HEIGHT = 60.dp
 
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
@@ -272,6 +274,7 @@ fun SpotifyNowPlayingScreen(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = screenHeightPx * 0.5f
+    val artworkTopDrop = (configuration.screenWidthDp / ARTWORK_ASPECT_RATIO * ARTWORK_TOP_DROP).dp
 
     // Reset translation whenever the screen is composed
     LaunchedEffect(Unit) {
@@ -516,11 +519,12 @@ fun SpotifyNowPlayingScreen(
                         // behind the status bar and dissolves into the backdrop, with the
                         // header overlaying it so both scroll together without pushing the art down.
                         Box(modifier = Modifier.fillMaxWidth()) {
-                            Box(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
                             ) {
+                                Spacer(modifier = Modifier.height(artworkTopDrop))
                                 NowPlayingArtworkCard(
                                     title = title,
                                     coverUrl = coverUrl,
@@ -533,7 +537,7 @@ fun SpotifyNowPlayingScreen(
                                     fadeFraction = ARTWORK_FADE_FRACTION,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .aspectRatio(1.0f)
+                                        .aspectRatio(ARTWORK_ASPECT_RATIO)
                                         .graphicsLayer { translationX = artworkOffsetX.value }
                                 )
                             }
@@ -594,8 +598,6 @@ fun SpotifyNowPlayingScreen(
                         }
                     }
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -608,7 +610,7 @@ fun SpotifyNowPlayingScreen(
                                 onOpenLyrics = { isLyricsFullscreen = true }
                             )
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             NowPlayingTrackInfoRow(
                                 title = title,
@@ -623,7 +625,7 @@ fun SpotifyNowPlayingScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Box(
                         modifier = Modifier

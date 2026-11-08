@@ -164,7 +164,7 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
         if (key == transformKey) return
         transformKey = key
         val videoAspect = videoWidth.toFloat() / videoHeight
-        val viewAspect = viewWidth / viewHeight
+        val viewAspect = viewWidth.toFloat() / viewHeight
         val matrix = Matrix()
         when {
             videoAspect > viewAspect ->
