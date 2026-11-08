@@ -1823,7 +1823,10 @@ private fun SearchHit.toTrackItem(): TrackItem = TrackItem(
     imageUrl = imageUrl.takeIf { it.isNotBlank() },
     saved = saved,
     durationMs = durationMs,
-    hasVideo = video
+    hasVideo = video,
+    albumUri = albumUri,
+    artistUri = artistUri,
+    albumName = albumName,
 )
 
 @Composable

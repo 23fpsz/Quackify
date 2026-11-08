@@ -99,6 +99,16 @@ object GraphQl {
         return names.joinToString(", ")
     }
 
+    fun artistUri(entity: JSONObject?, field: String = "artists"): String {
+        val items = entity?.optJSONObject(field)?.optJSONArray("items") ?: return ""
+        for (i in 0 until items.length()) {
+            val artist = items.optJSONObject(i) ?: continue
+            val uri = artist.optString("uri")
+            if (uri.startsWith("spotify:artist:")) return uri
+        }
+        return ""
+    }
+
     private fun largestOf(sources: JSONArray): String {
         var best = ""
         var width = -1
