@@ -6,7 +6,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -408,6 +407,9 @@ fun SpotifyAppShell(
     onAddRecommended: ((TrackItem) -> Unit)? = null,
     albumTracks: List<TrackItem>? = null,
     albumDetail: AlbumDetail? = null,
+    albumLoading: Boolean = false,
+    albumFailed: Boolean = false,
+    onRetryAlbum: (() -> Unit)? = null,
     nowPlayingArtistBio: String = "",
     nowPlayingMonthlyListeners: String = "",
     nowPlayingArtistImageUrl: String? = null,
@@ -419,6 +421,8 @@ fun SpotifyAppShell(
     fullArtworkPlayer: Boolean = true,
     artistDetail: ArtistDetail? = null,
     artistLoading: Boolean = false,
+    artistFailed: Boolean = false,
+    onRetryArtist: (() -> Unit)? = null,
     trackCredits: Credits? = null,
     addToPlaylistChoices: List<PlaylistChoice>? = null,
     onShowCredits: ((String) -> Unit)? = null,
@@ -771,6 +775,8 @@ fun SpotifyAppShell(
         active.artistName = artist
         active.artistUri = artistUriToLoad
         active.artistAvatarUrl = libraryItems?.find { it.title.equals(artist, ignoreCase = true) }?.imageUrl
+            ?: searchData?.artists?.find { it.title.equals(artist, ignoreCase = true) }?.imageUrl
+                ?.takeIf { it.isNotBlank() }
             ?: nowPlayingArtistImageUrl?.takeIf { artist.equals(currentArtist, ignoreCase = true) }
 
         if (onLoadArtist != null) onLoadArtist?.invoke(artistUriToLoad, artist) else playerListener?.onLoadArtist(artistUriToLoad, artist)
@@ -871,11 +877,6 @@ fun SpotifyAppShell(
             putExtra(Intent.EXTRA_TEXT, url)
         }
         context.startActivity(Intent.createChooser(send, null))
-    }
-
-    fun openEntityInBrowser(uri: String) {
-        val url = entityUrl(uri) ?: return
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
 
     val libraryFolderChoices = remember(libraryItems) {
@@ -1091,6 +1092,9 @@ fun SpotifyAppShell(
                 activeAlbumColor = active.albumColor,
                 albumDetail = albumDetail,
                 albumTracks = albumTracks,
+                albumLoading = albumLoading,
+                albumFailed = albumFailed,
+                onRetryAlbum = onRetryAlbum,
                 currentTrackTitle = currentTrackTitle,
                 isPlaying = isPlaying,
                 playerListener = playerListener,
@@ -1111,6 +1115,8 @@ fun SpotifyAppShell(
                 artistReleases = artistReleases,
                 artistMonthlyListeners = artistMonthlyListeners,
                 artistLoading = artistLoading,
+                artistFailed = artistFailed,
+                onRetryArtist = onRetryArtist,
                 artistFollowed = artistFollowed,
                 currentTrackTitle = currentTrackTitle,
                 isPlaying = isPlaying,
@@ -1491,7 +1497,9 @@ fun SpotifyAppShell(
             albumCoverUrl = active.albumCoverUrl,
             albumUri = active.albumUri.ifBlank { albumDetail?.uri.orEmpty() },
             artistName = active.artistName,
-            artistAvatarUrl = active.artistAvatarUrl,
+            artistAvatarUrl = active.artistAvatarUrl
+                ?: artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
+                ?: artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() },
             artistUri = active.artistUri,
             artistFollowing = artistFollowed == true,
             onArtistFollowToggle = {
@@ -1575,7 +1583,6 @@ fun SpotifyAppShell(
             },
             onCopyLink = { uri -> copyEntityLink(uri) },
             onShare = { uri -> shareEntity(uri) },
-            onOpenInBrowser = { uri -> openEntityInBrowser(uri) },
             onWhatsNew = { pushCurrentState(); currentScreen = ShellScreen.NOTIFICATIONS },
             onHistory = {
                 pushCurrentState()
@@ -1809,8 +1816,7 @@ fun SpotifyAppShell(
                     }
                     else -> null
                 },
-                onShare = { shareEntity(entity.uri) },
-                onOpenInBrowser = { openEntityInBrowser(entity.uri) }
+                onShare = { shareEntity(entity.uri) }
             )
         }
 
@@ -2118,6 +2124,9 @@ private fun ShellAlbumPane(
     activeAlbumColor: Color,
     albumDetail: AlbumDetail?,
     albumTracks: List<TrackItem>?,
+    albumLoading: Boolean,
+    albumFailed: Boolean,
+    onRetryAlbum: (() -> Unit)?,
     currentTrackTitle: String,
     isPlaying: Boolean,
     playerListener: ComposePlayerListener?,
@@ -2151,6 +2160,9 @@ private fun ShellAlbumPane(
             phonographicNotice = albumDetail?.phonographic.orEmpty(),
             currentTrackTitle = currentTrackTitle,
             isPlaying = isPlaying,
+            isLoading = albumLoading,
+            loadFailed = albumFailed,
+            onRetry = { onRetryAlbum?.invoke() },
             coverUrl = activeAlbumCoverUrl ?: albumDetail?.imageUrl?.takeIf { it.isNotBlank() },
             artistImageUrl = albumDetail?.artistImageUrl?.takeIf { it.isNotBlank() },
             moreByArtist = remember(albumDetail) {
@@ -2277,6 +2289,8 @@ private fun ShellArtistPane(
     artistReleases: List<ArtistRelease>?,
     artistMonthlyListeners: String?,
     artistLoading: Boolean,
+    artistFailed: Boolean,
+    onRetryArtist: (() -> Unit)?,
     artistFollowed: Boolean?,
     currentTrackTitle: String,
     isPlaying: Boolean,
@@ -2314,6 +2328,8 @@ private fun ShellArtistPane(
             topCities = artistDetail?.topCities.orEmpty(),
             gallery = artistDetail?.gallery.orEmpty(),
             isLoading = artistLoading,
+            loadFailed = artistFailed,
+            onRetry = { onRetryArtist?.invoke() },
             onBackClick = onBackClick,
             onPlayPauseClick = onPlayPauseClick,
             onTrackSelect = onTrackSelect,
