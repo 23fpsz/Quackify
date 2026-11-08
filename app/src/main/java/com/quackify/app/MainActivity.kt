@@ -718,6 +718,14 @@ class MainActivity : ComponentActivity() {
                             val file = CanvasKit.download(context, uri)
                             if (uri == playback.trackUri) canvasFile = file
                         }
+                        // The playlist page warms the manifests of its first
+                        // rows so tapping one skips that round trip.
+                        LaunchedEffect(playlistTracks) {
+                            val rows = playlistTracks.orEmpty()
+                                .take(PLAYLIST_PREFETCH_ROWS)
+                                .mapNotNull { it.uri.takeIf { uri -> uri.startsWith("spotify:track:") } }
+                            if (rows.isNotEmpty()) bridge.prefetchUris(rows)
+                        }
                         LaunchedEffect(bridge) {
                             log.i("starting playback bridge device=${bridge.deviceId}")
                             PlaybackHost.startService(context)
@@ -1487,6 +1495,8 @@ private suspend fun decorateSearchTracks(
 }
 
 private const val FAVORITE_ARTIST_LIMIT = 10
+
+private const val PLAYLIST_PREFETCH_ROWS = 8
 
 private data class ArtistStanding(
     val plays: Int,
