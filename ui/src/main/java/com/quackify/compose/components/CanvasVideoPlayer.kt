@@ -10,8 +10,8 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.RenderEffect
 import android.graphics.Shader
-import android.graphics.SurfaceTexture
 import android.os.Build
+import android.os.Handler
 import android.view.TextureView
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -24,11 +24,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
+import androidx.media3.exoplayer.video.VideoRendererEventListener
+import com.quackify.backend.core.log.Logs
 import java.io.File
 
+private val log = Logs.of(Logs.Module.PLAYER)
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun CanvasVideoPlayer(
     filePath: String,
@@ -36,77 +47,223 @@ fun CanvasVideoPlayer(
     fadeFraction: Float = 0f
 ) {
     val context = LocalContext.current
+    // One frame for the whole lifetime here; the player is rebuilt whenever
+    // the file changes and rewired onto the same TextureView, so a file swap
+    // never leaves a fresh player playing without a video output.
+    val frame = remember {
+        CanvasFadeFrame(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+    }
+    // Built without a video output and left unprepared on purpose: the
+    // DisposableEffect below attaches the frame's TextureView first and only
+    // then calls prepare(). Preparing here would race the composition that
+    // supplies the surface - the player's internal playback thread can
+    // process the prepare message while the main thread is still composing
+    // the AndroidView that owns the texture, and a video-only stream that
+    // reaches a renderer with no output attached gets its video track
+    // skipped, so the first frames are lost waiting for a re-selection.
     val player = remember(filePath) {
-        ExoPlayer.Builder(context).build().apply {
+        ExoPlayer.Builder(
+            context,
+            // the canvas video renderer: the same decoder fallback as before,
+            // plus the drop-to-keyframe catch-up disabled - see
+            // CanvasVideoRenderer for why that one matters so much here
+            CanvasRenderersFactory(context).setEnableDecoderFallback(true),
+        ).build().apply {
             setMediaItem(MediaItem.fromUri(File(filePath).toUri()))
             repeatMode = Player.REPEAT_MODE_ONE
             volume = 0f
             playWhenReady = true
-            prepare()
         }
     }
-    DisposableEffect(player) {
-        onDispose { player.release() }
+    // Runs after this composition created the frame (the AndroidView
+    // factory), so the surface exists before playback starts - and unlike
+    // the old factory-scoped wiring it re-runs for every new player.
+    DisposableEffect(player, frame) {
+        player.setVideoTextureView(frame.texture)
+        val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                frame.videoWidth = videoSize.width
+                frame.videoHeight = videoSize.height
+                frame.applyVideoSize()
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                log.w("canvas playback error ${error.errorCodeName}")
+            }
+
+            // Boundary-stutter hunt, part 2: the timeline ExoPlayer derives
+            // from the stitched file's moov. If the CDN init's header
+            // durations are garbage, `duration` here is NOT the canvas length
+            // and repeat/loop logic resets the renderer at the wrong spot —
+            // the flush-storm signature. One log line at STATE_READY settles
+            // it instantly.
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                log.w(
+                    "canvas state=$playbackState posMs=${player.currentPosition} " +
+                        "durMs=${player.duration}"
+                )
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int,
+            ) {
+                log.w(
+                    "canvas jump ${oldPosition.positionMs} -> ${newPosition.positionMs} " +
+                        "reason=$reason"
+                )
+            }
+        }
+        // Diagnostics for the boundary-stutter hunt: a healthy canvas loop
+        // logs nothing here. Dropped frames or a mid-loop decoder
+        // (re)initialization is the signature of whatever still makes the
+        // renderer fall behind, and lands in the in-app LOGS viewer.
+        // Player.Listener carries no renderer-level callbacks, so these two
+        // ride on a separate AnalyticsListener instead: both take an EventTime
+        // parameter first, and the init duration is a Long, not an Int.
+        val diagnostics = object : AnalyticsListener {
+            override fun onDroppedVideoFrames(
+                eventTime: AnalyticsListener.EventTime,
+                droppedFrames: Int,
+                elapsedMs: Long,
+            ) {
+                log.w(
+                    "canvas dropped $droppedFrames video frame(s) over ${elapsedMs}ms " +
+                        "(${File(filePath).name})"
+                )
+            }
+
+            override fun onVideoDecoderInitialized(
+                eventTime: AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedTimestampMs: Long,
+                initializationDurationMs: Long,
+            ) {
+                log.i("canvas decoder $decoderName initialized in ${initializationDurationMs}ms")
+            }
+        }
+        player.addListener(listener)
+        player.addAnalyticsListener(diagnostics)
+        player.prepare()
+        onDispose {
+            player.removeListener(listener)
+            player.removeAnalyticsListener(diagnostics)
+            player.release()
+        }
     }
 
     AndroidView(
-        factory = { viewContext ->
-            CanvasFadeFrame(viewContext).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                val texture = texture
-                player.setVideoTextureView(texture)
-                val delegate = texture.surfaceTextureListener
-                texture.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                    override fun onSurfaceTextureAvailable(
-                        surface: SurfaceTexture,
-                        width: Int,
-                        height: Int
-                    ) {
-                        delegate?.onSurfaceTextureAvailable(surface, width, height)
-                        applyVideoSize()
-                        applyFade()
-                    }
-
-                    override fun onSurfaceTextureSizeChanged(
-                        surface: SurfaceTexture,
-                        width: Int,
-                        height: Int
-                    ) {
-                        delegate?.onSurfaceTextureSizeChanged(surface, width, height)
-                        applyVideoSize()
-                    }
-
-                    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-                        applyFade()
-                        return delegate?.onSurfaceTextureDestroyed(surface) ?: true
-                    }
-
-                    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
-                        delegate?.onSurfaceTextureUpdated(surface)
-                        applyVideoSize()
-                    }
-                }
-                player.addListener(object : Player.Listener {
-                    override fun onVideoSizeChanged(videoSize: VideoSize) {
-                        videoWidth = videoSize.width
-                        videoHeight = videoSize.height
-                        applyVideoSize()
-                    }
-                })
-                this.fadeFraction = fadeFraction
-                applyFade()
-            }
-        },
-        update = { frame ->
-            frame.fadeFraction = fadeFraction
-            frame.applyVideoSize()
-            frame.applyFade()
+        factory = { frame },
+        update = { view ->
+            view.fadeFraction = fadeFraction
+            view.applyVideoSize()
+            view.applyFade()
         },
         modifier = modifier
     )
+}
+
+/**
+ * Renderers factory swapping the stock video renderer for [CanvasVideoRenderer].
+ *
+ * Everything else - audio, text, metadata renderers - still comes from the
+ * stock factory; only the video pipeline is canvas-specific.
+ */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+private class CanvasRenderersFactory(context: Context) : DefaultRenderersFactory(context) {
+
+    // The parameter types must match the parent declaration exactly: in
+    // media3 1.11.1 the eventHandler/eventListener parameters are non-null,
+    // so declaring them Handler? / VideoRendererEventListener? here makes
+    // Kotlin report "overrides nothing".
+    override fun buildVideoRenderers(
+        context: Context,
+        extensionRendererMode: Int,
+        mediaCodecSelector: MediaCodecSelector,
+        enableDecoderFallback: Boolean,
+        eventHandler: Handler,
+        eventListener: VideoRendererEventListener,
+        allowedVideoJoiningTimeMs: Long,
+        out: ArrayList<Renderer>,
+    ) {
+        out.add(
+            CanvasVideoRenderer(
+                MediaCodecVideoRenderer.Builder(context)
+                    .setCodecAdapterFactory(getCodecAdapterFactory())
+                    .setMediaCodecSelector(mediaCodecSelector)
+                    .setAllowedJoiningTimeMs(allowedVideoJoiningTimeMs)
+                    .setEnableDecoderFallback(enableDecoderFallback)
+                    .setEventHandler(eventHandler)
+                    .setEventListener(eventListener)
+                    // batches of 5 keep the dropped-frame diagnostics in the
+                    // player logs meaningful without spamming healthy playback
+                    .setMaxDroppedFramesToNotify(5)
+            )
+        )
+        // extension renderers are deliberately not added: this player only
+        // ever feeds one local fMP4 file
+    }
+}
+
+/**
+ * The canvas video renderer: identical to media3's stock
+ * [MediaCodecVideoRenderer] except that the drop-to-keyframe catch-up is off.
+ *
+ * When a decoded frame is more than 500ms late
+ * (MediaCodecVideoRenderer.MIN_EARLY_US_VERY_LATE_THRESHOLD), the stock
+ * renderer discards every buffered sample up to the next sync frame and
+ * flushes the codec (shouldDropBuffersToKeyframe -> maybeDropBuffersToKeyframe
+ * -> skipSource + flushOrReinitializeCodec). A canvas file carries exactly
+ * two sync samples - one at 0 and one at the ~4s fragment boundary - so any
+ * transient stall in the first half of the loop (a slow 200KB IDR decode, a
+ * compositing hiccup, a GC pause) does not cost a few dropped frames: the
+ * video freezes and jumps the whole chunk to the boundary keyframe. That is
+ * the on-device "stutter at second 4" that survived the tfdt rebase while
+ * the same file played clean on a desktop - its frames.csv is a perfect
+ * 33.4ms ladder and its only irregularity is the 200KB IDR at 4.004s.
+ *
+ * Returning false here degrades the same event the way desktop players do:
+ * VideoFrameReleaseControl falls through to shouldDropFrame, the late frame
+ * is dropped on its own and playback catches up frame by frame, without the
+ * codec flush that the skip path triggers. The loop seam is unaffected -
+ * onPositionReset resets the source to a keyframe on its own and never
+ * consults this hook.
+ */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+private class CanvasVideoRenderer(
+    builder: MediaCodecVideoRenderer.Builder,
+) : MediaCodecVideoRenderer(builder) {
+
+    override fun shouldDropBuffersToKeyframe(
+        earlyUs: Long,
+        elapsedRealtimeUs: Long,
+        isLastBuffer: Boolean,
+    ): Boolean = false
+
+    // Boundary-stutter hunt, part 3: every renderer position reset goes
+    // through here, and a reset is exactly what triggers
+    // flushOrReinitializeCodec -> codec.flush(). A healthy looping canvas
+    // logs this once per loop (~7s); a flush storm logs it every few hundred
+    // milliseconds with the position it resets to. The stack names the
+    // caller, so one buggy run is enough to identify the loop driver.
+    override fun onPositionReset(
+        positionUs: Long,
+        joining: Boolean,
+        sampleStreamIsResetToKeyFrame: Boolean,
+    ) {
+        log.w(
+            "canvas position reset posUs=$positionUs joining=$joining " +
+                "toKeyFrame=$sampleStreamIsResetToKeyFrame",
+            Exception("canvas reset trace"),
+        )
+        super.onPositionReset(positionUs, joining, sampleStreamIsResetToKeyFrame)
+    }
 }
 
 private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
