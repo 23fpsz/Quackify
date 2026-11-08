@@ -10,7 +10,6 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.RenderEffect
 import android.graphics.Shader
-import android.graphics.SurfaceTexture
 import android.os.Build
 import android.view.TextureView
 import android.view.ViewGroup
@@ -26,6 +25,7 @@ import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import java.io.File
 
@@ -36,74 +36,65 @@ fun CanvasVideoPlayer(
     fadeFraction: Float = 0f
 ) {
     val context = LocalContext.current
+    // One frame for the whole lifetime here; the player is rebuilt whenever
+    // the file changes and rewired onto the same TextureView, so a file swap
+    // never leaves a fresh player playing without a video output.
+    val frame = remember {
+        CanvasFadeFrame(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+    }
+    // Built without a video output and left unprepared on purpose: the
+    // DisposableEffect below attaches the frame's TextureView first and only
+    // then calls prepare(). Preparing here would race the composition that
+    // supplies the surface - the player's internal playback thread can
+    // process the prepare message while the main thread is still composing
+    // the AndroidView that owns the texture, and a video-only stream that
+    // reaches a renderer with no output attached gets its video track
+    // skipped, so the first frames are lost waiting for a re-selection.
     val player = remember(filePath) {
-        ExoPlayer.Builder(context).build().apply {
+        ExoPlayer.Builder(
+            context,
+            // a decoder that fails to initialize or dies mid-loop falls
+            // through to the next one the device offers instead of failing
+            // playback outright
+            DefaultRenderersFactory(context).setEnableDecoderFallback(true),
+        ).build().apply {
             setMediaItem(MediaItem.fromUri(File(filePath).toUri()))
             repeatMode = Player.REPEAT_MODE_ONE
             volume = 0f
             playWhenReady = true
-            prepare()
         }
     }
-    DisposableEffect(player) {
-        onDispose { player.release() }
+    // Runs after this composition created the frame (the AndroidView
+    // factory), so the surface exists before playback starts - and unlike
+    // the old factory-scoped wiring it re-runs for every new player.
+    DisposableEffect(player, frame) {
+        player.setVideoTextureView(frame.texture)
+        val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                frame.videoWidth = videoSize.width
+                frame.videoHeight = videoSize.height
+                frame.applyVideoSize()
+            }
+        }
+        player.addListener(listener)
+        player.prepare()
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
     }
 
     AndroidView(
-        factory = { viewContext ->
-            CanvasFadeFrame(viewContext).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                val texture = texture
-                player.setVideoTextureView(texture)
-                val delegate = texture.surfaceTextureListener
-                texture.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                    override fun onSurfaceTextureAvailable(
-                        surface: SurfaceTexture,
-                        width: Int,
-                        height: Int
-                    ) {
-                        delegate?.onSurfaceTextureAvailable(surface, width, height)
-                        applyVideoSize()
-                        applyFade()
-                    }
-
-                    override fun onSurfaceTextureSizeChanged(
-                        surface: SurfaceTexture,
-                        width: Int,
-                        height: Int
-                    ) {
-                        delegate?.onSurfaceTextureSizeChanged(surface, width, height)
-                        applyVideoSize()
-                    }
-
-                    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-                        applyFade()
-                        return delegate?.onSurfaceTextureDestroyed(surface) ?: true
-                    }
-
-                    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
-                        delegate?.onSurfaceTextureUpdated(surface)
-                        applyVideoSize()
-                    }
-                }
-                player.addListener(object : Player.Listener {
-                    override fun onVideoSizeChanged(videoSize: VideoSize) {
-                        videoWidth = videoSize.width
-                        videoHeight = videoSize.height
-                        applyVideoSize()
-                    }
-                })
-                this.fadeFraction = fadeFraction
-                applyFade()
-            }
-        },
-        update = { frame ->
-            frame.fadeFraction = fadeFraction
-            frame.applyVideoSize()
-            frame.applyFade()
+        factory = { frame },
+        update = { view ->
+            view.fadeFraction = fadeFraction
+            view.applyVideoSize()
+            view.applyFade()
         },
         modifier = modifier
     )
