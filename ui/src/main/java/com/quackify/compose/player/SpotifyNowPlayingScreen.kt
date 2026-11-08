@@ -449,7 +449,8 @@ fun SpotifyNowPlayingScreen(
                             onTitleClick = onTitleClick,
                             onArtistClick = onArtistClick,
                             onLikeClick = onLikeClick,
-                            onBanClick = onBanClick
+                            onBanClick = onBanClick,
+                            coverUrl = coverUrl
                         )
 
                         Spacer(modifier = Modifier.height(20.dp))
@@ -636,7 +637,8 @@ fun SpotifyNowPlayingScreen(
                                 onTitleClick = onTitleClick,
                                 onArtistClick = onArtistClick,
                                 onLikeClick = onLikeClick,
-                                onBanClick = onBanClick
+                                onBanClick = onBanClick,
+                                coverUrl = coverUrl
                             )
                         }
                     }
@@ -1127,6 +1129,7 @@ private fun NowPlayingTrackInfoRow(
     onArtistClick: () -> Unit,
     onLikeClick: () -> Unit,
     onBanClick: (() -> Unit)? = null,
+    coverUrl: String? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -1135,6 +1138,17 @@ private fun NowPlayingTrackInfoRow(
             .padding(start = 24.dp, end = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (!coverUrl.isNullOrBlank()) {
+            SpotifyArtworkImage(
+                imageUrl = coverUrl,
+                contentDescription = title,
+                modifier = Modifier
+                    .size(52.dp)
+                    .clickable(onClick = onTitleClick),
+                cornerRadius = 4.dp
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
