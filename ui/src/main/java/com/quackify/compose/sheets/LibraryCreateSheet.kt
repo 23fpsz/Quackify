@@ -36,17 +36,15 @@ import com.quackify.compose.theme.SpotifyTheme
 
 /**
  * Spotify Library Create Bottom Sheet (+ button).
- * When opened from root library: shows "Create" header + Playlist, Folder, Blend.
- * When opened from within a folder: shows Playlist, Folder (no Blend, no header).
+ * When opened from root library: shows "Create" header + Playlist, Folder.
+ * When opened from within a folder: shows Playlist, Folder (no header).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryCreateSheet(
     isOpen: Boolean,
     onCreatePlaylist: () -> Unit,
-    onCreateBlend: () -> Unit,
     onCreateFolder: () -> Unit = {},
-    showBlend: Boolean = true,
     showHeader: Boolean = true,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -106,18 +104,6 @@ fun LibraryCreateSheet(
                     onCreateFolder()
                 }
             )
-
-            if (showBlend) {
-                CreateOptionItem(
-                    title = "Blend",
-                    subtitle = "Combine your friends' tastes into a playlist",
-                    iconRes = R.drawable.encore_icon_user_24,
-                    onClick = {
-                        onDismiss()
-                        onCreateBlend()
-                    }
-                )
-            }
 
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -182,7 +168,6 @@ fun PreviewLibraryCreateSheet() {
         LibraryCreateSheet(
             isOpen = true,
             onCreatePlaylist = {},
-            onCreateBlend = {},
             onCreateFolder = {},
             onDismiss = {}
         )

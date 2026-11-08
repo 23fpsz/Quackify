@@ -1583,7 +1583,6 @@ fun SpotifyAppShell(
                     flags.isCreatePlaylistOpen = true
                 }
             },
-            onCreateBlend = { pushCurrentState(); active.playlistTitle = "Duck + Friend Blend"; currentScreen = ShellScreen.PLAYLIST },
             onCreateFolder = { folderDraft = FolderDraft(mode = FolderMode.CREATE) },
             onSelectDevice = { id -> localDevice = id; flags.isDeviceSheetOpen = false; playerListener?.onSelectDevice(id) },
             onDeviceVisible = { visible -> playerListener?.onDeviceSheetVisible(visible) },

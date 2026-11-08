@@ -112,7 +112,6 @@ internal fun ShellSheets(
     onGoToArtist: (String) -> Unit,
     onSortSelected: (LibrarySortOption) -> Unit,
     onCreatePlaylist: () -> Unit,
-    onCreateBlend: () -> Unit,
     onCreateFolder: () -> Unit = {},
     onSelectDevice: (String) -> Unit,
     onDeviceVisible: (Boolean) -> Unit,
@@ -213,9 +212,7 @@ internal fun ShellSheets(
     LibraryCreateSheet(
         isOpen = flags.create,
         onCreatePlaylist = onCreatePlaylist,
-        onCreateBlend = onCreateBlend,
         onCreateFolder = onCreateFolder,
-        showBlend = !isFolder,
         showHeader = !isFolder,
         onDismiss = onDismissCreate
     )
