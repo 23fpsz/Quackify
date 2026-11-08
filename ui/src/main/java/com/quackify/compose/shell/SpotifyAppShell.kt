@@ -69,6 +69,7 @@ import com.quackify.compose.sheets.LibrarySortOption
 import com.quackify.compose.sheets.SleepTimerOption
 import com.quackify.compose.sheets.ArtistAboutSheet
 import com.quackify.compose.sheets.DiscographySheet
+import com.quackify.compose.share.Share
 import com.quackify.compose.sheets.CreditsSheet
 import com.quackify.compose.sheets.AddToPlaylistSheet
 import com.quackify.compose.sheets.EditPlaylistSheet
@@ -1702,7 +1703,7 @@ fun SpotifyAppShell(
                 externalLinks = artistDetail?.externalLinks.orEmpty(),
                 gallery = artistDetail?.gallery.orEmpty(),
                 onDismiss = { flags.isArtistAboutOpen = false },
-                onLinkClick = { }
+                onLinkClick = { link -> Share.openUrl(context, link) }
             )
         }
 
