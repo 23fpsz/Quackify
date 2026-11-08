@@ -648,39 +648,50 @@ fun SpotifyAppShell(
     val resolvedArtistUri = playbackState?.artistUri?.takeIf { it.isNotBlank() }
         ?: currentQueueRow?.artistUri.orEmpty()
 
-    val openAlbum: (String, String, String) -> Unit = { title, artist, uri ->
+    val openAlbum: (String, String, String) -> Unit = openAlbum@ { title, artist, uri ->
+        val foundEntity = libraryItems?.find { it.title.equals(title, ignoreCase = true) }
+        val albumUriToLoad = uri.takeIf { it.startsWith("spotify:album:") }
+            ?: foundEntity?.uri?.takeIf { it.startsWith("spotify:album:") }
+            ?: searchData?.albums?.find { it.title.equals(title, ignoreCase = true) }
+                ?.uri?.takeIf { it.startsWith("spotify:album:") }
+        if (albumUriToLoad == null) {
+            Toast.makeText(context, "Couldn't open $title", Toast.LENGTH_SHORT).show()
+            return@openAlbum
+        }
+
         active.albumTitle = title
         active.albumArtist = artist
-        active.albumUri = uri
-        val foundEntity = libraryItems?.find { it.title.equals(title, ignoreCase = true) }
+        active.albumUri = albumUriToLoad
         active.albumCoverUrl = foundEntity?.imageUrl
 
-        val albumUriToLoad = uri.takeIf { it.startsWith("spotify:album:") }
-            ?: foundEntity?.uri?.takeIf { it.startsWith("spotify:album:") }.orEmpty()
         if (onLoadAlbum != null) onLoadAlbum?.invoke(albumUriToLoad, title) else playerListener?.onLoadAlbum(albumUriToLoad, title, active.albumArtist)
 
         pushCurrentState()
         currentScreen = ShellScreen.ALBUM
     }
 
-    val openShow: (String) -> Unit = { uri ->
+    val openShow: (String) -> Unit = openShow@ { uri ->
+        if (uri.isBlank()) return@openShow
         pushCurrentState()
         active.showUri = uri
         currentScreen = ShellScreen.SHOW
         onOpenShow?.invoke(uri)
     }
 
-    val openPlaylist: (String, String) -> Unit = { title, uri ->
+    val openPlaylist: (String, String) -> Unit = openPlaylist@ { title, uri ->
+        if (uri.isBlank()) {
+            Toast.makeText(context, "Couldn't open $title", Toast.LENGTH_SHORT).show()
+            return@openPlaylist
+        }
         pushCurrentState()
         active.playlistTitle = title
         active.playlistUri = uri
         currentScreen = ShellScreen.PLAYLIST
-        if (uri.isNotEmpty()) {
-            if (onLoadPlaylist != null) onLoadPlaylist?.invoke(uri) else playerListener?.onLoadPlaylist(uri)
-        }
+        if (onLoadPlaylist != null) onLoadPlaylist?.invoke(uri) else playerListener?.onLoadPlaylist(uri)
     }
 
-    val openEpisode: (String) -> Unit = { uri ->
+    val openEpisode: (String) -> Unit = openEpisode@ { uri ->
+        if (uri.isBlank()) return@openEpisode
         pushCurrentState()
         active.episodeUri = uri
         currentScreen = ShellScreen.EPISODE
@@ -1590,8 +1601,7 @@ fun SpotifyAppShell(
                 flags.isAlbumOptionsOpen = false
                 isPlayerExpanded = false
                 openArtist(artist, albumDetail?.artistUri.orEmpty())
-            },
-            onSortSelected = { selected -> currentSortOption = selected },
+            },            onSortSelected = { selected -> currentSortOption = selected },
             onCreatePlaylist = {
                 shellScope.launch {
                     playlistCreateName = onPlaylistDefaultName?.invoke() ?: "My Playlist"

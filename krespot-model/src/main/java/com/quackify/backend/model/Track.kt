@@ -29,6 +29,7 @@ data class TrackItem(
     val durationMs: Long = 0L,
     val albumUri: String = "",
     val artistUri: String = "",
+    val albumName: String = "",
     val discNumber: Int = 1,
     val trackNumber: Int = 0,
     val hasVideo: Boolean = false,
