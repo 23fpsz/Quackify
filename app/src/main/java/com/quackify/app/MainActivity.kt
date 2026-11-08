@@ -75,6 +75,9 @@ import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.util.rememberIsOffline
 import com.quackify.backend.core.webview.SilentTokenRefresh
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -416,12 +419,24 @@ class MainActivity : ComponentActivity() {
                             playlistTracks = detail?.tracks?.map { it.toTrackItem() }
                             playlistHasMore = detail?.hasMore == true
                             playlistLoading = false
-                            playlistSaved = Krespot.rootlist.saved(context, uri)
+                            playlistSaved = null
                             playlistPublished = null
                             playlistCanRemoveCover = false
-                            if (detail?.editable == true) {
-                                playlistPublished = Krespot.rootlist.published(context, uri)
-                                playlistCanRemoveCover = Krespot.playlists.hasCustomCover(context, uri)
+                            val editable = detail?.editable == true
+                            // The saved/published/cover lookups are independent
+                            // of each other; waiting for them one by one makes
+                            // opening a playlist as slow as their sum.
+                            coroutineScope {
+                                val saved = async { Krespot.rootlist.saved(context, uri) }
+                                val published = if (editable) {
+                                    async { Krespot.rootlist.published(context, uri) }
+                                } else null
+                                val cover = if (editable) {
+                                    async { Krespot.playlists.hasCustomCover(context, uri) }
+                                } else null
+                                playlistSaved = saved.await()
+                                playlistPublished = published?.await()
+                                playlistCanRemoveCover = cover?.await() ?: false
                             }
                         }
 
@@ -476,8 +491,14 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 val picks = LinkedHashMap<String, TrackItem>()
-                                for (artist in seedArtists) {
-                                    val detail = Krespot.artists.artist(context, artist) ?: continue
+                                // The seed artists are independent lookups; fetching
+                                // them together beats one-by-one round trips.
+                                val overviews = coroutineScope {
+                                    seedArtists.map { artist ->
+                                        async { Krespot.artists.artist(context, artist) }
+                                    }.awaitAll()
+                                }
+                                for (detail in overviews.filterNotNull()) {
                                     for (row in detail.topTracks) {
                                         if (row.uri in inPlaylist || picks.containsKey(row.uri)) continue
                                         picks[row.uri] = row.toTrackItem()
