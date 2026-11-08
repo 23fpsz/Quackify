@@ -601,6 +601,7 @@ class PlaybackBridge(private val context: Context) {
                         albumUri = if (engineOwns && engineUri != state.trackUri) albumUriOf(engineUri)
                         else state.albumUri,
                         isPlaying = if (engineOwns) playing.playing else state.isPlaying,
+                        isBuffering = if (engineOwns) playing.buffering else false,
                         positionMs = position,
                         durationMs = duration,
                         progress = progressOf(position, duration),
@@ -613,6 +614,7 @@ class PlaybackBridge(private val context: Context) {
                         next.title != state.title || next.artist != state.artist ||
                         next.coverUrl != state.coverUrl || next.artistUri != state.artistUri ||
                         next.albumUri != state.albumUri || next.isPlaying != state.isPlaying ||
+                        next.isBuffering != state.isBuffering ||
                         next.durationMs != state.durationMs
                     if (!identityChanged && kotlin.math.abs(next.positionMs - state.positionMs) < 400L) {
                         threshold(playing)
@@ -1090,6 +1092,7 @@ class PlaybackBridge(private val context: Context) {
             artistUri = row.artistUri.ifBlank { state.artistUri.takeIf { state.trackUri == row.uri }.orEmpty() },
             albumUri = row.albumUri.ifBlank { state.albumUri.takeIf { state.trackUri == row.uri }.orEmpty() },
             isPlaying = playing,
+            isBuffering = playing,
             positionMs = positionMs,
             durationMs = duration,
             progress = progressOf(positionMs, duration),
@@ -1275,6 +1278,7 @@ class PlaybackBridge(private val context: Context) {
             albumUri = nextAlbumUri,
             isPlaying = if (loaded == track.uri && player.hasSource) player.isPlaying
             else !command.paused,
+            isBuffering = if (loaded == track.uri && player.hasSource) state.isBuffering else false,
             controllingRemote = false,
             positionMs = position,
             progress = progressOf(position, state.durationMs),
@@ -1307,11 +1311,11 @@ class PlaybackBridge(private val context: Context) {
         when (what) {
             "pause" -> {
                 if (player.hasSource && player.isPlaying) player.pause()
-                state = state.copy(isPlaying = false)
+                state = state.copy(isPlaying = false, isBuffering = false)
             }
             "resume" -> {
                 if (player.hasSource && !player.isPlaying) player.resume()
-                state = state.copy(isPlaying = true)
+                state = state.copy(isPlaying = true, isBuffering = false)
             }
             "skip_next" -> scope.launch { skipLocal(forward = true) }
             "skip_prev" -> scope.launch { skipLocal(forward = false) }
@@ -1668,6 +1672,7 @@ class PlaybackBridge(private val context: Context) {
             coverUrl = track.imageUrl,
             trackUri = track.uri,
             isPlaying = false,
+            isBuffering = false,
             positionMs = 0L,
             durationMs = duration,
             progress = 0f,
@@ -1729,7 +1734,7 @@ class PlaybackBridge(private val context: Context) {
         // teardown runs handOff() and then stop(); without this flip the
         // second pauseRemoteOnExit() sends the very same pause again and
         // blocks the main thread for another round trip.
-        state = state.copy(isPlaying = false)
+        state = state.copy(isPlaying = false, isBuffering = false)
     }
 
     private fun advanceRemote() {
@@ -1783,6 +1788,7 @@ class PlaybackBridge(private val context: Context) {
                 artist = "",
                 trackUri = uri,
                 isPlaying = if (player.hasSource) player.isPlaying else cluster.isPlaying,
+                isBuffering = false,
                 positionMs = cluster.positionMs,
                 durationMs = cluster.durationMs.takeIf { it > 0L } ?: state.durationMs,
             )
@@ -1854,7 +1860,7 @@ class PlaybackBridge(private val context: Context) {
             publishQueue(cluster)
             val remoteNow = cluster.activeDevice?.let { it.id != deviceId } == true
             if (!remoteNow && player.hasSource) {
-                state = state.copy(isPlaying = player.isPlaying)
+                state = state.copy(isPlaying = player.isPlaying, isBuffering = false)
             }
             if (remoteNow) {
                 val duration = cluster.durationMs.takeIf { it > 0L } ?: state.durationMs
@@ -1980,6 +1986,7 @@ class PlaybackBridge(private val context: Context) {
                 .ifBlank { if (sameTrack) state.artistUri else "" }
                 .ifBlank { artistUriOf(cluster.track.uri) },
             isPlaying = if (local) player.isPlaying else (intent ?: followPlaying),
+            isBuffering = if (local) player.state.value.buffering else false,
             positionMs = position,
             durationMs = duration,
             progress = progressOf(position, duration),
@@ -2441,6 +2448,7 @@ class PlaybackBridge(private val context: Context) {
             artistUri = nextArtistUri,
             albumUri = nextAlbumUri,
             isPlaying = if (local) player.isPlaying else !command.paused,
+            isBuffering = if (local) player.state.value.buffering else false,
             positionMs = position,
             durationMs = duration,
             progress = progressOf(position, duration),
