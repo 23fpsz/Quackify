@@ -84,6 +84,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.library.Krespot
+import com.quackify.compose.home.toQuickAccessFallback
 
 private val log = Logs.of(Logs.Module.MAIN)
 
