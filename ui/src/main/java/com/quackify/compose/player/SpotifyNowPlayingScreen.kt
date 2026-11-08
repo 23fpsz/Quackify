@@ -240,11 +240,12 @@ fun SpotifyNowPlayingScreen(
     monthlyListeners: String = "",
     artistBio: String = "",
     artistImageUrl: String? = null,
+    isArtistFollowing: Boolean = false,
+    onArtistFollowToggle: (Boolean) -> Unit = {},
     lyrics: List<TimeSyncedLyric> = emptyList()
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
-    var isFollowingArtist by remember { mutableStateOf(false) }
 
     // Back while the fullscreen lyrics overlay is up closes the overlay
     // first; without this the shell's handler collapses the whole player.
@@ -504,8 +505,8 @@ fun SpotifyNowPlayingScreen(
                                 monthlyListeners = effectiveMonthlyListeners,
                                 artistBio = effectiveArtistBio,
                                 artistImageUrl = artistImageUrl,
-                                isFollowingArtist = isFollowingArtist,
-                                onFollowToggle = { isFollowingArtist = !isFollowingArtist },
+                                isFollowingArtist = isArtistFollowing,
+                                onFollowToggle = { onArtistFollowToggle(!isArtistFollowing) },
                                 onArtistClick = onArtistClick
                             )
 
@@ -707,8 +708,8 @@ fun SpotifyNowPlayingScreen(
                                     monthlyListeners = effectiveMonthlyListeners,
                                     artistBio = effectiveArtistBio,
                                     artistImageUrl = artistImageUrl,
-                                    isFollowingArtist = isFollowingArtist,
-                                    onFollowToggle = { isFollowingArtist = !isFollowingArtist },
+                                    isFollowingArtist = isArtistFollowing,
+                                    onFollowToggle = { onArtistFollowToggle(!isArtistFollowing) },
                                     onArtistClick = onArtistClick
                                 )
 

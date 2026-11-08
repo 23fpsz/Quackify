@@ -663,23 +663,37 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         var nowPlayingArtist by remember { mutableStateOf<ArtistDetail?>(null) }
+                        // The now-playing artist's follow state: null until the
+                        // library contains-check has answered.
+                        var nowPlayingArtistFollowed by remember { mutableStateOf<Boolean?>(null) }
                         var nowPlayingLyrics by remember { mutableStateOf<TrackLyrics?>(null) }
                         val artistCache = remember { mutableMapOf<String, ArtistDetail>() }
                         LaunchedEffect(nowPlayingArtistUri) {
                             if (nowPlayingArtistUri.isBlank()) {
                                 nowPlayingArtist = null
+                                nowPlayingArtistFollowed = null
                                 return@LaunchedEffect
                             }
                             val cached = artistCache[nowPlayingArtistUri]
                             if (cached != null) {
                                 nowPlayingArtist = cached
-                                return@LaunchedEffect
+                            } else {
+                                nowPlayingArtist = Krespot.artists.artist(context, nowPlayingArtistUri)
+                                    ?.also {
+                                        if (artistCache.size >= 24) artistCache.clear()
+                                        artistCache[it.uri] = it
+                                    }
                             }
-                            nowPlayingArtist = Krespot.artists.artist(context, nowPlayingArtistUri)
-                                ?.also {
-                                    if (artistCache.size >= 24) artistCache.clear()
-                                    artistCache[it.uri] = it
-                                }
+                            // Follow state: same lookup the artist screen uses —
+                            // the dedicated library check is the truth, the
+                            // overview's own saved flag covers a lookup that
+                            // came back with nothing.
+                            val inLibrary = Library.saved(context, listOf(nowPlayingArtistUri))
+                            nowPlayingArtistFollowed = if (inLibrary.isEmpty()) {
+                                nowPlayingArtist?.saved == true
+                            } else {
+                                nowPlayingArtistUri in inLibrary
+                            }
                         }
                         LaunchedEffect(playback.trackUri) {
                             val uri = playback.trackUri
@@ -868,6 +882,7 @@ class MainActivity : ComponentActivity() {
                             nowPlayingMonthlyListeners = nowPlayingArtist?.monthlyListeners
                                 ?.takeIf { it > 0L }?.let { formatCount(it) + " monthly listeners" }.orEmpty(),
                             nowPlayingArtistImageUrl = nowPlayingArtist?.imageUrl?.takeIf { it.isNotBlank() },
+                            nowPlayingArtistFollowed = nowPlayingArtistFollowed,
                             nowPlayingLyrics = remember(nowPlayingLyrics) {
                                 nowPlayingLyrics?.lines?.map {
                                     TimeSyncedLyric(it.startTimeMs, it.text)
@@ -1073,7 +1088,11 @@ class MainActivity : ComponentActivity() {
                                     // once the server has accepted the change.
                                     val ok = Library.setSaved(context, listOf(uri), follow)
                                     log.i("artist follow '$uri' -> $follow ok=$ok")
-                                    if (ok) artistFollowed = follow
+                                    if (!ok) return@launch
+                                    // Update whichever follow state the uri belongs
+                                    // to: the open artist screen or the NPV card.
+                                    if (uri == artistUri) artistFollowed = follow
+                                    if (uri == nowPlayingArtistUri) nowPlayingArtistFollowed = follow
                                 }
                             },
                             onArtistRadio = { uri ->
