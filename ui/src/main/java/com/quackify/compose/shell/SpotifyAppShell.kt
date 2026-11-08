@@ -775,6 +775,8 @@ fun SpotifyAppShell(
         active.artistName = artist
         active.artistUri = artistUriToLoad
         active.artistAvatarUrl = libraryItems?.find { it.title.equals(artist, ignoreCase = true) }?.imageUrl
+            ?: searchData?.artists?.find { it.title.equals(artist, ignoreCase = true) }?.imageUrl
+                ?.takeIf { it.isNotBlank() }
             ?: nowPlayingArtistImageUrl?.takeIf { artist.equals(currentArtist, ignoreCase = true) }
 
         if (onLoadArtist != null) onLoadArtist?.invoke(artistUriToLoad, artist) else playerListener?.onLoadArtist(artistUriToLoad, artist)
@@ -1495,7 +1497,9 @@ fun SpotifyAppShell(
             albumCoverUrl = active.albumCoverUrl,
             albumUri = active.albumUri.ifBlank { albumDetail?.uri.orEmpty() },
             artistName = active.artistName,
-            artistAvatarUrl = active.artistAvatarUrl,
+            artistAvatarUrl = active.artistAvatarUrl
+                ?: artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
+                ?: artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() },
             artistUri = active.artistUri,
             artistFollowing = artistFollowed == true,
             onArtistFollowToggle = {
