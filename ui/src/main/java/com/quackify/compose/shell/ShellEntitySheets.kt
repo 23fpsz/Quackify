@@ -126,7 +126,7 @@ internal fun ShellEntitySheets(
         FolderOptionsSheet(
             isOpen = true,
             folderTitle = folderItem.title,
-            playlistCount = if (folderItem.uri == active.folderUri) folderItems?.size ?: 0 else 0,
+            playlistSubtitle = folderItem.subtitle.ifBlank { "0 playlists" },
             isNested = local.activeFolderOptionsNested,
             onMoveToFolder = {
                 val targetUri = folderItem.uri
