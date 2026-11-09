@@ -148,6 +148,7 @@ fun SpotifyPlaylistScreen(
     onPlaylistOptionsClick: () -> Unit = {},
     onEditModeChange: (Boolean) -> Unit = {},
     onSaveOrder: (List<TrackItem>) -> Unit = {},
+    onEditDetails: (suspend (name: String, description: String, cover: ByteArray?, clearCover: Boolean) -> Unit)? = null,
     isEditable: Boolean = false,
     onShareClick: () -> Unit = {},
     isSaved: Boolean? = null,
@@ -1376,6 +1377,7 @@ fun SpotifyPlaylistScreen(
             currentTitle = name
             currentDescription = desc
             isEditDetailsOpen = false
+            scope.launch { onEditDetails?.invoke(name, desc, cover, clearCover) }
         },
         onDismiss = { isEditDetailsOpen = false }
     )

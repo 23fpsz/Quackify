@@ -608,6 +608,7 @@ fun SpotifyAppShell(
                 onRefreshRecommendations = onRefreshRecommendations,
                 onAddRecommended = onAddRecommended,
                 onSavePlaylistOrder = onSavePlaylistOrder,
+                onEditPlaylistDetails = onEditPlaylistDetails,
                 onTogglePlaylistSaved = onTogglePlaylistSaved,
                 handleBack = handleBack,
                 handleTrackOptions = handleTrackOptions,
