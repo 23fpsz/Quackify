@@ -607,6 +607,12 @@ fun SpotifyAppShell(
                 onAddRecommended = onAddRecommended,
                 onSavePlaylistOrder = onSavePlaylistOrder,
                 onEditPlaylistDetails = onEditPlaylistDetails,
+                onDeletePlaylist = { uri ->
+                    shellScope.launch {
+                        val ok = onDeletePlaylist?.invoke(uri) ?: false
+                        if (ok) handleBack()
+                    }
+                },
                 onTogglePlaylistSaved = onTogglePlaylistSaved,
                 handleBack = handleBack,
                 handleTrackOptions = handleTrackOptions,
