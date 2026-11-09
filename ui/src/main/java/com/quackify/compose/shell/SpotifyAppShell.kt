@@ -1316,6 +1316,7 @@ fun SpotifyAppShell(
             shellScope = shellScope,
             libraryFolderChoices = libraryFolderChoices,
             editablePlaylistUris = editablePlaylistUris,
+            playlistDescription = playlistDetail?.description.orEmpty(),
             albumTracks = albumTracks,
             folderItems = folderItems,
             onEditPlaylist = onEditPlaylist,

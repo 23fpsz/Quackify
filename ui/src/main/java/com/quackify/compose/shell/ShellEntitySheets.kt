@@ -22,6 +22,7 @@ internal fun ShellEntitySheets(
     shellScope: CoroutineScope,
     libraryFolderChoices: List<Pair<String, String>>,
     editablePlaylistUris: Set<String>,
+    playlistDescription: String,
     albumTracks: List<TrackItem>?,
     folderItems: List<LibraryItem>?,
     onEditPlaylist: ((String) -> Unit)?,
@@ -172,7 +173,7 @@ internal fun ShellEntitySheets(
             if (uri.isNotBlank()) {
                 active.playlistTitle = newTitle
                 shellScope.launch {
-                    onEditPlaylistDetails?.invoke(uri, newTitle, "", null, false)
+                    onEditPlaylistDetails?.invoke(uri, newTitle, playlistDescription, null, false)
                 }
             }
         },
