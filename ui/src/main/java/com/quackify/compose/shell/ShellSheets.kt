@@ -55,7 +55,6 @@ internal fun ShellSheets(
     playlistEntity: EntityOptions?,
     playlistEditable: Boolean,
     playlistSaved: Boolean?,
-    playlistPublished: Boolean?,
     albumTitle: String,
     albumArtist: String,
     albumCoverUrl: String?,
@@ -94,7 +93,6 @@ internal fun ShellSheets(
     onShowCredits: () -> Unit,
     onEditPlaylist: () -> Unit,
     onTogglePlaylistSaved: () -> Unit,
-    onTogglePlaylistPublished: () -> Unit,
     onDeletePlaylist: () -> Unit,
     onCopyLink: (String) -> Unit,
     onShare: (String) -> Unit,
@@ -172,9 +170,6 @@ internal fun ShellSheets(
         onSaveToggle = onTogglePlaylistSaved,
         canDeletePlaylist = playlistEditable,
         onDeletePlaylist = onDeletePlaylist,
-        isPublished = playlistPublished,
-        canPublish = playlistEditable,
-        onPublishToggle = onTogglePlaylistPublished,
         onCopyLink = { playlistEntity?.uri?.let(onCopyLink) },
         onShare = { playlistEntity?.uri?.let(onShare) }
     )

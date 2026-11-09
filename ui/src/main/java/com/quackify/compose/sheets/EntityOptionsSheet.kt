@@ -60,9 +60,6 @@ fun EntityOptionsSheet(
     onGoToRadio: () -> Unit = {},
     canDeletePlaylist: Boolean = false,
     onDeletePlaylist: () -> Unit = {},
-    isPublished: Boolean? = null,
-    canPublish: Boolean = false,
-    onPublishToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || entity == null) return
@@ -200,17 +197,6 @@ fun EntityOptionsSheet(
                     onDismiss()
                     onAddToPlaylist()
                 }
-            }
-
-            if (canPublish && isPublished != null) {
-                EntityRow(
-                    title = if (isPublished) "Remove from profile" else "Add to profile",
-                    iconRes = R.drawable.encore_icon_user_24,
-                    onClick = {
-                        onDismiss()
-                        onPublishToggle()
-                    }
-                )
             }
 
             EntityRow(

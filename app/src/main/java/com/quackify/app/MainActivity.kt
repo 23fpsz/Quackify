@@ -363,7 +363,6 @@ class MainActivity : ComponentActivity() {
                         var recommendationsLoading by remember { mutableStateOf(false) }
                         var recommendationsNonce by remember { mutableStateOf(0) }
                         var playlistSaved by remember { mutableStateOf<Boolean?>(null) }
-                        var playlistPublished by remember { mutableStateOf<Boolean?>(null) }
                         var playlistCanRemoveCover by remember { mutableStateOf(false) }
                         var playlistEditDraft by remember { mutableStateOf<PlaylistEditDraft?>(null) }
                         var editableUris by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -441,7 +440,6 @@ class MainActivity : ComponentActivity() {
                             playlistHasMore = detail?.hasMore == true
                             playlistLoading = false
                             playlistSaved = Krespot.rootlist.saved(context, uri)
-                            playlistPublished = null
                             playlistCanRemoveCover = false
                             val editable = detail?.editable == true
                             // The saved/published/cover lookups are independent
@@ -449,14 +447,10 @@ class MainActivity : ComponentActivity() {
                             // opening a playlist as slow as their sum.
                             coroutineScope {
                                 val saved = async { Krespot.rootlist.saved(context, uri) }
-                                val published = if (editable) {
-                                    async { Krespot.rootlist.published(context, uri) }
-                                } else null
                                 val cover = if (editable) {
                                     async { Krespot.playlists.hasCustomCover(context, uri) }
                                 } else null
                                 playlistSaved = saved.await()
-                                playlistPublished = published?.await()
                                 playlistCanRemoveCover = cover?.await() ?: false
                             }
                         }
@@ -1009,7 +1003,6 @@ class MainActivity : ComponentActivity() {
                                 uri
                             },
                             playlistSaved = playlistSaved,
-                            playlistPublished = playlistPublished,
                             playlistEditDraft = playlistEditDraft,
                             editablePlaylistUris = editableUris,
                             onEditPlaylist = { uri ->
@@ -1070,13 +1063,6 @@ class MainActivity : ComponentActivity() {
                                         Krespot.library.invalidate()
                                         playlistSaved = saved
                                     }
-                                }
-                            },
-                            onTogglePlaylistPublished = { uri, published ->
-                                scope.launch {
-                                    val ok = Krespot.rootlist.setPublished(context, uri, published)
-                                    log.i("playlist '$uri' published -> $published ok=$ok")
-                                    if (ok) playlistPublished = published
                                 }
                             },
                             onRemoveLibraryItem = { uri ->
@@ -1262,7 +1248,6 @@ class MainActivity : ComponentActivity() {
                                     playlistLoading = true
                                     playlistRecommendations = emptyList()
                                     playlistSaved = null
-                                    playlistPublished = null
                                 }
                             },
                             onRetryPlaylist = {

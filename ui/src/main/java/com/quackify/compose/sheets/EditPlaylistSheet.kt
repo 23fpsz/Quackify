@@ -79,8 +79,6 @@ fun EditPlaylistSheet(
     onSave: (name: String, description: String, cover: ByteArray?, clearCover: Boolean) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    isInitiallyPrivate: Boolean = false,
-    onTogglePrivate: ((Boolean) -> Unit)? = null,
     onDeletePlaylist: (() -> Unit)? = null,
     title: String = "Name & details",
     saveLabel: String = "Save" 
@@ -97,7 +95,6 @@ fun EditPlaylistSheet(
     var pickedFailed by remember { mutableStateOf(false) }
     var removeCover by remember { mutableStateOf(false) }
     var decoding by remember { mutableStateOf(false) }
-    var isPrivate by remember { mutableStateOf(isInitiallyPrivate) }
 
     val previewBitmap = remember(picked) {
         picked?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }
@@ -335,36 +332,6 @@ fun EditPlaylistSheet(
             }
 
             Spacer(modifier = Modifier.height(28.dp))
-
-            // Action Row 1: Make private / Make public
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        isPrivate = !isPrivate
-                        onTogglePrivate?.invoke(isPrivate)
-                    }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.encore_icon_locked_24),
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Text(
-                    text = if (isPrivate) "Make public" else "Make private",
-                    style = TextStyle(
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
-            }
 
             // Action Row 2: Delete playlist
             Row(
