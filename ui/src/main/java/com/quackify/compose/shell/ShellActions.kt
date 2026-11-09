@@ -97,6 +97,7 @@ internal class ShellActions(
 
     fun libraryLongPress(item: LibraryItem) {
         if (item.type == LibraryItemType.FOLDER) {
+            local.activeFolderOptionsNested = navController.currentScreen == ShellScreen.FOLDER
             local.activeFolderOptionsItem = item
         } else {
             local.libraryItemOptions = EntityOptions(
