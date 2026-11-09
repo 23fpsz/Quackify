@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.sheets.DeleteConfirmDialog
 import com.quackify.compose.sheets.FolderOptionsSheet
 import com.quackify.compose.sheets.FolderSheet
 import com.quackify.compose.sheets.EntityOptionsSheet
@@ -59,9 +60,18 @@ internal fun ShellEntitySheets(
             },
             canDeletePlaylist = editable,
             onDeletePlaylist = {
-                shellScope.launch {
-                    onDeletePlaylist?.invoke(entity.uri)
-                }
+                val uri = entity.uri
+                val title = entity.title
+                local.libraryItemOptions = null
+                local.deleteAsk = DeleteAsk(
+                    title = "Delete playlist?",
+                    message = "\"$title\" will be deleted from Your Library.",
+                    onConfirm = {
+                        shellScope.launch {
+                            onDeletePlaylist?.invoke(uri)
+                        }
+                    }
+                )
             },
             onCopyLink = { onCopyEntityLink(entity.uri) },
             onAddToQueue = when {
@@ -157,10 +167,16 @@ internal fun ShellEntitySheets(
             onDeleteFolder = {
                 val targetUri = folderItem.uri
                 local.activeFolderOptionsItem = null
-                onDeleteFolder?.invoke(targetUri)
-                if (navController.currentScreen == ShellScreen.FOLDER && active.folderUri == targetUri) {
-                    navController.handleBack()
-                }
+                local.deleteAsk = DeleteAsk(
+                    title = "Delete folder?",
+                    message = "\"${folderItem.title}\" will be deleted. The playlists inside stay in Your Library.",
+                    onConfirm = {
+                        onDeleteFolder?.invoke(targetUri)
+                        if (navController.currentScreen == ShellScreen.FOLDER && active.folderUri == targetUri) {
+                            navController.handleBack()
+                        }
+                    }
+                )
             },
             onDismiss = { local.activeFolderOptionsItem = null }
         )
@@ -184,4 +200,13 @@ internal fun ShellEntitySheets(
         },
         onDismiss = { flags.isRenamePlaylistDialogOpen = false }
     )
+
+    local.deleteAsk?.let { ask ->
+        DeleteConfirmDialog(
+            title = ask.title,
+            message = ask.message,
+            onConfirm = ask.onConfirm,
+            onDismiss = { local.deleteAsk = null }
+        )
+    }
 }

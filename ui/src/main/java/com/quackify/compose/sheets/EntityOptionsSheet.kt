@@ -20,10 +20,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,7 +66,6 @@ fun EntityOptionsSheet(
 
     val isEpisode = entity.uri.startsWith("spotify:episode:")
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var confirmDelete by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -234,22 +229,13 @@ fun EntityOptionsSheet(
                     iconRes = R.drawable.encore_icon_x_24,
                     onClick = {
                         onDismiss()
-                        confirmDelete = true
+                        onDeletePlaylist()
                     }
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
         }
-    }
-
-    if (confirmDelete) {
-        DeleteConfirmDialog(
-            title = "Delete playlist?",
-            message = "\"${entity.title}\" will be deleted from Your Library.",
-            onConfirm = onDeletePlaylist,
-            onDismiss = { confirmDelete = false }
-        )
     }
 }
 

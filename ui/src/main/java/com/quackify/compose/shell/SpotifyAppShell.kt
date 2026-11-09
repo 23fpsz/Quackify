@@ -1303,7 +1303,10 @@ fun SpotifyAppShell(
             editDraft = playlistEditDraft,
             onEditSave = onEditPlaylistDetails,
             onDismissEdit = onDismissEditPlaylist,
-            onDeletePlaylist = onDeletePlaylist
+            onDeletePlaylist = onDeletePlaylist,
+            onDeleteAsk = { title, message, onConfirm ->
+                local.deleteAsk = DeleteAsk(title, message, onConfirm)
+            }
         )
 
         ShellEntitySheets(
