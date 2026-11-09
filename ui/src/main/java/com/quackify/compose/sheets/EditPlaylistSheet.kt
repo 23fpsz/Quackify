@@ -25,13 +25,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -97,7 +95,6 @@ fun EditPlaylistSheet(
     var pickedFailed by remember { mutableStateOf(false) }
     var removeCover by remember { mutableStateOf(false) }
     var decoding by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
 
     val previewBitmap = remember(picked) {
         picked?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }
@@ -342,7 +339,7 @@ fun EditPlaylistSheet(
                     .fillMaxWidth()
                     .clickable {
                         onDismiss()
-                        confirmDelete = true
+                        onDeletePlaylist?.invoke()
                     }
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -369,15 +366,6 @@ fun EditPlaylistSheet(
             Spacer(modifier = Modifier.height(24.dp))
 
         }
-    }
-
-    if (confirmDelete && onDeletePlaylist != null) {
-        DeleteConfirmDialog(
-            title = "Delete playlist?",
-            message = "\"$name\" will be deleted from Your Library and your followers won't have access anymore.",
-            onConfirm = onDeletePlaylist,
-            onDismiss = { confirmDelete = false }
-        )
     }
 }
 

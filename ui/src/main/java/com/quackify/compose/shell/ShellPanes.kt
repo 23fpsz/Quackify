@@ -851,7 +851,8 @@ internal fun ShellPlaylistEditSheets(
     editDraft: PlaylistEditDraft?,
     onEditSave: (suspend (String, String, String, ByteArray?, Boolean) -> Boolean)?,
     onDismissEdit: () -> Unit,
-    onDeletePlaylist: (suspend (String) -> Boolean)?
+    onDeletePlaylist: (suspend (String) -> Boolean)?,
+    onDeleteAsk: (String, String, () -> Unit) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     if (editDraft != null) {
@@ -870,7 +871,10 @@ internal fun ShellPlaylistEditSheets(
             },
             onDeletePlaylist = {
                 onDismissEdit()
-                scope.launch { onDeletePlaylist?.invoke(editDraft.uri) }
+                onDeleteAsk(
+                    "Delete playlist?",
+                    "\"${editDraft.name}\" will be deleted from Your Library and your followers won't have access anymore.",
+                ) { scope.launch { onDeletePlaylist?.invoke(editDraft.uri) } }
             },
             onDismiss = onDismissEdit
         )

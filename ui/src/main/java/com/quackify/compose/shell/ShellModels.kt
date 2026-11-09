@@ -136,6 +136,12 @@ internal data class FolderDraft(
     val folders: List<Pair<String, String>> = emptyList(),
 )
 
+data class DeleteAsk(
+    val title: String,
+    val message: String,
+    val onConfirm: () -> Unit,
+)
+
 internal data class PlaybackOrigin(
     val screen: ShellScreen,
     val label: String,
@@ -210,6 +216,7 @@ internal class ShellLocalState {
     var activeFolderOptionsItem by mutableStateOf<LibraryItem?>(null)
     var activeFolderOptionsNested by mutableStateOf(false)
     var activeEntityInsideFolder by mutableStateOf(false)
+    var deleteAsk by mutableStateOf<DeleteAsk?>(null)
     var folderDraft by mutableStateOf<FolderDraft?>(null)
     var playlistCreateName by mutableStateOf("My Playlist")
     var creditsTrack by mutableStateOf<TrackItem?>(null)
