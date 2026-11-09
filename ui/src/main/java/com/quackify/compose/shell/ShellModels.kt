@@ -33,7 +33,8 @@ enum class ShellScreen {
     FOLDER,
     SHOW,
     EPISODE,
-    BROWSE
+    BROWSE,
+    ADD_TRACKS
 }
 
 data class PlaylistEditDraft(

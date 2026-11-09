@@ -192,6 +192,13 @@ fun SpotifyAppShell(
     onRetryArtist: (() -> Unit)? = null,
     trackCredits: Credits? = null,
     addToPlaylistChoices: List<PlaylistChoice>? = null,
+    addTracksSongs: List<TrackItem> = emptyList(),
+    addTracksEpisodes: List<TrackItem> = emptyList(),
+    addTracksLiked: List<TrackItem> = emptyList(),
+    addTracksRecent: List<TrackItem> = emptyList(),
+    addTracksLoading: Boolean = false,
+    onAddTracksOpen: (() -> Unit)? = null,
+    onAddTrack: (suspend (String) -> Boolean)? = null,
     onShowCredits: ((String) -> Unit)? = null,
     onAddToPlaylist: ((TrackItem) -> Unit)? = null,
     onPickPlaylist: ((PlaylistChoice, TrackItem) -> Unit)? = null,
@@ -241,6 +248,7 @@ fun SpotifyAppShell(
         onLoadArtist = onLoadArtist,
         onOpenShow = onOpenShow,
         onOpenEpisode = onOpenEpisode,
+        onAddTracksClosed = { onRetryPlaylist?.invoke() },
         libraryItems = libraryItems,
         searchData = searchData,
         nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
@@ -623,7 +631,8 @@ fun SpotifyAppShell(
                 onEditModeChange = { isEditing -> flags.isPlaylistEditMode = isEditing },
                 onChangeTitle = { flags.isRenamePlaylistDialogOpen = true },
                 onAddTracksClick = {
-                    currentScreen = ShellScreen.SEARCH
+                    navController.openAddTracks()
+                    onAddTracksOpen?.invoke()
                 },
                 onEditCoverClick = {
                     val uri = active.playlistUri
@@ -773,6 +782,16 @@ fun SpotifyAppShell(
                 loading = historyLoading,
                 currentTrackTitle = currentTrackTitle,
                 isPlaying = isPlaying
+            )
+            ShellScreen.ADD_TRACKS -> ShellAddTracksPane(
+                targetTitle = active.playlistTitle,
+                songs = addTracksSongs,
+                episodes = addTracksEpisodes,
+                recent = addTracksRecent,
+                liked = addTracksLiked,
+                loading = addTracksLoading,
+                onBack = handleBack,
+                onAdd = { uri -> onAddTrack?.invoke(uri) ?: false }
             )
             ShellScreen.BROWSE -> ShellBrowsePane(
                 page = browsePage,
