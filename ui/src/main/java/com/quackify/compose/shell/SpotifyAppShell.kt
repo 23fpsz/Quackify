@@ -835,6 +835,7 @@ fun SpotifyAppShell(
                 currentSort = currentSortOption,
                 onBackClick = { handleBack() },
                 onFolderOptionsClick = {
+                    local.activeFolderOptionsNested = false
                     activeFolderOptionsItem = LibraryItem(
                         title = active.folderTitle,
                         subtitle = "${folderItems?.size ?: 0} playlists",

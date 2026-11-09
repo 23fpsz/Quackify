@@ -48,6 +48,7 @@ fun FolderOptionsSheet(
     isOpen: Boolean,
     folderTitle: String,
     playlistCount: Int,
+    isNested: Boolean,
     onMoveToFolder: () -> Unit,
     onRenameFolder: () -> Unit,
     onMoveToLibrary: () -> Unit,
@@ -149,14 +150,16 @@ fun FolderOptionsSheet(
                 }
             )
 
-            FolderActionItem(
-                title = "Move to Your Library",
-                iconRes = R.drawable.encore_icon_your_library_24,
-                onClick = {
-                    onDismiss()
-                    onMoveToLibrary()
-                }
-            )
+            if (isNested) {
+                FolderActionItem(
+                    title = "Move to Your Library",
+                    iconRes = R.drawable.encore_icon_your_library_24,
+                    onClick = {
+                        onDismiss()
+                        onMoveToLibrary()
+                    }
+                )
+            }
 
             FolderActionItem(
                 title = "Delete folder",

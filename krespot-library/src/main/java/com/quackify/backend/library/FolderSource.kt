@@ -108,6 +108,17 @@ object FolderSource {
         return ok
     }
 
+    private fun sourceIndex(snap: Rootlist.Snapshot, uri: String): Pair<Int, Int> {
+        val direct = snap.indexOf(uri)
+        if (direct >= 0) return direct to 1
+        val hash = folderHash(uri)
+        if (hash.isBlank()) return -1 to 0
+        val start = snap.groupIndex(hash, end = false)
+        val end = snap.groupIndex(hash, end = true)
+        if (start < 0 || end <= start) return -1 to 0
+        return start to end - start + 1
+    }
+
     suspend fun moveIntoFolder(context: Context, uri: String, folderUri: String): Boolean {
         val hash = folderHash(folderUri)
         if (hash.isBlank() || uri.isBlank()) {
@@ -115,25 +126,36 @@ object FolderSource {
             return false
         }
         val snap = Rootlist.snapshot(context) ?: return false
-        val from = snap.indexOf(uri)
-        val end = snap.groupIndex(hash, end = true)
-        if (from < 0 || end < 0) {
-            log.w("moveIntoFolder: from=$from end=$end among ${snap.entries.size} entries")
+        val (from, length) = sourceIndex(snap, uri)
+        if (from < 0) {
+            log.w("moveIntoFolder: no entry for $uri among ${snap.entries.size} entries")
             return false
         }
-        val to = end
-        log.i("moveIntoFolder $uri from=$from to=$to endGroup=$end")
-        return Rootlist.move(context, from, to, 1, snap.revision)
+        if (folderHash(uri) == hash) {
+            log.w("moveIntoFolder: cannot move a folder into itself")
+            return false
+        }
+        val end = snap.groupIndex(hash, end = true)
+        if (end < 0) {
+            log.w("moveIntoFolder: no end-group for $hash among ${snap.entries.size} entries")
+            return false
+        }
+        if (end > from && end < from + length) {
+            log.w("moveIntoFolder: target folder $hash sits inside the source block [$from..${from + length - 1}]")
+            return false
+        }
+        log.i("moveIntoFolder $uri from=$from length=$length to=$end endGroup=$end")
+        return Rootlist.move(context, from, end, length, snap.revision)
     }
 
     suspend fun removeFromFolder(context: Context, uri: String): Boolean {
         val snap = Rootlist.snapshot(context) ?: return false
-        val from = snap.indexOf(uri)
+        val (from, length) = sourceIndex(snap, uri)
         if (from <= 0) {
             log.w("removeFromFolder: $uri at $from, nothing to do")
             return from == 0
         }
-        log.i("removeFromFolder $uri from=$from to=0")
-        return Rootlist.move(context, from, 0, 1, snap.revision)
+        log.i("removeFromFolder $uri from=$from length=$length to=0")
+        return Rootlist.move(context, from, 0, length, snap.revision)
     }
 }
