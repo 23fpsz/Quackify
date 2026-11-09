@@ -1,25 +1,44 @@
 package com.quackify.compose.shell
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.BrowseCard
@@ -33,7 +52,12 @@ import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.collectionDuration
 import com.quackify.backend.model.collectionDurationIsEstimate
+import com.quackify.compose.R
 import com.quackify.compose.components.DetailPageSkeleton
+import com.quackify.compose.components.EncoreChip
+import com.quackify.compose.components.EncoreIconButton
+import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.format.parseHexColor
 import com.quackify.compose.home.HomeShelf
 import com.quackify.compose.home.QuickAccessItem
@@ -877,6 +901,170 @@ internal fun ShellPlaylistEditSheets(
                 ) { scope.launch { onDeletePlaylist?.invoke(editDraft.uri) } }
             },
             onDismiss = onDismissEdit
+        )
+    }
+}
+
+private enum class AddTracksFilter(val label: String) {
+    SONGS("Songs"),
+    EPISODES("Episodes"),
+    RECENT("Recently played"),
+    LIKED("Liked songs")
+}
+
+@Composable
+internal fun ShellAddTracksPane(
+    targetTitle: String,
+    songs: List<TrackItem>,
+    episodes: List<TrackItem>,
+    recent: List<TrackItem>,
+    liked: List<TrackItem>,
+    loading: Boolean,
+    onBack: () -> Unit,
+    onAdd: suspend (String) -> Boolean
+) {
+    var filter by remember { mutableStateOf(AddTracksFilter.SONGS) }
+    val added = remember { mutableStateListOf<String>() }
+    val scope = rememberCoroutineScope()
+
+    val items = when (filter) {
+        AddTracksFilter.SONGS -> songs
+        AddTracksFilter.EPISODES -> episodes
+        AddTracksFilter.RECENT -> recent
+        AddTracksFilter.LIKED -> liked
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EncoreColors.Background)
+            .statusBarsPadding()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            EncoreIconButton(
+                iconRes = R.drawable.encore_icon_arrow_left_24,
+                contentDescription = "Back",
+                onClick = onBack,
+                tint = EncoreColors.TextPrimary
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = "Add tracks",
+                    style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp)
+                )
+                Text(
+                    text = "To $targetTitle",
+                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AddTracksFilter.entries.forEach { option ->
+                EncoreChip(
+                    text = option.label,
+                    isSelected = option == filter,
+                    onClick = { filter = option }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        when {
+            loading -> TrackListSkeleton(
+                rows = 9,
+                modifier = Modifier.fillMaxSize()
+            )
+            items.isEmpty() -> Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Nothing here yet",
+                    color = EncoreColors.TextSecondary
+                )
+            }
+            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(items) { item ->
+                    AddTrackRow(
+                        item = item,
+                        added = item.uri in added,
+                        onAdd = {
+                            scope.launch {
+                                if (onAdd(item.uri)) added.add(item.uri)
+                            }
+                        }
+                    )
+                }
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddTrackRow(
+    item: TrackItem,
+    added: Boolean,
+    onAdd: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(4.dp))
+        ) {
+            SpotifyArtworkImage(
+                imageUrl = item.imageUrl,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = 4.dp
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.title,
+                style = SpotifyTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = EncoreColors.TextPrimary
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (item.artist.isNotBlank()) {
+                Text(
+                    text = item.artist,
+                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        EncoreIconButton(
+            iconRes = if (added) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24,
+            contentDescription = if (added) "Added" else "Add",
+            onClick = { if (!added) onAdd() },
+            tint = if (added) EncoreColors.Green else EncoreColors.TextPrimary
         )
     }
 }

@@ -22,6 +22,7 @@ internal class ShellNavController(
     private val searchData: SearchResults?,
     private val nowPlayingArtistImageUrl: String?,
     private val currentArtist: () -> String,
+    private val onAddTracksClosed: (() -> Unit)? = null,
 ) {
     var currentScreen
         get() = nav.currentScreen
@@ -63,6 +64,7 @@ internal class ShellNavController(
     }
 
     fun handleBack() {
+        val leaving = currentScreen
         val stack = nav.backStack
         if (stack.isNotEmpty()) {
             val previous = stack.removeAt(stack.lastIndex)
@@ -110,6 +112,9 @@ internal class ShellNavController(
                 ShellScreen.SEARCH, ShellScreen.CATEGORY -> selectedNavIndex = 1
                 ShellScreen.LIBRARY -> selectedNavIndex = 2
                 else -> {}
+            }
+            if (leaving == ShellScreen.ADD_TRACKS) {
+                onAddTracksClosed?.invoke()
             }
         } else if (currentScreen != ShellScreen.HOME) {
             currentScreen = ShellScreen.HOME
@@ -206,6 +211,11 @@ internal class ShellNavController(
         active.folderTitle = item.title
         currentScreen = ShellScreen.FOLDER
         onOpenFolder?.invoke(item.uri)
+    }
+
+    fun openAddTracks() {
+        pushCurrentState()
+        currentScreen = ShellScreen.ADD_TRACKS
     }
 
     fun openCategory(title: String, color: androidx.compose.ui.graphics.Color) {

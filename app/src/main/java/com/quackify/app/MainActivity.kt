@@ -379,6 +379,12 @@ class MainActivity : ComponentActivity() {
                         var artistRetry by remember { mutableStateOf(0) }
                         var trackCredits by remember { mutableStateOf<Credits?>(null) }
                         var addToPlaylistChoices by remember { mutableStateOf<List<PlaylistChoice>?>(null) }
+                        var addTracksSongs by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
+                        var addTracksEpisodes by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
+                        var addTracksLiked by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
+                        var addTracksRecent by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
+                        var addTracksLoading by remember { mutableStateOf(false) }
+                        var addTracksFetch by remember { mutableStateOf(0) }
                         var artistTracks by remember { mutableStateOf<List<PopularTrack>?>(null) }
                         var artistReleases by remember { mutableStateOf<List<ArtistRelease>?>(null) }
                         var artistListeners by remember { mutableStateOf<String?>(null) }
@@ -426,6 +432,50 @@ class MainActivity : ComponentActivity() {
                                 if (feed.isEmpty()) resumeSignal++
                                 if (libraryItems.isNullOrEmpty()) Krespot.library.invalidate()
                                 if (whatsNew.isEmpty()) whatsNewFetch++
+                            }
+                        }
+
+                        LaunchedEffect(playlistUri, addTracksFetch) {
+                            if (playlistUri.isBlank()) return@LaunchedEffect
+                            addTracksLoading = true
+                            try {
+                                coroutineScope {
+                                    val likedDeferred = async {
+                                        Krespot.collections.collection(context, "spotify:collection:tracks")
+                                    }
+                                    val pageDeferred = async { Krespot.library.page(context) }
+                                    addTracksLiked = likedDeferred.await()
+                                        ?.tracks?.map { it.toTrackItem() }
+                                        .orEmpty()
+                                    val page = pageDeferred.await()
+                                    addTracksEpisodes = page?.items
+                                        ?.filter { it.uri.startsWith("spotify:episode:") }
+                                        ?.map {
+                                            TrackItem(
+                                                title = it.title,
+                                                artist = it.subtitle,
+                                                uri = it.uri,
+                                                imageUrl = it.imageUrl.takeIf { src -> src.isNotBlank() },
+                                            )
+                                        }
+                                        .orEmpty()
+                                    val sourceUris = page?.items
+                                        ?.filter { it.kind == ShelfKind.PLAYLIST && it.uri != playlistUri }
+                                        ?.map { it.uri }
+                                        .orEmpty()
+                                    val seen = HashSet<String>()
+                                    addTracksSongs = sourceUris
+                                        .map { async { Krespot.collections.collection(context, it) } }
+                                        .awaitAll()
+                                        .asSequence()
+                                        .flatMap { it?.tracks.orEmpty().asSequence() }
+                                        .filter { seen.add(it.uri) }
+                                        .map { it.toTrackItem() }
+                                        .toList()
+                                    addTracksRecent = PlayHistory.all(context).map { it.item }
+                                }
+                            } finally {
+                                addTracksLoading = false
                             }
                         }
 
@@ -936,6 +986,17 @@ class MainActivity : ComponentActivity() {
                             onRetryArtist = { artistRetry++ },
                             trackCredits = trackCredits,
                             addToPlaylistChoices = addToPlaylistChoices,
+                            addTracksSongs = addTracksSongs,
+                            addTracksEpisodes = addTracksEpisodes,
+                            addTracksLiked = addTracksLiked,
+                            addTracksRecent = addTracksRecent,
+                            addTracksLoading = addTracksLoading,
+                            onAddTracksOpen = { addTracksFetch++ },
+                            onAddTrack = { trackUri ->
+                                val ok = Krespot.playlists.addTrack(context, playlistUri, trackUri)
+                                log.i("add '$trackUri' -> '$playlistUri' ok=$ok")
+                                ok
+                            },
                             onShowCredits = { uri ->
                                 trackCredits = null
                                 scope.launch {
