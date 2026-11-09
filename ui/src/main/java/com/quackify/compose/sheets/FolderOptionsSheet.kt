@@ -13,13 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -180,27 +178,11 @@ fun FolderOptionsSheet(
     }
 
     if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            containerColor = EncoreColors.CardElevated,
-            title = { Text("Delete folder?", color = EncoreColors.TextPrimary) },
-            text = {
-                Text(
-                    "\"$folderTitle\" will be deleted. The playlists inside stay in Your Library.",
-                    color = EncoreColors.TextSecondary
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = false
-                    onDeleteFolder()
-                }) { Text("Delete", color = EncoreColors.Error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) {
-                    Text("Cancel", color = EncoreColors.TextPrimary)
-                }
-            }
+        DeleteConfirmDialog(
+            title = "Delete folder?",
+            message = "\"$folderTitle\" will be deleted. The playlists inside stay in Your Library.",
+            onConfirm = onDeleteFolder,
+            onDismiss = { confirmDelete = false }
         )
     }
 }
