@@ -46,6 +46,7 @@ internal fun FolderSheet(
     onDismiss: () -> Unit,
     onSubmit: (String) -> Unit,
     onPick: (String) -> Unit,
+    canRemoveFromFolder: Boolean = false,
     onDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -105,12 +106,14 @@ internal fun FolderSheet(
                             onClick = { onPick(folder.first) }
                         )
                     }
-                    item {
-                        PickerRow(
-                            title = "Remove from folder",
-                            subtitle = "",
-                            onClick = { onPick("") }
-                        )
+                    if (canRemoveFromFolder) {
+                        item {
+                            PickerRow(
+                                title = "Remove from folder",
+                                subtitle = "",
+                                onClick = { onPick("") }
+                            )
+                        }
                     }
                     if (draft.folders.isEmpty()) {
                         item {

@@ -100,6 +100,7 @@ internal class ShellActions(
             local.activeFolderOptionsNested = navController.currentScreen == ShellScreen.FOLDER
             local.activeFolderOptionsItem = item
         } else {
+            local.activeEntityInsideFolder = navController.currentScreen == ShellScreen.FOLDER
             local.libraryItemOptions = EntityOptions(
                 title = item.title,
                 subtitle = item.subtitle,

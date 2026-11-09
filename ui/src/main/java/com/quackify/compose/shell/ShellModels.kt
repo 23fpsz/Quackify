@@ -209,6 +209,7 @@ internal class ShellLocalState {
     var libraryItemOptions by mutableStateOf<EntityOptions?>(null)
     var activeFolderOptionsItem by mutableStateOf<LibraryItem?>(null)
     var activeFolderOptionsNested by mutableStateOf(false)
+    var activeEntityInsideFolder by mutableStateOf(false)
     var folderDraft by mutableStateOf<FolderDraft?>(null)
     var playlistCreateName by mutableStateOf("My Playlist")
     var creditsTrack by mutableStateOf<TrackItem?>(null)

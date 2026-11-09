@@ -88,6 +88,7 @@ internal fun ShellEntitySheets(
         if (draft.mode == FolderMode.PICKER) {
             FolderSheet(
                 draft = draft,
+                canRemoveFromFolder = local.activeEntityInsideFolder,
                 onDismiss = { local.folderDraft = null },
                 onSubmit = {},
                 onPick = { folderUri ->
