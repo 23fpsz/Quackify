@@ -135,7 +135,7 @@ internal fun ShellEntitySheets(
                     mode = FolderMode.PICKER,
                     folderUri = targetUri,
                     title = targetTitle,
-                    folders = libraryFolderChoices
+                    folders = libraryFolderChoices.filter { it.first != targetUri }
                 )
             },
             onRenameFolder = {
