@@ -448,17 +448,26 @@ class MainActivity : ComponentActivity() {
                                         ?.tracks?.map { it.toTrackItem() }
                                         .orEmpty()
                                     val page = pageDeferred.await()
-                                    addTracksEpisodes = page?.items
-                                        ?.filter { it.uri.startsWith("spotify:episode:") }
-                                        ?.map {
-                                            TrackItem(
-                                                title = it.title,
-                                                artist = it.subtitle,
-                                                uri = it.uri,
-                                                imageUrl = it.imageUrl.takeIf { src -> src.isNotBlank() },
-                                            )
-                                        }
-                                        .orEmpty()
+                                    addTracksEpisodes = run {
+                                        val libraryEpisodes = page?.items
+                                            ?.filter { it.uri.startsWith("spotify:episode:") }
+                                            ?.map {
+                                                TrackItem(
+                                                    title = it.title,
+                                                    artist = it.subtitle,
+                                                    uri = it.uri,
+                                                    imageUrl = it.imageUrl.takeIf { src -> src.isNotBlank() },
+                                                )
+                                            }
+                                            .orEmpty()
+                                        val seenEpisodes = libraryEpisodes.map { it.uri }.toHashSet()
+                                        libraryEpisodes + PlayHistory.all(context)
+                                            .filter {
+                                                it.item.uri.startsWith("spotify:episode:") &&
+                                                        seenEpisodes.add(it.item.uri)
+                                            }
+                                            .map { it.item }
+                                    }
                                     val sourceUris = page?.items
                                         ?.filter { it.kind == ShelfKind.PLAYLIST && it.uri != playlistUri }
                                         ?.map { it.uri }
@@ -778,7 +787,9 @@ class MainActivity : ComponentActivity() {
 
                         LaunchedEffect(playback.trackUri, playback.title, playback.artistUri) {
                             val now = playback
-                            if (!now.trackUri.startsWith("spotify:track:") || now.title.isBlank()) {
+                            val addable = now.trackUri.startsWith("spotify:track:") ||
+                                    now.trackUri.startsWith("spotify:episode:")
+                            if (!addable || now.title.isBlank()) {
                                 return@LaunchedEffect
                             }
                             val cover = now.coverUrl.takeIf { it.isNotBlank() }

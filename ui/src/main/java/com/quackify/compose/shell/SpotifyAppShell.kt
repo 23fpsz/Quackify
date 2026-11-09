@@ -884,7 +884,7 @@ fun SpotifyAppShell(
             ?: playbackState?.devices?.firstOrNull { it.name == effectiveConnectedDevice }
         val activeDeviceKind = activeDevice?.kind
 
-        if (!flags.isPlaylistEditMode) {
+        if (!flags.isPlaylistEditMode && currentScreen != ShellScreen.ADD_TRACKS) {
             ShellBottomBar(
                 title = playerIdentity.title,
                 artist = playerIdentity.artist,
