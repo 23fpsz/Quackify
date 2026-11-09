@@ -84,6 +84,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.library.Krespot
+import com.quackify.backend.library.PlaylistSource
 import com.quackify.compose.home.toQuickAccessFallback
 
 private val log = Logs.of(Logs.Module.MAIN)
@@ -876,6 +877,37 @@ class MainActivity : ComponentActivity() {
                                     log.i("recommend '${track.title}' into playlist ok=$ok")
                                     if (ok) {
                                         val detail = Krespot.collections.collection(context, playlistUri)
+                                        playlistDetail = detail
+                                        playlistTracks = detail?.tracks?.map { it.toTrackItem() }
+                                    }
+                                }
+                            },
+                            onSavePlaylistOrder = { uri, order ->
+                                scope.launch {
+                                    val before = playlistTracks.orEmpty()
+                                    val current = before.map { it.uid }.toMutableList()
+                                    val target = order.map { it.uid }
+                                    if (target.any { it.isBlank() }) {
+                                        log.w("playlist order save '$uri': missing uids, skipping")
+                                        return@launch
+                                    }
+                                    var moved = 0
+                                    for (i in target.indices) {
+                                        if (current.getOrNull(i) == target[i]) continue
+                                        val anchor = current.getOrNull(i)
+                                        if (anchor.isNullOrBlank()) continue
+                                        if (!Krespot.playlists.moveItems(
+                                                context, uri, listOf(target[i]),
+                                                PlaylistSource.Position.BeforeUid(anchor),
+                                            )
+                                        ) continue
+                                        current.remove(target[i])
+                                        current.add(i, target[i])
+                                        moved++
+                                    }
+                                    log.i("playlist order save '$uri' -> $moved move(s) of ${target.size}")
+                                    if (moved > 0) {
+                                        val detail = Krespot.collections.collection(context, uri)
                                         playlistDetail = detail
                                         playlistTracks = detail?.tracks?.map { it.toTrackItem() }
                                     }

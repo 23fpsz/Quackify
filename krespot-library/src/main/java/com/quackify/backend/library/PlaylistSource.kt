@@ -304,66 +304,48 @@ object PlaylistSource {
         return ok
     }
 
-    suspend fun revision(context: Context, playlistUri: String): String? {
+    suspend fun moveItems(
+        context: Context,
+        playlistUri: String,
+        uids: List<String>,
+        position: Position,
+    ): Boolean {
         val playlist = id(playlistUri)
-        if (playlist.isBlank()) return null
-        val response = Net.get(
-            "$BASE/playlist/$playlist?decorate=revision",
-            headers(context),
-            "playlist/revision",
-        ) ?: return null
-        val revision = response.json()?.optString("revision").orEmpty()
-        log.i("revision $playlistUri -> '$revision' http=${response.code}")
-        return revision.takeIf { it.isNotBlank() }
+        if (playlist.isBlank() || uids.isEmpty()) {
+            log.w("moveItems: bad input '$playlistUri' uids=${uids.size}")
+            return false
+        }
+        val token = SpotifyAuth.token(context)
+        if (token.isBlank()) {
+            log.w("moveItems: no token")
+            return false
+        }
+        val newPosition = JSONObject().put("fromUid", JSONObject.NULL)
+        when (position) {
+            Position.TOP -> newPosition.put("moveType", "TOP_OF_PLAYLIST")
+            Position.BOTTOM -> newPosition.put("moveType", "BOTTOM_OF_PLAYLIST")
+            is Position.BeforeUid -> newPosition.put("moveType", "BEFORE_UID").put("fromUid", position.uid)
+            is Position.AfterUid -> newPosition.put("moveType", "AFTER_UID").put("fromUid", position.uid)
+        }
+        val variables = JSONObject()
+            .put("playlistUri", playlistUri)
+            .put("uids", JSONArray(uids))
+            .put("newPosition", newPosition)
+            .toString()
+        val json = Pathfinder.queryPost(context, token, OP_MOVE_ITEMS, variables, fallbackToGet = false)
+        val payload = json?.optJSONObject("data")?.optJSONObject("moveItemsInPlaylist")
+        val errors = json?.optJSONArray("errors")?.length() ?: 0
+        val ok = payload != null && errors == 0 &&
+            payload.optString("__typename") != "GenericError"
+        log.i("moveItems ${uids.size} uid(s) $position in $playlistUri ok=$ok errors=$errors")
+        return ok
     }
 
-    suspend fun moveTrack(context: Context, playlistUri: String, from: Int, to: Int): Boolean {
-        val playlist = id(playlistUri)
-        if (playlist.isBlank() || from < 0 || to < 0 || from == to) {
-            log.w("moveTrack: bad input '$playlistUri' from=$from to=$to")
-            return false
-        }
-        val base = revision(context, playlistUri)
-        if (base.isNullOrBlank()) {
-            log.w("moveTrack: no revision, an index op is rejected without baseRevision")
-            return false
-        }
-        val op = JSONObject().put("kind", "MOV").put(
-            "mov",
-            JSONObject()
-                .put("fromIndex", from)
-                .put("toIndex", to)
-                .put("length", 1)
-                .put("items", JSONArray()),
-        )
-        val delta = JSONObject()
-            .put("baseRevision", base)
-            .put(
-                "deltas",
-                JSONArray().put(
-                    JSONObject()
-                        .put("ops", JSONArray().put(op))
-                        .put(
-                            "info",
-                            JSONObject().put("source", JSONObject().put("client", "WEBPLAYER")),
-                        ),
-                ),
-            )
-            .put("wantResultingRevisions", false)
-            .put("wantSyncResult", false)
-            .put("nonces", JSONArray())
-            .toString()
-        val response = Net.postJson(
-            "$BASE/playlist/$playlist/changes",
-            delta,
-            protoHeaders(context),
-            "playlist/moveTrack",
-        )
-        val ok = response?.ok == true
-        log.i("moveTrack $playlistUri $from -> $to ok=$ok http=${response?.code ?: -1} " +
-                response?.body?.take(160).orEmpty()
-        )
-        return ok
+    sealed interface Position {
+        object TOP : Position
+        object BOTTOM : Position
+        data class BeforeUid(val uid: String) : Position
+        data class AfterUid(val uid: String) : Position
     }
 
     suspend fun hasCustomCover(context: Context, playlistUri: String): Boolean {

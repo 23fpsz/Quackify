@@ -195,6 +195,7 @@ fun TrackRow.toTrackItem(): TrackItem = TrackItem(
     artist = artists,
     isExplicit = explicit,
     uri = uri,
+    uid = uid,
     imageUrl = imageUrl.takeIf { it.isNotBlank() },
     saved = saved,
     durationMs = durationMs,

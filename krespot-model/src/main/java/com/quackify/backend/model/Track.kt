@@ -2,6 +2,7 @@ package com.quackify.backend.model
 
 data class TrackRow(
     val uri: String,
+    val uid: String = "",
     val title: String,
     val artists: String,
     val album: String,
