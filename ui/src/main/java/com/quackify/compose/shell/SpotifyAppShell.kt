@@ -201,7 +201,6 @@ fun SpotifyAppShell(
     onPlaylistDefaultName: (suspend () -> String)? = null,
     onCreatePlaylist: (suspend (name: String, description: String, cover: ByteArray?) -> String?)? = null,
     playlistSaved: Boolean? = null,
-    playlistPublished: Boolean? = null,
     playlistEditDraft: PlaylistEditDraft? = null,
     editablePlaylistUris: Set<String> = emptySet(),
     onEditPlaylist: ((uri: String) -> Unit)? = null,
@@ -209,7 +208,6 @@ fun SpotifyAppShell(
     onDeletePlaylist: (suspend (uri: String) -> Boolean)? = null,
     onDismissEditPlaylist: () -> Unit = {},
     onTogglePlaylistSaved: ((uri: String, saved: Boolean) -> Unit)? = null,
-    onTogglePlaylistPublished: ((uri: String, published: Boolean) -> Unit)? = null,
     onRemoveLibraryItem: ((uri: String) -> Unit)? = null,
     onCreateFolder: (suspend (name: String) -> String?)? = null,
     onRenameFolder: ((uri: String, name: String) -> Unit)? = null,
@@ -1024,7 +1022,6 @@ fun SpotifyAppShell(
             playlistEntity = playlistEntity,
             playlistEditable = isPlaylistUri && playlistDetail?.editable == true,
             playlistSaved = if (isPlaylistUri) playlistSaved else null,
-            playlistPublished = if (isPlaylistUri) playlistPublished else null,
             albumTitle = active.albumTitle,
             albumArtist = active.albumArtist,
             albumCoverUrl = active.albumCoverUrl,
@@ -1101,11 +1098,6 @@ fun SpotifyAppShell(
             onTogglePlaylistSaved = {
                 if (isPlaylistUri && active.playlistUri.isNotEmpty()) {
                     onTogglePlaylistSaved?.invoke(active.playlistUri, !(playlistSaved ?: false))
-                }
-            },
-            onTogglePlaylistPublished = {
-                if (isPlaylistUri && active.playlistUri.isNotEmpty()) {
-                    onTogglePlaylistPublished?.invoke(active.playlistUri, !(playlistPublished ?: false))
                 }
             },
             onDeletePlaylist = {

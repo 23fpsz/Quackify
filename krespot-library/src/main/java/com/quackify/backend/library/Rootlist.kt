@@ -270,55 +270,6 @@ object Rootlist {
         )
 
 
-    suspend fun setPublished(context: Context, uri: String, published: Boolean): Boolean {
-        if (uri.isBlank()) return false
-        val user = username(context)
-        if (user.isBlank()) {
-            log.w("setPublished: no username yet")
-            return false
-        }
-        val op = JSONObject().put("kind", "UPDATE_ITEM_ATTRIBUTES").put(
-            "updateItemAttributes",
-            JSONObject()
-                .put(
-                    "newAttributes",
-                    JSONObject()
-                        .put(
-                            "values",
-                            JSONObject()
-                                .put("public", published)
-                                .put("formatAttributes", JSONArray())
-                                .put("availableSignals", JSONArray()),
-                        )
-                        .put("noValue", JSONArray()),
-                )
-                .put("item", JSONObject().put("uri", uri)),
-        )
-        val json = JSONObject()
-            .put(
-                "deltas",
-                JSONArray().put(JSONObject().put("ops", JSONArray().put(op)).put("info", info())),
-            )
-            .put("wantResultingRevisions", false)
-            .put("wantSyncResult", false)
-            .put("nonces", JSONArray())
-        val response = Net.postJson(
-            "$BASE/$user/rootlist/changes",
-            json.toString(),
-            headers(context),
-            "rootlist/setPublished",
-        )
-        val ok = response?.ok == true
-        log.i("setPublished $uri -> $published ok=$ok http=${response?.code ?: -1} " +
-                response?.body?.take(160).orEmpty()
-        )
-        if (ok) {
-            lastRead = null
-            LibraryPageSource.invalidate()
-        }
-        return ok
-    }
-
     /** The rootlist document, served from a short-lived cache when it was just read. */
     private suspend fun read(context: Context, tag: String): JSONObject? {
         lastRead?.takeIf { System.currentTimeMillis() - it.first < READ_CACHE_MS }?.let { return it.second }
@@ -335,24 +286,6 @@ object Rootlist {
         val json = response.json() ?: return null
         lastRead = System.currentTimeMillis() to json
         return json
-    }
-
-    suspend fun published(context: Context, uri: String): Boolean? {
-        if (uri.isBlank()) return null
-        val json = read(context, "rootlist/read") ?: return null
-        val items = json.optJSONObject("contents")?.optJSONArray("items") ?: return null
-        for (i in 0 until items.length()) {
-            val node = items.optJSONObject(i) ?: continue
-            if (node.optString("uri") != uri) continue
-            val attributes = node.optJSONObject("attributes")
-            val value = attributes?.optBoolean("public")
-            log.i("published $uri -> $value (attribute " +
-                    "${if (attributes?.has("public") == true) "present" else "absent"})"
-            )
-            return value ?: false
-        }
-        log.i("published $uri -> null, not in the rootlist")
-        return null
     }
 
     suspend fun saved(context: Context, uri: String): Boolean? {
