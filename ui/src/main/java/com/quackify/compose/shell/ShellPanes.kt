@@ -848,7 +848,8 @@ internal fun ShellFolderPane(
 internal fun ShellPlaylistEditSheets(
     editDraft: PlaylistEditDraft?,
     onEditSave: (suspend (String, String, String, ByteArray?, Boolean) -> Boolean)?,
-    onDismissEdit: () -> Unit
+    onDismissEdit: () -> Unit,
+    onDeletePlaylist: (suspend (String) -> Boolean)?
 ) {
     val scope = rememberCoroutineScope()
     if (editDraft != null) {
@@ -864,6 +865,10 @@ internal fun ShellPlaylistEditSheets(
                     val ok = onEditSave?.invoke(uri, name, description, cover, clearCover) ?: false
                     if (ok) onDismissEdit()
                 }
+            },
+            onDeletePlaylist = {
+                onDismissEdit()
+                scope.launch { onDeletePlaylist?.invoke(editDraft.uri) }
             },
             onDismiss = onDismissEdit
         )
