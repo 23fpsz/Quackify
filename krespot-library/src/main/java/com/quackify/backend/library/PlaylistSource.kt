@@ -514,7 +514,9 @@ object PlaylistSource {
         val payload = data?.optJSONObject("addItemsToPlaylist")
             ?: data?.optJSONObject("AddItemsToPlaylistPayload")
         val errors = json?.optJSONArray("errors")?.length() ?: 0
-        val ok = payload != null && errors == 0
+        val typename = payload?.optString("__typename").orEmpty()
+        val ok = payload != null && errors == 0 &&
+            typename != "NotFound" && typename != "GenericError"
         log.i("addTrack $trackUri -> $playlistUri ok=$ok errors=$errors " +
                 "keys=${data?.keys()?.asSequence()?.toList()}"
         )
