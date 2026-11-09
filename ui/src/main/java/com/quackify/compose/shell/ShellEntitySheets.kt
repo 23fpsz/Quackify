@@ -1,0 +1,181 @@
+package com.quackify.compose.shell
+
+import android.content.Context
+import androidx.compose.runtime.Composable
+import com.quackify.compose.library.LibraryItem
+import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.sheets.FolderOptionsSheet
+import com.quackify.compose.sheets.FolderSheet
+import com.quackify.compose.sheets.EntityOptionsSheet
+import com.quackify.compose.sheets.SpotifyCreateNameDialog
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+
+@Composable
+internal fun ShellEntitySheets(
+    flags: ShellUiFlags,
+    local: ShellLocalState,
+    active: ShellActiveEntity,
+    navController: ShellNavController,
+    actions: ShellActions,
+    context: Context,
+    shellScope: CoroutineScope,
+    libraryFolderChoices: List<Pair<String, String>>,
+    editablePlaylistUris: Set<String>,
+    albumTracks: List<TrackItem>?,
+    folderItems: List<LibraryItem>?,
+    onEditPlaylist: ((String) -> Unit)?,
+    onRemoveLibraryItem: ((String) -> Unit)?,
+    onDeletePlaylist: (suspend (String) -> Boolean)?,
+    onMoveToFolder: ((String, String) -> Unit)?,
+    onCreateFolder: (suspend (String) -> String?)?,
+    onRenameFolder: ((String, String) -> Unit)?,
+    onDeleteFolder: ((String) -> Unit)?,
+    onEditPlaylistDetails: (suspend (String, String, String, ByteArray?, Boolean) -> Boolean)?,
+    onCopyEntityLink: (String) -> Unit,
+    onShareEntity: (String) -> Unit,
+    playerListener: ComposePlayerListener?,
+) {
+    local.libraryItemOptions?.let { entity ->
+        val editable = entity.uri in editablePlaylistUris
+        val removable = isCollectionUri(entity.uri).not()
+        EntityOptionsSheet(
+            entity = entity,
+            isOpen = true,
+            onDismiss = { local.libraryItemOptions = null },
+            canEditPlaylist = editable,
+            onEditPlaylist = { onEditPlaylist?.invoke(entity.uri) },
+            isSaved = if (removable) true else null,
+            onSaveToggle = { if (removable) onRemoveLibraryItem?.invoke(entity.uri) },
+            canMoveToFolder = entity.uri.startsWith("spotify:playlist:"),
+            onMoveToFolder = {
+                local.folderDraft = FolderDraft(
+                    mode = FolderMode.PICKER,
+                    folderUri = entity.uri,
+                    title = entity.title,
+                    folders = libraryFolderChoices,
+                )
+            },
+            canDeletePlaylist = editable,
+            onDeletePlaylist = {
+                shellScope.launch {
+                    onDeletePlaylist?.invoke(entity.uri)
+                }
+            },
+            onCopyLink = { onCopyEntityLink(entity.uri) },
+            onAddToQueue = when {
+                entity.uri.startsWith("spotify:episode:") -> {
+                    { playerListener?.onQueueAdd(entity.uri) }
+                }
+                entity.uri.startsWith("spotify:album:") -> {
+                    {
+                        val rows = albumTracks.orEmpty()
+                        if (rows.isEmpty()) {
+                            playerListener?.onQueueAdd(entity.uri)
+                        } else {
+                            rows.forEach { row -> playerListener?.onQueueAdd(row.uri) }
+                        }
+                    }
+                }
+                else -> null
+            },
+            onShare = { onShareEntity(entity.uri) }
+        )
+    }
+
+    local.folderDraft?.let { draft ->
+        if (draft.mode == FolderMode.PICKER) {
+            FolderSheet(
+                draft = draft,
+                onDismiss = { local.folderDraft = null },
+                onSubmit = {},
+                onPick = { folderUri ->
+                    local.folderDraft = null
+                    onMoveToFolder?.invoke(draft.folderUri, folderUri)
+                }
+            )
+        } else {
+            SpotifyCreateNameDialog(
+                isOpen = true,
+                title = if (draft.mode == FolderMode.CREATE) "Give your folder a name" else "Rename folder",
+                initialName = if (draft.mode == FolderMode.CREATE) "New folder" else draft.title,
+                confirmLabel = if (draft.mode == FolderMode.CREATE) "Create" else "Save",
+                cancelLabel = "Cancel",
+                onConfirm = { name ->
+                    val currentDraft = local.folderDraft
+                    local.folderDraft = null
+                    if (currentDraft?.mode == FolderMode.CREATE) {
+                        shellScope.launch {
+                            onCreateFolder?.invoke(name)
+                        }
+                    } else if (currentDraft?.mode == FolderMode.RENAME) {
+                        onRenameFolder?.invoke(currentDraft.folderUri, name)
+                    }
+                },
+                onDismiss = { local.folderDraft = null }
+            )
+        }
+    }
+
+    local.activeFolderOptionsItem?.let { folderItem ->
+        FolderOptionsSheet(
+            isOpen = true,
+            folderTitle = folderItem.title,
+            playlistCount = if (folderItem.uri == active.folderUri) folderItems?.size ?: 0 else 0,
+            onMoveToFolder = {
+                val targetUri = folderItem.uri
+                val targetTitle = folderItem.title
+                local.activeFolderOptionsItem = null
+                local.folderDraft = FolderDraft(
+                    mode = FolderMode.PICKER,
+                    folderUri = targetUri,
+                    title = targetTitle,
+                    folders = libraryFolderChoices
+                )
+            },
+            onRenameFolder = {
+                val targetUri = folderItem.uri
+                val targetTitle = folderItem.title
+                local.activeFolderOptionsItem = null
+                local.folderDraft = FolderDraft(
+                    mode = FolderMode.RENAME,
+                    folderUri = targetUri,
+                    title = targetTitle
+                )
+            },
+            onMoveToLibrary = {
+                val targetUri = folderItem.uri
+                local.activeFolderOptionsItem = null
+                onMoveToFolder?.invoke(targetUri, "")
+            },
+            onDeleteFolder = {
+                val targetUri = folderItem.uri
+                local.activeFolderOptionsItem = null
+                onDeleteFolder?.invoke(targetUri)
+                if (navController.currentScreen == ShellScreen.FOLDER && active.folderUri == targetUri) {
+                    navController.handleBack()
+                }
+            },
+            onDismiss = { local.activeFolderOptionsItem = null }
+        )
+    }
+
+    SpotifyCreateNameDialog(
+        isOpen = flags.isRenamePlaylistDialogOpen,
+        title = "Give your playlist a name",
+        initialName = active.playlistTitle,
+        confirmLabel = "Save",
+        cancelLabel = "Cancel",
+        onConfirm = { newTitle ->
+            flags.isRenamePlaylistDialogOpen = false
+            val uri = active.playlistUri
+            if (uri.isNotBlank()) {
+                active.playlistTitle = newTitle
+                shellScope.launch {
+                    onEditPlaylistDetails?.invoke(uri, newTitle, "", null, false)
+                }
+            }
+        },
+        onDismiss = { flags.isRenamePlaylistDialogOpen = false }
+    )
+}
