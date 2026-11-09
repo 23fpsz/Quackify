@@ -1295,7 +1295,8 @@ fun SpotifyAppShell(
         ShellPlaylistEditSheets(
             editDraft = playlistEditDraft,
             onEditSave = onEditPlaylistDetails,
-            onDismissEdit = onDismissEditPlaylist
+            onDismissEdit = onDismissEditPlaylist,
+            onDeletePlaylist = onDeletePlaylist
         )
 
         ShellEntitySheets(
