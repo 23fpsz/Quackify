@@ -18,6 +18,10 @@ object PlaylistSource {
     const val OP_EDITABLE = "editablePlaylists"
     const val OP_ADD_TRACK = "addToPlaylist"
 
+    const val OP_MOVE_ITEMS = "moveItemsInPlaylist"
+
+    const val DUMMY_TRACK_URI = "spotify:track:0000000000000000000000"
+
     private const val BASE = "https://spclient.wg.spotify.com/playlist/v2"
 
     private const val UPLOAD = "https://image-upload.spotify.com/v4"
@@ -55,7 +59,7 @@ object PlaylistSource {
             return emptyList()
         }
         val uris = JSONArray()
-        if (trackUri.isNotBlank()) uris.put(trackUri)
+        uris.put(trackUri.ifBlank { DUMMY_TRACK_URI })
         val out = ArrayList<PlaylistChoice>()
         var skipped = 0
         var offset = 0
