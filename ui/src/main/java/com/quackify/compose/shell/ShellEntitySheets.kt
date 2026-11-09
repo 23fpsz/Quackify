@@ -110,6 +110,9 @@ internal fun ShellEntitySheets(
                             onCreateFolder?.invoke(name)
                         }
                     } else if (currentDraft?.mode == FolderMode.RENAME) {
+                        if (currentDraft.folderUri == active.folderUri) {
+                            active.folderTitle = name
+                        }
                         onRenameFolder?.invoke(currentDraft.folderUri, name)
                     }
                 },
