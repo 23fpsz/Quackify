@@ -537,6 +537,7 @@ internal fun ShellPlaylistPane(
     onRefreshRecommendations: (() -> Unit)?,
     onAddRecommended: ((TrackItem) -> Unit)?,
     onSavePlaylistOrder: ((String, List<TrackItem>) -> Unit)?,
+    onEditPlaylistDetails: (suspend (String, String, String, ByteArray?, Boolean) -> Boolean)?,
     onTogglePlaylistSaved: ((String, Boolean) -> Unit)?,
     handleBack: () -> Unit,
     handleTrackOptions: (TrackItem) -> Unit,
@@ -650,6 +651,9 @@ internal fun ShellPlaylistPane(
             onEditCoverClick = onEditCoverClick,
             onEditModeChange = onEditModeChange,
             onSaveOrder = { order -> onSavePlaylistOrder?.invoke(activePlaylistUri, order) },
+            onEditDetails = { name, description, cover, clearCover ->
+                onEditPlaylistDetails?.invoke(activePlaylistUri, name, description, cover, clearCover)
+            },
             isEditable = playlistDetail?.editable == true
         )
     }
