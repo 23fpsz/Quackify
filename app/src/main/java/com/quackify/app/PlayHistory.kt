@@ -32,7 +32,7 @@ object PlayHistory {
             val node = array.optJSONObject(i) ?: continue
 
             val uri = node.optString("uri")
-            if (!uri.startsWith("spotify:track:")) continue
+            if (!uri.startsWith("spotify:track:") && !uri.startsWith("spotify:episode:")) continue
 
             val candidate = PlayedTrack(
                 item = TrackItem(
@@ -66,7 +66,9 @@ object PlayHistory {
         track: TrackItem,
         playedAtMs: Long,
     ): List<PlayedTrack> {
-        if (!track.uri.startsWith("spotify:track:")) {
+        if (!track.uri.startsWith("spotify:track:") &&
+            !track.uri.startsWith("spotify:episode:")
+        ) {
             return all(context)
         }
 
