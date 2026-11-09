@@ -148,6 +148,7 @@ fun SpotifyPlaylistScreen(
     onPlaylistOptionsClick: () -> Unit = {},
     onEditModeChange: (Boolean) -> Unit = {},
     onSaveOrder: (List<TrackItem>) -> Unit = {},
+    isEditable: Boolean = false,
     onShareClick: () -> Unit = {},
     isSaved: Boolean? = null,
     onSaveToggle: () -> Unit = {},
@@ -612,7 +613,11 @@ fun SpotifyPlaylistScreen(
                                     onEditCoverClick = { onEditCoverClick?.invoke() ?: onPlaylistOptionsClick() },
                                     onChangeTitle = onChangeTitle,
                                     onShareClick = onShareClick,
-                                    onAddTracksClick = { onAddTracksClick?.invoke() ?: run { isSearching = true } }
+                                    onAddTracksClick = {
+                                        if (isEditable) {
+                                            onAddTracksClick?.invoke() ?: run { isSearching = true }
+                                        }
+                                    }
                                 )
                             } else {
                                 // Interactive Pull-Down Snapping Search Bar
@@ -973,7 +978,7 @@ fun SpotifyPlaylistScreen(
                 }
 
                 // In-List Filter Chips Bar matching Spotify specs:
-                if (displayedTracks.isNotEmpty()) {
+                if (displayedTracks.isNotEmpty() && isEditable) {
                     item(key = "filter_chips_row") {
                     Box(
                         modifier = Modifier
@@ -1060,7 +1065,7 @@ fun SpotifyPlaylistScreen(
                 }
 
                 // "Recommended Songs" Section (add_more_row_blend_playlist.xml)
-                if (!loading && !loadFailed && (recommendedTracks.isNotEmpty() || recommendationsLoading)) {
+                if (!loading && !loadFailed && isEditable && (recommendedTracks.isNotEmpty() || recommendationsLoading)) {
                     item {
                         Column(
                             modifier = Modifier
@@ -1306,7 +1311,7 @@ fun SpotifyPlaylistScreen(
 
             // Pinned Filter Chips Bar directly below the Top Bar:
             // Locks at toolbarBottom as soon as list scrolls beneath the top bar
-            if (displayedTracks.isNotEmpty() && (chipsRowYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
+            if (displayedTracks.isNotEmpty() && isEditable && (chipsRowYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
