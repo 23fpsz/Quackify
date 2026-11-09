@@ -102,6 +102,7 @@ data class TrackItem(
     val artist: String,
     val isExplicit: Boolean = false,
     val uri: String = "",
+    val uid: String = "",
     val imageUrl: String? = null,
     val saved: Boolean? = null,
     val durationMs: Long = 0L,
@@ -146,6 +147,7 @@ fun SpotifyPlaylistScreen(
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onPlaylistOptionsClick: () -> Unit = {},
     onEditModeChange: (Boolean) -> Unit = {},
+    onSaveOrder: (List<TrackItem>) -> Unit = {},
     onShareClick: () -> Unit = {},
     isSaved: Boolean? = null,
     onSaveToggle: () -> Unit = {},
@@ -323,6 +325,7 @@ fun SpotifyPlaylistScreen(
                 onSave = { updatedList ->
                     currentTracks.clear()
                     currentTracks.addAll(updatedList)
+                    onSaveOrder(updatedList)
                     isEditMode = false
                     onEditModeChange(false)
                 },

@@ -131,8 +131,9 @@ object CollectionSource {
         val items = content?.optJSONArray("items")
         val rows = ArrayList<TrackRow>(items?.length() ?: 0)
         for (i in 0 until (items?.length() ?: 0)) {
-            val node = items?.optJSONObject(i)?.optJSONObject("itemV2") ?: continue
-            track(node.optJSONObject("data"), "")?.let(rows::add)
+            val entry = items?.optJSONObject(i) ?: continue
+            val node = entry.optJSONObject("itemV2") ?: continue
+            track(node.optJSONObject("data"), "")?.let { rows.add(it.copy(uid = entry.optString("uid"))) }
         }
         return rows
     }
