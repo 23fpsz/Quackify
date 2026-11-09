@@ -99,11 +99,6 @@ fun SpotifyCreateNameDialog(
                         )
                     )
                 )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                )
                 .imePadding(),
             contentAlignment = Alignment.Center
         ) {
