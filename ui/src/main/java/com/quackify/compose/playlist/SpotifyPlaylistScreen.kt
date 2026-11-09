@@ -925,6 +925,22 @@ fun SpotifyPlaylistScreen(
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.Transparent)
+                                            .clickable { isSortSheetOpen = true },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.encore_icon_sort_by_24),
+                                            contentDescription = "Sort",
+                                            tint = EncoreColors.TextSecondary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
                                 }
 
                                 Row(
@@ -997,8 +1013,7 @@ fun SpotifyPlaylistScreen(
                                 }
                             },
                             onEditClick = { isEditMode = true; onEditModeChange(true) },
-                            onNameDetailsClick = { isEditDetailsOpen = true },
-                            onSortClick = { isSortSheetOpen = true }
+                            onNameDetailsClick = { isEditDetailsOpen = true }
                         )
                     }
                 }
@@ -1331,8 +1346,7 @@ fun SpotifyPlaylistScreen(
                             }
                         },
                         onEditClick = { isEditMode = true; onEditModeChange(true) },
-                        onNameDetailsClick = { isEditDetailsOpen = true },
-                        onSortClick = { isSortSheetOpen = true }
+                        onNameDetailsClick = { isEditDetailsOpen = true }
                     )
                 }
             }
@@ -1376,7 +1390,6 @@ private fun PlaylistChipsRow(
     onAddClick: () -> Unit,
     onEditClick: () -> Unit,
     onNameDetailsClick: () -> Unit,
-    onSortClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -1404,12 +1417,6 @@ private fun PlaylistChipsRow(
             iconRes = R.drawable.encore_icon_edit_24,
             label = "Name & details",
             onClick = onNameDetailsClick
-        )
-
-        PlaylistChip(
-            iconRes = R.drawable.encore_icon_sort_by_24,
-            label = "Sort",
-            onClick = onSortClick
         )
 
         Spacer(modifier = Modifier.width(72.dp))
