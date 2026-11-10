@@ -225,10 +225,13 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         LaunchedEffect(playHistory) {
-                            favoriteArtistsOf(playHistory).map { it.artistUri }.distinct().forEach { uri ->
+                            favoriteArtistsOf(playHistory).forEach { artist ->
+                                val uri = artist.artistUri
                                 if (homeArtistImages.containsKey(uri)) return@forEach
-                                val fetched = runCatching { Krespot.artists.artist(context, uri)?.imageUrl }
-                                    .getOrNull()?.takeIf { it.isNotBlank() }
+                                val fetched = runCatching {
+                                    Search.section(context, com.quackify.backend.model.SearchKind.ARTIST, artist.artist.substringBefore(", "))
+                                        .firstOrNull { it.uri == uri }
+                                }.getOrNull()?.imageUrl?.takeIf { it.isNotBlank() }
                                 if (fetched != null) homeArtistImages[uri] = fetched
                             }
                         }

@@ -134,7 +134,7 @@ fun SpotifyHomeScreen(
     }
 
     val shelfSections = remember(shelves) {
-        shelves.orEmpty().filter { it.cards.isNotEmpty() }
+        shelves.orEmpty().filter { it.cards.isNotEmpty() || it.artists.isNotEmpty() }
     }
 
     // The tint comes from the first cover on screen, so the backdrop belongs
