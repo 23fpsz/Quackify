@@ -214,10 +214,28 @@ class MainActivity : ComponentActivity() {
                         val shelves = remember(feed) { feed.toShelves() }
                         // The listening history owns the first two shelves:
                         // Recently played and the favorite artists ranked by it.
-                        val historyShelves = remember(playHistory) {
+                        val homeArtistImages = remember { mutableStateMapOf<String, String>() }
+                        LaunchedEffect(feed) {
+                            feed.forEach { section ->
+                                section.items.forEach { item ->
+                                    if (item.uri.startsWith("spotify:artist:") && item.imageUrl.isNotBlank()) {
+                                        homeArtistImages[item.uri] = item.imageUrl
+                                    }
+                                }
+                            }
+                        }
+                        LaunchedEffect(playHistory) {
+                            favoriteArtistsOf(playHistory).map { it.artistUri }.distinct().forEach { uri ->
+                                if (homeArtistImages.containsKey(uri)) return@forEach
+                                val fetched = runCatching { Krespot.artists.artist(context, uri)?.imageUrl }
+                                    .getOrNull()?.takeIf { it.isNotBlank() }
+                                if (fetched != null) homeArtistImages[uri] = fetched
+                            }
+                        }
+                        val historyShelves = remember(playHistory, homeArtistImages.size) {
                             listOfNotNull(
                                 playHistory.map { it.item }.toRecentlyPlayedShelf(),
-                                favoriteArtistsOf(playHistory).toFavoriteArtistsShelf(),
+                                favoriteArtistsOf(playHistory).toFavoriteArtistsShelf(homeArtistImages),
                             )
                         }
                         LaunchedEffect(shelves) {
