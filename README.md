@@ -46,3 +46,7 @@ Quackify is a community driven project built with passion by:
 - **Main dev:** [23fpsz](https://github.com/23fpsz)
 - **Lead dev backend:** [xzyyysh](https://github.com/xzyyysh)
 - **Backend & UI dev:** [AldySan](https://github.com/AldySan)
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - see the [LICENSE](LICENSE) file for details.
