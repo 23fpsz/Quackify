@@ -202,6 +202,7 @@ fun SpotifyAppShell(
     onShowCredits: ((String) -> Unit)? = null,
     onAddToPlaylist: ((TrackItem) -> Unit)? = null,
     onPickPlaylist: ((PlaylistChoice, TrackItem) -> Unit)? = null,
+    onTogglePlaylist: ((PlaylistChoice, TrackItem, Boolean) -> Unit)? = null,
     onCreatePlaylistWith: ((TrackItem) -> Unit)? = null,
     onLoadPlaylistFolder: (suspend (trackUri: String, folderUri: String) -> List<PlaylistChoice>)? = null,
     onLoadTrackCount: (suspend (playlistUri: String) -> Int)? = null,
@@ -923,7 +924,22 @@ fun SpotifyAppShell(
                     runCatching { searchFieldFocusRequester.requestFocus() }
                 },
                 onPlayPause = handlePlayPause,
-                onLike = { if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = !localIsLiked },
+                onLike = {
+                    val playingUri = playbackState?.trackUri.orEmpty()
+                    if (!isLiked) {
+                        if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = true
+                    }
+                    val playingTrack = TrackItem(
+                        title = currentTrackTitle,
+                        artist = currentArtist,
+                        uri = playingUri,
+                        imageUrl = currentCoverUrl.takeIf { it.isNotBlank() },
+                        saved = true
+                    )
+                    local.addTrackTarget = playingTrack
+                    onAddToPlaylist?.invoke(playingTrack)
+                    flags.isAddToPlaylistOpen = true
+                },
                 onDeviceClick = { flags.isDeviceSheetOpen = true },
                 onBarClick = { isPlayerExpanded = true },
                 onSkipNext = handleSkipNext,
@@ -980,7 +996,22 @@ fun SpotifyAppShell(
             onPlayPause = handlePlayPause,
             onSkipNext = handleSkipNext,
             onSkipPrevious = handleSkipPrevious,
-            onLike = { if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = !localIsLiked },
+            onLike = {
+                val playingUri = playbackState?.trackUri.orEmpty()
+                if (!isLiked) {
+                    if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = true
+                }
+                val playingTrack = TrackItem(
+                    title = currentTrackTitle,
+                    artist = currentArtist,
+                    uri = playingUri,
+                    imageUrl = currentCoverUrl.takeIf { it.isNotBlank() },
+                    saved = true
+                )
+                local.addTrackTarget = playingTrack
+                onAddToPlaylist?.invoke(playingTrack)
+                flags.isAddToPlaylistOpen = true
+            },
             onShuffle = { if (playerListener != null) playerListener.onShuffleToggle() else localShuffleMode = localShuffleMode.next() },
             onRepeat = { if (playerListener != null) playerListener.onRepeatToggle() else localRepeatMode = localRepeatMode.next() },
             onSeek = { p -> if (playerListener != null) playerListener.onSeek((p * durationMs).toLong()) else { localProgress = p; localPositionMs = (p * durationMs).toLong() } },
@@ -1307,9 +1338,12 @@ fun SpotifyAppShell(
         }
 
         if (flags.isAddToPlaylistOpen) {
+            val target = local.addTrackTarget
+            val targetIsLiked = if (target?.uri == playbackState?.trackUri) isLiked else (target?.saved == true)
             AddToPlaylistSheet(
                 isOpen = true,
-                trackTitle = local.addTrackTarget?.title.orEmpty(),
+                trackTitle = target?.title.orEmpty(),
+                isTargetLiked = targetIsLiked,
                 choices = addToPlaylistChoices.orEmpty(),
                 isLoading = addToPlaylistChoices == null,
                 onPick = { choice ->
@@ -1322,7 +1356,21 @@ fun SpotifyAppShell(
                             onPickPlaylist?.invoke(choice, target)
                         }
                     }
-                    flags.isAddToPlaylistOpen = false
+                },
+                onToggle = { choice, isAdding ->
+                    val target = local.addTrackTarget
+                    if (target != null) {
+                        if (target.uri.startsWith("spotify:album:")) {
+                            val rows = albumTracks.orEmpty()
+                            rows.forEach { row ->
+                                onTogglePlaylist?.invoke(choice, row, isAdding)
+                                    ?: if (isAdding) onPickPlaylist?.invoke(choice, row) else Unit
+                            }
+                        } else {
+                            onTogglePlaylist?.invoke(choice, target, isAdding)
+                                ?: if (isAdding) onPickPlaylist?.invoke(choice, target) else Unit
+                        }
+                    }
                 },
                 // The sheet owns the folder drill-down; this feeds it the rows
                 // of the folder it entered, checks and all, for the same track.

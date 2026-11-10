@@ -1,6 +1,8 @@
 package com.quackify.compose.sheets
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,14 +56,30 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
+/**
+ * 1:1 Spotify "Saved in" (Add to Playlist) bottom sheet.
+ * Reverse-engineered from Spotify Mobile decompiled smali: `smali_classes4/p/xzl1.smali`, `zzl1.smali`.
+ *
+ * Structure:
+ * - Top drag handle (36dp x 4dp)
+ * - Top header bar: "Cancel" (left), "Done" (right)
+ * - Section headline: "Saved in" (if saved in 1+ destinations) / "Save in" (if empty) + green "New playlist" button
+ * - Destination rows:
+ *   - Liked Songs: 48dp purple-blue gradient square with white heart
+ *   - Playlists: 48dp artwork, title, subtitle (e.g. "142 songs"), trailing green check (✓) or outline plus (+)
+ *   - + New playlist row at the bottom
+ * - Floating bottom green pill button: "Done"
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddToPlaylistSheet(
     isOpen: Boolean,
     trackTitle: String,
+    isTargetLiked: Boolean = false,
     choices: List<PlaylistChoice>,
     isLoading: Boolean,
     onPick: (PlaylistChoice) -> Unit,
+    onToggle: ((choice: PlaylistChoice, isAdding: Boolean) -> Unit)? = null,
     onLoadFolder: (suspend (folderUri: String) -> List<PlaylistChoice>)? = null,
     // Answers "how many songs does this playlist hold" for the rows in view;
     // the sheet asks per uri so the counts work inside folders too.
@@ -83,9 +104,38 @@ fun AddToPlaylistSheet(
     val rows = currentRows ?: choices
     val inFolder = currentFolder != null
 
+    // Track selection state per playlist uri for instant UI feedback
+    val selectionState = remember {
+        mutableStateMapOf<String, Boolean>().apply {
+            choices.forEach { choice ->
+                val initialSelected = if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
+                    choice.containsTrack || isTargetLiked
+                } else {
+                    choice.containsTrack
+                }
+                put(choice.uri, initialSelected)
+            }
+        }
+    }
+
+    // Populate entries as choices finish loading asynchronously, without overwriting user mutations
+    LaunchedEffect(choices) {
+        choices.forEach { choice ->
+            if (!selectionState.containsKey(choice.uri)) {
+                val initialSelected = if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
+                    choice.containsTrack || isTargetLiked
+                } else {
+                    choice.containsTrack
+                }
+                selectionState[choice.uri] = initialSelected
+            }
+        }
+    }
+
+    // Number of destinations currently checked
+    val savedCount = selectionState.values.count { it }
+
     // Song count per playlist row, hydrated while the list is on screen.
-    // Counts are remembered by uri, so drilling into a folder and back out
-    // shows the root's counts again without another round trip.
     val trackCounts = remember { mutableStateMapOf<String, Int>() }
     LaunchedEffect(rows) {
         val loader = onLoadTrackCount ?: return@LaunchedEffect
@@ -104,6 +154,17 @@ fun AddToPlaylistSheet(
                     }.awaitAll()
                 }
             }
+    }
+
+    fun handleToggle(choice: PlaylistChoice) {
+        val currentlySelected = selectionState[choice.uri] ?: choice.containsTrack
+        val next = !currentlySelected
+        selectionState[choice.uri] = next
+        if (onToggle != null) {
+            onToggle(choice, next)
+        } else {
+            onPick(choice)
+        }
     }
 
     fun openFolder(folder: PlaylistChoice) {
@@ -133,7 +194,7 @@ fun AddToPlaylistSheet(
         dragHandle = {
             Box(
                 modifier = Modifier
-                    .padding(vertical = 12.dp)
+                    .padding(top = 10.dp, bottom = 4.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
@@ -146,45 +207,77 @@ fun AddToPlaylistSheet(
                 .fillMaxWidth()
                 .navigationBarsPadding()
         ) {
-            Text(
-                text = currentFolder?.name ?: "Add to playlist",
-                style = SpotifyTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = EncoreColors.TextPrimary
-                ),
+            // Top Bar: Cancel (left) - Done (right)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                textAlign = TextAlign.Center
-            )
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Cancel",
+                    style = SpotifyTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = EncoreColors.TextPrimary,
+                        fontSize = 15.sp
+                    ),
+                    modifier = Modifier
+                        .clickable(onClick = onDismiss)
+                        .padding(vertical = 4.dp)
+                )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Done",
+                    style = SpotifyTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = EncoreColors.TextPrimary,
+                        fontSize = 15.sp
+                    ),
+                    modifier = Modifier
+                        .clickable(onClick = onDismiss)
+                        .padding(vertical = 4.dp)
+                )
+            }
 
-            Text(
-                text = trackTitle,
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+            // Headline row: "Saved in" / "Save in" (left) + "New playlist" (right)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = if (inFolder) currentFolder?.name.orEmpty()
+                    else if (savedCount > 0) "Saved in" else "Save in",
+                    style = SpotifyTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp,
+                        color = EncoreColors.TextPrimary
+                    )
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(EncoreColors.PureBlack.copy(alpha = 0.5f))
-            )
+                if (!inFolder) {
+                    Text(
+                        text = "New playlist",
+                        style = SpotifyTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = EncoreColors.Green,
+                            fontSize = 14.sp
+                        ),
+                        modifier = Modifier
+                            .clickable(onClick = onCreateNew)
+                            .padding(vertical = 4.dp)
+                    )
+                }
+            }
 
             when {
                 isLoading || folderLoading -> Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp),
+                        .height(180.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     InlineLoadingDots(color = EncoreColors.TextSecondary)
@@ -193,7 +286,7 @@ fun AddToPlaylistSheet(
                 else -> LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp)
+                        .heightIn(max = 420.dp)
                 ) {
                     if (inFolder) {
                         // Way back out of the folder, above its rows.
@@ -203,7 +296,7 @@ fun AddToPlaylistSheet(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { backOutOfFolder() }
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
@@ -212,48 +305,15 @@ fun AddToPlaylistSheet(
                                     tint = EncoreColors.TextSecondary,
                                     modifier = Modifier.size(22.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = parentName?.let { "Back to $it" } ?: "Back to your playlists",
                                     style = SpotifyTheme.typography.bodyMedium.copy(
-                                        color = EncoreColors.TextSecondary
+                                        color = EncoreColors.TextSecondary,
+                                        fontWeight = FontWeight.Medium
                                     ),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    } else {
-                        item(key = "__new__") {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onCreateNew() }
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(EncoreColors.TextSecondary.copy(alpha = 0.18f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.encore_icon_plus_24),
-                                        contentDescription = "New playlist",
-                                        tint = EncoreColors.TextPrimary,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                Text(
-                                    text = "New playlist",
-                                    style = SpotifyTheme.typography.bodyMedium.copy(fontSize = 15.sp),
-                                    color = EncoreColors.TextPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
                                 )
                             }
                         }
@@ -279,72 +339,195 @@ fun AddToPlaylistSheet(
                         if (choice.kind == PlaylistChoice.Kind.FOLDER) {
                             AddToFolderRow(folder = choice, onOpen = { openFolder(choice) })
                         } else {
+                            val isSelected = selectionState[choice.uri] ?: choice.containsTrack
                             AddToPlaylistRow(
                                 choice = choice,
+                                isSelected = isSelected,
                                 songCount = trackCounts[choice.uri],
-                                onPick = { onPick(choice) }
+                                onToggle = { handleToggle(choice) }
                             )
+                        }
+                    }
+
+                    // Bottom "+ New playlist" row (matches Spotify baseline)
+                    if (!inFolder) {
+                        item(key = "__new_bottom_row__") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onCreateNew() }
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFF282828)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.encore_icon_plus_24),
+                                        contentDescription = "New playlist",
+                                        tint = EncoreColors.TextSecondary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "New playlist",
+                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium
+                                    ),
+                                    color = EncoreColors.TextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Bottom floating green "Done" button
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(EncoreColors.Green)
+                        .clickable(onClick = onDismiss)
+                        .padding(horizontal = 36.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Done",
+                        style = SpotifyTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = Color.Black
+                        )
+                    )
+                }
+            }
         }
     }
 }
 
 /**
- * A playlist (or the Liked Songs pseudo playlist) the track can be added to.
- * The green check marks the ones the answer flagged as already holding it,
- * and the right-aligned count says how many songs it holds right now.
+ * 1:1 Spotify playlist row with trailing checkmark (when in playlist) or plus (when not in playlist).
+ * When [choice.kind] is [PlaylistChoice.Kind.LIKED_SONGS], displays the official purple-blue gradient with heart.
  */
 @Composable
 private fun AddToPlaylistRow(
     choice: PlaylistChoice,
+    isSelected: Boolean,
     songCount: Int?,
-    onPick: () -> Unit,
+    onToggle: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onPick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        SpotifyArtworkImage(
-            imageUrl = choice.imageUrl.takeIf { it.isNotBlank() },
-            contentDescription = choice.name,
-            modifier = Modifier.size(44.dp),
-            cornerRadius = 4.dp
-        )
-        Text(
-            text = choice.name,
-            style = SpotifyTheme.typography.bodyMedium.copy(fontSize = 15.sp),
-            color = EncoreColors.TextPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        if (songCount != null && songCount >= 0) {
+        if (choice.kind == PlaylistChoice.Kind.LIKED_SONGS) {
+            // Official Spotify Liked Songs gradient square
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFF450AF5), Color(0xFF8E8EE5))
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_heart_active_24),
+                    contentDescription = choice.name,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        } else {
+            SpotifyArtworkImage(
+                imageUrl = choice.imageUrl.takeIf { it.isNotBlank() },
+                contentDescription = choice.name,
+                modifier = Modifier.size(48.dp),
+                cornerRadius = 4.dp
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "$songCount song" + if (songCount == 1) "" else "s",
-                style = SpotifyTheme.typography.bodySmall.copy(
-                    color = EncoreColors.TextSecondary
+                text = choice.name,
+                style = SpotifyTheme.typography.bodyMedium.copy(
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
                 ),
-                maxLines = 1
+                color = EncoreColors.TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
+
+            if (songCount != null && songCount >= 0) {
+                Text(
+                    text = "$songCount song" + if (songCount == 1) "" else "s",
+                    style = SpotifyTheme.typography.bodySmall.copy(
+                        color = EncoreColors.TextSecondary,
+                        fontSize = 13.sp
+                    ),
+                    maxLines = 1
+                )
+            }
         }
-        if (choice.containsTrack) {
-            Icon(
-                painter = painterResource(id = R.drawable.encore_icon_check_24),
-                contentDescription = "Already in ${choice.name}",
-                tint = EncoreColors.Green,
-                modifier = Modifier.size(20.dp)
-            )
+
+        // Trailing Selection Indicator: Green circle check (✓) or outline circle plus (+)
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(EncoreColors.Green),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_check_24),
+                    contentDescription = "Saved in ${choice.name}",
+                    tint = Color.Black,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .border(
+                        BorderStroke(1.5.dp, EncoreColors.TextSecondary.copy(alpha = 0.65f)),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_plus_24),
+                    contentDescription = "Save in ${choice.name}",
+                    tint = EncoreColors.TextSecondary,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
         }
-        Spacer(modifier = Modifier.width(4.dp))
     }
 }
 
@@ -358,27 +541,30 @@ private fun AddToFolderRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(48.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(EncoreColors.TextSecondary.copy(alpha = 0.18f)),
+                .background(Color(0xFF282828)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_folder_24),
                 contentDescription = null,
-                tint = EncoreColors.TextPrimary,
-                modifier = Modifier.size(22.dp)
+                tint = EncoreColors.TextSecondary,
+                modifier = Modifier.size(24.dp)
             )
         }
         Text(
             text = folder.name,
-            style = SpotifyTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+            style = SpotifyTheme.typography.bodyMedium.copy(
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium
+            ),
             color = EncoreColors.TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
