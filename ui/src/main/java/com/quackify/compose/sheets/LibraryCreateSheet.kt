@@ -37,7 +37,8 @@ import com.quackify.compose.theme.SpotifyTheme
 /**
  * Spotify Library Create Bottom Sheet (+ button).
  * When opened from root library: shows "Create" header + Playlist, Folder.
- * When opened from within a folder: shows Playlist, Folder (no header).
+ * When opened from within a folder: shows Playlist only (no header).
+ * Spotify does not support nested folders, so Folder is a root-only option.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,15 +96,17 @@ fun LibraryCreateSheet(
                 }
             )
 
-            CreateOptionItem(
-                title = "Folder",
-                subtitle = "Organize your playlists",
-                iconRes = R.drawable.encore_icon_folder_24,
-                onClick = {
-                    onDismiss()
-                    onCreateFolder()
-                }
-            )
+            if (showHeader) {
+                CreateOptionItem(
+                    title = "Folder",
+                    subtitle = "Organize your playlists",
+                    iconRes = R.drawable.encore_icon_folder_24,
+                    onClick = {
+                        onDismiss()
+                        onCreateFolder()
+                    }
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
         }

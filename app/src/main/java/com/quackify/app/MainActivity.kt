@@ -1194,14 +1194,18 @@ class MainActivity : ComponentActivity() {
                                     log.i("delete folder '$uri' ok=$ok")
                                 }
                             },
-                            onMoveToFolder = { playlistUri, folderUri ->
+                            onMoveToFolder = { playlistUri, targetFolderUri ->
                                 scope.launch {
-                                    val ok = if (folderUri.isBlank()) {
+                                    val ok = if (targetFolderUri.isBlank()) {
                                         Krespot.folders.removeFromFolder(context, playlistUri)
                                     } else {
-                                        Krespot.folders.moveIntoFolder(context, playlistUri, folderUri)
+                                        Krespot.folders.moveIntoFolder(context, playlistUri, targetFolderUri)
                                     }
-                                    log.i("move '$playlistUri' into '$folderUri' ok=$ok")
+                                    log.i("move '$playlistUri' into '$targetFolderUri' ok=$ok")
+                                    if (ok && folderUri.isNotBlank()) {
+                                        folderItems = null
+                                        folderFetch++
+                                    }
                                 }
                             },
                             artistTracks = artistTracks,
