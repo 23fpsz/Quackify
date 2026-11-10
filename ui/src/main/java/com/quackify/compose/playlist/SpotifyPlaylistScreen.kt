@@ -96,6 +96,8 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
 import com.quackify.compose.theme.rememberBottomPadding
+import com.quackify.compose.util.search.GenericSearchEngine
+import com.quackify.compose.util.search.SearchableFieldExtractor
 import kotlinx.coroutines.launch
 
 data class TrackItem(
@@ -114,6 +116,12 @@ data class TrackItem(
     val trackNumber: Int = 0,
     val hasVideo: Boolean = false
 )
+
+private val trackSearchEngine = GenericSearchEngine<TrackItem>(maxResult = Int.MAX_VALUE)
+
+private val TRACK_SEARCH_FIELDS = SearchableFieldExtractor<TrackItem> {
+    arrayOf(it.title, it.artist, it.albumName)
+}
 
 enum class PlaylistSort(
     val label: String,
@@ -206,14 +214,11 @@ fun SpotifyPlaylistScreen(
     }
 
     val displayedTracks = remember(tracks, currentTracks, searchQuery, sortOption, sortDirection) {
-        val base = if (searchQuery.isBlank()) {
+        val query = searchQuery.trim()
+        val base = if (query.isEmpty()) {
             currentTracks.toList()
         } else {
-            currentTracks.filter {
-                it.title.contains(searchQuery, ignoreCase = true) ||
-                it.artist.contains(searchQuery, ignoreCase = true) ||
-                it.albumName.contains(searchQuery, ignoreCase = true)
-            }
+            trackSearchEngine.filter(currentTracks, query, TRACK_SEARCH_FIELDS)
         }
         when (sortOption) {
             PlaylistSort.TITLE -> {
