@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -23,6 +24,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -131,13 +133,12 @@ private const val REVEAL_CONTROLS_DELAY_MS = 160
 private const val REVEAL_REST_DELAY_MS = 220
 private const val REVEAL_RISE_FRACTION = 0.06f
 private const val ARTWORK_FADE_FRACTION = 0.42f
-private const val ARTWORK_ASPECT_RATIO = 0.90f
-private const val ARTWORK_TOP_DROP = 0.05f
 
 /** Canvas banners are glued to the status bar and zoomed to hide the seam. */
 private const val CANVAS_FADE_FRACTION = 0.30f
 private const val CANVAS_ZOOM = 1.06f
 private val HEADER_ROW_HEIGHT = 60.dp
+private val PEEK_HEIGHT = 44.dp
 
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
@@ -274,13 +275,44 @@ fun SpotifyNowPlayingScreen(
     val effectiveIsLoading = isLoading
     val effectiveLyricsVisible = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
 
+    // 1-line lyrics height & bottom spacer: collapses cleanly to 0dp when lyrics are absent
+    // to eliminate any dead space between artwork and track info!
+    val lyricLineHeight by animateDpAsState(
+        targetValue = if (effectiveLyricsVisible) 36.dp else 0.dp,
+        animationSpec = tween(
+            durationMillis = 350,
+            easing = EncoreAnimation.DecelerateInterpolator
+        ),
+        label = "lyricLineHeight"
+    )
+    val lyricBottomSpacerHeight by animateDpAsState(
+        targetValue = if (effectiveLyricsVisible) 28.dp else 0.dp,
+        animationSpec = tween(
+            durationMillis = 350,
+            easing = EncoreAnimation.DecelerateInterpolator
+        ),
+        label = "lyricBottomSpacerHeight"
+    )
+
+    // When lyrics become available, the album art smoothly glides UPWARD
+    // to accommodate the 1-line lyrics while the player controls remain at their exact vertical positions!
+    val artworkPushUpOffset by animateDpAsState(
+        targetValue = if (effectiveLyricsVisible) 0.dp else 40.dp,
+        animationSpec = tween(
+            durationMillis = 350,
+            easing = EncoreAnimation.DecelerateInterpolator
+        ),
+        label = "artworkPushUpOffset"
+    )
+
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = screenHeightPx * 0.5f
-    val artworkTopDrop = (configuration.screenWidthDp / ARTWORK_ASPECT_RATIO * ARTWORK_TOP_DROP).dp
-    val artworkHeight = (configuration.screenWidthDp / ARTWORK_ASPECT_RATIO).dp
+    // Full artwork extends from top edge to the same bottom baseline as standard mode
+    // (status bar ~36-40dp + 60dp header + 24dp spacing + (screenWidth - 48dp) artwork)
+    val fullArtworkHeight = (configuration.screenWidthDp + 76).dp
 
     // Reset translation whenever the screen is composed
     LaunchedEffect(Unit) {
@@ -333,13 +365,14 @@ fun SpotifyNowPlayingScreen(
         onSnapBack = snapBackPlayer
     )
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .graphicsLayer {
                 translationY = playerOffsetY.value.coerceAtLeast(0f)
             }
     ) {
+        val viewportHeight = maxHeight
         val dynamicArtworkColor by rememberDominantColor(
             imageUrl = coverUrl,
             fallbackSeed = title + artist,
@@ -436,10 +469,13 @@ fun SpotifyNowPlayingScreen(
                         NowPlayingSyncedLyricLine(
                             lyricText = activeLyricLine,
                             visible = effectiveLyricsVisible,
+                            height = if (effectiveLyricsVisible) 36.dp else 0.dp,
                             onOpenLyrics = { isLyricsFullscreen = true }
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        if (effectiveLyricsVisible) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
 
                         NowPlayingTrackInfoRow(
                             title = title,
@@ -449,8 +485,7 @@ fun SpotifyNowPlayingScreen(
                             onTitleClick = onTitleClick,
                             onArtistClick = onArtistClick,
                             onLikeClick = onLikeClick,
-                            onBanClick = onBanClick,
-                            coverUrl = coverUrl
+                            onBanClick = onBanClick
                         )
 
                         Spacer(modifier = Modifier.height(20.dp))
@@ -499,7 +534,9 @@ fun SpotifyNowPlayingScreen(
                         )
 
                         if (!effectiveIsLoading && artist.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(EncoreSpacers.Base))
+                            if (effectiveLyricsVisible) {
+                                Spacer(modifier = Modifier.height(EncoreSpacers.Base))
+                            }
 
                             NowPlayingAboutArtistCard(
                                 artist = artist,
@@ -522,41 +559,60 @@ fun SpotifyNowPlayingScreen(
                         .verticalScroll(state = scrollState, enabled = isScrollEnabled),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (fullArtwork) {
-                        // Full-bleed banner: the artwork starts at the very top of the screen
-                        // behind the status bar and dissolves into the backdrop, with the
-                        // header overlaying it so both scroll together without pushing the art down.
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
-                            ) {
-                                Spacer(modifier = Modifier.height(if (canvasActive) 0.dp else artworkTopDrop))
-                                NowPlayingArtworkCard(
-                                    title = title,
-                                    coverUrl = coverUrl,
-                                    dominantColor = dynamicArtworkColor,
-                                    backgroundColor = animatedDominantColor,
-                                    canvasFilePath = canvasFilePath,
-                                    isCanvasEnabled = canvasActive,
-                                    gestureModifier = artworkGestureModifier,
-                                    fullBleed = true,
-                                    fadeFraction = if (canvasActive) CANVAS_FADE_FRACTION else ARTWORK_FADE_FRACTION,
-                                    canvasZoom = CANVAS_ZOOM,
+                    // Main Player Container: Constrained to viewport height minus peek height,
+                    // exactly matching Spotify's FullScreenLayout and negative topMargin PeekScrollView!
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(viewportHeight - PEEK_HEIGHT),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (fullArtwork) {
+                            // Full-bleed banner mode: artwork begins at the very top edge behind status bar
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .then(
-                                            if (canvasActive) {
-                                                Modifier.height(artworkHeight + artworkTopDrop)
-                                            } else {
-                                                Modifier.aspectRatio(ARTWORK_ASPECT_RATIO)
-                                            }
-                                        )
-                                        .graphicsLayer { translationX = artworkOffsetX.value }
-                                )
+                                        .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
+                                ) {
+                                    NowPlayingArtworkCard(
+                                        title = title,
+                                        coverUrl = coverUrl,
+                                        dominantColor = dynamicArtworkColor,
+                                        backgroundColor = animatedDominantColor,
+                                        canvasFilePath = canvasFilePath,
+                                        isCanvasEnabled = canvasActive,
+                                        gestureModifier = artworkGestureModifier,
+                                        fullBleed = true,
+                                        fadeFraction = if (canvasActive) CANVAS_FADE_FRACTION else ARTWORK_FADE_FRACTION,
+                                        canvasZoom = CANVAS_ZOOM,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(fullArtworkHeight)
+                                            .graphicsLayer { translationX = artworkOffsetX.value }
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .statusBarsPadding()
+                                ) {
+                                    NowPlayingHeaderRow(
+                                        resolvedContextTitle = resolvedContextTitle,
+                                        contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                                        onCollapseClick = onCollapseClick,
+                                        onMoreClick = onMoreClick,
+                                        dominantColor = animatedDominantColor,
+                                        dragModifier = headerDragModifier
+                                    )
+                                }
                             }
 
+                            Spacer(modifier = Modifier.weight(1f))
+                        } else {
+                            // Standard card mode matching revised_template_overlay.xml:
+                            // 1. Header (status bar padding + 60dp)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -571,64 +627,53 @@ fun SpotifyNowPlayingScreen(
                                     dragModifier = headerDragModifier
                                 )
                             }
-                        }
-                    } else {
-                        // Standard card mode: header with statusBarsPadding, 24dp spacing, and inset artwork
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                        ) {
-                            NowPlayingHeaderRow(
-                                resolvedContextTitle = resolvedContextTitle,
-                                contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
-                                onCollapseClick = onCollapseClick,
-                                onMoreClick = onMoreClick,
-                                dominantColor = animatedDominantColor,
-                                dragModifier = headerDragModifier
-                            )
-                        }
 
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp)
-                                .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
-                        ) {
-                            NowPlayingArtworkCard(
-                                title = title,
-                                coverUrl = coverUrl,
-                                dominantColor = dynamicArtworkColor,
-                                backgroundColor = animatedDominantColor,
-                                canvasFilePath = canvasFilePath,
-                                isCanvasEnabled = canvasActive,
-                                gestureModifier = artworkGestureModifier,
-                                fullBleed = false,
-                                fadeFraction = 0f,
+                            // 2. Track Carousel Artwork: Centered vertically in available space
+                            // between header barrier and footer barrier via weight(1f)!
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .aspectRatio(1.0f)
-                                    .graphicsLayer { translationX = artworkOffsetX.value }
-                            )
+                                    .weight(1f)
+                                    .padding(horizontal = 24.dp)
+                                    .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                NowPlayingArtworkCard(
+                                    title = title,
+                                    coverUrl = coverUrl,
+                                    dominantColor = dynamicArtworkColor,
+                                    backgroundColor = animatedDominantColor,
+                                    canvasFilePath = canvasFilePath,
+                                    isCanvasEnabled = canvasActive,
+                                    gestureModifier = artworkGestureModifier,
+                                    fullBleed = false,
+                                    fadeFraction = 0f,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1.0f)
+                                        .graphicsLayer { translationX = artworkOffsetX.value }
+                                )
+                            }
                         }
-                    }
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .revealAt(reveal, REVEAL_INFO_DELAY_MS / REVEAL_MS.toFloat())
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // 3. Player Overlay Footer: anchored at the bottom (matches @id/player_overlay_footer)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // 1-line synchronized lyrics line
                             NowPlayingSyncedLyricLine(
                                 lyricText = activeLyricLine,
                                 visible = effectiveLyricsVisible,
+                                height = lyricLineHeight,
                                 onOpenLyrics = { isLyricsFullscreen = true }
                             )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(lyricBottomSpacerHeight))
 
+                            // Track Info Row (Title, Artist, Like button)
                             NowPlayingTrackInfoRow(
                                 title = title,
                                 artist = artist,
@@ -637,20 +682,12 @@ fun SpotifyNowPlayingScreen(
                                 onTitleClick = onTitleClick,
                                 onArtistClick = onArtistClick,
                                 onLikeClick = onLikeClick,
-                                onBanClick = onBanClick,
-                                coverUrl = coverUrl
+                                onBanClick = onBanClick
                             )
-                        }
-                    }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .revealAt(reveal, REVEAL_CONTROLS_DELAY_MS / REVEAL_MS.toFloat())
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Seek Bar Section
                             NowPlayingSeekBarSection(
                                 progress = progress,
                                 durationMs = durationMs,
@@ -659,8 +696,9 @@ fun SpotifyNowPlayingScreen(
                                 isLoading = effectiveIsLoading
                             )
 
-                            Spacer(modifier = Modifier.height(28.dp))
+                            Spacer(modifier = Modifier.height(20.dp))
 
+                            // Playback Controls Row
                             NowPlayingControlsRow(
                                 shuffleMode = shuffleMode,
                                 repeatMode = repeatMode,
@@ -673,8 +711,9 @@ fun SpotifyNowPlayingScreen(
                                 onRepeatClick = onRepeatClick
                             )
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
+                            // Footer Row (Connect device, Share, Queue)
                             NowPlayingFooterRow(
                                 connectedDeviceName = connectedDeviceName,
                                 onDeviceClick = onDeviceClick,
@@ -683,8 +722,6 @@ fun SpotifyNowPlayingScreen(
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
 
                     Box(
                         modifier = Modifier
@@ -703,7 +740,9 @@ fun SpotifyNowPlayingScreen(
 
                             // Other cards (e.g. About the Artist) only appear once loaded and accessible upon scrolling down
                             if (!effectiveIsLoading && artist.isNotBlank()) {
-                                Spacer(modifier = Modifier.height(EncoreSpacers.Base))
+                                if (effectiveLyricsVisible) {
+                                    Spacer(modifier = Modifier.height(EncoreSpacers.Base))
+                                }
 
                                 NowPlayingAboutArtistCard(
                                     artist = artist,
@@ -1072,13 +1111,16 @@ private fun NowPlayingArtworkCard(
 private fun NowPlayingSyncedLyricLine(
     lyricText: String,
     visible: Boolean,
+    height: Dp,
     onOpenLyrics: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (height <= 0.dp && !visible) return
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(height)
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -1129,7 +1171,6 @@ private fun NowPlayingTrackInfoRow(
     onArtistClick: () -> Unit,
     onLikeClick: () -> Unit,
     onBanClick: (() -> Unit)? = null,
-    coverUrl: String? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -1138,17 +1179,6 @@ private fun NowPlayingTrackInfoRow(
             .padding(start = 24.dp, end = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (!coverUrl.isNullOrBlank()) {
-            SpotifyArtworkImage(
-                imageUrl = coverUrl,
-                contentDescription = title,
-                modifier = Modifier
-                    .size(52.dp)
-                    .clickable(onClick = onTitleClick),
-                cornerRadius = 4.dp
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -1427,11 +1457,14 @@ private fun NowPlayingLyricsPeekCard(
                 .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
                 .background(dominantColor.copy(alpha = 0.65f))
                 .clickable { onOpenLyrics() }
-                .padding(EncoreSpacers.Looser)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
+                // Header: exactly PEEK_HEIGHT tall so that ONLY "Lyrics preview" is visible in the idle peek!
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(PEEK_HEIGHT)
+                        .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1459,9 +1492,9 @@ private fun NowPlayingLyricsPeekCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Lyrics fill the remaining card space and scroll inside the fixed layout
+                // Lyrics fill the remaining card space (revealed only upon scrolling down)
                 val lyricsListState = rememberLazyListState()
                 LaunchedEffect(activeIndex, lyrics.size) {
                     if (lyrics.isEmpty()) return@LaunchedEffect
@@ -1471,6 +1504,7 @@ private fun NowPlayingLyricsPeekCard(
                     state = lyricsListState,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
                         .weight(1f)
                 ) {
                     itemsIndexed(lyrics) { i, lyric ->
@@ -1519,15 +1553,37 @@ private fun NowPlayingAboutArtistCard(
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
             .background(EncoreColors.Card)
-            .padding(EncoreSpacers.Looser)
     ) {
         Column {
-            // Header: Artist photo banner placeholder + Avatar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Header area: matches creator_bio_title in bio_card_view.xml
+            // Exactly PEEK_HEIGHT tall so that ONLY "About the artist" is visible in the idle peek!
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PEEK_HEIGHT)
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
+                Text(
+                    text = "About the artist",
+                    style = SpotifyTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                )
+            }
+
+            // Body: matches bio_card_content in bio_card_view.xml (revealed only upon scrolling down)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -1624,6 +1680,7 @@ private fun NowPlayingAboutArtistCard(
             )
         }
     }
+}
 }
 
 /**
