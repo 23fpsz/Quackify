@@ -1,6 +1,8 @@
 package com.quackify.compose.shell
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +19,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -1063,11 +1067,20 @@ private fun AddTrackRow(
                 )
             }
         }
-        EncoreIconButton(
-            iconRes = if (added) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24,
-            contentDescription = if (added) "Added" else "Add",
-            onClick = { if (!added) onAdd() },
-            tint = if (added) EncoreColors.Green else EncoreColors.TextPrimary
-        )
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                .clickable { if (!added) onAdd() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = if (added) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24),
+                contentDescription = if (added) "Added" else "Add",
+                tint = if (added) EncoreColors.Green else Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+        }
     }
 }
