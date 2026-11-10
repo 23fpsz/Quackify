@@ -245,7 +245,9 @@ internal object LicenseEndpoint {
 
     private fun stored(context: Context, host: String, now: Long): String? {
         val prefs = SecurePrefs.get(context)
-        if (prefs.getString(KEY_HOST, "") != host) return null
+        // The stored url is absolute, so a caller whose dealer host has not
+        // resolved yet must not drop it over a key mismatch.
+        if (host.isNotBlank() && prefs.getString(KEY_HOST, "") != host) return null
         val url = prefs.getString(KEY_URL, "").orEmpty()
         val expires = prefs.getLong(KEY_EXP, 0L)
         if (url.isBlank() || expires <= now) return null
