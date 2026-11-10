@@ -224,7 +224,11 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-                        LaunchedEffect(playHistory) {
+                        LaunchedEffect(playHistory, loading) {
+                            // Pure decoration for the shelf covers: the artist
+                            // searches ride the same pipe as the home feed and
+                            // the playback fetch, so they wait for home to land.
+                            if (loading) return@LaunchedEffect
                             favoriteArtistsOf(playHistory).forEach { artist ->
                                 val uri = artist.artistUri
                                 if (homeArtistImages.containsKey(uri)) return@forEach
