@@ -227,6 +227,68 @@ object Rootlist {
         return ok
     }
 
+    suspend fun moveAfter(context: Context, uri: String, afterUri: String): Boolean {
+        if (uri.isBlank() || afterUri.isBlank()) {
+            log.w("moveAfter: bad input '$uri' '$afterUri'")
+            return false
+        }
+        val user = username(context)
+        if (user.isBlank()) {
+            log.w("moveAfter: no username yet")
+            return false
+        }
+        val op = JSONObject().put("kind", "MOV").put(
+            "mov",
+            JSONObject()
+                .put("items", JSONArray().put(JSONObject().put("uri", uri)))
+                .put("addAfterItem", JSONObject().put("uri", afterUri)),
+        )
+        lastRead = null
+        val response = Net.postJson(
+            "$BASE/$user/rootlist/changes",
+            body(op),
+            headers(context),
+            "rootlist/moveAfter",
+        )
+        val ok = response?.ok == true
+        log.i("moveAfter '$uri' after '$afterUri' ok=$ok http=${response?.code ?: -1} " +
+                response?.body?.take(160).orEmpty()
+        )
+        if (ok) LibraryPageSource.invalidate()
+        return ok
+    }
+
+    suspend fun moveFirst(context: Context, uri: String): Boolean {
+        if (uri.isBlank()) {
+            log.w("moveFirst: bad input '$uri'")
+            return false
+        }
+        val user = username(context)
+        if (user.isBlank()) {
+            log.w("moveFirst: no username yet")
+            return false
+        }
+        val op = JSONObject().put("kind", "MOV").put(
+            "mov",
+            JSONObject()
+                .put("items", JSONArray().put(JSONObject().put("uri", uri)))
+                .put("addFirst", true),
+        )
+        lastRead = null
+        val response = Net.postJson(
+            "$BASE/$user/rootlist/changes",
+            body(op),
+            headers(context),
+            "rootlist/moveFirst",
+        )
+        val ok = response?.ok == true
+        log.i("moveFirst '$uri' ok=$ok http=${response?.code ?: -1} " +
+                response?.body?.take(160).orEmpty()
+        )
+        if (ok) LibraryPageSource.invalidate()
+        return ok
+    }
+
     internal suspend fun writeOps(
         context: Context,
         ops: JSONArray,
