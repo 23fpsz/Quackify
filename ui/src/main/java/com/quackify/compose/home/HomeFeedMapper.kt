@@ -172,19 +172,17 @@ fun List<TrackItem>.toRecentlyPlayedShelf(): HomeShelf? {
 }
 
 /** The history's favorite artists, each as its most recent track, as the home favorites shelf. */
-fun List<TrackItem>.toFavoriteArtistsShelf(): HomeShelf? {
+fun List<TrackItem>.toFavoriteArtistsShelf(artistImages: Map<String, String> = emptyMap()): HomeShelf? {
     if (isEmpty()) return null
     return HomeShelf(
         id = LOCAL_FAVORITE_ARTISTS_SHELF_ID,
         title = "Your favorite artist",
-        cards = map { track ->
-            RecommendationCard(
-                title = track.artist.substringBefore(", "),
-                subtitle = "Artist",
-                coverColor = FallbackCardColor,
+        artists = map { track ->
+            ArtistCardItem(
+                name = track.artist.substringBefore(", "),
+                color = FallbackCardColor,
                 uri = track.artistUri,
-                imageUrl = track.imageUrl,
-                tag = "ARTIST",
+                imageUrl = artistImages[track.artistUri],
             )
         },
     )
