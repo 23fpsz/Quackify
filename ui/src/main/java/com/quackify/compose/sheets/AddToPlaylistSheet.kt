@@ -54,11 +54,17 @@ import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.util.search.GenericSearchEngine
+import com.quackify.compose.util.search.SearchableFieldExtractor
 import com.quackify.backend.model.PlaylistChoice
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+
+private val playlistSearchEngine = GenericSearchEngine<PlaylistChoice>(maxResult = Int.MAX_VALUE)
+
+private val PLAYLIST_CHOICE_FIELDS = SearchableFieldExtractor<PlaylistChoice> { arrayOf(it.name) }
 
 /**
  * 1:1 Spotify "Saved in" (Add to Playlist) bottom sheet.
@@ -68,7 +74,7 @@ import kotlinx.coroutines.launch
  * - Top drag handle (36dp x 4dp)
  * - Top header bar: "Cancel" (left), "Done" (right)
  * - Section headline: "Saved in" (if saved in 1+ destinations) / "Save in" (if empty) + green "New playlist" button
- * - Search box filtering the visible level locally, playlists and folders alike
+ * - Search box filtering the visible level locally via the generic fuzzy search engine, playlists and folders alike
  * - Destination rows:
  *   - Liked Songs: 48dp purple-blue gradient square with white heart
  *   - Playlists: 48dp artwork, title, subtitle (e.g. "142 songs"), trailing green check (✓) or outline plus (+)
@@ -104,8 +110,11 @@ fun AddToPlaylistSheet(
 
     val rows = currentRows ?: choices
     val inFolder = currentFolder != null
-    val visibleRows = if (searchQuery.isBlank()) rows
-    else rows.filter { it.name.contains(searchQuery.trim(), ignoreCase = true) }
+    val visibleRows = remember(rows, searchQuery) {
+        val query = searchQuery.trim()
+        if (query.isEmpty()) rows
+        else playlistSearchEngine.filter(rows, query, PLAYLIST_CHOICE_FIELDS)
+    }
 
     val selectionState = remember {
         mutableStateMapOf<String, Boolean>().apply {
