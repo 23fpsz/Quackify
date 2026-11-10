@@ -412,7 +412,7 @@ object SpotifyAuth {
     private fun plausibleId(value: String): String? =
         value.trim().takeIf { it.isNotBlank() && it != "me" && !it.contains(":") && !it.contains(" ") }
 
-    suspend fun userId(context: Context): String {
+    suspend fun userId(context: Context, force: Boolean = false): String {
         resolvedUserId.takeIf { it.isNotBlank() }?.let { return it }
         val stored = SecurePrefs.get(context).getString(KEY_ID, "").orEmpty()
         plausibleId(stored)?.let {
@@ -424,7 +424,7 @@ object SpotifyAuth {
             SecurePrefs.get(context).edit().remove(KEY_ID).apply()
         }
         val now = System.currentTimeMillis()
-        if (now - lastUserIdAttempt < USER_ID_RETRY_MS) return ""
+        if (!force && now - lastUserIdAttempt < USER_ID_RETRY_MS) return ""
         lastUserIdAttempt = now
         val token = token(context)
         if (token.isBlank()) {
