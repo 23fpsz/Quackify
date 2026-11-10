@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -39,8 +41,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,6 +68,7 @@ import kotlinx.coroutines.launch
  * - Top drag handle (36dp x 4dp)
  * - Top header bar: "Cancel" (left), "Done" (right)
  * - Section headline: "Saved in" (if saved in 1+ destinations) / "Save in" (if empty) + green "New playlist" button
+ * - Search box filtering the visible level locally, playlists and folders alike
  * - Destination rows:
  *   - Liked Songs: 48dp purple-blue gradient square with white heart
  *   - Playlists: 48dp artwork, title, subtitle (e.g. "142 songs"), trailing green check (✓) or outline plus (+)
@@ -95,9 +100,12 @@ fun AddToPlaylistSheet(
     var currentRows by remember { mutableStateOf<List<PlaylistChoice>?>(null) }
     val parentLevels = remember { mutableStateListOf<Pair<PlaylistChoice?, List<PlaylistChoice>>>() }
     var folderLoading by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
 
     val rows = currentRows ?: choices
     val inFolder = currentFolder != null
+    val visibleRows = if (searchQuery.isBlank()) rows
+    else rows.filter { it.name.contains(searchQuery.trim(), ignoreCase = true) }
 
     val selectionState = remember {
         mutableStateMapOf<String, Boolean>().apply {
@@ -128,9 +136,9 @@ fun AddToPlaylistSheet(
     val savedCount = selectionState.values.count { it }
 
     val trackCounts = remember { mutableStateMapOf<String, Int>() }
-    LaunchedEffect(rows) {
+    LaunchedEffect(visibleRows) {
         val loader = onLoadTrackCount ?: return@LaunchedEffect
-        rows.asSequence()
+        visibleRows.asSequence()
             .filter { it.kind != PlaylistChoice.Kind.FOLDER && !trackCounts.containsKey(it.uri) }
             .map { it.uri }
             .toList()
@@ -167,6 +175,7 @@ fun AddToPlaylistSheet(
             parentLevels += currentFolder to (currentRows ?: choices)
             currentFolder = folder
             currentRows = loaded
+            searchQuery = ""
             folderLoading = false
         }
     }
@@ -175,6 +184,7 @@ fun AddToPlaylistSheet(
         val parent = parentLevels.removeLastOrNull() ?: return
         currentFolder = parent.first
         currentRows = parent.second
+        searchQuery = ""
     }
 
     ModalBottomSheet(
@@ -262,6 +272,14 @@ fun AddToPlaylistSheet(
                 }
             }
 
+            AddToPlaylistSearchBox(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+
             when {
                 isLoading || folderLoading -> Box(
                     modifier = Modifier
@@ -307,11 +325,14 @@ fun AddToPlaylistSheet(
                         }
                     }
 
-                    if (rows.isEmpty()) {
+                    if (visibleRows.isEmpty()) {
                         item(key = "__empty__") {
                             Text(
-                                text = if (inFolder) "This folder is empty"
-                                else "No playlists you can add to",
+                                text = when {
+                                    searchQuery.isNotBlank() -> "No results for \"${searchQuery.trim()}\""
+                                    inFolder -> "This folder is empty"
+                                    else -> "No playlists you can add to"
+                                },
                                 style = SpotifyTheme.typography.bodyMedium.copy(
                                     color = EncoreColors.TextSecondary
                                 ),
@@ -323,7 +344,7 @@ fun AddToPlaylistSheet(
                         }
                     }
 
-                    items(rows, key = { it.uri }) { choice ->
+                    items(visibleRows, key = { it.uri }) { choice ->
                         if (choice.kind == PlaylistChoice.Kind.FOLDER) {
                             AddToFolderRow(folder = choice, onOpen = { openFolder(choice) })
                         } else {
@@ -403,6 +424,72 @@ fun AddToPlaylistSheet(
                     )
                 }
             }
+        }
+    }
+}
+
+/** Local name filter for the current level, folders included. */
+@Composable
+private fun AddToPlaylistSearchBox(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(EncoreColors.Background)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.encore_icon_search_24),
+            contentDescription = null,
+            tint = EncoreColors.TextSecondary,
+            modifier = Modifier.size(20.dp)
+        )
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            singleLine = true,
+            textStyle = SpotifyTheme.typography.bodyMedium.copy(
+                color = EncoreColors.TextPrimary,
+                fontSize = 15.sp
+            ),
+            cursorBrush = SolidColor(EncoreColors.TextPrimary),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            modifier = Modifier.weight(1f),
+            decorationBox = { field ->
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (query.isEmpty()) {
+                        Text(
+                            text = "Search",
+                            style = SpotifyTheme.typography.bodyMedium.copy(
+                                color = EncoreColors.TextSecondary,
+                                fontSize = 15.sp
+                            )
+                        )
+                    }
+                    field()
+                }
+            }
+        )
+        if (query.isNotEmpty()) {
+            Icon(
+                painter = painterResource(id = R.drawable.encore_icon_x_24),
+                contentDescription = "Clear search",
+                tint = EncoreColors.TextSecondary,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .clickable { onQueryChange("") }
+            )
         }
     }
 }
