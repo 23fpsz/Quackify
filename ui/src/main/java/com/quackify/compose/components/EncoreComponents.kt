@@ -14,7 +14,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -658,7 +657,6 @@ fun EncoreRepeatButton(
 fun EncoreHeartButton(
     isLiked: Boolean,
     onLikeToggle: () -> Unit,
-    onLikeLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
     iconSize: Dp = 24.dp
@@ -709,11 +707,10 @@ fun EncoreHeartButton(
             .size(size)
             .scale(totalScale)
             .clip(CircleShape)
-            .combinedClickable(
+            .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onLikeToggle,
-                onLongClick = onLikeLongClick
+                onClick = onLikeToggle
             ),
         contentAlignment = Alignment.Center
     ) {
