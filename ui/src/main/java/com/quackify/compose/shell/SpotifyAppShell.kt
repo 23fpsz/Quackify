@@ -215,6 +215,7 @@ fun SpotifyAppShell(
     onDeletePlaylist: (suspend (uri: String) -> Boolean)? = null,
     onDismissEditPlaylist: () -> Unit = {},
     onTogglePlaylistSaved: ((uri: String, saved: Boolean) -> Unit)? = null,
+    onRemoveTrackFromPlaylist: ((playlistUri: String, trackUri: String) -> Unit)? = null,
     onRemoveLibraryItem: ((uri: String) -> Unit)? = null,
     onCreateFolder: (suspend (name: String) -> String?)? = null,
     onRenameFolder: ((uri: String, name: String) -> Unit)? = null,
@@ -1223,7 +1224,52 @@ fun SpotifyAppShell(
                 val context = playbackState?.queueFromContext.orEmpty()
                 playerListener?.onQueueSet(context.map { it.uri })
             },
-            onSleepTimerSelected = { option -> local.sleepTimer = option }
+            onSleepTimerSelected = { option -> local.sleepTimer = option },
+            onRemoveTrackFromPlaylist = if (currentScreen == ShellScreen.PLAYLIST && isPlaylistUri && playlistDetail?.editable == true && active.playlistUri.isNotBlank()) {
+                {
+                    val trackUri = local.trackForOptions?.uri.orEmpty()
+                    val playlistUri = active.playlistUri
+                    flags.isTrackOptionsOpen = false
+                    if (trackUri.isNotBlank() && playlistUri.isNotBlank()) {
+                        onRemoveTrackFromPlaylist?.invoke(playlistUri, trackUri)
+                    }
+                }
+            } else null,
+            onSongRadio = {
+                val trackNow = local.trackForOptions
+                flags.isTrackOptionsOpen = false
+                isPlayerExpanded = false
+                if (trackNow != null && trackNow.uri.startsWith("spotify:track:")) {
+                    shellScope.launch {
+                        val radio = onArtistRadio?.invoke(trackNow.uri)
+                        if (radio != null && radio.startsWith("spotify:playlist:")) {
+                            openPlaylist(trackNow.title + " Radio", radio)
+                        }
+                    }
+                }
+            },
+            onAlbumRadio = {
+                flags.isAlbumOptionsOpen = false
+                isPlayerExpanded = false
+                val albumUriNow = active.albumUri.ifBlank { albumDetail?.uri.orEmpty() }
+                if (albumUriNow.startsWith("spotify:album:")) {
+                    shellScope.launch {
+                        val radio = onArtistRadio?.invoke(albumUriNow)
+                        if (radio != null && radio.startsWith("spotify:playlist:")) {
+                            openPlaylist(active.albumTitle + " Radio", radio)
+                        }
+                    }
+                }
+            },
+            onAddToPlaylistFromAlbum = {
+                flags.isAlbumOptionsOpen = false
+                local.addTrackTarget = TrackItem(
+                    title = active.albumTitle,
+                    artist = active.albumArtist,
+                    uri = active.albumUri.ifBlank { albumDetail?.uri.orEmpty() }
+                )
+                flags.isAddToPlaylistOpen = true
+            }
         )
 
         if (flags.isArtistAboutOpen) {
@@ -1263,7 +1309,15 @@ fun SpotifyAppShell(
                 choices = addToPlaylistChoices.orEmpty(),
                 isLoading = addToPlaylistChoices == null,
                 onPick = { choice ->
-                    local.addTrackTarget?.let { track -> onPickPlaylist?.invoke(choice, track) }
+                    val target = local.addTrackTarget
+                    if (target != null) {
+                        if (target.uri.startsWith("spotify:album:")) {
+                            val rows = albumTracks.orEmpty()
+                            rows.forEach { row -> onPickPlaylist?.invoke(choice, row) }
+                        } else {
+                            onPickPlaylist?.invoke(choice, target)
+                        }
+                    }
                     flags.isAddToPlaylistOpen = false
                 },
                 // The sheet owns the folder drill-down; this feeds it the rows

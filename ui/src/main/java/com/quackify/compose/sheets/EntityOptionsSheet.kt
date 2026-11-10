@@ -183,8 +183,8 @@ fun EntityOptionsSheet(
 
             if (canGoToRadio) {
                 EntityRow(
-                    title = "Go to artist radio",
-                    iconRes = R.drawable.encore_icon_play_24,
+                    title = if (entity.uri.startsWith("spotify:artist:")) "Go to artist radio" else "Go to playlist radio",
+                    iconRes = R.drawable.encore_icon_radio_24,
                     onClick = {
                         onDismiss()
                         onGoToRadio()
@@ -226,7 +226,7 @@ fun EntityOptionsSheet(
 
                 EntityRow(
                     title = "Delete playlist",
-                    iconRes = R.drawable.encore_icon_x_24,
+                    iconRes = R.drawable.encore_icon_delete_24,
                     onClick = {
                         onDismiss()
                         onDeletePlaylist()
