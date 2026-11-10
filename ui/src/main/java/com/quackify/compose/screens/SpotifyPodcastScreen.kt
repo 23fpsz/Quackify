@@ -159,13 +159,10 @@ fun SpotifyPodcastScreen(
         label = "podcastFollowText"
     )
 
-    // Coordinated Nested Scroll Connection:
-    // Collapses header on scroll up; expands header when active list is at top
     val nestedScrollConnection = remember(pagerState.currentPage, maxCollapsePx) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val delta = available.y
-                // Scrolling UP (delta < 0): collapse header first before child scrolls
                 if (delta < 0f && headerOffsetPx > -maxCollapsePx) {
                     val newOffset = (headerOffsetPx + delta).coerceIn(-maxCollapsePx, 0f)
                     val consumed = newOffset - headerOffsetPx
@@ -173,7 +170,6 @@ fun SpotifyPodcastScreen(
                     return Offset(0f, consumed)
                 }
 
-                // Scrolling DOWN (delta > 0) when current child is at top: expand header immediately
                 val activeList = when (pagerState.currentPage) {
                     0 -> episodesListState
                     1 -> aboutListState
@@ -194,7 +190,6 @@ fun SpotifyPodcastScreen(
                 source: NestedScrollSource
             ): Offset {
                 val delta = available.y
-                // Scrolling DOWN (delta > 0) after child reached top: expand header
                 if (delta > 0f && headerOffsetPx < 0f) {
                     val newOffset = (headerOffsetPx + delta).coerceIn(-maxCollapsePx, 0f)
                     val consumedY = newOffset - headerOffsetPx
@@ -213,9 +208,6 @@ fun SpotifyPodcastScreen(
     }
     val availablePagerHeightDp = with(density) { availablePagerHeightPx.toDp() }
 
-    // Dynamic Gradient Height:
-    // Reaches exactly down to where the tabs bar begins, and contracts to toolbarBottom on collapse.
-    // Never bleeds into the tabs bar or child lists.
     val currentGradientHeightPx = (toolbarBottomPx + headerContentHeightPx + headerOffsetPx).coerceAtLeast(toolbarBottomPx)
     val currentGradientHeightDp = with(density) { currentGradientHeightPx.toDp() }
 
@@ -228,7 +220,6 @@ fun SpotifyPodcastScreen(
             }
             .nestedScroll(nestedScrollConnection)
     ) {
-        // Collapsible Header Gradient Background (terminates before tabs bar)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -246,16 +237,13 @@ fun SpotifyPodcastScreen(
                 )
         )
 
-        // Main Scrolling Column (Header + Pinned Tabs + HorizontalPager)
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .offset { IntOffset(0, headerOffsetPx.roundToInt()) }
         ) {
-            // Spacer for Top Navigation Bar
             Spacer(modifier = Modifier.height(toolbarBottom))
 
-            // Show Header Content (Collapsible show identity & actions)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -275,12 +263,10 @@ fun SpotifyPodcastScreen(
                     }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Two-Column Header: Cover Art (112x112dp) on Left, Title & Creator on Right
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Show Artwork
                     Box(
                         modifier = Modifier
                             .size(112.dp)
@@ -308,7 +294,6 @@ fun SpotifyPodcastScreen(
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    // Show Title & Creator
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = showTitle,
@@ -339,7 +324,6 @@ fun SpotifyPodcastScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Metadata Row: Middle dot separated badges
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -391,13 +375,11 @@ fun SpotifyPodcastScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Header Action Bar: Teaser circular play, Follow pill, Bell, Gear
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Trailer / Teaser Preview Button
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -414,7 +396,6 @@ fun SpotifyPodcastScreen(
                         )
                     }
 
-                    // Follow Pill Button
                     Box(
                         modifier = Modifier
                             .height(36.dp)
@@ -433,7 +414,6 @@ fun SpotifyPodcastScreen(
                         )
                     }
 
-                    // Notification Bell
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -451,7 +431,6 @@ fun SpotifyPodcastScreen(
                         )
                     }
 
-                    // Settings Gear
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -471,7 +450,6 @@ fun SpotifyPodcastScreen(
                 Spacer(modifier = Modifier.height(14.dp))
             }
 
-            // Pinned Navigation Tabs Bar (Directly below Top Bar when scrolled, pure #121212 black background)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -525,7 +503,6 @@ fun SpotifyPodcastScreen(
                 )
             }
 
-            // HorizontalPager: Smooth swiping between Episodes, About, and More like this with animated slide
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
@@ -535,13 +512,11 @@ fun SpotifyPodcastScreen(
             ) { page ->
                 when (page) {
                     0 -> {
-                        // Page 0: Episodes List
                         LazyColumn(
                             state = episodesListState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(bottom = bottomPadding)
                         ) {
-                            // Sticky Sort / Filter Dropdown Pill (Stays directly below the Tabs Bar)
                             stickyHeader {
                                 Box(
                                     modifier = Modifier
@@ -578,7 +553,6 @@ fun SpotifyPodcastScreen(
                                 }
                             }
 
-                            // Episode Rows
                             items(episodes, key = { it.id }) { episode ->
                                 val isCurrentEpisode = episode.id == currentEpisodeId
                                 PodcastEpisodeRow(
@@ -596,7 +570,6 @@ fun SpotifyPodcastScreen(
                         }
                     }
                     1 -> {
-                        // Page 1: About Tab
                         LazyColumn(
                             state = aboutListState,
                             modifier = Modifier.fillMaxSize(),
@@ -655,7 +628,6 @@ fun SpotifyPodcastScreen(
                         }
                     }
                     2 -> {
-                        // Page 2: More Like This Tab
                         LazyColumn(
                             state = moreListState,
                             modifier = Modifier.fillMaxSize(),
@@ -724,7 +696,6 @@ fun SpotifyPodcastScreen(
             }
         }
 
-        // Pinned Top Navigation Bar (Layered above sliding header at zIndex 10f)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -737,7 +708,6 @@ fun SpotifyPodcastScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Back Button
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -754,7 +724,6 @@ fun SpotifyPodcastScreen(
                 )
             }
 
-            // Centered Title in Top Bar when scrolled
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -777,7 +746,6 @@ fun SpotifyPodcastScreen(
                 }
             }
 
-            // 3-Dots Show Options Button
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -823,12 +791,10 @@ private fun PodcastEpisodeRow(
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
-        // Top Row: 16:9 Widescreen Artwork + Title
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
-            // 16:9 Widescreen Thumbnail (114dp x 64dp)
             Box(
                 modifier = Modifier
                     .size(width = 114.dp, height = 64.dp)
@@ -855,7 +821,6 @@ private fun PodcastEpisodeRow(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Title
             Text(
                 text = episode.title,
                 style = SpotifyTheme.typography.bodyMedium.copy(
@@ -872,7 +837,6 @@ private fun PodcastEpisodeRow(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Body Description Snippet (maxLines = 2)
         Text(
             text = episode.description,
             style = SpotifyTheme.typography.bodySmall.copy(
@@ -886,7 +850,6 @@ private fun PodcastEpisodeRow(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Episode Metadata: Day • Duration • Status (e.g. "Tue • 1h 15m" or "Sat • 1h 50m left • Finished")
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (episode.isExplicit) {
                 EncoreExplicitTag(
@@ -916,18 +879,15 @@ private fun PodcastEpisodeRow(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Action Footer Row: [+] [↓] [Share] [...] on left, (▶) 32dp white play button on right
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left Action Icons
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Add to Your Episodes
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -945,7 +905,6 @@ private fun PodcastEpisodeRow(
                     )
                 }
 
-                // Download Button
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -963,7 +922,6 @@ private fun PodcastEpisodeRow(
                     )
                 }
 
-                // Share Button
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -979,7 +937,6 @@ private fun PodcastEpisodeRow(
                     )
                 }
 
-                // 3-Dots Button
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -996,7 +953,6 @@ private fun PodcastEpisodeRow(
                 }
             }
 
-            // Right: Primary Play Button (32dp solid white circle with pure black play triangle)
             Box(
                 modifier = Modifier
                     .size(32.dp)

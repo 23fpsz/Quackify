@@ -77,7 +77,6 @@ fun LibrarySortSheet(
         containerColor = EncoreColors.Card,
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         dragHandle = {
-            // sort_and_filter_bottom_sheet_handle.xml: 36dp x 4dp rounded clip, #4DFFFFFF
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
@@ -93,7 +92,6 @@ fun LibrarySortSheet(
                 .fillMaxWidth()
                 .navigationBarsPadding()
         ) {
-            // Centered Header Title matching @string/sort_and_filter_sort_group_title ("Sort by")
             Text(
                 text = "Sort by",
                 style = SpotifyTheme.typography.bodyMedium.copy(
@@ -106,7 +104,6 @@ fun LibrarySortSheet(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
-            // Divider matching sort_filter_bottom_sheet_layout.xml: 1dp ?backgroundTintedHighlight
             Spacer(modifier = Modifier.height(12.dp))
             Box(
                 modifier = Modifier
@@ -116,7 +113,6 @@ fun LibrarySortSheet(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Sort Options styled with CwpSortAndFilterOptionStyle
             LibrarySortOption.values().forEach { option ->
                 val isSelected = option == currentSort
                 Row(

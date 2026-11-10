@@ -89,9 +89,6 @@ class Dealer {
             while (true) {
                 delay(PING_MS)
                 if (!socket.send("""{"type":"ping"}""")) return@launch
-                // A buffered write can "succeed" into a half-open socket for
-                // minutes after a network switch; a silent server means the
-                // connection is gone even though nothing failed yet.
                 if (SystemClock.elapsedRealtime() - listener.lastReceiveAt > SILENCE_MS) {
                     log.w("dealer silent for ${SILENCE_MS / 1000}s, forcing a reconnect")
                     socket.cancel()

@@ -130,16 +130,7 @@ fun LogViewerScreen(
                     (entry.error?.contains(needle, ignoreCase = true) == true))
         }
     }
-    // entries is already oldest-first, so a plain top-anchored list reads the
-    // way the viewer promises: oldest at the top, fresh lines growing
-    // downward. No reverseLayout — that would pin short content to the
-    // bottom of the screen with a blank area above it.
 
-    // While Auto-scroll is on, keep the newest line pinned to the bottom as
-    // fresh entries stream in. Turn it off to browse older lines undisturbed.
-    // scrollToItem clamps at the end of the content, so the tail lands at the
-    // bottom of the viewport (and lists shorter than the screen do not
-    // scroll at all — they just sit anchored at the top).
     LaunchedEffect(revision, autoScroll) {
         if (autoScroll && entries.isNotEmpty()) {
             listState.scrollToItem(entries.size + 1)
@@ -335,7 +326,6 @@ fun LogViewerScreen(
                     .padding(vertical = 4.dp),
                 contentPadding = PaddingValues(bottom = bottomPadding)
             ) {
-                // Top of the screen: the oldest end of the ring buffer.
                 item(key = "oldest") {
                     LogEdgeMarker(text = "oldest of ${entries.size}")
                 }
@@ -346,7 +336,6 @@ fun LogViewerScreen(
                         onLongClick = { copy(Logs.format(entry), "Line copied") }
                     )
                 }
-                // Bottom of the screen: where fresh lines land.
                 item(key = "newest") {
                     LogEdgeMarker(text = "newest of ${entries.size}")
                 }

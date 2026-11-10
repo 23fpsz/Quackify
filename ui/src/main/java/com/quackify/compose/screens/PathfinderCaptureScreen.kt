@@ -23,10 +23,6 @@ private val log = Logs.of(Logs.Module.CAPTURE)
 @Composable
 fun PathfinderCaptureScreen(onDone: () -> Unit) {
     val context = LocalContext.current
-    // The system webview provider can vanish (package disabled, hidden or
-    // mid-update); building the host then throws straight out of composition
-    // and takes the app down. Skip the capture pass instead — the stored
-    // session still carries the token until a refresh becomes possible.
     val host = remember {
         runCatching {
             SpotifyAuth.applySession(context)

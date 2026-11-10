@@ -121,7 +121,6 @@ fun EncorePlayButton(
             }
         }
 
-        // Shuffle badge at bottom-right corner (matches encore_play_button_badge_size 11dp)
         if (showShuffleBadge) {
             Box(
                 modifier = Modifier
@@ -401,7 +400,6 @@ fun EncoreTrackRow(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Track number (Album view)
         if (trackNumber != null) {
             Box(
                 modifier = Modifier.width(28.dp),
@@ -421,7 +419,6 @@ fun EncoreTrackRow(
                 }
             }
         } else {
-            // Track Cover Art thumbnail (Playlist, Search, History)
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -452,7 +449,6 @@ fun EncoreTrackRow(
             Spacer(modifier = Modifier.width(12.dp))
         }
 
-        // Title and Artist
         androidx.compose.foundation.layout.Column(
             modifier = Modifier
                 .weight(1f)
@@ -481,7 +477,6 @@ fun EncoreTrackRow(
             }
         }
 
-        // More options button (encore_icon_more_android_24)
         EncoreIconButton(
             iconRes = R.drawable.encore_icon_more_android_24,
             contentDescription = "More options for $title",
@@ -569,7 +564,6 @@ fun EncoreSmartShuffleButton(
                 tint = tint,
                 modifier = Modifier.size(24.dp)
             )
-            // Active dot indicator (matches Spotify's 4dp green dot)
             if (isActive) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Box(
@@ -638,7 +632,6 @@ fun EncoreRepeatButton(
                 tint = tint,
                 modifier = Modifier.size(24.dp)
             )
-            // Active dot indicator
             if (isActive) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Box(

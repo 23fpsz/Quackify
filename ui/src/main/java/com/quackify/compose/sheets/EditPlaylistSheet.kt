@@ -139,7 +139,6 @@ fun EditPlaylistSheet(
                 .fillMaxWidth()
                 .navigationBarsPadding()
         ) {
-            // Top Bar: Cancel (left) | Name & details (center) | Save (right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -187,14 +186,12 @@ fun EditPlaylistSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Main Editor Row: Left Artwork with floating Pencil button | Right Fields (Name, Description)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                // Square Artwork with bottom-right circular edit pencil button overlay
                 Box(
                     modifier = Modifier
                         .size(108.dp)
@@ -234,7 +231,6 @@ fun EditPlaylistSheet(
                         }
                     }
 
-                    // Floating circular pencil edit badge overlay
                     Box(
                         modifier = Modifier
                             .size(32.dp)
@@ -256,12 +252,10 @@ fun EditPlaylistSheet(
 
                 Spacer(modifier = Modifier.width(14.dp))
 
-                // Name and Description Input Fields
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Playlist Name Input Container
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -294,7 +288,6 @@ fun EditPlaylistSheet(
                         )
                     }
 
-                    // Playlist Description Input Container
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -333,7 +326,6 @@ fun EditPlaylistSheet(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Action Row 2: Delete playlist
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

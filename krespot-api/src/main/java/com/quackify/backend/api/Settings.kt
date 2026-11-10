@@ -44,7 +44,6 @@ object Settings {
             musicVideoLocked = !a.isNull("lockMusicVideoDisabled"),
             otherVideoLocked = !a.isNull("lockOtherVideoDisabled"),
             hasPodcasts = a.optBoolean("hasPodcastsAvailable", true),
-            // hasAudiobooks = a.optBoolean("hasAudiobooksAvailable", true),
         )
         log.i("attributes product=${result.product} country=${result.country} " +
                 "canvas=${!result.canvasDisabled} music=${!result.musicVideoDisabled} " +

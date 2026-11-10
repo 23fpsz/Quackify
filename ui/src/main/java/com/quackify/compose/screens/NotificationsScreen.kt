@@ -92,7 +92,6 @@ fun NotificationsScreen(
             .background(EncoreColors.Background)
             .statusBarsPadding()
     ) {
-        // Sticky Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -112,7 +111,6 @@ fun NotificationsScreen(
             )
         }
 
-        // Filter Pills
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
@@ -128,7 +126,6 @@ fun NotificationsScreen(
             }
         }
 
-        // Notification List
         if (loading) {
             TrackListSkeleton(
                 rows = 9,
@@ -137,9 +134,6 @@ fun NotificationsScreen(
                     .padding(top = 8.dp)
             )
         } else if (loadFailed && filtered.isEmpty()) {
-            // The fetch finished with nothing: say the network is the reason
-            // and offer a retry, the same card the playlist screen shows,
-            // instead of a premature "all caught up"
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -209,7 +203,6 @@ fun NotificationsScreen(
                             .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Artwork
                         Box(
                             modifier = Modifier
                                 .size(56.dp)

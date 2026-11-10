@@ -89,9 +89,6 @@ data class PlaybackCommand(
 ) {
     val startAtMs: Long get() = if (seekToMs >= 0L) seekToMs else (currentState?.initialPositionMs ?: 0L)
 
-    // A transfer rides in as a command too, but it carries the whole state
-    // to load, so it walks the replace_state path rather than the control
-    // one (a pause or a seek never brings a machine with it).
     val isControl: Boolean get() = endpoint.isNotBlank() && endpoint != TRANSFER
 
     val isTransfer: Boolean get() = endpoint == TRANSFER

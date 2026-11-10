@@ -63,7 +63,6 @@ internal class PlayerEngine(
     @Volatile
     private var positionMs = 0L
 
-    // Written by the engine coroutine, read from the connect/UI threads.
     @Volatile
     private var sink: AudioSink? = null
 
@@ -126,10 +125,6 @@ internal class PlayerEngine(
     fun seekTo(ms: Long) {
         val limit = (durationMs - SEEK_TAIL_MS).coerceAtLeast(0L)
         val target = ms.coerceIn(0L, limit)
-        // The seek is only consumed by the decode loop, which can be a whole
-        // segment away: until then every reader (the seekbar, the published
-        // member state) kept seeing the pre-seek position and the thumb
-        // snapped back. Report the target from here on.
         reachedEnd = false
         positionMs = target
         reportedMs = target
@@ -156,10 +151,6 @@ internal class PlayerEngine(
         val crypto = try {
             openedCrypto.await()
         } catch (cancellation: CancellationException) {
-            // The sink build usually completes while the licence is still in
-            // flight; cancelling the deferred no-ops then and the AudioTrack
-            // would leak. The engine scope outlives this run, so it can still
-            // await and release the sink.
             scope.launch { runCatching { opening.await().release() } }
             throw cancellation
         }
@@ -187,8 +178,6 @@ internal class PlayerEngine(
         val audio = try {
             opening.await()
         } catch (cancellation: CancellationException) {
-            // run() itself was cancelled mid-await: the built sink is nobody's
-            // to claim any more, hand it to the engine scope for release.
             scope.launch { runCatching { opening.await().release() } }
             throw cancellation
         }
@@ -295,13 +284,8 @@ internal class PlayerEngine(
                 while (isActive && index < table.count && !stopped) {
                     var bytes = cache[index]
                     if (bytes == null) {
-                        // One dropped segment used to freeze the track forever
-                        // with no event out; a mobile network blips, so retry
-                        // a couple of times before giving up on the track.
                         for (attempt in 1..SEGMENT_ATTEMPTS) {
                             if (attempt > 1) delay(500L * (attempt - 1))
-                            // ensure() joins a download the prefetch already
-                            // started instead of repeating it.
                             bytes = runCatching {
                                 SegmentStore.ensure(source, index)
                             }.getOrElse {
@@ -584,9 +568,6 @@ internal class PlayerEngine(
                 audio.rebuild()
             }
         }
-        // A seek in flight owns the position: the samples drained here still
-        // belong to the old spot, and letting them write it back undid the
-        // jump the user just asked for.
         if (!paused && pendingSeekSeconds == null) {
             positionMs = (to - init.primingFrames) * 1000L / init.sampleRate
             report()

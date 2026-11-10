@@ -80,7 +80,6 @@ fun ProfileDrawerSheet(
                 .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
         ) {
-            // Profile Header: opens the account switcher
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -133,7 +132,6 @@ fun ProfileDrawerSheet(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
-            // Menu Items
             ProfileDrawerItem(
                 title = "What's new",
                 iconRes = R.drawable.encore_icon_notification_new_24,

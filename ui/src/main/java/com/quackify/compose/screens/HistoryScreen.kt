@@ -71,7 +71,6 @@ fun HistoryScreen(
         yesterdayTracks.isNotEmpty() ||
         earlierTracks.isNotEmpty()
 
-    // Artist-group expansion, keyed per section + group; absent = collapsed.
     val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
 
     Column(
@@ -80,7 +79,6 @@ fun HistoryScreen(
             .background(EncoreColors.Background)
             .statusBarsPadding()
     ) {
-        // Sticky Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -181,8 +179,6 @@ private sealed interface HistoryEntry {
     ) : HistoryEntry
 }
 
-// The artist uri is the identity when the play carried one; the artist line
-// itself (case-insensitive) is the fallback for uri-less rows.
 private fun artistKey(track: TrackItem): String =
     track.artistUri.takeIf { it.isNotBlank() } ?: track.artist.lowercase()
 

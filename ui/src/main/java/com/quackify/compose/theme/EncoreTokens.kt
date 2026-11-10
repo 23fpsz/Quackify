@@ -68,18 +68,12 @@ object EncoreAnimation {
     const val PressedScale: Float = 0.90f          // encore_button_animation_pressed_scale
     const val ShimmerDuration: Int = 1200          // shimmer_animation_duration
 
-    // nowplaying_activity_enter: 150ms decelerate (FastOutSlowInEasing)
     const val NowPlayingEnterDuration: Int = 150
-    // nowplaying_activity_exit: 200ms decelerate
     const val NowPlayingExitDuration: Int = 200
-    // lyrics_fullscreen_activity_enter / exit: 250ms decelerate
     const val LyricsFullscreenDuration: Int = 250
 
-    // encore_button_animation_interpolator.xml: controlX1=0.3, controlY1=0.0, controlX2=0.0, controlY2=1.0
     val ButtonInterpolator = CubicBezierEasing(0.3f, 0.0f, 0.0f, 1.0f)
-    // encore_box_animation_interpolator.xml: controlX1=0.3, controlY1=0.0, controlX2=0.4, controlY2=1.0
     val BoxInterpolator = CubicBezierEasing(0.3f, 0.0f, 0.4f, 1.0f)
-    // @android:anim/decelerate_interpolator
     val DecelerateInterpolator = FastOutSlowInEasing
 }
 

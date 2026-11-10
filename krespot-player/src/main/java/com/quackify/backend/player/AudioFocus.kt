@@ -54,9 +54,6 @@ internal class AudioFocus(private val context: Context) {
 
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 held = false
-                // CAN_DUCK can escalate into a full transient loss: without
-                // unducking here the GAIN branch below never fires and the
-                // sink stays at the ducked volume after the resume.
                 if (ducked) {
                     ducked = false
                     log.i("focus lost for a moment, unducking before pausing")
@@ -116,8 +113,6 @@ internal class AudioFocus(private val context: Context) {
     fun abandon() {
         val audio = manager ?: return
         if (!held && request == null) return
-        // A later acquire() that is simply granted never re-delivers GAIN,
-        // so the duck level has to be restored here while letting go.
         if (ducked) {
             ducked = false
             log.i("letting go while ducked, restoring the volume")

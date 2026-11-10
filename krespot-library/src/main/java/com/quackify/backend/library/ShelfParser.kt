@@ -37,9 +37,6 @@ internal fun releases(discography: JSONObject?): List<ShelfItem> {
         release(popular?.optJSONObject(i))?.let(out::add)
     }
     if (out.isEmpty()) {
-        // Spotify fills "Popular releases" with releases of every type, so a
-        // singles-only artist still gets a shelf; feeding it albums only left
-        // the section blank until the user opened the Discography sheet.
         out += releaseGroup(discography?.optJSONObject("albums"), limit = 20)
         out += releaseGroup(discography?.optJSONObject("singles"), limit = 20)
         out += releaseGroup(discography?.optJSONObject("compilations"), limit = 20)

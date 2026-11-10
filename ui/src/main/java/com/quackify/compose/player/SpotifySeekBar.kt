@@ -77,19 +77,12 @@ fun SpotifySeekBar(
     var seekingTo by remember { mutableStateOf<Float?>(null) }
     val currentSeek by rememberUpdatedState(onSeek)
 
-    // The player position keeps ticking while the finger is down; sync only
-    // when idle so a tick never snaps the thumb away mid-gesture.
     LaunchedEffect(progress) {
         if (!isDragging) dragProgress = progress
-        // A seek lands a segment later than the gesture: hold the thumb on
-        // the target until the player reports a position next to it, or the
-        // bar jumps back to where the track was and looks like the seek was
-        // ignored.
         val pending = seekingTo
         if (pending != null && kotlin.math.abs(progress - pending) < 0.01f) seekingTo = null
     }
 
-    // A seek the player never confirms must not freeze the bar forever.
     LaunchedEffect(seekingTo) {
         if (seekingTo == null) return@LaunchedEffect
         delay(SEEK_HOLD_MS)
@@ -101,7 +94,6 @@ fun SpotifySeekBar(
         currentSeek(target)
     }
 
-    // Smooth continuous progress interpolation between periodic player ticks (120fps / 60fps)
     val smoothProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 250, easing = LinearEasing),
@@ -113,7 +105,6 @@ fun SpotifySeekBar(
         else -> smoothProgress
     }
 
-    // Thumb size: 8dp resting (crisp and visible matching Spotify), 12dp when user is scrubbing
     val thumbDotSize by animateDpAsState(
         targetValue = if (isDragging) 12.dp else 8.dp,
         animationSpec = spring(stiffness = 600f),
@@ -130,7 +121,6 @@ fun SpotifySeekBar(
         val widthPx = constraints.maxWidth.toFloat()
         val thumbOffsetPx = (displayProgress * widthPx).coerceIn(0f, widthPx)
 
-        // Drag & Tap Pointer Input
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -160,10 +150,6 @@ fun SpotifySeekBar(
                 },
             contentAlignment = Alignment.CenterStart
         ) {
-            // Track Background (4dp height, 2dp corner radius, 30% opacity white)
-            // When isLoading is true, an animated light pulse sweeps outward from the thumb across the track.
-            // The infinite transition lives INSIDE this branch: hoisted at the top level it kept
-            // recomposing the whole seekbar at frame rate even while nothing was loading.
             if (isLoading) {
                 val infiniteTransition = rememberInfiniteTransition(label = "seekbarLoadingTransition")
                 val pulsePhase by infiniteTransition.animateFloat(
@@ -206,7 +192,6 @@ fun SpotifySeekBar(
                 )
             }
 
-            // Buffer Progress (if any, 50% opacity white)
             if (bufferProgress > 0f) {
                 Box(
                     modifier = Modifier
@@ -217,7 +202,6 @@ fun SpotifySeekBar(
                 )
             }
 
-            // Active Track Progress (100% solid white, 4dp height)
             Box(
                 modifier = Modifier
                     .fillMaxWidth(displayProgress)
@@ -226,7 +210,6 @@ fun SpotifySeekBar(
                     .background(if (isDragging) EncoreColors.Green else activeColor)
             )
 
-            // Thumb (32dp touch box with centered circular white dot)
             val thumbOffsetPx = (displayProgress * widthPx).coerceIn(0f, widthPx)
             Box(
                 modifier = Modifier
@@ -252,7 +235,6 @@ fun SpotifySeekBar(
             }
         }
 
-        // Floating Time Tooltip while dragging
         AnimatedVisibility(
             visible = isDragging,
             enter = fadeIn(),

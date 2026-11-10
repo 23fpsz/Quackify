@@ -103,7 +103,6 @@ fun SpotifyConnectDeviceSheet(
                 .navigationBarsPadding()
                 .padding(vertical = EncoreSpacers.Base)
         ) {
-            // Header: Title with close 'X' button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -128,7 +127,6 @@ fun SpotifyConnectDeviceSheet(
 
             Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
-            // Current Device Hero Card (Active green state)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -179,7 +177,6 @@ fun SpotifyConnectDeviceSheet(
 
                     Spacer(modifier = Modifier.height(EncoreSpacers.Base))
 
-                    // Volume Slider Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -217,7 +214,6 @@ fun SpotifyConnectDeviceSheet(
 
             Spacer(modifier = Modifier.height(EncoreSpacers.Looser2))
 
-            // "Select another device" Section
             Text(
                 text = "Select another device",
                 style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
@@ -304,8 +300,6 @@ fun ConnectDevice.toSpotifyDevice(): SpotifyDevice = SpotifyDevice(
         DeviceKind.CAST -> DeviceType.CAST
         DeviceKind.UNKNOWN -> DeviceType.COMPUTER
     },
-    // Only the device the account is actually listening on is "current"; a
-    // local-but-inactive phone must stay pickable in "Select another device".
     isCurrent = active,
     protocol = if (brand.isBlank()) "Spotify Connect" else brand,
     volumeFraction = if (volumeSteps > 0) (volume.toFloat() / volumeSteps.toFloat()).coerceIn(0f, 1f) else -1f
