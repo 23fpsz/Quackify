@@ -124,9 +124,29 @@ fun SpotifyAlbumScreen(
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
 
-    var actionRowYInRoot by remember { mutableFloatStateOf(Float.MAX_VALUE) }
-    var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
-    var isPlayButtonSlotMeasured by remember { mutableStateOf(false) }
+    var actionRowRestAnchorYInRoot by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+    var playButtonRestAnchorYInRoot by remember { mutableFloatStateOf(-1f) }
+
+    val isPlayButtonSlotMeasured by remember {
+        derivedStateOf { playButtonRestAnchorYInRoot > 0f }
+    }
+    val playButtonSlotYInRoot by remember {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0 || playButtonRestAnchorYInRoot <= 0f) -1f else
+                playButtonRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
+        }
+    }
+    val actionRowYInRoot by remember {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) {
+                -1f
+            } else if (actionRowRestAnchorYInRoot != Float.MAX_VALUE) {
+                actionRowRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
+            } else {
+                Float.MAX_VALUE
+            }
+        }
+    }
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val toolbarHeight = 54.dp
@@ -377,7 +397,9 @@ fun SpotifyAlbumScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                                 .onGloballyPositioned { coords ->
-                                    actionRowYInRoot = coords.positionInRoot().y
+                                    if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                                        actionRowRestAnchorYInRoot = coords.positionInRoot().y
+                                    }
                                 },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -464,8 +486,9 @@ fun SpotifyAlbumScreen(
                                     modifier = Modifier
                                         .size(playButtonSize)
                                         .onGloballyPositioned { coords ->
-                                            isPlayButtonSlotMeasured = true
-                                            playButtonSlotYInRoot = coords.positionInRoot().y
+                                            if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                                                playButtonRestAnchorYInRoot = coords.positionInRoot().y
+                                            }
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {

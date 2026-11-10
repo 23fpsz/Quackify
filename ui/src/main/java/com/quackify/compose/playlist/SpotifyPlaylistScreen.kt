@@ -516,11 +516,32 @@ fun SpotifyPlaylistScreen(
             val pinnedTop = toolbarBottom - playButtonHalf
             val pinnedTopPx = with(density) { pinnedTop.toPx() }
 
+            var playButtonRestAnchorYInRoot by remember { mutableFloatStateOf(-1f) }
+            var chipsRowRestAnchorYInRoot by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+
+            val statusBarTopPx = with(density) { statusBarTop.toPx() }
+            val toolbarHeightPx = with(density) { toolbarHeight.toPx() }
             val toolbarBottomPx = with(density) { toolbarBottom.toPx() }
 
-            var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
-            var isPlayButtonSlotMeasured by remember { mutableStateOf(false) }
-            var chipsRowYInRoot by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+            val isPlayButtonSlotMeasured by remember {
+                derivedStateOf { playButtonRestAnchorYInRoot > 0f }
+            }
+            val playButtonSlotYInRoot by remember {
+                derivedStateOf {
+                    if (listState.firstVisibleItemIndex > 0 || playButtonRestAnchorYInRoot <= 0f) -1f else
+                        playButtonRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
+                }
+            }
+            val chipsRowYInRoot by remember {
+                derivedStateOf {
+                    when {
+                        listState.firstVisibleItemIndex > 1 -> -1f
+                        listState.firstVisibleItemIndex == 1 -> statusBarTopPx + toolbarHeightPx - listState.firstVisibleItemScrollOffset
+                        chipsRowRestAnchorYInRoot != Float.MAX_VALUE -> chipsRowRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
+                        else -> Float.MAX_VALUE
+                    }
+                }
+            }
             val chipsScrollState = rememberScrollState()
 
             // Dynamic top offset for header:
@@ -1006,8 +1027,9 @@ fun SpotifyPlaylistScreen(
                                         modifier = Modifier
                                             .size(playButtonSize)
                                             .onGloballyPositioned { coords ->
-                                                isPlayButtonSlotMeasured = true
-                                                playButtonSlotYInRoot = coords.positionInRoot().y
+                                                if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                                                    playButtonRestAnchorYInRoot = coords.positionInRoot().y
+                                                }
                                             },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -1039,7 +1061,9 @@ fun SpotifyPlaylistScreen(
                             .fillMaxWidth()
                             .background(Color(0xFF121212))
                             .onGloballyPositioned { coords ->
-                                chipsRowYInRoot = coords.positionInRoot().y
+                                if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                                    chipsRowRestAnchorYInRoot = coords.positionInRoot().y
+                                }
                             }
                             .padding(vertical = 8.dp)
                     ) {

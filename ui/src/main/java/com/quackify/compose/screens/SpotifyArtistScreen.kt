@@ -149,9 +149,17 @@ fun SpotifyArtistScreen(
         releases.filter { it.type.equals("Single", ignoreCase = true) || it.type.equals("EP", ignoreCase = true) }
     }
 
-    var actionRowYInRoot by remember { mutableStateOf(Float.MAX_VALUE) }
-    var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
-    var isPlayButtonSlotMeasured by remember { mutableStateOf(false) }
+    var playButtonRestAnchorYInRoot by remember { mutableFloatStateOf(-1f) }
+
+    val isPlayButtonSlotMeasured by remember {
+        derivedStateOf { playButtonRestAnchorYInRoot > 0f }
+    }
+    val playButtonSlotYInRoot by remember {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0 || playButtonRestAnchorYInRoot <= 0f) -1f else
+                playButtonRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
+        }
+    }
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val toolbarHeight = 54.dp
@@ -347,10 +355,7 @@ fun SpotifyArtistScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Base)
-                        .onGloballyPositioned { coords ->
-                            actionRowYInRoot = coords.positionInRoot().y
-                        },
+                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Base),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -432,8 +437,9 @@ fun SpotifyArtistScreen(
                             modifier = Modifier
                                 .size(playButtonSize)
                                 .onGloballyPositioned { coords ->
-                                    isPlayButtonSlotMeasured = true
-                                    playButtonSlotYInRoot = coords.positionInRoot().y
+                                    if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                                        playButtonRestAnchorYInRoot = coords.positionInRoot().y
+                                    }
                                 },
                             contentAlignment = Alignment.Center
                         ) {
