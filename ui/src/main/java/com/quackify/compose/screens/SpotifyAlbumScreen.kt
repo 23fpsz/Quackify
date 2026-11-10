@@ -124,7 +124,7 @@ fun SpotifyAlbumScreen(
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
 
-    var actionRowYInRoot by remember { mutableStateOf(Float.MAX_VALUE) }
+    var actionRowYInRoot by remember { mutableFloatStateOf(Float.MAX_VALUE) }
     var playButtonSlotYInRoot by remember { mutableFloatStateOf(-1f) }
     var isPlayButtonSlotMeasured by remember { mutableStateOf(false) }
 
@@ -137,7 +137,9 @@ fun SpotifyAlbumScreen(
     val pinnedTop = toolbarBottom - playButtonHalf
     val pinnedTopPx = with(density) { pinnedTop.toPx() }
 
-    val isHeaderOffScreen = listState.firstVisibleItemIndex > 0
+    val isHeaderOffScreen by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 }
+    }
 
     val dockDistancePx by remember {
         derivedStateOf {
@@ -151,43 +153,67 @@ fun SpotifyAlbumScreen(
         }
     }
     val dockThresholdPx = with(density) { 56.dp.toPx() }
-    val dockFraction = (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f)
+    val dockFraction by remember {
+        derivedStateOf { (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f) }
+    }
 
-    val topBarThreeDotsAlpha = if (isHeaderOffScreen) 0f else dockFraction
-    val topBarTitleAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 100.dp.toPx() })).coerceIn(0f, 1f)
-    val topBarAlpha = if (isHeaderOffScreen) 1f else (1f - (dockDistancePx / with(density) { 180.dp.toPx() })).coerceIn(0f, 1f)
+    val topBarThreeDotsAlpha by remember {
+        derivedStateOf { if (isHeaderOffScreen) 0f else dockFraction }
+    }
+    val topBarTitleAlpha by remember {
+        derivedStateOf {
+            if (isHeaderOffScreen) {
+                1f
+            } else {
+                val titleScrollStartPx = with(density) { 160.dp.toPx() }
+                val titleScrollFadeRangePx = with(density) { 60.dp.toPx() }
+                ((listState.firstVisibleItemScrollOffset.toFloat() - titleScrollStartPx) / titleScrollFadeRangePx).coerceIn(0f, 1f)
+            }
+        }
+    }
+    val topBarAlpha by remember {
+        derivedStateOf {
+            if (isHeaderOffScreen) {
+                1f
+            } else {
+                (listState.firstVisibleItemScrollOffset.toFloat() / with(density) { 90.dp.toPx() }).coerceIn(0f, 1f)
+            }
+        }
+    }
     val smoothCoverColor by rememberSmoothColor(target = coverColor)
-    val topBarBgColor = smoothCoverColor.copy(alpha = topBarAlpha)
-    val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
+    val circleBtnAlpha by remember {
+        derivedStateOf { ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f) }
+    }
     val topOffsetPx = with(density) { (toolbarHeight - 8.dp).toPx().toInt() }
 
+    // Dynamically bounded by action controls row (actionRowYInRoot), matching SpotifyPlaylistScreen:
+    // Never extends past the action row, eliminating any gradient bleed onto tracks when scrolling,
+    // and smoothly contracts to toolbarBottom without animation lag or visual popping.
     val currentGradientHeightDp by remember {
         derivedStateOf {
             if (isHeaderOffScreen) {
                 toolbarBottom
-            } else if (isPlayButtonSlotMeasured && playButtonSlotYInRoot > 0f) {
-                maxOf(toolbarBottom, with(density) { (playButtonSlotYInRoot + playButtonSize.toPx() + with(density) { 14.dp.toPx() }).toDp() })
+            } else if (actionRowYInRoot != Float.MAX_VALUE && actionRowYInRoot > 0f) {
+                maxOf(toolbarBottom, with(density) { actionRowYInRoot.toDp() })
             } else {
-                toolbarBottom + 390.dp
+                toolbarBottom + 320.dp
             }
         }
     }
 
-    // The gradient height above is measured from the layout, so it steps in
-    // whole pixels as the header scrolls. Feeding that straight into .height()
-    // re-laid the gradient every frame and the colour visibly blinked at each
-    // step. Easing the height keeps the same bound but moves it smoothly.
-    val gradientHeight by animateDpAsState(
-        targetValue = currentGradientHeightDp,
-        animationSpec = tween(durationMillis = 220, easing = EncoreAnimation.DecelerateInterpolator),
-        label = "albumGradientHeight"
-    )
-
     // Dynamic Artwork Shrink Calculation
-    val scrollOffset = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset else 500
-    val shrinkFraction = (scrollOffset / with(density) { 200.dp.toPx() }).coerceIn(0f, 1f)
-    val artworkSize = 240.dp - (50.dp * shrinkFraction)
-    val artworkAlpha = (1f - (shrinkFraction * 0.35f)).coerceIn(0f, 1f)
+    val shrinkFraction by remember {
+        derivedStateOf {
+            val scrollOffset = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else with(density) { 200.dp.toPx() }
+            (scrollOffset / with(density) { 200.dp.toPx() }).coerceIn(0f, 1f)
+        }
+    }
+    val artworkSize by remember {
+        derivedStateOf { 240.dp - (50.dp * shrinkFraction) }
+    }
+    val artworkAlpha by remember {
+        derivedStateOf { (1f - (shrinkFraction * 0.35f)).coerceIn(0f, 1f) }
+    }
 
     Box(
         modifier = modifier
@@ -195,12 +221,12 @@ fun SpotifyAlbumScreen(
             .background(Color(0xFF121212))
     ) {
         // Collapsible Header Gradient Background
-        // Spans from top of screen (Y = 0) down to the bottom of the action row,
+        // Spans from top of screen (Y = 0) down to the top of the action row,
         // dynamically bounded so it smoothly contracts into toolbarBottom without scroll bleed or popping.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(gradientHeight)
+                .height(currentGradientHeightDp)
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
@@ -640,12 +666,24 @@ fun SpotifyAlbumScreen(
             }
         }
 
+        // Collapsing Header Background covering status bar + top bar (Solid transition matching SpotifyPlaylistScreen)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .height(toolbarBottom)
+                .graphicsLayer {
+                    alpha = topBarAlpha
+                }
+                .background(smoothCoverColor)
+                .zIndex(9.8f)
+        )
+
         // Pinned Top Navigation Bar (Overlays top of screen, transparent at rest, solid when scrolled)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .background(topBarBgColor)
                 .statusBarsPadding()
                 .height(toolbarHeight)
                 .padding(horizontal = 16.dp)
