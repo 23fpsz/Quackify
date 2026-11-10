@@ -38,6 +38,20 @@ private const val KEY_SETTLE_MS = 300L
 
 private const val DUCK_LEVEL = 0.2f
 
+private const val PLAYER_PREFS = "quackify.player"
+
+private const val KEY_RESUME_URI = "resumeUri"
+
+private const val KEY_RESUME_FILE = "resumeFile"
+
+private const val KEY_RESUME_FORMAT = "resumeFormat"
+
+private const val KEY_RESUME_AT = "resumeAt"
+
+// Close enough to pick the right warm segments, sparse enough to keep the
+// prefs writes off the engine's progress beat.
+private const val RESUME_WRITE_MS = 5_000L
+
 sealed interface PlayerEvent {
     data object Started : PlayerEvent
     data object Ended : PlayerEvent
@@ -135,6 +149,10 @@ class KrespotPlayer(private val context: Context) {
 
     @Volatile
     private var deepTarget: String = ""
+
+    private var resumeWrittenUri = ""
+
+    private var resumeWrittenMs = -1L
 
     fun rememberFile(trackUri: String, fileId: String) {
         if (trackUri.isBlank() || fileId.length < 32) return
@@ -289,6 +307,58 @@ class KrespotPlayer(private val context: Context) {
             }
         }
         return android.os.SystemClock.elapsedRealtime() - started
+    }
+
+    /**
+     * Cold-start fast path for "autoplay on startup": the cluster names the
+     * track only after its round trip, but this phone already knows what it
+     * played last, so its source, licence and first segments warm while the
+     * cluster request is still on the wire and play() starts from caches.
+     * A miss costs one background resolve and licence, never the play.
+     */
+    fun resumeLast(spclient: String) {
+        scope.launch {
+            val prefs = context.getSharedPreferences(PLAYER_PREFS, Context.MODE_PRIVATE)
+            val uri = prefs.getString(KEY_RESUME_URI, "").orEmpty()
+            val file = prefs.getString(KEY_RESUME_FILE, "").orEmpty()
+            val format = prefs.getInt(KEY_RESUME_FORMAT, 0)
+            val at = prefs.getLong(KEY_RESUME_AT, 0L).coerceAtLeast(0L)
+            if (!uri.startsWith("spotify:track:") || file.length < 32) {
+                log.i("resume: no remembered track to prefetch")
+                return@launch
+            }
+            if (sourceFor(uri) != null) return@launch
+            val source = runCatching {
+                SourceResolver.resolve(context, spclient, uri, fileId = file, format = format)
+            }.getOrNull()
+            if (source == null) {
+                log.i("resume: '${uri.takeLast(12)}' did not resolve, autoplay takes the cold path")
+                return@launch
+            }
+            rememberSource(uri, source)
+            widevine.open(source.seektable.pssh)
+            SegmentStore.warm(source, at)
+            log.i("resume: '${uri.takeLast(12)}' file=${source.fileId.take(8)} " +
+                    "licence and segments warmed at ${at}ms"
+            )
+        }
+    }
+
+    private fun persistResume() {
+        val current = _state.value
+        val file = current.fileId
+        if (file.isBlank() || !current.trackUri.startsWith("spotify:track:")) return
+        if (current.trackUri == resumeWrittenUri &&
+            kotlin.math.abs(current.positionMs - resumeWrittenMs) < RESUME_WRITE_MS
+        ) return
+        resumeWrittenUri = current.trackUri
+        resumeWrittenMs = current.positionMs
+        context.getSharedPreferences(PLAYER_PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_RESUME_URI, current.trackUri)
+            .putString(KEY_RESUME_FILE, file)
+            .putInt(KEY_RESUME_FORMAT, current.format)
+            .putLong(KEY_RESUME_AT, current.positionMs)
+            .apply()
     }
 
     val positionMs: Long
@@ -586,5 +656,6 @@ class KrespotPlayer(private val context: Context) {
                 is PlayerEvent.Failed -> current.copy(playing = false, buffering = false, trackUri = "")
             }
         }
+        persistResume()
     }
 }

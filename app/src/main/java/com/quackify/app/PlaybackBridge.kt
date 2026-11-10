@@ -505,6 +505,9 @@ class PlaybackBridge(private val context: Context) {
                 log.i("the other app is done, the volume is back")
         }
         player.warm()
+        // The cluster fetch is already on the wire and the remembered track is
+        // what autoplay will ask for: warm it in parallel.
+        if (autoplayOnStartup) player.resumeLast(connect.spclientHost)
         connect.holdsStream = false
         deviceWatch = scope.launch {
             while (true) {
