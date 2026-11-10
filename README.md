@@ -9,7 +9,6 @@ Quackify is the continuation of SpotiDuck, built as a native Android client with
 - View your library's playlists and albums
 - Play playlist and album tracks with the mini player
 - Expand to the full Now Playing screen with seek controls and lyrics
-- Toggle between light and dark mode (if applicable)
 
 ## Getting Started
 
