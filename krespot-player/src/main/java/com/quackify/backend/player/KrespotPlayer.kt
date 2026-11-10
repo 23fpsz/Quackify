@@ -270,6 +270,7 @@ class KrespotPlayer(private val context: Context) {
             val decoder = warmDecoder()
             log.i("audio sink warmed in ${sink}ms, decoder in ${decoder}ms")
         }
+        scope.launch { widevine.warm() }
     }
 
     private fun warmDecoder(): Long {
