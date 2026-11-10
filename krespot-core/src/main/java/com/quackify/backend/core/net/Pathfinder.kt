@@ -2,6 +2,8 @@ package com.quackify.backend.core.net
 
 import android.content.Context
 import com.quackify.backend.core.auth.SpotifyAuth
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URLEncoder
 import com.quackify.backend.core.log.Logs
@@ -389,7 +391,7 @@ object Pathfinder {
         return query(context, token, operation, variables)
     }
 
-    private fun finish(context: Context, operation: String, response: Net.Response, token: String): JSONObject? {
+    private suspend fun finish(context: Context, operation: String, response: Net.Response, token: String): JSONObject? {
         if (response.code == 401 || response.code == 403) {
             log.w("$operation http=${response.code} even after a fresh client-token, " +
                     "so it is the access token — ${response.body.take(200)}"
@@ -406,13 +408,18 @@ object Pathfinder {
             log.w("$operation http=${response.code} ${response.body.take(200)}")
             return null
         }
-        val json = response.json()
-        if (json == null) {
-            log.w("$operation not-json ${response.body.take(200)}")
-            return null
+        // The body of a single startup answer runs to hundreds of kilobytes;
+        // parsing it wherever the caller resumed (the main thread for every
+        // LaunchedEffect loader) is what dropped the first frames.
+        return withContext(Dispatchers.Default) {
+            val json = response.json()
+            if (json == null) {
+                log.w("$operation not-json ${response.body.take(200)}")
+                return@withContext null
+            }
+            logShape(operation, json)
+            json
         }
-        logShape(operation, json)
-        return json
     }
 
     private fun logShape(operation: String, json: JSONObject) {
