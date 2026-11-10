@@ -844,7 +844,7 @@ fun SpotifyPlaylistScreen(
 
                             Spacer(modifier = Modifier.height(6.dp))
 
-                            // Metadata Row: 🌐 Globe + Save Count & Duration
+                            // Metadata Row: Globe + Save Count & Duration
                             val metadataText = buildString {
                                 if (saveCount.isNotBlank()) append(saveCount)
                                 val duration = formatCollectionDuration(totalDurationMs, totalIsEstimate)
@@ -860,9 +860,11 @@ fun SpotifyPlaylistScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     modifier = Modifier.padding(horizontal = 16.dp)
                                 ) {
-                                    Text(
-                                        text = "🌐",
-                                        fontSize = 12.sp
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.encore_icon_globe_24),
+                                        contentDescription = "Public playlist",
+                                        tint = EncoreColors.TextSecondary,
+                                        modifier = Modifier.size(14.dp)
                                     )
                                     Text(
                                         text = metadataText,
@@ -1687,14 +1689,16 @@ private fun PlaylistEmptyCurationHeader(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Actions Row: 🌐 Globe + Share icon
+        // Actions Row: Globe + Share icon
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "🌐",
-                fontSize = 14.sp
+            Icon(
+                painter = painterResource(id = R.drawable.encore_icon_globe_24),
+                contentDescription = "Public playlist",
+                tint = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp)
             )
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_share_android_24),
