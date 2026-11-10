@@ -715,20 +715,18 @@ fun SpotifyAlbumScreen(
                     .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (topBarTitleAlpha > 0.01f) {
-                    Text(
-                        text = albumTitle,
-                        style = SpotifyTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            fontSize = 17.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.graphicsLayer { alpha = topBarTitleAlpha }
-                    )
-                }
+                Text(
+                    text = albumTitle,
+                    style = SpotifyTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 17.sp
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.graphicsLayer { alpha = topBarTitleAlpha }
+                )
             }
 
             // 3-Dots Button (smoothly cross-fades out as play button docks)
@@ -736,23 +734,21 @@ fun SpotifyAlbumScreen(
                 modifier = Modifier.size(38.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (topBarThreeDotsAlpha > 0.01f) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = circleBtnAlpha * topBarThreeDotsAlpha))
-                            .clickable(onClick = onAlbumOptionsClick)
-                            .graphicsLayer { alpha = topBarThreeDotsAlpha },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.encore_icon_more_android_24),
-                            contentDescription = "Album options",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = circleBtnAlpha * topBarThreeDotsAlpha))
+                        .clickable(onClick = onAlbumOptionsClick)
+                        .graphicsLayer { alpha = topBarThreeDotsAlpha },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_more_android_24),
+                        contentDescription = "Album options",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
