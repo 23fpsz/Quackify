@@ -1047,20 +1047,33 @@ class MainActivity : ComponentActivity() {
                                     val name = choice.name
                                     // The sheet's first row is the liked songs
                                     // pseudo playlist; adding to it is a like.
-                                    val ok = if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
+                                    if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
                                         val saved = Library.setSaved(context, listOf(track.uri), true)
                                         log.i("add '${track.title}' to Liked Songs ok=$saved")
-                                        saved
                                     } else {
                                         val added = Krespot.playlists.addTrack(context, choice.uri, track.uri)
                                         log.i("add '${track.title}' to '$name' ok=$added")
-                                        added
                                     }
-                                    Toast.makeText(
-                                        context,
-                                        if (ok) "Added to $name" else "Couldn't add to $name",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                }
+                            },
+                            onTogglePlaylist = { choice, track, shouldAdd ->
+                                scope.launch {
+                                    val name = choice.name
+                                    if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
+                                        if (track.uri == bridge.state.trackUri && bridge.state.isLiked != shouldAdd) {
+                                            bridge.listener.onLikeToggle()
+                                        } else {
+                                            val saved = Library.setSaved(context, listOf(track.uri), shouldAdd)
+                                            log.i("${if (shouldAdd) "add" else "remove"} '${track.title}' to/from Liked Songs ok=$saved")
+                                        }
+                                    } else {
+                                        val res = if (shouldAdd) {
+                                            Krespot.playlists.addTrack(context, choice.uri, track.uri)
+                                        } else {
+                                            Krespot.playlists.removeTrack(context, choice.uri, track.uri)
+                                        }
+                                        log.i("${if (shouldAdd) "add" else "remove"} '${track.title}' to/from '$name' ok=$res")
+                                    }
                                 }
                             },
                             onLoadPlaylistFolder = { trackUri, folderUri ->
@@ -1076,9 +1089,6 @@ class MainActivity : ComponentActivity() {
                                     log.i("create playlist '$name' ok=${uri != null}")
                                     if (uri != null) {
                                         Krespot.library.invalidate()
-                                        Toast.makeText(context, "Added to $name", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "Couldn't create playlist", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
@@ -1194,14 +1204,18 @@ class MainActivity : ComponentActivity() {
                                     log.i("delete folder '$uri' ok=$ok")
                                 }
                             },
-                            onMoveToFolder = { playlistUri, folderUri ->
+                            onMoveToFolder = { playlistUri, targetFolderUri ->
                                 scope.launch {
-                                    val ok = if (folderUri.isBlank()) {
+                                    val ok = if (targetFolderUri.isBlank()) {
                                         Krespot.folders.removeFromFolder(context, playlistUri)
                                     } else {
-                                        Krespot.folders.moveIntoFolder(context, playlistUri, folderUri)
+                                        Krespot.folders.moveIntoFolder(context, playlistUri, targetFolderUri)
                                     }
-                                    log.i("move '$playlistUri' into '$folderUri' ok=$ok")
+                                    log.i("move '$playlistUri' into '$targetFolderUri' ok=$ok")
+                                    if (ok && folderUri.isNotBlank()) {
+                                        folderItems = null
+                                        folderFetch++
+                                    }
                                 }
                             },
                             artistTracks = artistTracks,
@@ -1425,8 +1439,6 @@ class MainActivity : ComponentActivity() {
                             onAddAccount = {
                                 log.i("add account tapped")
                                 scope.launch {
-                                    // The new login overwrites the active session, so the
-                                    // current account must be snapshotted now or it is lost.
                                     SpotifyAuth.userId(context, force = true)
                                     SpotifyAuth.storeCurrentAccount(context)
                                     savedAccountsList = SpotifyAuth.savedAccounts(context)
