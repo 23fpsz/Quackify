@@ -73,7 +73,6 @@ fun DiscardChangesDialog(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Title
                     Text(
                         text = "Discard changes?",
                         fontSize = 20.sp,
@@ -84,7 +83,6 @@ fun DiscardChangesDialog(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Message
                     Text(
                         text = "If you go back now, you'll lose your changes.",
                         fontSize = 14.sp,
@@ -96,7 +94,6 @@ fun DiscardChangesDialog(
 
                     Spacer(modifier = Modifier.height(26.dp))
 
-                    // Primary Button: "Keep editing" Green Pill
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(0.72f)
@@ -116,7 +113,6 @@ fun DiscardChangesDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Secondary Action: "Discard" text button
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))

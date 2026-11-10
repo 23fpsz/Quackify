@@ -87,8 +87,6 @@ internal object SegmentStore {
         if (bytes != null) {
             entry.segments.putIfAbsent(index, bytes)
         } else {
-            // A failed download must not linger as the shared answer for this
-            // index: drop it so the next caller starts a fresh attempt.
             entry.inFlight.remove(index)
         }
         return bytes

@@ -147,7 +147,6 @@ fun EntityOptionsSheet(
                         isSaved -> "Remove from Your Library"
                         else -> "Add to Your Library"
                     },
-                    // a removal must read as destructive, never as a checkmark
                     iconRes = when {
                         isSaved -> R.drawable.encore_icon_trash_24
                         else -> R.drawable.encore_icon_plus_24

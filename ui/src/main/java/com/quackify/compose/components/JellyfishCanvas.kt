@@ -39,7 +39,6 @@ fun JellyfishCanvas(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "jellyfishMotion")
 
-    // Phase angle driving the sinusoidal wave oscillation
     val phase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
@@ -59,7 +58,6 @@ fun JellyfishCanvas(
             val width = size.width
             val height = size.height
 
-            // 1. Bottom Spline Layer (Deep Ambient Swell)
             drawSplineWave(
                 width = width,
                 height = height,
@@ -70,7 +68,6 @@ fun JellyfishCanvas(
                 fillColor = dominantColor.copy(alpha = 0.35f)
             )
 
-            // 2. Mid Spline Layer (Vibrant Mid Wave)
             drawSplineWave(
                 width = width,
                 height = height,
@@ -81,7 +78,6 @@ fun JellyfishCanvas(
                 fillColor = accentColor.copy(alpha = 0.50f)
             )
 
-            // 3. Top Spline Layer (Bright Fluid Crest)
             drawSplineWave(
                 width = width,
                 height = height,
@@ -92,7 +88,6 @@ fun JellyfishCanvas(
                 fillColor = dominantColor.copy(alpha = 0.65f)
             )
 
-            // Overlay dark vertical vignette gradient fading seamlessly into Spotify base black
             drawRect(
                 brush = Brush.verticalGradient(
                     colorStops = arrayOf(
@@ -125,7 +120,6 @@ private fun DrawScope.drawSplineWave(
     val segments = 4
     val segmentWidth = width / segments
 
-    // Start at top-left
     val startY = baseY + amplitude * sin(phase)
     path.moveTo(0f, startY)
 
@@ -146,7 +140,6 @@ private fun DrawScope.drawSplineWave(
         path.cubicTo(cp1x, cp1y, cp2x, cp2y, x1, y1)
     }
 
-    // Close path down to the bottom edges
     path.lineTo(width, height)
     path.lineTo(0f, height)
     path.close()

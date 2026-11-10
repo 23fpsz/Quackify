@@ -139,7 +139,6 @@ fun SpotifyCategoryScreen(
     val effectiveShelves = shelves?.takeIf { it.isNotEmpty() } ?: fallbackShelves
     val effectiveSubgenres = subgenres?.takeIf { it.isNotEmpty() } ?: fallbackSubgenres
 
-    // Top bar scroll alpha calculations
     val scrollOffset by remember {
         derivedStateOf {
             listState.firstVisibleItemScrollOffset + listState.firstVisibleItemIndex * 400
@@ -161,7 +160,6 @@ fun SpotifyCategoryScreen(
             .fillMaxSize()
             .background(EncoreColors.PureBlack)
     ) {
-        // Dynamic Genre Header Gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -177,13 +175,11 @@ fun SpotifyCategoryScreen(
                 )
         )
 
-        // Main Scrollable Category Feed
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(top = statusBarHeight + toolbarHeight)
         ) {
-            // Large Category Title Header
             item(key = "category_header") {
                 Column(
                     modifier = Modifier
@@ -201,10 +197,8 @@ fun SpotifyCategoryScreen(
                 }
             }
 
-            // Recommendation Shelves
             items(effectiveShelves, key = { it.title }) { shelf ->
                 Column(modifier = Modifier.padding(top = 18.dp)) {
-                    // Shelf Header
                     Text(
                         text = shelf.title,
                         style = SpotifyTheme.typography.titleLarge.copy(
@@ -227,7 +221,6 @@ fun SpotifyCategoryScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Horizontal Card Carousel
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -244,7 +237,6 @@ fun SpotifyCategoryScreen(
                                         }
                                     }
                             ) {
-                                // Artwork Box with floating play button
                                 Box(
                                     modifier = Modifier
                                         .size(148.dp)
@@ -267,7 +259,6 @@ fun SpotifyCategoryScreen(
                                         )
                                     }
 
-                                    // Floating Quick Play Button
                                     EncorePlayButton(
                                         isPlaying = false,
                                         onClick = {
@@ -291,7 +282,6 @@ fun SpotifyCategoryScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                // Item Title
                                 Text(
                                     text = item.title,
                                     style = SpotifyTheme.typography.bodyMedium.copy(
@@ -305,7 +295,6 @@ fun SpotifyCategoryScreen(
 
                                 Spacer(modifier = Modifier.height(2.dp))
 
-                                // Item Subtitle / Description
                                 Text(
                                     text = item.subtitle,
                                     style = SpotifyTheme.typography.bodySmall.copy(
@@ -322,7 +311,6 @@ fun SpotifyCategoryScreen(
                 }
             }
 
-            // Subcategories / Explore Section
             if (effectiveSubgenres.isNotEmpty()) {
                 item(key = "subcategories_header") {
                     Column(
@@ -342,7 +330,6 @@ fun SpotifyCategoryScreen(
                     }
                 }
 
-                // Chunk subgenres into pairs of 2 for a clean grid layout
                 items(effectiveSubgenres.chunked(2), key = { pair -> pair.joinToString { it.title } }) { rowPair ->
                     Row(
                         modifier = Modifier
@@ -378,13 +365,11 @@ fun SpotifyCategoryScreen(
                 }
             }
 
-            // Bottom Spacing for MiniPlayer and Navigation Bar
             item(key = "bottom_spacer") {
                 Spacer(modifier = Modifier.height(bottomPadding + 16.dp))
             }
         }
 
-        // Sticky Overlay Top Bar with Smooth Back Navigation and Title
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -395,7 +380,6 @@ fun SpotifyCategoryScreen(
                 .height(toolbarHeight)
                 .padding(horizontal = 16.dp)
         ) {
-            // Back Button
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -413,7 +397,6 @@ fun SpotifyCategoryScreen(
                 )
             }
 
-            // Centered Title in Top Bar when scrolled
             if (topBarTitleAlpha > 0.01f) {
                 Text(
                     text = categoryTitle,

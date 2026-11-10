@@ -50,9 +50,6 @@ object PlayHistory {
                 plays = node.optInt("plays", 1).coerceAtLeast(1),
             )
 
-            // The list is stored newest-first: collapse re-plays of the same
-            // song (different URIs of a re-release count as the same song)
-            // into the most recent entry.
             if (out.none { sameSong(it.item, candidate.item) }) {
                 out += candidate
             }
@@ -74,7 +71,6 @@ object PlayHistory {
 
         val previous = all(context)
 
-        // Keep an already stored cover if this play carries none
         val enriched = if (track.imageUrl.isNullOrBlank()) {
             track.copy(
                 imageUrl = previous

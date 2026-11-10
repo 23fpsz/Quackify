@@ -202,22 +202,13 @@ fun SpotifySearchScreen(
     var searchQuery by remember { mutableStateOf(initialQuery) }
     var selectedSearchTab by remember { mutableIntStateOf(0) }
     var isSearchBarFocused by remember { mutableStateOf(false) }
-    // A play from the suggestion dropdown keeps the overlay on screen (with the
-    // keyboard folded) so the tap never reads like an autocomplete pick: the
-    // typed text is not committed and the results page does not slide in
-    // behind the play. Any other interaction (typing, focusing, picking a
-    // query row, a chip, back/clear) drops the pin again.
     var suggestionsPinned by remember { mutableStateOf(false) }
     val searchTabs = listOf("Top", "Songs", "Artists", "Playlists", "Albums", "Podcasts")
     val focusManager = LocalFocusManager.current
     val bottomPadding = rememberBottomPadding()
 
-    // The same live connectivity the shell's offline banner uses: searching
-    // with the radio off must say so instead of spinning on "Searching...".
     val isOffline = rememberIsOffline()
 
-    // Voice search: hand the query to the system speech recognizer and feed the
-    // transcript straight into the search flow
     val appContext = LocalContext.current
     val speechIntent = remember {
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -247,9 +238,6 @@ fun SpotifySearchScreen(
 
     val categories = remember(browseCategories) { browseCategories }
 
-    // The grid has no retry of its own, so a blank list after a moment means the
-    // fetch failed rather than still running. Without this the spinner sits there
-    // forever on an offline launch.
     var categoriesFailed by remember { mutableStateOf(false) }
     LaunchedEffect(categories.isEmpty()) {
         categoriesFailed = false
@@ -259,10 +247,6 @@ fun SpotifySearchScreen(
         }
     }
 
-    // The activity folds every heart press into an overlay on top of the fetched
-    // answer, so each row keeps showing what the user last pressed while the
-    // write round-trips, and the rows the fetch never covered (the paged-in
-    // section lists, the as-you-type suggestions) stay in step too.
     val displaySearchData = remember(searchData, savedOverrides) {
         savedOverrides.entries.fold(searchData) { acc, (uri, saved) ->
             acc?.withSaved(uri, saved)
@@ -328,9 +312,6 @@ fun SpotifySearchScreen(
     val filteredTracks = remember(searchQuery, searchResults, suggestions, loading, displaySearchData) {
         when {
             searchQuery.isBlank() -> emptyList()
-            // The full search knows the covers and artist lines; the
-            // as-you-type suggestions only carry names, so once the real
-            // results land they take over the list.
             !displaySearchData?.tracks.isNullOrEmpty() -> displaySearchData!!.tracks.map { it.toTrackItem() }
             !searchResults.isNullOrEmpty() -> searchResults
             !loading && suggestions.isNotEmpty() -> suggestions
@@ -382,10 +363,6 @@ fun SpotifySearchScreen(
     var sectionLoadingMore by remember { mutableStateOf(false) }
 
     val tabKind = kindOfTab(selectedSearchTab)
-    // The loader must not key the load effect: a fresh lambda instance from a
-    // parent recomposition (every playback tick rebuilds the shell arguments)
-    // would restart the in-flight section load, keeping the tab resetting to
-    // its placeholder forever. Read the latest instance when it runs instead.
     val currentLoader by rememberUpdatedState(onLoadSection)
 
     LaunchedEffect(tabKind, searchQuery, isSearchBarFocused) {
@@ -419,10 +396,6 @@ fun SpotifySearchScreen(
         }
     }
 
-    // Playing a song is the ONLY thing a tap does: the keyboard folds so the
-    // field cannot stay focused and keep popping the keyboard over the list.
-    // (The suggestion dropdown pins its overlay separately before playing, so
-    // a play from it also leaves the typed text and its overlay untouched.)
     val playFromSearch: (TrackItem) -> Unit = { track ->
         if (isSearchBarFocused) {
             isSearchBarFocused = false
@@ -449,7 +422,6 @@ fun SpotifySearchScreen(
             .background(EncoreColors.Background)
             .statusBarsPadding()
     ) {
-        // Sticky Header: Avatar, "Search" Title & Modern Search Header Field
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -484,13 +456,11 @@ fun SpotifySearchScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Spotify Search Pill Bar (matching modern_search_header.xml)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (isSearching) {
-                    // Back button view (48dp x 48dp)
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_chevron_left_24,
                         contentDescription = "Back",
@@ -500,8 +470,6 @@ fun SpotifySearchScreen(
                             suggestionsPinned = false
                             isSearchBarFocused = false
                             focusManager.clearFocus()
-                            // Tell the activity too, so its stale results and
-                            // suggestions for the old term drop with the view.
                             onSearchQueryChange("")
                         },
                         size = 48.dp,
@@ -510,7 +478,6 @@ fun SpotifySearchScreen(
                     )
                 }
 
-                // Input box with gray_15 background (#282828) or white when idle
                 BasicTextField(
                     value = searchQuery,
                     onValueChange = {
@@ -569,7 +536,6 @@ fun SpotifySearchScreen(
                                         }
                                 )
                             } else if (isSearchBarFocused && canVoiceSearch) {
-                                // Voice search mic — only visible when search bar is focused (active state)
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_mic_24),
                                     contentDescription = "Voice search",
@@ -581,30 +547,24 @@ fun SpotifySearchScreen(
                                         }
                                 )
                             }
-                            // Idle state: no icon on right side of pill (avoids duplicate mic confusion)
                         }
                     },
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
                         .then(
-                            // The shell's nav bar focuses this field through the
-                            // requester when the Search tab is double-tapped.
                             searchFieldFocusRequester?.let { Modifier.focusRequester(it) } ?: Modifier
                         )
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isSearching) Color(0xFF282828) else Color.White)
                         .onFocusChanged {
                             isSearchBarFocused = it.isFocused
-                            // Tapping back into the field returns it to the
-                            // ordinary focused overlay; the pin (if any) is over.
                             if (it.isFocused) suggestionsPinned = false
                         }
                         .padding(horizontal = 12.dp)
                 )
             }
 
-            // Category filter chips: ONLY visible when a search query is typed (matches filter_compose visibility="gone" default in search_fragment_layout.xml)
             if (searchQuery.isNotBlank()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -614,10 +574,6 @@ fun SpotifySearchScreen(
                             isSelected = selectedSearchTab == index,
                             onClick = {
                                 selectedSearchTab = index
-                                // Picking a filter asks for the filtered list, not
-                                // for more typing: fold the keyboard and the
-                                // as-you-type overlay so the tab's content takes
-                                // their place right away (the field keeps its text).
                                 suggestionsPinned = false
                                 if (isSearchBarFocused) {
                                     isSearchBarFocused = false
@@ -630,10 +586,6 @@ fun SpotifySearchScreen(
             }
         }
 
-        // Content Area: Switched dynamically based on state
-        // 1. Idle (unfocused, empty query): Categories Browse Grid
-        // 2. Focused & Empty query: Recent Searches List (history_row_search_layout.xml)
-        // 3. Query entered: Search suggestions & Search results
         if (showRecentSearches) {
             LazyColumn(
                 modifier = Modifier
@@ -641,7 +593,6 @@ fun SpotifySearchScreen(
                     .background(EncoreColors.Background),
                 contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
             ) {
-                // Header: "Recent searches"
                 item {
                     Text(
                         text = "Recent searches",
@@ -654,11 +605,6 @@ fun SpotifySearchScreen(
                     )
                 }
 
-                // History rows matching history_row_search_layout.xml:
-                // - artwork (48dp, circle for artist, 4dp rounded for tracks/playlists)
-                // - title (BodyMedium, encore_row_title)
-                // - subtitle (BodySmall, encore_row_subtitle)
-                // - remove button (spacer_48 = 48dp tap area, encore_accessory tint)
                 items(recentSearches, key = { it.title }) { searchItem ->
                     Row(
                         modifier = Modifier
@@ -672,7 +618,6 @@ fun SpotifySearchScreen(
                             .height(64.dp), // minHeight = 64.0dp from history_row_search_layout.xml
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Artwork view (@dimen/track_row_cover_art_size = 48.0dp)
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
@@ -698,7 +643,6 @@ fun SpotifySearchScreen(
 
                         Spacer(modifier = Modifier.width(12.dp))
 
-                        // Title & Subtitle column
                         Column(
                             modifier = Modifier
                                 .weight(1f)
@@ -722,7 +666,6 @@ fun SpotifySearchScreen(
                             )
                         }
 
-                        // Remove button matching ClearButtonView (spacer_48 = 48.0dp, encore_icon_x)
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
@@ -742,8 +685,6 @@ fun SpotifySearchScreen(
                     }
                 }
 
-                // Centered "Clear recent searches" button matching history_heading_clear_search_layout.xml
-                // Uses Encore.Button.Secondary.Small (pill outlined button, 32dp height, BodySmallBold)
                 if (recentSearches.isNotEmpty()) {
                     item {
                         Box(
@@ -780,8 +721,6 @@ fun SpotifySearchScreen(
                 }
             }
         } else if (showSuggestions) {
-            // As-you-type dropdown. The rows mirror the saved-state overlay the
-            // activity keeps, so a heart pressed here flips in place too.
             val dropHits = remember(suggestionHits, savedOverrides) {
                 suggestionHits.map { hit -> savedOverrides[hit.uri]?.let { hit.copy(saved = it) } ?: hit }
             }
@@ -803,13 +742,6 @@ fun SpotifySearchScreen(
                                     focusManager.clearFocus()
                                     onSearchQueryChange(hit.title)
                                 } else {
-                                    // Pressing an entity opens it straight from the
-                                    // dropdown — a song plays — instead of re-running
-                                    // the search on its name. A play also pins the
-                                    // overlay: the keyboard folds but the suggestions
-                                    // stay on screen, so the tap is nothing more than
-                                    // the play — no autocomplete-style commit of the
-                                    // text, no results page sliding in behind it.
                                     if (hit.kind == SearchKind.TRACK) suggestionsPinned = true
                                     isSearchBarFocused = false
                                     focusManager.clearFocus()
@@ -850,7 +782,6 @@ fun SpotifySearchScreen(
                             }
                         }
                         if (hit.kind == SearchKind.TRACK) {
-                            // Like a song straight from the dropdown, playing it optional.
                             EncoreIconButton(
                                 iconRes = if (hit.saved) R.drawable.encore_icon_heart_active_24
                                 else R.drawable.encore_icon_heart_24,
@@ -882,9 +813,6 @@ fun SpotifySearchScreen(
                         .padding(top = 8.dp)
                 )
             } else if (!hasResults && (isOffline || loadFailed)) {
-                // Nothing came back because the network is gone or the query
-                // itself failed - the same card the playlist screen shows,
-                // with a retry instead of a misleading "couldn't find"
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -942,9 +870,7 @@ fun SpotifySearchScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    // TAB 0: "Top" (Composite: Top Result + Songs + Artists + Albums + Playlists)
                     if (selectedSearchTab == 0) {
-                        // Top Result Card
                         val topHit = displaySearchData?.top
                         val topTrack = if (topHit == null) filteredTracks.firstOrNull() else null
                         if (topHit != null || topTrack != null) {
@@ -1035,7 +961,6 @@ fun SpotifySearchScreen(
                             }
                         }
 
-                        // Songs subset (up to 4)
                         if (filteredTracks.isNotEmpty()) {
                             item {
                                 Text(
@@ -1062,7 +987,6 @@ fun SpotifySearchScreen(
                             }
                         }
 
-                        // Artists subset (up to 2)
                         if (filteredArtists.isNotEmpty()) {
                             item {
                                 Text(
@@ -1085,7 +1009,6 @@ fun SpotifySearchScreen(
                             }
                         }
 
-                        // Albums subset
                         if (filteredAlbums.isNotEmpty()) {
                             item {
                                 Text(
@@ -1108,7 +1031,6 @@ fun SpotifySearchScreen(
                             }
                         }
 
-                        // Playlists subset
                         if (filteredPlaylists.isNotEmpty()) {
                             item {
                                 Text(
@@ -1130,7 +1052,6 @@ fun SpotifySearchScreen(
                             }
                         }
 
-                        // Podcasts subset
                         if (filteredPodcasts.isNotEmpty()) {
                             item {
                                 Text(
@@ -1152,8 +1073,6 @@ fun SpotifySearchScreen(
                             }
                         }
 
-                        // Server shelves interleaved in topResultsV2 ("Featuring …",
-                        // "Music videos", …): the web player gives each its own block.
                         displaySearchData?.sections.orEmpty().forEach { section ->
                             if (section.items.isNotEmpty()) {
                                 item(key = "section_${section.title}") {
@@ -1187,8 +1106,6 @@ fun SpotifySearchScreen(
                         }
                     }
 
-                    // A specific tab: the server's own operation for that section
-                    // once it answered, the slice of the top 50 until then.
                     if (tabKind != null) {
                         items(tabHits, key = { "tab_${it.uri}_${it.title}" }) { hit ->
                             SearchHitRow(
@@ -1206,9 +1123,6 @@ fun SpotifySearchScreen(
                             )
                         }
 
-                        // A tab with no rows yet: the section page may still be on
-                        // its way (dots), or the search really has none of that
-                        // kind — say so instead of leaving the tab looking dead.
                         if (tabHits.isEmpty()) {
                             item(key = "tab_empty_${tabKind}") {
                                 Box(
@@ -1255,7 +1169,6 @@ fun SpotifySearchScreen(
                 }
             }
         } else {
-            // Idle State: Browse All Categories Grid (recent searches now shown as dropdown overlay)
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier
@@ -1295,7 +1208,6 @@ fun SpotifySearchScreen(
                     }
                 }
 
-                // Category Cards (96dp category_card_max_height from dimens.xml, 4dp corner radius)
                 items(categories, key = { it.uri.ifBlank { it.title } }) { category ->
                     Box(
                         modifier = Modifier
@@ -1332,7 +1244,6 @@ fun SpotifySearchScreen(
                             }
                         }
 
-                        // Rotated Art Thumbnail Peek (offset 16dp x, 6dp y, 25 deg rotate)
                         Box(
                             modifier = Modifier
                                 .size(64.dp)
@@ -1388,7 +1299,6 @@ private fun SearchTrackRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Artwork thumbnail (48dp x 48dp, 4dp corner radius)
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -1415,7 +1325,6 @@ private fun SearchTrackRow(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Title and Subtitle Column
         Column(
             modifier = Modifier.weight(1f)
         ) {
@@ -1454,7 +1363,6 @@ private fun SearchTrackRow(
             }
         }
 
-        // Like button
         EncoreIconButton(
             iconRes = if (track.saved == true) R.drawable.encore_icon_heart_active_24
             else R.drawable.encore_icon_heart_24,
@@ -1466,7 +1374,6 @@ private fun SearchTrackRow(
             tint = if (track.saved == true) EncoreColors.Green else EncoreColors.TextSecondary
         )
 
-        // More options button (encore_icon_more_android_24)
         EncoreIconButton(
             iconRes = R.drawable.encore_icon_more_android_24,
             contentDescription = "More options for ${track.title}",

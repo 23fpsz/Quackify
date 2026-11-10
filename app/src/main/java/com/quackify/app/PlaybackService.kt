@@ -81,8 +81,6 @@ class PlaybackService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
-            // Pre-13 notification buttons arrive here; 13+ goes through the
-            // session callback. Both end up in the same bridge calls.
             ACTION_TOGGLE -> PlaybackHost.bridge?.listener?.onPlayPause()
             ACTION_NEXT -> PlaybackHost.bridge?.listener?.onSkipNext()
             ACTION_PREVIOUS -> PlaybackHost.bridge?.listener?.onSkipPrevious()
@@ -117,8 +115,6 @@ class PlaybackService : Service() {
     }
 
     private fun channel() {
-        // Notification channels only exist from API 26; on 24/25 the
-        // compat builder posts straight to the legacy notification path.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
         if (manager.getNotificationChannel(CHANNEL) != null) return
@@ -151,8 +147,6 @@ class PlaybackService : Service() {
                 bridge.listener.onSeek(pos)
             }
 
-            // The like / shuffle / repeat buttons on the 13+ media card arrive
-            // here; the raw notification's buttons use the service actions.
             override fun onCustomAction(action: String?, extras: Bundle?) {
                 when (action) {
                     CUSTOM_LIKE -> bridge.listener.onLikeToggle()
@@ -162,15 +156,10 @@ class PlaybackService : Service() {
             }
 
             override fun onStop() {
-                // The user swiped the media card away while paused.
                 log.i("session stopped, leaving the foreground")
                 stopSelf()
             }
         })
-        // Android 15+ refuses a mediaPlayback startForeground() without an
-        // active session, so this goes live before the notification does;
-        // a STATE_NONE playback state keeps idle sessions out of the system's
-        // media carousel.
         session.isActive = true
         session.setPlaybackState(
             PlaybackStateCompat.Builder()
@@ -209,8 +198,6 @@ class PlaybackService : Service() {
      */
     private fun updatePlaybackState(session: MediaSessionCompat, state: ComposePlaybackState, hasTrack: Boolean) {
         if (!hasTrack) {
-            // Idle: STATE_NONE keeps the live-but-empty session out of the
-            // system carousel until a track actually lands.
             session.setPlaybackState(
                 PlaybackStateCompat.Builder()
                     .setState(PlaybackStateCompat.STATE_NONE, 0L, 0.0f)
@@ -229,11 +216,6 @@ class PlaybackService : Service() {
         }
         val playback = PlaybackStateCompat.Builder()
             .setActions(actions)
-        // The 13+ system media card reads its extra buttons from the session's
-        // custom actions in Spotify's order: like first, then shuffle, then
-        // repeat. Stock shades render five slots, so like and shuffle flank the
-        // transport there; OEMs with wider cards draw all three. The icons ride
-        // the state, so a like fills the heart without re-posting anything.
         playback.addCustomAction(
             PlaybackStateCompat.CustomAction.Builder(
                 CUSTOM_LIKE, if (state.isLiked) "Unlike" else "Like",
@@ -341,9 +323,6 @@ class PlaybackService : Service() {
             return builder
                 .setContentTitle("Quackify")
                 .setContentText("Nothing playing")
-                // The quiet placeholder carries the session token too, so it
-                // stays a media notification: the 13+ system shows those even
-                // without POST_NOTIFICATIONS, which the app no longer asks for.
                 .setStyle(
                     MediaNotificationCompat.MediaStyle()
                         .setMediaSession(session?.sessionToken)
@@ -377,9 +356,6 @@ class PlaybackService : Service() {
                 "Repeat",
                 servicePending(ACTION_REPEAT),
             )
-        // Expanded MediaStyle draws the first five: like, previous, play,
-        // next, shuffle; the compact bar keeps the transport alone. Repeat
-        // rides the session's custom actions where the wider cards draw it.
         builder.setStyle(
             MediaNotificationCompat.MediaStyle()
                 .setMediaSession(session?.sessionToken)
@@ -389,8 +365,6 @@ class PlaybackService : Service() {
     }
 
     private fun contentIntent(): PendingIntent {
-        // Tapping the card's body opens the app straight into the Now Playing
-        // view, the way Spotify's notification does, instead of a bare relaunch.
         val open = Intent(this, MainActivity::class.java)
             .setAction(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_LAUNCHER)

@@ -248,12 +248,8 @@ fun SpotifyNowPlayingScreen(
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
 
-    // Back while the fullscreen lyrics overlay is up closes the overlay
-    // first; without this the shell's handler collapses the whole player.
     BackHandler(enabled = isLyricsFullscreen) { isLyricsFullscreen = false }
 
-    // Canvas loop: the Settings toggle gates the whole feature, the pill state
-    // is a quick per-user switch that only matters while the gate is open
     val canvasActive = isCanvasAllowed && isCanvasEnabled && canvasFilePath != null
 
     val coroutineScope = rememberCoroutineScope()
@@ -275,8 +271,6 @@ fun SpotifyNowPlayingScreen(
     val effectiveIsLoading = isLoading
     val effectiveLyricsVisible = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
 
-    // 1-line lyrics height & bottom spacer: collapses cleanly to 0dp when lyrics are absent
-    // to eliminate any dead space between artwork and track info!
     val lyricLineHeight by animateDpAsState(
         targetValue = if (effectiveLyricsVisible) 36.dp else 0.dp,
         animationSpec = tween(
@@ -294,8 +288,6 @@ fun SpotifyNowPlayingScreen(
         label = "lyricBottomSpacerHeight"
     )
 
-    // When lyrics become available, the album art smoothly glides UPWARD
-    // to accommodate the 1-line lyrics while the player controls remain at their exact vertical positions!
     val artworkPushUpOffset by animateDpAsState(
         targetValue = if (effectiveLyricsVisible) 0.dp else 40.dp,
         animationSpec = tween(
@@ -310,11 +302,8 @@ fun SpotifyNowPlayingScreen(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = screenHeightPx * 0.5f
-    // Full artwork extends from top edge to the same bottom baseline as standard mode
-    // (status bar ~36-40dp + 60dp header + 24dp spacing + (screenWidth - 48dp) artwork)
     val fullArtworkHeight = (configuration.screenWidthDp + 76).dp
 
-    // Reset translation whenever the screen is composed
     LaunchedEffect(Unit) {
         playerOffsetY.snapTo(0f)
     }
@@ -387,8 +376,6 @@ fun SpotifyNowPlayingScreen(
 
         val fullArtworkBlur by rememberFullArtworkBlur(coverUrl)
 
-        // Authentic album-art-extracted vertical gradient matching Spotify nowplaying_overlay_gradient.xml
-        // Vivid artwork color on top easing into base black across most of the screen
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -559,8 +546,6 @@ fun SpotifyNowPlayingScreen(
                         .verticalScroll(state = scrollState, enabled = isScrollEnabled),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Main Player Container: Constrained to viewport height minus peek height,
-                    // exactly matching Spotify's FullScreenLayout and negative topMargin PeekScrollView!
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -568,7 +553,6 @@ fun SpotifyNowPlayingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         if (fullArtwork) {
-                            // Full-bleed banner mode: artwork begins at the very top edge behind status bar
                             Box(modifier = Modifier.fillMaxWidth()) {
                                 Box(
                                     modifier = Modifier
@@ -611,8 +595,6 @@ fun SpotifyNowPlayingScreen(
 
                             Spacer(modifier = Modifier.weight(1f))
                         } else {
-                            // Standard card mode matching revised_template_overlay.xml:
-                            // 1. Header (status bar padding + 60dp)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -628,8 +610,6 @@ fun SpotifyNowPlayingScreen(
                                 )
                             }
 
-                            // 2. Track Carousel Artwork: Centered vertically in available space
-                            // between header barrier and footer barrier via weight(1f)!
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -656,14 +636,12 @@ fun SpotifyNowPlayingScreen(
                             }
                         }
 
-                        // 3. Player Overlay Footer: anchored at the bottom (matches @id/player_overlay_footer)
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 12.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // 1-line synchronized lyrics line
                             NowPlayingSyncedLyricLine(
                                 lyricText = activeLyricLine,
                                 visible = effectiveLyricsVisible,
@@ -673,7 +651,6 @@ fun SpotifyNowPlayingScreen(
 
                             Spacer(modifier = Modifier.height(lyricBottomSpacerHeight))
 
-                            // Track Info Row (Title, Artist, Like button)
                             NowPlayingTrackInfoRow(
                                 title = title,
                                 artist = artist,
@@ -687,7 +664,6 @@ fun SpotifyNowPlayingScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Seek Bar Section
                             NowPlayingSeekBarSection(
                                 progress = progress,
                                 durationMs = durationMs,
@@ -698,7 +674,6 @@ fun SpotifyNowPlayingScreen(
 
                             Spacer(modifier = Modifier.height(20.dp))
 
-                            // Playback Controls Row
                             NowPlayingControlsRow(
                                 shuffleMode = shuffleMode,
                                 repeatMode = repeatMode,
@@ -713,7 +688,6 @@ fun SpotifyNowPlayingScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Footer Row (Connect device, Share, Queue)
                             NowPlayingFooterRow(
                                 connectedDeviceName = connectedDeviceName,
                                 onDeviceClick = onDeviceClick,
@@ -738,7 +712,6 @@ fun SpotifyNowPlayingScreen(
                                 onShareLyrics = { isLyricsShareOpen = true }
                             )
 
-                            // Other cards (e.g. About the Artist) only appear once loaded and accessible upon scrolling down
                             if (!effectiveIsLoading && artist.isNotBlank()) {
                                 if (effectiveLyricsVisible) {
                                     Spacer(modifier = Modifier.height(EncoreSpacers.Base))
@@ -762,7 +735,6 @@ fun SpotifyNowPlayingScreen(
             }
         }
 
-        // Fullscreen Lyrics Overlay (Slides up over player)
         AnimatedVisibility(
             visible = isLyricsFullscreen,
             enter = slideInVertically(
@@ -786,7 +758,6 @@ fun SpotifyNowPlayingScreen(
             )
         }
 
-        // Lyrics Share Card Modal
         AnimatedVisibility(
             visible = isLyricsShareOpen,
             enter = slideInVertically(
@@ -1194,7 +1165,6 @@ private fun NowPlayingTrackInfoRow(
             Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isExplicit) {
-                    // ContentRestrictionBadgeView from track_info_nowplaying_view.xml: 16dp x 16dp, 3dp radius, marginEnd 8dp
                     EncoreExplicitTag(
                         modifier = Modifier.padding(end = 8.dp),
                         size = 16.dp,
@@ -1212,7 +1182,6 @@ private fun NowPlayingTrackInfoRow(
             }
         }
 
-        // Feedback buttons container: Don't Play (Ban) + Add/Like
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (onBanClick != null) {
                 EncoreIconButton(
@@ -1259,7 +1228,6 @@ private fun NowPlayingSeekBarSection(
                 .padding(horizontal = 24.dp)
         )
 
-        // Elapsed time & Remaining time timestamps (TextAppearance.Encore.Marginal, 12sp, tnum)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1310,14 +1278,12 @@ private fun NowPlayingControlsRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Smart Shuffle (Off -> Shuffle -> Smart Shuffle)
         EncoreSmartShuffleButton(
             mode = shuffleMode,
             onClick = onShuffleClick,
             size = 48.dp
         )
 
-        // Previous
         EncoreIconButton(
             iconRes = R.drawable.encore_icon_skip_back_24,
             contentDescription = "Previous",
@@ -1327,7 +1293,6 @@ private fun NowPlayingControlsRow(
             iconSize = 30.dp
         )
 
-        // Play / Pause Button (White 64dp circle)
         EncorePlayButton(
             isPlaying = isPlaying,
             onClick = onPlayPauseClick,
@@ -1338,7 +1303,6 @@ private fun NowPlayingControlsRow(
             isLoading = isLoading
         )
 
-        // Next
         EncoreIconButton(
             iconRes = R.drawable.encore_icon_skip_forward_24,
             contentDescription = "Next",
@@ -1348,7 +1312,6 @@ private fun NowPlayingControlsRow(
             iconSize = 30.dp
         )
 
-        // Repeat (Off -> Repeat All -> Repeat One)
         EncoreRepeatButton(
             mode = repeatMode,
             onClick = onRepeatClick,
@@ -1459,7 +1422,6 @@ private fun NowPlayingLyricsPeekCard(
                 .clickable { onOpenLyrics() }
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header: exactly PEEK_HEIGHT tall so that ONLY "Lyrics preview" is visible in the idle peek!
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1494,7 +1456,6 @@ private fun NowPlayingLyricsPeekCard(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Lyrics fill the remaining card space (revealed only upon scrolling down)
                 val lyricsListState = rememberLazyListState()
                 LaunchedEffect(activeIndex, lyrics.size) {
                     if (lyrics.isEmpty()) return@LaunchedEffect
@@ -1555,8 +1516,6 @@ private fun NowPlayingAboutArtistCard(
             .background(EncoreColors.Card)
     ) {
         Column {
-            // Header area: matches creator_bio_title in bio_card_view.xml
-            // Exactly PEEK_HEIGHT tall so that ONLY "About the artist" is visible in the idle peek!
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1573,7 +1532,6 @@ private fun NowPlayingAboutArtistCard(
                 )
             }
 
-            // Body: matches bio_card_content in bio_card_view.xml (revealed only upon scrolling down)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1625,9 +1583,6 @@ private fun NowPlayingAboutArtistCard(
                                 style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                // weight(fill = false) caps the name at the space left over
-                                // after the badge, so a long artist can never squeeze the
-                                // 16dp verified icon down to nothing.
                                 modifier = Modifier.weight(1f, fill = false)
                             )
                             Spacer(modifier = Modifier.width(EncoreSpacers.Tighter4))
@@ -1645,7 +1600,6 @@ private fun NowPlayingAboutArtistCard(
                     }
                 }
 
-                // Follow Button (Encore 999dp pill)
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(EncoreCornerRadii.FollowPill))

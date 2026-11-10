@@ -84,9 +84,6 @@ fun LoginScreen(
 ) {
 
     val context = LocalContext.current
-    // The login webview is the whole screen; when the system WebView
-    // provider is missing, disabled or mid-update, building the host throws
-    // straight out of composition. Show what happened instead of crashing.
     var webviewAttempts by remember { mutableStateOf(0) }
     val host = remember(webviewAttempts) {
         runCatching { LoginWebViewHost(context) }.getOrElse { t ->
@@ -99,13 +96,7 @@ fun LoginScreen(
         return
     }
     var splash by remember { mutableStateOf(false) }
-    // Native escape hatch for the login webview: it cannot reach Settings, so
-    // a translucent LOGS pill in the corner opens the log viewer directly —
-    // tiny and out of the way so it never disturbs actually signing in.
     var viewerOpen by remember { mutableStateOf(false) }
-    // Whether back has an earlier webview page to walk to; the host bumps it
-    // on every navigation so the BackHandler below enables and disables with
-    // the history instead of swallowing backs it cannot serve.
     var canGoBack by remember { mutableStateOf(false) }
     val navSignal = remember { Channel<Unit>(Channel.CONFLATED) }
     val webAlpha by animateFloatAsState(
@@ -128,9 +119,6 @@ fun LoginScreen(
         }
     }
 
-    // Registered before the goBack handler: it only runs once the webview's
-    // own history is exhausted, so a wrong login turn still walks back page
-    // by page first.
     BackHandler {
         if (onBackExhausted != null) {
             onBackExhausted()
@@ -268,9 +256,6 @@ fun LoginScreen(
             SplashScreen()
         }
 
-        // The log viewer rides on top of everything (webview, pill, splash)
-        // and its back handler is composed last, so system back closes the
-        // viewer before the webview's own history back gets a turn.
         if (viewerOpen) {
             BackHandler { viewerOpen = false }
             LogViewerScreen(onBackClick = { viewerOpen = false })

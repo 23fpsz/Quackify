@@ -334,7 +334,6 @@ fun SpotifyAppShell(
     var localRepeatMode by local::repeatMode
     var localDevice by local::device
 
-    // Resolved playback properties: External state takes precedence if provided
     val currentTrackTitle = playbackState?.title ?: localTrackTitle
     val currentArtist = playbackState?.artist ?: localArtist
     val isPlaying = playbackState?.isPlaying ?: localIsPlaying
@@ -348,9 +347,6 @@ fun SpotifyAppShell(
     val connectedDevice = playbackState?.connectedDevice ?: localDevice
     val currentCoverUrl = playbackState?.coverUrl ?: ""
 
-    // No song has loaded yet (fresh app open): the mini player and the NPV keep
-    // an explicit "No Track" state instead of blank lines, and the transport
-    // button stands quiet, so it is obvious nothing is loaded.
     val playerIdentity = playerIdentityOf(
         title = currentTrackTitle,
         artist = currentArtist,
@@ -358,7 +354,6 @@ fun SpotifyAppShell(
         localTitle = localTrackTitle,
     )
 
-    // Resolved uris of the playing track, used by the player title/artist taps and the three-dot sheet
     val currentQueueRow = remember(playbackState?.trackUri, playbackState?.queue, playbackState?.queueFromContext) {
         (playbackState?.queue.orEmpty() + playbackState?.queueFromContext.orEmpty())
             .firstOrNull { it.uri == playbackState?.trackUri }
@@ -408,11 +403,8 @@ fun SpotifyAppShell(
         )
     }
 
-    // A double-tap on the Search tab hands this requester to the search screen's
-    // field; the plain single tap stays exactly the navigation it always was.
     val searchFieldFocusRequester = remember { FocusRequester() }
 
-    // System Back Handler
     BackHandler(
         enabled = isPlayerExpanded ||
                 flags.isProfileDrawerOpen ||
@@ -482,9 +474,6 @@ fun SpotifyAppShell(
             .fillMaxSize()
             .background(EncoreColors.PureBlack)
     ) {
-        // Active Screen Content
-        // A finished load that still has no rows at all means the fetch itself
-        // failed (an empty playlist comes back as a non-null empty list).
         val playlistLoadFailed = !playlistLoading && playlistTracks == null
         ShellScreenSlot {
         when (currentScreen) {
@@ -551,10 +540,6 @@ fun SpotifyAppShell(
                     pushCurrentState()
                     active.categoryTitle = category.title
                     active.categoryColor = category.color
-                    // Only a spotify:page uri resolves through browsePage. Client
-                    // features (Live Events -> spotify:concerts) and any other
-                    // scheme have no browsable section tree, so they fall back to
-                    // the local category screen instead of an empty page.
                     if (category.uri.startsWith("spotify:page:")) {
                         currentScreen = ShellScreen.BROWSE
                         onOpenBrowse?.invoke(category.uri)
@@ -910,17 +895,12 @@ fun SpotifyAppShell(
                         1 -> if (currentScreen != ShellScreen.SEARCH) {
                             navBackStack.clear(); currentScreen = ShellScreen.SEARCH
                         } else {
-                            // Already on Search: retapping the tab focuses the field —
-                            // the second focus path besides the double tap. A no-op when
-                            // the field already holds focus.
                             runCatching { searchFieldFocusRequester.requestFocus() }
                         }
                         2 -> if (currentScreen != ShellScreen.LIBRARY) { navBackStack.clear(); currentScreen = ShellScreen.LIBRARY }
                     }
                 },
                 onSearchDoubleTap = {
-                    // The first tap of the pair already switched to Search; focus
-                    // once the field is attached, or swallow it if it is not yet.
                     runCatching { searchFieldFocusRequester.requestFocus() }
                 },
                 onPlayPause = handlePlayPause,
@@ -949,7 +929,6 @@ fun SpotifyAppShell(
             )
         }
 
-        // Full Now Playing Screen
         val (contextHeader, contextSub) = nowPlayingContext(
             trackLoaded = playerIdentity.trackLoaded,
             origin = playbackOrigin,
@@ -1103,10 +1082,6 @@ fun SpotifyAppShell(
                 val artistUriNow = active.artistUri
                 if (artistUriNow.startsWith("spotify:artist:")) {
                     shellScope.launch {
-                        // seed_to_playlist resolves the artist into its radio
-                        // playlist; the shell only opens that page — no autoplay,
-                        // the queue stays exactly as it is until the user hits
-                        // the playlist's own play button.
                         val radio = onArtistRadio?.invoke(artistUriNow)
                         if (radio != null && radio.startsWith("spotify:playlist:")) {
                             openPlaylist(active.artistName + " Radio", radio)
@@ -1213,8 +1188,6 @@ fun SpotifyAppShell(
                 val uri = track?.uri.orEmpty()
                 if (!uri.startsWith("spotify:track:")) return@toggle
                 val previous = trackTasteExcluded
-                // Optimistic: flip the cached answer so the next sheet open is
-                // already correct, then reconcile with the real write result.
                 trackTasteExcluded = exclude
                 tasteExclusionCache[uri] = exclude
                 shellScope.launch {
@@ -1372,12 +1345,9 @@ fun SpotifyAppShell(
                         }
                     }
                 },
-                // The sheet owns the folder drill-down; this feeds it the rows
-                // of the folder it entered, checks and all, for the same track.
                 onLoadFolder = onLoadPlaylistFolder?.let { loader ->
                     { folderUri -> loader(local.addTrackTarget?.uri.orEmpty(), folderUri) }
                 },
-                // Song counts for the rows it is showing, root list or folder.
                 onLoadTrackCount = onLoadTrackCount,
                 onCreateNew = {
                     local.addTrackTarget?.let { track -> onCreatePlaylistWith?.invoke(track) }

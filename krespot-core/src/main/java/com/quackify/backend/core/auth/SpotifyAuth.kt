@@ -37,10 +37,6 @@ object SpotifyAuth {
     private const val KEY_CLIENT_TOKEN = "client_token"
     private const val KEY_CLIENT_TOKEN_EXP = "client_token_exp"
 
-    // ---- hot-path memos ----
-    // Every request needs these strings; an encrypted-prefs read is a keybox
-    // decrypt per call, so the values are mirrored in memory and every writer
-    // in this object keeps the mirror in step. Null still means "not loaded".
     @Volatile
     private var tokenMemo: String? = null
 
@@ -60,10 +56,6 @@ object SpotifyAuth {
         clientTokenExpMemo = 0L
     }
 
-    // ---- multi-account store ----
-    // Every logged-in account keeps a full snapshot (session cookies + profile)
-    // under "multi.<id>.*" so the user can hop between accounts. The index
-    // preserves the order in which accounts were added, newest last.
     private const val KEY_MULTI_INDEX = "multi.index"
     private const val KEY_MULTI_ACTIVE = "multi.active"
 
@@ -152,7 +144,6 @@ object SpotifyAuth {
             .putString(KEY_COUNTRY, p.getString("multi.$id.country", "").orEmpty())
             .putLong(KEY_SAVED_AT, System.currentTimeMillis())
             .putString(KEY_MULTI_ACTIVE, id)
-            // the minted tokens belong to the account we are leaving
             .remove(KEY_TOKEN)
             .remove(KEY_TOKEN_AT)
             .remove(KEY_TOKEN_EXP)
@@ -516,8 +507,6 @@ object SpotifyAuth {
             .putString(KEY_COUNTRY, account.country)
             .putLong(KEY_SAVED_AT, System.currentTimeMillis())
             .apply()
-        // Adding an account on top of a live session must not keep serving
-        // the previous user's id to Rootlist and Collection2.
         resolvedUserId = ""
         applySession(context)
     }
@@ -546,8 +535,6 @@ object SpotifyAuth {
         if (active.isNotBlank()) {
             forgetAccount(context, active)
         }
-        // Drop the active session, profile and tokens but keep the stored
-        // snapshots of the other accounts so the user can hop back in.
         SecurePrefs.get(context).edit()
             .remove(KEY_SESSION)
             .remove(KEY_NAME)

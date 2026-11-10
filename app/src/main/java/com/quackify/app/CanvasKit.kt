@@ -98,9 +98,6 @@ object CanvasKit {
         if (!trackUri.startsWith("spotify:track:") || id.isBlank()) return null
         val token = SpotifyAuth.token(context)
         if (token.isBlank()) return null
-        // The exact header set every other pathfinder call sends: without the
-        // browser User-Agent (and app version) the edge answers
-        // 403 "Client/request not allowed" for this operation.
         val headers = mutableMapOf(
             "Authorization" to "Bearer $token",
             "Accept" to "application/json",
@@ -124,7 +121,6 @@ object CanvasKit {
             .toString()
         var response = Net.postJson(PATHFINDER, body, headers, "canvas") ?: return null
         if (response.code == 403) {
-            // a stale client-token also produces a 403 here; mint a fresh one once
             log.w("canvas $id 403, retrying with a fresh client-token")
             ClientToken.get(context, force = true).takeIf { it.isNotBlank() }?.let {
                 headers["client-token"] = it
@@ -176,7 +172,6 @@ object CanvasKit {
         val initTemplate = root.optString("initialization_template")
         val baseUrl = root.optJSONArray("base_urls")?.optString(0).orEmpty()
         if (!initTemplate.startsWith("v1/") || baseUrl.isBlank()) return null
-        // the template targets one encoding of the source; only its profiles apply
         val encodingId = initTemplate.substringAfter("/encodings/", "").substringBefore("/")
         val contents = root.optJSONArray("contents") ?: return null
         var best: JSONObject? = null
@@ -185,9 +180,6 @@ object CanvasKit {
         for (i in 0 until contents.length()) {
             val content = contents.optJSONObject(i) ?: continue
             if (content.optString("encoding_id") != encodingId) continue
-            // the endpoint only speaks options/supports_drm: renditions of a
-            // drm-scoped encoding arrive ciphered and the stitcher cannot
-            // decrypt, so such manifests fall back to the direct canvaz file
             if ((content.optJSONArray("encryption_infos")?.length() ?: 0) > 0) continue
             stride = content.optInt("segment_length", 0)
             val profiles = content.optJSONArray("profiles") ?: continue
@@ -210,8 +202,6 @@ object CanvasKit {
                 }
             }
         }
-        // degenerate ladders with no rung at or under the cap take their
-        // lowest rung above it instead of nothing
         val chosen = best ?: fallback ?: return null
         val initUrl = baseUrl.trimEnd('/') + "/" + initTemplate.trimStart('/')
             .replace("{{profile_id}}", chosen.optString("id"))
@@ -227,16 +217,8 @@ object CanvasKit {
     suspend fun download(context: Context, trackUri: String): String? = withContext(Dispatchers.IO) {
         val id = trackUri.substringAfterLast(":")
         val dir = File(context.cacheDir, "canvas")
-        // v7: per-segment sidx boxes stripped from the stitch. v6 and older
-        // files carry them, and each one makes FragmentedMp4Extractor emit a
-        // fresh seek map, so the timeline's duration keeps flipping and every
-        // flip hammers the renderer with a forced flush (the ~300 ms storm:
-        // FLUSHING/FLUSHED/STARTED cycling, most frames decode-only)
         val cache = File(dir, "v7-$id.mp4")
         if (cache.isFile && cache.length() > 0L) return@withContext cache.absolutePath
-        // one-time: v6 files still carry the CDN's per-segment sidx boxes,
-        // whose repeated seek maps drive the duration flip behind the flush
-        // storm; drop them
         dir.listFiles()?.filter { it.isFile && it.name.startsWith("v6-") }?.forEach {
             if (it.delete()) log.i("canvas cache dropped ${it.name}")
         }
@@ -262,8 +244,6 @@ object CanvasKit {
             val base = initUrl.substringBefore('?').removeSuffix(INIT_MARKER)
             val query = initUrl.substringAfter('?', "")
             if (target.stride != null) {
-                // manifest numbering: segment names are start timestamps spaced
-                // `stride` apart and the loop opens at 0
                 var at = 0
                 while (parts.size - 1 < MAX_SEGMENTS && total < MAX_BYTES) {
                     val segment = "$base/$at.mp4" + if (query.isBlank()) "" else "?$query"
@@ -274,8 +254,6 @@ object CanvasKit {
                     at += target.stride
                 }
             } else {
-                // legacy numbering: not always contiguous (some canvases step by
-                // 4), so the stepper probes +1 first and falls back to +4
             var index = 0
             var step = 0 // 0 = numbering still unknown, probe both strides
             while (parts.size - 1 < MAX_SEGMENTS && total < MAX_BYTES) {

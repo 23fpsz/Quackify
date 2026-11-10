@@ -171,7 +171,6 @@ fun SpotifyAlbumScreen(
         }
     }
 
-    // Dynamic Artwork Shrink Calculation
     val shrinkFraction by remember {
         derivedStateOf {
             val scrollOffset = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else with(density) { 200.dp.toPx() }
@@ -190,9 +189,6 @@ fun SpotifyAlbumScreen(
             .fillMaxSize()
             .background(Color(0xFF121212))
     ) {
-        // Collapsible Header Gradient Background
-        // Spans from top of screen (Y = 0) down to the top of the action row,
-        // dynamically bounded so it smoothly contracts into toolbarBottom without scroll bleed or popping.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -210,7 +206,6 @@ fun SpotifyAlbumScreen(
                 )
         )
 
-        // Scrollable LazyColumn with Collapsing Header and Tracks
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -219,7 +214,6 @@ fun SpotifyAlbumScreen(
                 bottom = bottomPadding
             )
         ) {
-            // Header Item: shifted up by topOffsetPx so artwork sits directly at statusBarTop + 8.dp
             item {
                 Box(
                     modifier = Modifier
@@ -236,7 +230,6 @@ fun SpotifyAlbumScreen(
                             .fillMaxWidth()
                             .padding(top = 4.dp)
                     ) {
-                        // Hero Album Artwork
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -273,7 +266,6 @@ fun SpotifyAlbumScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Album Title (Left-aligned, bold, 24sp)
                         Text(
                             text = albumTitle,
                             style = SpotifyTheme.typography.headlineLarge.copy(
@@ -288,7 +280,6 @@ fun SpotifyAlbumScreen(
 
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // Artist Pill (Avatar + Name)
                         Row(
                             modifier = Modifier
                                 .clickable { onArtistClick(artistName) }
@@ -332,7 +323,6 @@ fun SpotifyAlbumScreen(
 
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        // Album Type & Year
                         Text(
                             text = "Album • $releaseYear",
                             style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
@@ -341,7 +331,6 @@ fun SpotifyAlbumScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Action Controls Row
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -353,7 +342,6 @@ fun SpotifyAlbumScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                // Download Button (Matches official Spotify 1:1)
                                 Box(
                                     modifier = Modifier
                                         .size(32.dp)
@@ -371,7 +359,6 @@ fun SpotifyAlbumScreen(
                                     )
                                 }
 
-                                // Heart / Add to library Button
                                 Box(
                                     modifier = Modifier
                                         .size(32.dp)
@@ -389,7 +376,6 @@ fun SpotifyAlbumScreen(
                                     )
                                 }
 
-                                // 3-Dots Album Options Button
                                 Box(
                                     modifier = Modifier
                                         .size(32.dp)
@@ -410,7 +396,6 @@ fun SpotifyAlbumScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                // Shuffle Button
                                 Box(
                                     modifier = Modifier
                                         .size(36.dp)
@@ -448,7 +433,6 @@ fun SpotifyAlbumScreen(
                 }
             }
 
-            // If discs are specified, group by disc separator (album_track_row_layout.xml)
             if (discs != null && discs.size > 1) {
                 discs.forEach { disc ->
                     item {
@@ -504,7 +488,6 @@ fun SpotifyAlbumScreen(
                     )
                 }
             } else {
-                // Single disc: list all tracks
                 itemsIndexed(tracks) { index, track ->
                     val isCurrentTrack = track.title == currentTrackTitle
                     AlbumTrackRow(
@@ -517,7 +500,6 @@ fun SpotifyAlbumScreen(
                 }
             }
 
-            // Footer: Release date, song count & runtime, and Copyrights (copyrights_layout.xml)
             item {
                 Column(
                     modifier = Modifier
@@ -570,7 +552,6 @@ fun SpotifyAlbumScreen(
                 }
             }
 
-            // "More by [Artist]" shelf
             if (!moreByArtist.isNullOrEmpty()) {
                 item {
                     Text(
@@ -626,7 +607,6 @@ fun SpotifyAlbumScreen(
             }
         }
 
-        // Collapsing Header Background covering status bar + top bar (Solid transition matching SpotifyPlaylistScreen)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -639,7 +619,6 @@ fun SpotifyAlbumScreen(
                 .zIndex(9.8f)
         )
 
-        // Pinned Top Navigation Bar (Overlays top of screen, transparent at rest, solid when scrolled)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -651,7 +630,6 @@ fun SpotifyAlbumScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Back Button (Locked at 16dp from left border)
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -668,7 +646,6 @@ fun SpotifyAlbumScreen(
                 )
             }
 
-            // Centered Title in Top Bar when scrolled
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -689,7 +666,6 @@ fun SpotifyAlbumScreen(
                 )
             }
 
-            // 3-Dots Button (smoothly cross-fades out as play button docks)
             Box(
                 modifier = Modifier.size(38.dp),
                 contentAlignment = Alignment.Center
@@ -713,8 +689,6 @@ fun SpotifyAlbumScreen(
             }
         }
 
-        // Pinned Play Button (matching Spotify ComposePlayButtonBehavior):
-        // Floats above top bar at zIndex(20f) as soon as it reaches toolbar, docking at pinnedTopPx
         if (playFraction > 0f) {
             Box(
                 modifier = Modifier
@@ -762,7 +736,6 @@ private fun AlbumTrackRow(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Track number (28dp width) or animated play indicator
         Box(
             modifier = Modifier.width(28.dp),
             contentAlignment = Alignment.CenterStart
@@ -784,7 +757,6 @@ private fun AlbumTrackRow(
             }
         }
 
-        // Track title & artist
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -817,7 +789,6 @@ private fun AlbumTrackRow(
             }
         }
 
-        // 3-dot context menu
         EncoreIconButton(
             iconRes = R.drawable.encore_icon_more_android_24,
             contentDescription = "Track options",

@@ -12,9 +12,6 @@ internal class AudioSink(
     private val channels: Int,
 ) {
 
-    // Written by the decode thread in rebuild(), read from main through
-    // pause()/resume()/duck() - every other cross-thread field here is
-    // @Volatile and this one has to be too.
     @Volatile
     private var track: AudioTrack = build()
 

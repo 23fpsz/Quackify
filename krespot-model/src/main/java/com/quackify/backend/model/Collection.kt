@@ -21,10 +21,6 @@ data class CollectionDetail(
     val durationIsEstimate: Boolean get() = collectionDurationIsEstimate(tracks.map { it.durationMs }, total)
 }
 
-// Only the loaded tracks contribute a real duration. When the collection is
-// longer than what was fetched, the average of the loaded ones is scaled to the
-// reported total, which is the same estimate the web player shows. The caller
-// passes whatever it currently holds, so paging in more tracks narrows it.
 fun collectionDuration(durations: List<Long>, total: Int): Long {
     val counted = durations.filter { it > 0L }
     if (counted.isEmpty()) return 0L
@@ -43,17 +39,11 @@ data class PlaylistChoice(
     val name: String,
     val imageUrl: String = "",
     val kind: Kind = Kind.PLAYLIST,
-    // The add-to-playlist answer flags, per playlist, whether the track the
-    // sheet was opened for already sits in it (editablePlaylists' "curates"
-    // when the request carries the track's uri). The sheet turns it into the
-    // green check the web player shows.
     val containsTrack: Boolean = false,
 ) {
     enum class Kind { PLAYLIST, LIKED_SONGS, FOLDER }
 
     companion object {
-        // The rootlist's pinned pseudo playlist standing in for the liked
-        // songs collection inside editablePlaylists answers.
         const val LIKED_SONGS_URI = "spotify:collection:tracks"
     }
 }

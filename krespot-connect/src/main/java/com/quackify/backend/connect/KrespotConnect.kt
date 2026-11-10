@@ -121,12 +121,6 @@ class KrespotConnect(private val context: Context) {
             spclient = host.second
             val token = SpotifyAuth.token(context)
             log.i("device=$deviceId dealer=${host.first} token=${token.length}B")
-            // Seed the cluster before the dealer handshake: this GET answers
-            // in one round trip, so the device list and the active player are
-            // known while the websocket is still connecting (that used to be
-            // the ~5s the UI spent believing this phone was the player).
-            // Only the first pass needs it: later iterations already hold a
-            // cluster, and the dealer pushes plus the polling keep it fresh.
             if (_cluster.value == null) {
                 runCatching { seedCluster() }
                     .onFailure { log.w("cluster seed failed ${it.javaClass.simpleName}: ${it.message}") }
@@ -178,9 +172,6 @@ class KrespotConnect(private val context: Context) {
             }
 
             frame.uri == DealerUri.TRACK_COMMAND -> frame.payloads.forEach { payload ->
-                // Track commands are the largest payloads in the system (whole
-                // state machines with manifests); parsing them on the collector
-                // thread would jank the main thread that collects this flow.
                 val parsed = withContext(Dispatchers.Default) { CommandParser.parse(payload) } ?: return@forEach
                 if (accepts?.invoke(parsed) == false) {
                     log.w("command dropped: '${parsed.currentTrack?.name}' idx=${parsed.stateIndex} " +
@@ -227,11 +218,6 @@ class KrespotConnect(private val context: Context) {
                 }
             }
 
-            // Another client moved the account's stream onto this phone: the
-            // backend notifies the target over its dealer connection with a
-            // request on the connect-state command channel. Without this the
-            // move landed nowhere - the phone stayed silent and, once the
-            // server gave up on it, vanished from every "Listening on" list.
             frame.uri.startsWith(PLAYER_COMMAND_URI) ||
                     frame.uri.startsWith(CONNECT_TRANSFER_URI) ->
                 frame.payloads.forEach { payload ->
@@ -257,10 +243,6 @@ class KrespotConnect(private val context: Context) {
         val host = spclient
         val started = SystemClock.elapsedRealtime()
         val player = Registration.player(context, host, deviceId, connectionId)
-        // The observer PUT rebinds this dealer connection to the hidden
-        // hobs_ device, which is why the full member has to be published
-        // after it: publishing first and observing second made the server
-        // drop the phone from the cluster within seconds.
         val observer = Registration.observer(context, host, deviceId, connectionId)
         val member = Registration.connectState(context, host, deviceId, connectionId)
         val body = observer?.takeIf { it.ok }?.body.orEmpty()
@@ -308,10 +290,6 @@ class KrespotConnect(private val context: Context) {
     @Volatile
     var holdsStream: Boolean = false
         set(value) {
-            // The moment this flips back on is a takeover: the stream starts
-            // playing here and now, and started_playing_at has to say so. The
-            // wall clock of an earlier takeover made the server keep the
-            // previous device active, so the stream never came home.
             if (value && !field) activeSince = System.currentTimeMillis()
             field = value
         }
@@ -349,8 +327,6 @@ class KrespotConnect(private val context: Context) {
         }
         if (track.uri.isBlank()) return false
         if (activeSince <= 0L) activeSince = System.currentTimeMillis()
-        // Building the state re-parses the raw metadata of up to ~91 queue
-        // rows; that belongs off the caller's (main) dispatcher.
         val state = withContext(Dispatchers.Default) {
             localPlayerState(
                 track, contextUri, contextIndex, positionMs, playing, durationMs,
@@ -447,8 +423,6 @@ class KrespotConnect(private val context: Context) {
             .put("position_as_of_timestamp", positionMs)
             .put("timestamp", now)
             .put("duration", if (durationMs > 0L) durationMs else track.durationMs)
-            // A paused player still reports is_playing=true with is_paused
-            // on top - that is how every native client publishes it.
             .put("is_playing", true)
             .put("is_paused", !playing)
             .put("is_buffering", !playing)
@@ -516,14 +490,8 @@ class KrespotConnect(private val context: Context) {
             return false
         }
         if (holdsStream) {
-            // While the engine here owns the stream, the member PUT is the
-            // poll: it refreshes the cluster answer-side and keeps the
-            // active registration warm, where the hobs_ observer would only
-            // rebind the connection to the hidden device again.
             return true
         }
-        // The observer PUT needs a dealer connection id; before the dealer
-        // is up (or while it reconnects) the plain cluster GET still works.
         val response = if (connection.isBlank()) {
             runCatching { Registration.cluster(context, spclient) }.getOrNull()
         } else {

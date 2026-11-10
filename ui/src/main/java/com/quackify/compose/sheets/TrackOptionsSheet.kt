@@ -129,7 +129,6 @@ fun TrackOptionsSheet(
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Track Art Thumbnail (Centered, 112dp x 112dp, 8dp corner radius)
             SpotifyArtworkImage(
                 imageUrl = track.imageUrl,
                 contentDescription = track.title,
@@ -139,7 +138,6 @@ fun TrackOptionsSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Track Title
             Text(
                 text = track.title,
                 style = SpotifyTheme.typography.titleLarge.copy(
@@ -155,7 +153,6 @@ fun TrackOptionsSheet(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Track Artist
             Text(
                 text = track.artist,
                 style = SpotifyTheme.typography.bodyMedium.copy(
@@ -170,13 +167,11 @@ fun TrackOptionsSheet(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Quick Action Icons Row: Like, Add to Playlist, Add to Queue
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Like / Liked Button
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -207,7 +202,6 @@ fun TrackOptionsSheet(
                     )
                 }
 
-                // Add to Playlist Button
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -265,7 +259,6 @@ fun TrackOptionsSheet(
                 modifier = Modifier.padding(vertical = 16.dp)
             )
 
-            // Context Menu List Items (matching Spotify decompiled strings & icons)
             if (onRemoveFromPlaylist != null) {
                 ContextMenuRowItem(
                     title = "Remove from this playlist",
@@ -286,9 +279,6 @@ fun TrackOptionsSheet(
                 }
             )
 
-            // Taste-profile exclusion (Spotify's "Exclude from your taste profile").
-            // Hidden until the contains check answers, so the label never flashes
-            // the wrong action for a track that is already excluded.
             if (isTasteExcluded != null) {
                 ContextMenuRowItem(
                     title = if (isTasteExcluded) {

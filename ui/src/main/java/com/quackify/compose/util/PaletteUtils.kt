@@ -59,7 +59,6 @@ fun extractDominantColor(bitmap: Bitmap): Color {
         .maximumColorCount(16)
         .generate()
 
-    // Spotify prioritizes vibrant or dominant swatches that provide rich color depth
     val swatch = palette.dominantSwatch
         ?: palette.vibrantSwatch
         ?: palette.darkVibrantSwatch
@@ -85,9 +84,6 @@ fun rememberDominantColor(
 ): State<Color> {
     val context = LocalContext.current
     val fallback = defaultColor ?: spotifyColorForSeed(fallbackSeed ?: imageUrl)
-    // Keyed to the url alone: a track change that keeps the same cover must
-    // not throw away the extracted color, and the effect below re-extracts
-    // exactly when the url changes anyway.
     val colorState = remember(imageUrl) { mutableStateOf(fallback) }
 
     LaunchedEffect(imageUrl) {
@@ -99,9 +95,6 @@ fun rememberDominantColor(
 
         withContext(Dispatchers.IO) {
             try {
-                // The shared singleton loader reuses the memory/disk caches and
-                // the socket pool: a private ImageLoader per call re-downloaded
-                // every cover it was asked to extract a color from.
                 val request = ImageRequest.Builder(context)
                     .data(resolved)
                     .size(128) // a 128px decode is plenty for Palette
@@ -116,7 +109,6 @@ fun rememberDominantColor(
                     }
                 }
             } catch (_: Throwable) {
-                // Keep fallback color on network or decoding error
             }
         }
     }

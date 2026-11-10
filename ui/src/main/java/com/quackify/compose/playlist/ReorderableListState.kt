@@ -78,7 +78,6 @@ class ReorderableLazyListState(
             val currentEnd = currentStart + current.size
             val middle = (currentStart + currentEnd) / 2f
 
-            // Find target item to swap with
             val targetItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
                 item.key != draggingItemKey && middle >= item.offset && middle <= (item.offset + item.size)
             }
@@ -94,7 +93,6 @@ class ReorderableLazyListState(
                 }
             }
 
-            // Auto-scroll near viewport edges
             val viewportStart = listState.layoutInfo.viewportStartOffset
             val viewportEnd = listState.layoutInfo.viewportEndOffset
             val scrollThreshold = current.size * 0.75f

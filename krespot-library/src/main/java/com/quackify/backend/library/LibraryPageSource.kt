@@ -145,8 +145,6 @@ object LibraryPageSource {
         }
         val inside = snap.entries.filter { it.index > start && it.index < end }
         val byUri = HashMap<String, ShelfItem>()
-        // Stop paging once every playlist the folder names has its row; a
-        // three-playlist folder should not read the whole library.
         val wanted = inside.mapTo(HashSet()) { it.uri }
         var offset = 0
         while (offset < PAGE * 4) {
