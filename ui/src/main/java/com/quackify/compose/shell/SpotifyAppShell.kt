@@ -976,10 +976,6 @@ fun SpotifyAppShell(
             onSkipNext = handleSkipNext,
             onSkipPrevious = handleSkipPrevious,
             onLike = {
-                if (playerListener != null) playerListener.onLikeToggle()
-                else localIsLiked = !isLiked
-            },
-            onLikeLongPress = {
                 val playingTrack = TrackItem(
                     title = currentTrackTitle,
                     artist = currentArtist,
