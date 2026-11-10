@@ -126,6 +126,21 @@ internal class Widevine(
         fresh.crypto
     }
 
+    // The service certificate is static: fetching it during startup keeps its
+    // round trip off the first track's key request.
+    suspend fun warm() = gate.withLock {
+        val instance = drm ?: runCatching { MediaDrm(WIDEVINE) }.getOrElse {
+            log.w("warm: MediaDrm unavailable ${it.javaClass.simpleName}: ${it.message}")
+            return@withLock
+        }
+        drm = instance
+        if (!prepared) {
+            prepared = true
+            prepare(instance)
+        }
+        if (certify(instance)) log.i("drm warmed, the service certificate is in place")
+    }
+
     suspend fun close() = gate.withLock {
         val instance = drm
         slots.values.forEach { runCatching { instance?.closeSession(it.session) } }
