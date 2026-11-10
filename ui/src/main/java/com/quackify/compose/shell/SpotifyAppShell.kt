@@ -266,6 +266,7 @@ fun SpotifyAppShell(
     var trackTasteExcluded by local::trackTasteExcluded
     val tasteExclusionCache = remember { mutableMapOf<String, Boolean>() }
     var currentSortOption by local::sortOption
+    var currentSortDirection by local::sortDirection
     var playbackOrigin by local::playbackOrigin
     var libraryItemOptions by local::libraryItemOptions
     var activeFolderOptionsItem by local::activeFolderOptionsItem
@@ -590,7 +591,8 @@ fun SpotifyAppShell(
                     onProfileClick = openProfileDrawer,
                     onPlusClick = { flags.isCreateSheetOpen = true },
                     onSortClick = { flags.isSortSheetOpen = true },
-                    currentSort = currentSortOption
+                    currentSort = currentSortOption,
+                    sortDirection = currentSortDirection
                 )
             }
             ShellScreen.PLAYLIST -> ShellPlaylistPane(
@@ -853,6 +855,7 @@ fun SpotifyAppShell(
                 onPlusClick = { flags.isCreateSheetOpen = true },
                 onSortClick = { flags.isSortSheetOpen = true },
                 currentSort = currentSortOption,
+                sortDirection = currentSortDirection,
                 onBackClick = { handleBack() },
                 onFolderOptionsClick = {
                     local.activeFolderOptionsNested = false
@@ -1081,6 +1084,7 @@ fun SpotifyAppShell(
                 }
             },
             sortOption = local.sortOption,
+            sortDirection = local.sortDirection,
             sleepTimer = local.sleepTimer,
             userDisplayName = userDisplayName,
             userAvatarUrl = userAvatarUrl,
@@ -1160,7 +1164,7 @@ fun SpotifyAppShell(
                 flags.isAlbumOptionsOpen = false
                 isPlayerExpanded = false
                 openArtist(artist, albumDetail?.artistUri.orEmpty())
-            },            onSortSelected = { selected -> local.sortOption = selected },
+            },            onSortSelected = { selected, direction -> local.sortOption = selected; local.sortDirection = direction },
             onCreatePlaylist = {
                 shellScope.launch {
                     local.playlistCreateName = onPlaylistDefaultName?.invoke() ?: "My Playlist"

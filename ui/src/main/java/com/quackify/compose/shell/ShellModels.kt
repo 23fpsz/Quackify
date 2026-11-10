@@ -15,6 +15,7 @@ import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.sheets.EntityOptions
 import com.quackify.compose.sheets.LibrarySortOption
+import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.sheets.SleepTimerOption
 import com.quackify.compose.theme.EncoreColors
 
@@ -212,6 +213,7 @@ internal class ShellLocalState {
     var trackForOptions by mutableStateOf<TrackItem?>(null)
     var trackTasteExcluded by mutableStateOf<Boolean?>(null)
     var sortOption by mutableStateOf(LibrarySortOption.RECENTS)
+    var sortDirection by mutableStateOf(SortDirection.DESCENDING)
     var playbackOrigin by mutableStateOf<PlaybackOrigin?>(null)
     var libraryItemOptions by mutableStateOf<EntityOptions?>(null)
     var activeFolderOptionsItem by mutableStateOf<LibraryItem?>(null)

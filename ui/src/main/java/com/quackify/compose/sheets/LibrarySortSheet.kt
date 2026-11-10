@@ -32,11 +32,16 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
 
-enum class LibrarySortOption(val displayName: String, val apiId: String) {
-    RECENTS("Recents", "Recents"),
-    RECENTLY_ADDED("Recently added", "Recently Added"),
-    ALPHABETICAL("Alphabetical", "Alphabetical"),
-    CREATOR("Creator", "Creator");
+enum class LibrarySortOption(
+    val displayName: String,
+    val apiId: String,
+    val reversible: Boolean = true,
+    val defaultDirection: SortDirection = SortDirection.ASCENDING
+) {
+    RECENTS("Recents", "Recents", reversible = true, defaultDirection = SortDirection.DESCENDING),
+    RECENTLY_ADDED("Recently added", "Recently Added", reversible = true, defaultDirection = SortDirection.DESCENDING),
+    ALPHABETICAL("Alphabetical", "Alphabetical", reversible = true, defaultDirection = SortDirection.ASCENDING),
+    CREATOR("Creator", "Creator", reversible = true, defaultDirection = SortDirection.ASCENDING);
 
     companion object {
         fun fromApiId(id: String?): LibrarySortOption? =
@@ -49,14 +54,15 @@ enum class LibrarySortOption(val displayName: String, val apiId: String) {
  * - `sort_filter_bottom_sheet_layout.xml`
  * - `sort_and_filter_bottom_sheet_handle.xml` (36dp x 4dp grapple, #4DFFFFFF)
  * - `@style/CwpSortAndFilterTitleStyle` (48dp minHeight, 16dp horizontal padding)
- * - `@style/CwpSortAndFilterOptionStyle` (BodyMedium, 48dp minHeight, Green text + checkmark for active)
+ * - `@style/CwpSortAndFilterOptionStyle` (BodyMedium, 48dp minHeight, Green text + direction arrow/check for active)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibrarySortSheet(
     isOpen: Boolean,
     currentSort: LibrarySortOption,
-    onSortSelected: (LibrarySortOption) -> Unit,
+    currentDirection: SortDirection = SortDirection.DESCENDING,
+    onSortSelected: (LibrarySortOption, SortDirection) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -118,8 +124,12 @@ fun LibrarySortSheet(
                         .fillMaxWidth()
                         .height(48.dp)
                         .clickable {
-                            onSortSelected(option)
-                            onDismiss()
+                            val newDirection = if (isSelected && option.reversible) {
+                                currentDirection.toggle()
+                            } else {
+                                option.defaultDirection
+                            }
+                            onSortSelected(option, newDirection)
                         }
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -135,12 +145,27 @@ fun LibrarySortSheet(
                     )
 
                     if (isSelected) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.encore_icon_check_24),
-                            contentDescription = "Selected",
-                            tint = EncoreColors.Green,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        if (option.reversible) {
+                            Icon(
+                                painter = painterResource(
+                                    id = if (currentDirection == SortDirection.ASCENDING) {
+                                        R.drawable.encore_icon_arrow_up_24
+                                    } else {
+                                        R.drawable.encore_icon_arrow_down_24
+                                    }
+                                ),
+                                contentDescription = if (currentDirection == SortDirection.ASCENDING) "Sorted ascending" else "Sorted descending",
+                                tint = EncoreColors.Green,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_check_24),
+                                contentDescription = "Selected",
+                                tint = EncoreColors.Green,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -157,7 +182,8 @@ fun PreviewLibrarySortSheet() {
         LibrarySortSheet(
             isOpen = true,
             currentSort = LibrarySortOption.RECENTS,
-            onSortSelected = {},
+            currentDirection = SortDirection.DESCENDING,
+            onSortSelected = { _, _ -> },
             onDismiss = {}
         )
     }

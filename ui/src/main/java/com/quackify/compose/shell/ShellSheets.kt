@@ -13,6 +13,7 @@ import com.quackify.compose.sheets.EntityOptionsSheet
 import com.quackify.compose.sheets.LibraryCreateSheet
 import com.quackify.compose.sheets.LibrarySortOption
 import com.quackify.compose.sheets.LibrarySortSheet
+import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.sheets.ProfileDrawerSheet
 import com.quackify.compose.sheets.SleepTimerOption
 import com.quackify.compose.sheets.SleepTimerSheet
@@ -66,6 +67,7 @@ internal fun ShellSheets(
     onArtistFollowToggle: () -> Unit = {},
     onArtistRadio: () -> Unit = {},
     sortOption: LibrarySortOption,
+    sortDirection: SortDirection = SortDirection.DESCENDING,
     sleepTimer: SleepTimerOption?,
     userDisplayName: String,
     userAvatarUrl: String,
@@ -107,7 +109,7 @@ internal fun ShellSheets(
     onViewAlbum: (String, String) -> Unit,
     onSleepTimerClick: () -> Unit,
     onGoToArtist: (String) -> Unit,
-    onSortSelected: (LibrarySortOption) -> Unit,
+    onSortSelected: (LibrarySortOption, SortDirection) -> Unit,
     onCreatePlaylist: () -> Unit,
     onCreateFolder: () -> Unit = {},
     onSelectDevice: (String) -> Unit,
@@ -206,6 +208,7 @@ internal fun ShellSheets(
     LibrarySortSheet(
         isOpen = flags.sort,
         currentSort = sortOption,
+        currentDirection = sortDirection,
         onSortSelected = onSortSelected,
         onDismiss = onDismissSort
     )

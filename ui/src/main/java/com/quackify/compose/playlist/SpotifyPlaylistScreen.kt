@@ -91,6 +91,7 @@ import com.quackify.compose.components.ShimmerText
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.format.formatCollectionDuration
+import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
@@ -114,11 +115,16 @@ data class TrackItem(
     val hasVideo: Boolean = false
 )
 
-enum class PlaylistSort(val label: String) {
-    CUSTOM("Custom order"),
-    TITLE("Title"),
-    ARTIST("Artist"),
-    RECENTLY_ADDED("Recently added")
+enum class PlaylistSort(
+    val label: String,
+    val reversible: Boolean = true,
+    val defaultDirection: SortDirection = SortDirection.ASCENDING
+) {
+    CUSTOM("Custom order", reversible = false, defaultDirection = SortDirection.ASCENDING),
+    TITLE("Title", reversible = true, defaultDirection = SortDirection.ASCENDING),
+    ARTIST("Artist", reversible = true, defaultDirection = SortDirection.ASCENDING),
+    ALBUM("Album", reversible = true, defaultDirection = SortDirection.ASCENDING),
+    RECENTLY_ADDED("Recently added", reversible = true, defaultDirection = SortDirection.DESCENDING)
 }
 
 /**
@@ -185,6 +191,7 @@ fun SpotifyPlaylistScreen(
     var isDownloaded by remember { mutableStateOf(false) }
     var isShuffle by remember { mutableStateOf(false) }
     var sortOption by remember { mutableStateOf(PlaylistSort.CUSTOM) }
+    var sortDirection by remember { mutableStateOf(SortDirection.ASCENDING) }
     var isSearchRevealed by remember { mutableStateOf(false) }
     val bottomPadding = rememberBottomPadding()
     val scope = rememberCoroutineScope()
@@ -200,19 +207,46 @@ fun SpotifyPlaylistScreen(
         mutableStateListOf<TrackItem>().apply { addAll(tracks) }
     }
 
-    val displayedTracks = remember(tracks, currentTracks, searchQuery, sortOption) {
+    val displayedTracks = remember(tracks, currentTracks, searchQuery, sortOption, sortDirection) {
         val base = if (searchQuery.isBlank()) {
             currentTracks.toList()
         } else {
             currentTracks.filter {
                 it.title.contains(searchQuery, ignoreCase = true) ||
-                it.artist.contains(searchQuery, ignoreCase = true)
+                it.artist.contains(searchQuery, ignoreCase = true) ||
+                it.albumName.contains(searchQuery, ignoreCase = true)
             }
         }
         when (sortOption) {
-            PlaylistSort.TITLE -> base.sortedBy { it.title }
-            PlaylistSort.ARTIST -> base.sortedBy { it.artist }
-            else -> base
+            PlaylistSort.TITLE -> {
+                if (sortDirection == SortDirection.ASCENDING) {
+                    base.sortedBy { it.title.lowercase() }
+                } else {
+                    base.sortedByDescending { it.title.lowercase() }
+                }
+            }
+            PlaylistSort.ARTIST -> {
+                if (sortDirection == SortDirection.ASCENDING) {
+                    base.sortedBy { it.artist.lowercase() }
+                } else {
+                    base.sortedByDescending { it.artist.lowercase() }
+                }
+            }
+            PlaylistSort.ALBUM -> {
+                if (sortDirection == SortDirection.ASCENDING) {
+                    base.sortedBy { it.albumName.lowercase() }
+                } else {
+                    base.sortedByDescending { it.albumName.lowercase() }
+                }
+            }
+            PlaylistSort.RECENTLY_ADDED -> {
+                if (sortDirection == SortDirection.DESCENDING) {
+                    base.reversed()
+                } else {
+                    base
+                }
+            }
+            PlaylistSort.CUSTOM -> base
         }
     }
 
@@ -939,7 +973,7 @@ fun SpotifyPlaylistScreen(
                                         Icon(
                                             painter = painterResource(id = R.drawable.encore_icon_sort_by_24),
                                             contentDescription = "Sort",
-                                            tint = EncoreColors.TextSecondary,
+                                            tint = if (sortOption != PlaylistSort.CUSTOM) EncoreColors.Green else EncoreColors.TextSecondary,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -1360,9 +1394,10 @@ fun SpotifyPlaylistScreen(
     com.quackify.compose.sheets.PlaylistSortSheet(
         isOpen = isSortSheetOpen,
         currentSort = sortOption,
-        onSortSelected = { selected ->
+        currentDirection = sortDirection,
+        onSortSelected = { selected, direction ->
             sortOption = selected
-            isSortSheetOpen = false
+            sortDirection = direction
         },
         onDismiss = { isSortSheetOpen = false }
     )

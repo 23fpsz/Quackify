@@ -89,6 +89,7 @@ import com.quackify.compose.search.SearchHistoryItem
 import com.quackify.compose.search.SpotifySearchScreen
 import com.quackify.compose.sheets.EditPlaylistSheet
 import com.quackify.compose.sheets.LibrarySortOption
+import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
@@ -846,6 +847,7 @@ internal fun ShellFolderPane(
     onPlusClick: () -> Unit = {},
     onSortClick: () -> Unit = {},
     currentSort: LibrarySortOption = LibrarySortOption.RECENTS,
+    sortDirection: SortDirection = SortDirection.DESCENDING,
     onBackClick: () -> Unit = {},
     onFolderOptionsClick: () -> Unit = {},
     onPlayClick: () -> Unit = {}
@@ -863,6 +865,7 @@ internal fun ShellFolderPane(
         onPlusClick = onPlusClick,
         onSortClick = onSortClick,
         currentSort = currentSort,
+        sortDirection = sortDirection,
         isFolder = true,
         onBackClick = onBackClick,
         onFolderOptionsClick = onFolderOptionsClick,
