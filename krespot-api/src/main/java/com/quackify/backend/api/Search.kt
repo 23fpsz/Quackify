@@ -60,8 +60,6 @@ object Search {
         if (trimmed.isEmpty()) return emptyList()
         val json = call(context, OP_SUGGESTIONS, suggestionVariables(trimmed, limit)) ?: return emptyList()
         val hits = topHits(json).take(limit)
-        // The dropdown rows carry hearts now: ask the library which entities are
-        // already in it so the first press toggles the right way around.
         val entities = hits.filter { it.kind != SearchKind.QUERY && it.uri.isNotBlank() }
         val saved = if (entities.isEmpty()) emptySet() else Library.saved(context, entities.map { it.uri })
         val marked = if (saved.isEmpty()) hits else hits.map { if (it.uri in saved) it.copy(saved = true) else it }
@@ -95,7 +93,6 @@ object Search {
             .put("searchTerm", trimmed)
             .put("offset", offset)
             .put("limit", spec.third)
-            // .put("includeAudiobooks", true)
             .put("includeAuthors", true)
             .put("includeEpisodeContentRatingsV2", true)
             .toString()
@@ -141,7 +138,6 @@ object Search {
         .put("offset", 0)
         .put("numberOfTopResults", limit)
         .put("includeArtistHasConcertsField", false)
-        // .put("includeAudiobooks", true)
         .put("includeAuthors", true)
         .put("includePreReleases", true)
         .put("includeAlbumPreReleases", false)
@@ -175,11 +171,6 @@ object Search {
         }
         val sections = topSections(json)
         val chips = chipsOf(search, sections, hits)
-        // topResultsV2 carries the whole ranking, but only its first entry
-        // comes back fully decorated: the rows further down can arrive with
-        // nothing but a name and a uri. The dedicated sections (tracksV2,
-        // artists, ...) always carry covers and artist lines, so prefer them
-        // and keep the top-results order as the fallback.
         val sectionTracks = sectionHits(search, "tracksV2")
         val sectionArtists = sectionHits(search, "artists")
         val sectionAlbums = sectionHits(search, "albumsV2")

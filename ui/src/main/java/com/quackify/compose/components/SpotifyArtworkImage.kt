@@ -43,7 +43,6 @@ fun resolveSpotifyImageUrl(rawUrl: String?): String? {
             val id = trimmed.substringAfter("spotify:image:")
             "https://i.scdn.co/image/$id"
         }
-        // Spotify image ID is typically a 40 or 32 character hex string
         trimmed.length in 30..50 && trimmed.all { it.isDigit() || (it in 'a'..'f') || (it in 'A'..'F') } -> {
             "https://i.scdn.co/image/$trimmed"
         }

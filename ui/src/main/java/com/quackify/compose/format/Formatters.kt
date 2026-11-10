@@ -14,8 +14,6 @@ fun formatDuration(ms: Long): String {
     }
 }
 
-// Spotify rounds the collection total down to the minute and prefixes it with
-// "about" whenever the number came from an average instead of a full sum.
 fun formatCollectionDuration(ms: Long, isEstimate: Boolean = false): String {
     if (ms <= 0L) return ""
     val rounded = ms - ms % 60_000L

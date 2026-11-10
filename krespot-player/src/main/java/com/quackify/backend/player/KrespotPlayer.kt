@@ -32,8 +32,6 @@ private const val SOURCE_CACHE = 8
 
 private const val DEEP_LOOKAHEAD = 2
 
-// Only meant to absorb an accidental double tap before the key request;
-// anything longer sits on the critical path of every play.
 private const val KEY_SETTLE_MS = 300L
 
 private const val DUCK_LEVEL = 0.2f
@@ -138,8 +136,6 @@ class KrespotPlayer(private val context: Context) {
 
     fun rememberFile(trackUri: String, fileId: String) {
         if (trackUri.isBlank() || fileId.length < 32) return
-        // prefetchAhead parks one of these per track on Dispatchers.IO while
-        // play() calls it too; the deque below is not thread-safe on its own.
         synchronized(fileIdOrder) {
             if (fileIds.put(trackUri, fileId) == null) fileIdOrder.addLast(trackUri)
             while (fileIdOrder.size > FILE_ID_CACHE) {
@@ -351,9 +347,6 @@ class KrespotPlayer(private val context: Context) {
                     return@launch
                 }
                 rememberFile(track.uri, source.fileId)
-                // The key only needs the pssh from the seektable and the
-                // segments only need the resolved url, so both overlap the
-                // init segment fetch instead of queueing behind it.
                 val warmed = async(Dispatchers.IO) { SegmentStore.warm(source, fromMs) }
                 val drm = async(Dispatchers.IO) {
                     val left = KEY_SETTLE_MS - (SystemClock.elapsedRealtime() - startedAt)
@@ -513,9 +506,6 @@ class KrespotPlayer(private val context: Context) {
         val engine = engine
         if (engine == null) {
             if (job?.isActive == true) {
-                // The manifest, the init segment and the licence all take
-                // seconds; a scrub that lands in that window used to be
-                // dropped outright.
                 pendingSeekMs = ms
                 _state.update { it.copy(positionMs = ms) }
                 log.i("seek -> ${ms}ms parked, the engine is still loading")
@@ -526,10 +516,6 @@ class KrespotPlayer(private val context: Context) {
         }
         log.i("seek -> ${ms}ms")
         engine.seekTo(ms)
-        // Mirror the clamped target right away: the state flow kept the
-        // pre-seek position until the decode loop reached the new segment,
-        // and every reader of it (the bar, the published member state, the
-        // next cluster echo) put the thumb back where the track was.
         _state.update { it.copy(positionMs = engine.currentPositionMs) }
     }
 
@@ -537,9 +523,6 @@ class KrespotPlayer(private val context: Context) {
         generation++
         pendingPause = false
         pendingSeekMs = -1L
-        // A licence-gated retry must not survive the user moving on: without
-        // this a late gate-open would stop whatever is playing (or wake a
-        // released player) to restart a track nobody asked for.
         refused = null
         deepJob?.cancel()
         deepTarget = ""
@@ -572,10 +555,6 @@ class KrespotPlayer(private val context: Context) {
             when (event) {
                 is PlayerEvent.Progress -> current.copy(positionMs = event.positionMs, durationMs = event.durationMs)
                 is PlayerEvent.Seeked -> current.copy(positionMs = event.positionMs)
-                // The engine reports Started once its pipeline is up, even
-                // when the load was asked to stay paused (taking over a
-                // paused stream): keep the hold, or the button and the
-                // published state say playing while the engine sits silent.
                 PlayerEvent.Started -> if (current.paused) {
                     current.copy(buffering = false, durationMs = durationMs)
                 } else {

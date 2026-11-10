@@ -48,9 +48,6 @@ fun CanvasVideoPlayer(
     zoom: Float = 1f
 ) {
     val context = LocalContext.current
-    // One frame for the whole lifetime here; the player is rebuilt whenever
-    // the file changes and rewired onto the same TextureView, so a file swap
-    // never leaves a fresh player playing without a video output.
     val frame = remember {
         CanvasFadeFrame(context).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -59,20 +56,9 @@ fun CanvasVideoPlayer(
             )
         }
     }
-    // Built without a video output and left unprepared on purpose: the
-    // DisposableEffect below attaches the frame's TextureView first and only
-    // then calls prepare(). Preparing here would race the composition that
-    // supplies the surface - the player's internal playback thread can
-    // process the prepare message while the main thread is still composing
-    // the AndroidView that owns the texture, and a video-only stream that
-    // reaches a renderer with no output attached gets its video track
-    // skipped, so the first frames are lost waiting for a re-selection.
     val player = remember(filePath) {
         ExoPlayer.Builder(
             context,
-            // the canvas video renderer: the same decoder fallback as before,
-            // plus the drop-to-keyframe catch-up disabled - see
-            // CanvasVideoRenderer for why that one matters so much here
             CanvasRenderersFactory(context).setEnableDecoderFallback(true),
         ).build().apply {
             setMediaItem(MediaItem.fromUri(File(filePath).toUri()))
@@ -81,9 +67,6 @@ fun CanvasVideoPlayer(
             playWhenReady = true
         }
     }
-    // Runs after this composition created the frame (the AndroidView
-    // factory), so the surface exists before playback starts - and unlike
-    // the old factory-scoped wiring it re-runs for every new player.
     DisposableEffect(player, frame) {
         player.setVideoTextureView(frame.texture)
         val listener = object : Player.Listener {
@@ -97,12 +80,6 @@ fun CanvasVideoPlayer(
                 log.w("canvas playback error ${error.errorCodeName}")
             }
 
-            // Boundary-stutter hunt, part 2: the timeline ExoPlayer derives
-            // from the stitched file's moov. If the CDN init's header
-            // durations are garbage, `duration` here is NOT the canvas length
-            // and repeat/loop logic resets the renderer at the wrong spot —
-            // the flush-storm signature. One log line at STATE_READY settles
-            // it instantly.
             override fun onPlaybackStateChanged(playbackState: Int) {
                 log.w(
                     "canvas state=$playbackState posMs=${player.currentPosition} " +
@@ -121,13 +98,6 @@ fun CanvasVideoPlayer(
                 )
             }
         }
-        // Diagnostics for the boundary-stutter hunt: a healthy canvas loop
-        // logs nothing here. Dropped frames or a mid-loop decoder
-        // (re)initialization is the signature of whatever still makes the
-        // renderer fall behind, and lands in the in-app LOGS viewer.
-        // Player.Listener carries no renderer-level callbacks, so these two
-        // ride on a separate AnalyticsListener instead: both take an EventTime
-        // parameter first, and the init duration is a Long, not an Int.
         val diagnostics = object : AnalyticsListener {
             override fun onDroppedVideoFrames(
                 eventTime: AnalyticsListener.EventTime,
@@ -180,10 +150,6 @@ fun CanvasVideoPlayer(
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private class CanvasRenderersFactory(context: Context) : DefaultRenderersFactory(context) {
 
-    // The parameter types must match the parent declaration exactly: in
-    // media3 1.11.1 the eventHandler/eventListener parameters are non-null,
-    // so declaring them Handler? / VideoRendererEventListener? here makes
-    // Kotlin report "overrides nothing".
     override fun buildVideoRenderers(
         context: Context,
         extensionRendererMode: Int,
@@ -203,13 +169,9 @@ private class CanvasRenderersFactory(context: Context) : DefaultRenderersFactory
                     .setEnableDecoderFallback(enableDecoderFallback)
                     .setEventHandler(eventHandler)
                     .setEventListener(eventListener)
-                    // batches of 5 keep the dropped-frame diagnostics in the
-                    // player logs meaningful without spamming healthy playback
                     .setMaxDroppedFramesToNotify(5)
             )
         )
-        // extension renderers are deliberately not added: this player only
-        // ever feeds one local fMP4 file
     }
 }
 
@@ -248,12 +210,6 @@ private class CanvasVideoRenderer(
         isLastBuffer: Boolean,
     ): Boolean = false
 
-    // Boundary-stutter hunt, part 3: every renderer position reset goes
-    // through here, and a reset is exactly what triggers
-    // flushOrReinitializeCodec -> codec.flush(). A healthy looping canvas
-    // logs this once per loop (~7s); a flush storm logs it every few hundred
-    // milliseconds with the position it resets to. The stack names the
-    // caller, so one buggy run is enough to identify the loop driver.
     override fun onPositionReset(
         positionUs: Long,
         joining: Boolean,
@@ -286,10 +242,6 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
             invalidate()
         }
 
-    // Overscan of the video inside its own frame: the canvas is drawn from the
-    // very top of the screen, so the picture is scaled around the top edge
-    // (never around the centre) and any fractional rounding of the frame
-    // height shows video instead of a bare strip of background.
     var zoom: Float = 1f
         set(value) {
             val clamped = value.coerceAtLeast(1f)
@@ -303,12 +255,6 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
     }
     private var gradient: LinearGradient? = null
 
-    // onSurfaceTextureUpdated fires for every decoded frame and AndroidView's
-    // update block runs on every recomposition. Both used to re-apply the
-    // video transform / fade effect unconditionally, and setTransform +
-    // setRenderEffect each invalidate the view — on low-end GPUs that doubled
-    // the per-frame composition work and the canvas visibly stuttered. Both
-    // are now cached by key and become no-ops when nothing actually changed.
     private var transformKey = Long.MIN_VALUE
     private var transformZoom = -1f
     private var fadeKey = Long.MIN_VALUE
@@ -338,9 +284,6 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
         transformZoom = zoom
         val videoAspect = videoWidth.toFloat() / videoHeight
         val viewAspect = viewWidth.toFloat() / viewHeight
-        // Anchored on the top edge, never the centre: the canvas sits against
-        // the status bar, so any overscan has to grow downwards and keep row
-        // zero of the video at row zero of the frame.
         val matrix = Matrix()
         val scaleX: Float
         val scaleY: Float
@@ -364,18 +307,12 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
 
     fun applyFade() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Rebuilding the RenderEffect on every call also reallocated the
-            // shader on each frame; keep one alive until (height, fraction)
-            // actually changes.
             val key = (height.toLong() and 0xFFFFFFFFL).shl(32) or
                 (fadeFraction.toRawBits().toLong() and 0xFFFFFFFFL)
             if (key == fadeKey) return
             fadeKey = key
             texture.setRenderEffect(fadeEffect(height, fadeFraction))
         }
-        // The pre-S fallback paints the mask in dispatchDraw, and every
-        // caller that can change what it draws already invalidates (the
-        // fadeFraction setter and onSizeChanged), so nothing to do here.
     }
 
     override fun dispatchDraw(canvas: Canvas) {

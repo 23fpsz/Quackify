@@ -81,8 +81,6 @@ fun AddToPlaylistSheet(
     onPick: (PlaylistChoice) -> Unit,
     onToggle: ((choice: PlaylistChoice, isAdding: Boolean) -> Unit)? = null,
     onLoadFolder: (suspend (folderUri: String) -> List<PlaylistChoice>)? = null,
-    // Answers "how many songs does this playlist hold" for the rows in view;
-    // the sheet asks per uri so the counts work inside folders too.
     onLoadTrackCount: (suspend (playlistUri: String) -> Int)? = null,
     onCreateNew: () -> Unit,
     onDismiss: () -> Unit,
@@ -93,9 +91,6 @@ fun AddToPlaylistSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    // Folder drill-down: the stack remembers every level above the one shown,
-    // each a folder plus the rows it listed, so Back climbs out exactly the
-    // way it came in.
     var currentFolder by remember { mutableStateOf<PlaylistChoice?>(null) }
     var currentRows by remember { mutableStateOf<List<PlaylistChoice>?>(null) }
     val parentLevels = remember { mutableStateListOf<Pair<PlaylistChoice?, List<PlaylistChoice>>>() }
@@ -104,7 +99,6 @@ fun AddToPlaylistSheet(
     val rows = currentRows ?: choices
     val inFolder = currentFolder != null
 
-    // Track selection state per playlist uri for instant UI feedback
     val selectionState = remember {
         mutableStateMapOf<String, Boolean>().apply {
             choices.forEach { choice ->
@@ -118,7 +112,6 @@ fun AddToPlaylistSheet(
         }
     }
 
-    // Populate entries as choices finish loading asynchronously, without overwriting user mutations
     LaunchedEffect(choices) {
         choices.forEach { choice ->
             if (!selectionState.containsKey(choice.uri)) {
@@ -132,10 +125,8 @@ fun AddToPlaylistSheet(
         }
     }
 
-    // Number of destinations currently checked
     val savedCount = selectionState.values.count { it }
 
-    // Song count per playlist row, hydrated while the list is on screen.
     val trackCounts = remember { mutableStateMapOf<String, Int>() }
     LaunchedEffect(rows) {
         val loader = onLoadTrackCount ?: return@LaunchedEffect
@@ -207,7 +198,6 @@ fun AddToPlaylistSheet(
                 .fillMaxWidth()
                 .navigationBarsPadding()
         ) {
-            // Top Bar: Cancel (left) - Done (right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -240,7 +230,6 @@ fun AddToPlaylistSheet(
                 )
             }
 
-            // Headline row: "Saved in" / "Save in" (left) + "New playlist" (right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -289,7 +278,6 @@ fun AddToPlaylistSheet(
                         .heightIn(max = 420.dp)
                 ) {
                     if (inFolder) {
-                        // Way back out of the folder, above its rows.
                         item(key = "__back__") {
                             val parentName = parentLevels.lastOrNull()?.first?.name
                             Row(
@@ -349,7 +337,6 @@ fun AddToPlaylistSheet(
                         }
                     }
 
-                    // Bottom "+ New playlist" row (matches Spotify baseline)
                     if (!inFolder) {
                         item(key = "__new_bottom_row__") {
                             Row(
@@ -391,7 +378,6 @@ fun AddToPlaylistSheet(
                 }
             }
 
-            // Bottom floating green "Done" button
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -441,7 +427,6 @@ private fun AddToPlaylistRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (choice.kind == PlaylistChoice.Kind.LIKED_SONGS) {
-            // Official Spotify Liked Songs gradient square
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -493,7 +478,6 @@ private fun AddToPlaylistRow(
             }
         }
 
-        // Trailing Selection Indicator: Green circle check (✓) or outline circle plus (+)
         if (isSelected) {
             Box(
                 modifier = Modifier

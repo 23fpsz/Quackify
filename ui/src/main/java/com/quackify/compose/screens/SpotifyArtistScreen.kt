@@ -139,9 +139,6 @@ fun SpotifyArtistScreen(
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
 
-    // Discography sections: prefer the overview's dedicated groups; when it
-    // came back thin, split the popular-releases rows by their own type tags
-    // so the sections appear whenever the artist actually has any.
     val albumSection = albums.ifEmpty {
         releases.filter { it.type.equals("Album", ignoreCase = true) }
     }
@@ -198,7 +195,6 @@ fun SpotifyArtistScreen(
             .fillMaxSize()
             .background(Color(0xFF121212))
     ) {
-        // 1:1 Edge-to-Edge Background Hero Image with Parallax & Scrim
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -240,7 +236,6 @@ fun SpotifyArtistScreen(
                 }
             }
 
-            // Top scrim for status bar and navigation buttons contrast
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -255,7 +250,6 @@ fun SpotifyArtistScreen(
                     )
             )
 
-            // Bottom gradient fading smoothly into #121212 background (keeping artist face clear)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -277,7 +271,6 @@ fun SpotifyArtistScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = bottomPadding)
         ) {
-            // Overlaid Typography on Hero Section (transparent container over background image)
             item {
                 Box(
                     modifier = Modifier
@@ -287,7 +280,6 @@ fun SpotifyArtistScreen(
                     contentAlignment = Alignment.BottomStart
                 ) {
                     Column {
-                        // Giant Artist Title (44sp Bold White)
                         Text(
                             text = artistName,
                             style = SpotifyTheme.typography.headlineLarge.copy(
@@ -303,7 +295,6 @@ fun SpotifyArtistScreen(
 
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // Verified Artist Badge
                         if (verified) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
@@ -325,7 +316,6 @@ fun SpotifyArtistScreen(
                             Spacer(modifier = Modifier.height(3.dp))
                         }
 
-                        // Monthly Listeners
                         if (monthlyListeners.isNotBlank()) {
                             Text(
                                 text = "$monthlyListeners monthly listeners",
@@ -339,7 +329,6 @@ fun SpotifyArtistScreen(
                 }
             }
 
-            // Action Row: Latest Release Preview / Follow Pill, 3-dots, Shuffle, Green Play Button
             item {
                 Row(
                     modifier = Modifier
@@ -352,7 +341,6 @@ fun SpotifyArtistScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter)
                     ) {
-                        // Latest release preview thumbnail card if available
                         val latestRelease = releases.firstOrNull()
                         if (latestRelease?.imageUrl != null) {
                             Box(
@@ -370,7 +358,6 @@ fun SpotifyArtistScreen(
                             }
                         }
 
-                        // Follow Pill Button
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(EncoreCornerRadii.FollowPill))
@@ -384,7 +371,6 @@ fun SpotifyArtistScreen(
                             )
                         }
 
-                        // 3-Dots Artist Options Button
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -405,7 +391,6 @@ fun SpotifyArtistScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Shuffle Button
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -439,7 +424,6 @@ fun SpotifyArtistScreen(
                 }
             }
 
-            // "Popular" Header
             item {
                 Text(
                     text = "Popular",
@@ -452,7 +436,6 @@ fun SpotifyArtistScreen(
                 item { ArtistLoadingRows() }
             }
 
-            // Popular Track Rows
             itemsIndexed(popularTracks) { index, popTrack ->
                 val track = popTrack.track
                 val isCurrentTrack = track.title == currentTrackTitle
@@ -463,7 +446,6 @@ fun SpotifyArtistScreen(
                         .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Number or Equalizer
                     Box(
                         modifier = Modifier.width(28.dp),
                         contentAlignment = Alignment.CenterStart
@@ -484,7 +466,6 @@ fun SpotifyArtistScreen(
                         }
                     }
 
-                    // Thumbnail image
                     Box(
                         modifier = Modifier
                             .size(48.dp)
@@ -506,7 +487,6 @@ fun SpotifyArtistScreen(
 
                     Spacer(modifier = Modifier.width(EncoreSpacers.Tighter))
 
-                    // Title & Stream count
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = track.title,
@@ -534,7 +514,6 @@ fun SpotifyArtistScreen(
                         Spacer(modifier = Modifier.width(4.dp))
                     }
 
-                    // 3-dot context menu
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_more_android_24,
                         contentDescription = "Track options",
@@ -555,7 +534,6 @@ fun SpotifyArtistScreen(
                 }
             }
 
-            // "Popular releases" Header
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
@@ -580,11 +558,8 @@ fun SpotifyArtistScreen(
                 }
             }
 
-            // Popular Releases Carousel
             item { ArtistReleaseCarousel(releases, onReleaseClick) }
 
-            // "Albums": the overview's dedicated albums group (the whole list,
-            // not only the popular picks).
             if (albumSection.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
@@ -597,8 +572,6 @@ fun SpotifyArtistScreen(
                 item { ArtistReleaseCarousel(albumSection, onReleaseClick) }
             }
 
-            // "Singles & EPs": the overview's singles group (Spotify files EPs
-            // under it), with the same type-split fallback.
             if (singleSection.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
@@ -611,7 +584,6 @@ fun SpotifyArtistScreen(
                 item { ArtistReleaseCarousel(singleSection, onReleaseClick) }
             }
 
-            // About Section (Bio Card)
             val aboutStatLine = listOfNotNull(
                 followers.takeIf { it > 0L }?.let { formatCount(it) + " followers" },
                 worldRank.takeIf { it > 0 }?.let { "#$it in the world" },
@@ -636,8 +608,6 @@ fun SpotifyArtistScreen(
                             .clickable { onAboutClick() }
                     ) {
                         Column {
-                            // Photo banner like Spotify's About card; the card clip
-                            // rounds the top corners for free.
                             gallery.firstOrNull()?.let { photo ->
                                 SpotifyArtworkImage(
                                     imageUrl = photo,
@@ -692,9 +662,6 @@ fun SpotifyArtistScreen(
                 }
             }
 
-            // "Gallery": the artist's photo strip, whenever the overview brought
-            // any (the About card only ever shows its first photo; the About
-            // sheet keeps the full grid).
             if (gallery.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
@@ -730,7 +697,6 @@ fun SpotifyArtistScreen(
             }
         }
 
-        // Pinned Top Navigation Bar (floats on top of edge-to-edge hero image)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -743,7 +709,6 @@ fun SpotifyArtistScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Back Button (Locked at 16dp from left border)
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -760,7 +725,6 @@ fun SpotifyArtistScreen(
                 )
             }
 
-            // Centered Title in Top Bar when scrolled
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -781,7 +745,6 @@ fun SpotifyArtistScreen(
                 )
             }
 
-            // 3-Dots Button (smoothly cross-fades out as play button docks)
             Box(
                 modifier = Modifier.size(38.dp),
                 contentAlignment = Alignment.Center

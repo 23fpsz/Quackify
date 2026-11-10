@@ -85,9 +85,6 @@ object Net {
 
     private val counter = AtomicInteger(0)
 
-    // One shared engine for every call: https hosts negotiate h2 and multiplex
-    // their requests over a single connection, and the pool keeps idle sockets
-    // warm far beyond the JVM's five-socket keep-alive cap.
     private val baseClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -95,7 +92,6 @@ object Net {
         .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
         .build()
 
-    // Blob traffic rides the same pool with the longer media timeouts.
     private val longClient: OkHttpClient = baseClient.newBuilder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -119,7 +115,6 @@ object Net {
             builder.method(method, null)
         }
         headers.forEach { (k, v) ->
-            // The request body already carries the content type.
             if (body != null && k.equals("Content-Type", ignoreCase = true)) return@forEach
             builder.header(k, v)
         }
@@ -366,8 +361,6 @@ object Net {
 
     private fun preview(body: String): String {
         val flat = body.replace(Regex("\\s+"), " ").trim()
-        // The token endpoints answer with the live bearer in the body; keep
-        // it out of the log the same way redact() keeps it out of the headers.
         val safe = tokenValue.replace(flat) { match ->
             "\"${match.groupValues[1]}\":\"…${match.groupValues[2].length}B\""
         }

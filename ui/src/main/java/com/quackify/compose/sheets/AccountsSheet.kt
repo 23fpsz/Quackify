@@ -57,7 +57,6 @@ fun AccountsSheet(
     if (!isOpen) return
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // Deleting is only offered with another account left to fall back on.
     val canDelete = accounts.size > 1
 
     ModalBottomSheet(
@@ -152,8 +151,6 @@ fun AccountsSheet(
                         )
                     }
 
-                    // Delete appears on every row — the active one included —
-                    // but only while another account remains to take over.
                     if (canDelete) {
                         if (isActive) {
                             Spacer(modifier = Modifier.width(12.dp))

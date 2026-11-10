@@ -7,12 +7,10 @@ import androidx.compose.ui.graphics.Color
  * Spotify Encore Color Tokens extracted from Spotify Mobile decompiled resources.
  */
 object EncoreColors {
-    // Brand
     val Green = Color(0xFF1DB954)
     val GreenLight = Color(0xFF1ED760)
     val GreenDark = Color(0xFF169C46)
 
-    // Dark Backgrounds & Surfaces
     val PureBlack = Color(0xFF000000)
     val Background = Color(0xFF121212)      // gray_7: Default Spotify dark background
     val Surface = Color(0xFF181818)         // gray_10: Cards, quick access rows
@@ -21,12 +19,10 @@ object EncoreColors {
     val Divider = Color(0xFF535353)         // gray_30: Subtle separators, outlines
     val Outline = Color(0x33FFFFFF)         // 20% white outline
 
-    // Text & Content
     val TextPrimary = Color(0xFFFFFFFF)     // High-emphasis white
     val TextSecondary = Color(0xFFB3B3B3)   // gray_70: Subdued artist/metadata text
     val TextDisabled = Color(0xFF7F7F7F)    // gray_50: Disabled/placeholder text
 
-    // Accents & System
     val Error = Color(0xFFE91429)
     val HeartActive = Color(0xFF1DB954)
     val ProgressBarBackground = Color(0x33FFFFFF)

@@ -19,8 +19,6 @@ private const val QUICK_ACCESS_SIZE = 8
 private const val LIKED_SONGS_URI = "spotify:collection:tracks"
 private val LikedSongsColor = Color(0xFF5038A0)
 
-// The 'local:' prefix can never collide with the feed's spotify: section ids,
-// which the LazyColumn uses as keys.
 private const val LOCAL_RECENT_SHELF_ID = "local:recently-played"
 private const val LOCAL_FAVORITE_ARTISTS_SHELF_ID = "local:favorite-artists"
 
@@ -60,17 +58,11 @@ private fun HomeItem.toCard() = RecommendationCard(
 
 private fun List<HomeItem>.toCards(): List<RecommendationCard> = map { it.toCard() }
 
-// The server ships every recommendation as its own single-item section. Drawing
-// them one by one turns the feed into dozens of one-card carousels, so a run of
-// consecutive baseline sections collapses into one grid shelf anchored where the
-// first of them landed. Any other section kind ends the run.
 fun List<HomeSection>.toShelves(): List<HomeShelf> {
     val out = ArrayList<HomeShelf>()
     var run: MutableList<HomeItem>? = null
     var runIndex = -1
     for (section in this) {
-        // SHORTS feeds the shortcut grid and Recently played is owned by the
-        // local listening history, so neither renders as a feed shelf.
         if (section.kind == HomeFeed.SHORTS || section.kind == HomeFeed.RECENT) continue
         if (section.kind == HomeFeed.BASELINE) {
             if (section.items.isEmpty()) continue
@@ -205,8 +197,6 @@ fun TrackRow.toTrackItem(): TrackItem = TrackItem(
 )
 
 fun ShelfItem.toArtistRelease(): ArtistRelease {
-    // The release parser title-cases the raw type ("album" -> "Album"), which
-    // mangles "ep" into "Ep" — the shelf line should read "EP" like Spotify.
     val rawType = subtitle.substringAfter(" \u2022 ", "Album").trim()
     return ArtistRelease(
         title = title,

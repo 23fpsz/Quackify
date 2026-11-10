@@ -224,8 +224,6 @@ object Podcasts {
         if (iso.length < 10) return iso
         val precision = date.optString("precision").plainText()
         val year = iso.substring(0, 4)
-        // "0000-00-00" is Spotify's placeholder for an unknown date; month 0
-        // used to index MONTH_NAMES[-1] and crash the show screen.
         val month = iso.substring(5, 7).toIntOrNull()?.takeIf { it in 1..12 } ?: return year
         val day = iso.substring(8, 10).toIntOrNull()
         return when (precision) {

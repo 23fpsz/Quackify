@@ -230,18 +230,12 @@ object ClusterParser {
         val restrictions = player.optJSONObject("restrictions")
         val options = player.optJSONObject("options") ?: JSONObject()
         val index = player.optJSONObject("index")
-        // The PUT answers carry active_device_id at the root; the plain
-        // cluster GET nests it inside the cluster object.
         val declared = root.text("active_device_id")
             .ifBlank { cluster.text("active_device_id") }
         val origin = player.optJSONObject("play_origin")?.text("device_identifier").orEmpty()
         val activeId = declared.ifBlank {
             if (origin == LOCAL_ORIGIN) localDeviceId else ""
         }
-        // The connect state carries two separate flags: is_playing says a
-        // playback session exists, is_paused says it is parked. A paused
-        // device still reports is_playing=true, so the UI has to look at
-        // both or it keeps showing a paused remote as playing.
         val paused = player.optBoolean("is_paused", false)
         val playing = if (player.has("is_playing")) player.optBoolean("is_playing", false) else !paused
         return ClusterState(

@@ -12,7 +12,6 @@ data class AccountAttributes(
     val musicVideoLocked: Boolean = false,
     val otherVideoLocked: Boolean = false,
     val hasPodcasts: Boolean = true,
-    // val hasAudiobooks: Boolean = true,
 ) {
     val premium: Boolean get() = product.equals("PREMIUM", ignoreCase = true)
 }

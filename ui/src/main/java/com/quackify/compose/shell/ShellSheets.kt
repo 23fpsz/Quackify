@@ -222,8 +222,6 @@ internal fun ShellSheets(
     )
 
     if (flags.device) {
-        // The bridge only refreshes the cluster the moment the sheet opens
-        // (and polls fast while it is open) when it hears about it.
         LaunchedEffect(Unit) { onDeviceVisible(true) }
         val mapped = devices.map { it.toSpotifyDevice() }
         val current = mapped.firstOrNull { it.isCurrent }

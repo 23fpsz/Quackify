@@ -121,7 +121,6 @@ fun SpotifyLibraryScreen(
     var searchFilterText by remember { mutableStateOf("") }
     val bottomPadding = rememberBottomPadding()
 
-    // Authentic Spotify Library filters (matching @string/your_library_content_filter_*)
     val filters = listOf("Playlists", "Podcasts", "Albums", "Artists", "Downloaded")
 
     val allLibraryItems = items.orEmpty()
@@ -141,7 +140,6 @@ fun SpotifyLibraryScreen(
             matchesFilter && matchesSearch
         }
 
-        // Apply sort
         result = when (currentSort) {
             LibrarySortOption.ALPHABETICAL -> {
                 if (sortDirection == SortDirection.ASCENDING) {
@@ -181,21 +179,18 @@ fun SpotifyLibraryScreen(
             .background(EncoreColors.Background)
             .statusBarsPadding()
     ) {
-        // Header Section
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             if (isSearchActive) {
-                // In-Library Search Header (matching library_search_header_layout.xml)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Back / Cancel icon button (icon_back, chevron_left)
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_chevron_left_24,
                         contentDescription = "Cancel search",
@@ -210,7 +205,6 @@ fun SpotifyLibraryScreen(
 
                     Spacer(modifier = Modifier.width(4.dp))
 
-                    // Search EditText field (@drawable/library_search_field_background, 48dp minHeight, cornerRadius 4dp, gray_15 #282828)
                     BasicTextField(
                         value = searchFilterText,
                         onValueChange = { searchFilterText = it },
@@ -258,7 +252,6 @@ fun SpotifyLibraryScreen(
                     )
                 }
             } else if (isFolder) {
-                // Folder Title Header: Back Arrow + Folder Title + 3-Dots + Plus + Play
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -288,7 +281,6 @@ fun SpotifyLibraryScreen(
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Folder Options (3-dots)
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_more_android_24,
                         contentDescription = "Folder options",
@@ -298,7 +290,6 @@ fun SpotifyLibraryScreen(
                         tint = EncoreColors.TextPrimary
                     )
 
-                    // Plus (+) Create Button
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_plus_24,
                         contentDescription = "Create",
@@ -308,7 +299,6 @@ fun SpotifyLibraryScreen(
                         tint = EncoreColors.TextPrimary
                     )
 
-                    // Play Button
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_play_24,
                         contentDescription = "Play",
@@ -319,7 +309,6 @@ fun SpotifyLibraryScreen(
                     )
                 }
             } else {
-                // Standard Title Header: Profile Avatar + "Your Library" + Search + Plus
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -344,7 +333,6 @@ fun SpotifyLibraryScreen(
                         modifier = Modifier.weight(1f)
                     )
 
-                    // In-Library Search Icon (toggles search field)
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_search_24,
                         contentDescription = "Search in library",
@@ -354,7 +342,6 @@ fun SpotifyLibraryScreen(
                         tint = EncoreColors.TextPrimary
                     )
 
-                    // Plus (+) Create Button
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_plus_24,
                         contentDescription = "Create",
@@ -369,7 +356,6 @@ fun SpotifyLibraryScreen(
             if (!isFolder) {
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Filter Chips Row (matching your_library_content_filter_* tokens and library_chip_* dimensions)
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -390,13 +376,11 @@ fun SpotifyLibraryScreen(
             if (!isFolder || filteredItems.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Sort & View Toggle Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Sort Button (Recents etc.)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -432,7 +416,6 @@ fun SpotifyLibraryScreen(
                         }
                     }
 
-                    // Grid / List View Toggle Button
                     EncoreIconButton(
                         iconRes = if (isGridView) R.drawable.encore_icon_list_view_24 else R.drawable.encore_icon_grid_view_24,
                         contentDescription = if (isGridView) "List view" else "Grid view",
@@ -445,7 +428,6 @@ fun SpotifyLibraryScreen(
             }
         }
 
-        // Library Items Content: Loading State, Empty State, List View OR Grid View
         if (loading && filteredItems.isEmpty()) {
             LazyColumn(
                 modifier = Modifier
@@ -469,7 +451,6 @@ fun SpotifyLibraryScreen(
                 contentAlignment = Alignment.Center
             ) {
                 if (isFolder) {
-                    // 1:1 Spotify Empty Folder State
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "This folder looks empty",
@@ -514,7 +495,6 @@ fun SpotifyLibraryScreen(
                 }
             }
         } else if (isGridView) {
-            // 3-Column Dense Grid View matching your_library_dense_span_count
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 modifier = Modifier
@@ -607,7 +587,6 @@ fun SpotifyLibraryScreen(
                 }
             }
         } else {
-            // Full-Width List View
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = bottomPadding)

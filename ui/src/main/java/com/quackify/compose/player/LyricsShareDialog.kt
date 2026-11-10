@@ -83,9 +83,6 @@ fun LyricsShareDialog(
     onShareConfirm: (List<String>, Color, TextAlign) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Selectable lines (max 5 lines matching Spotify); keyed to the lyrics so
-    // a track change under the open dialog can never leave a stale index in
-    // the list (it used to crash on lyrics[idx] with shorter new lyrics).
     val selectedIndices = remember(lyrics) {
         mutableStateListOf<Int>().apply {
             if (lyrics.isNotEmpty()) add(0)
@@ -118,7 +115,6 @@ fun LyricsShareDialog(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
-    // Records the card preview so the Share button can export it as an image
     val cardLayer = rememberGraphicsLayer()
     val context = LocalContext.current
     val shareScope = rememberCoroutineScope()
@@ -133,7 +129,6 @@ fun LyricsShareDialog(
             .navigationBarsPadding()
             .padding(16.dp)
     ) {
-        // Header Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -302,7 +297,6 @@ private fun ShareCardPreview(
     textAlignIndex: Int,
     modifier: Modifier = Modifier
 ) {
-    // Card Preview Area (Instagram Stories format 9:16 aspect or compact rounded card)
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -329,7 +323,6 @@ private fun ShareCardPreview(
                 else -> Alignment.End
             }
         ) {
-            // Selected Lyric Lines
             if (selectedIndices.isEmpty()) {
                 Text(
                     text = "Tap up to 5 lines to share",
@@ -356,7 +349,6 @@ private fun ShareCardPreview(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Song Info + Spotify Watermark Footer
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -422,13 +414,11 @@ private fun ShareFormatControls(
     selectedCount: Int
 ) {
     Column {
-        // Formatting Controls (Alignment toggle + Color Palette)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Text Alignment Toggle Button
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
@@ -449,7 +439,6 @@ private fun ShareFormatControls(
                 )
             }
 
-            // Color Swatches
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -474,7 +463,6 @@ private fun ShareFormatControls(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Line selector hint
         Text(
             text = "Select up to 5 lines ($selectedCount/5)",
             style = SpotifyTheme.typography.marginal.copy(
@@ -493,7 +481,6 @@ private fun ShareLineSelector(
     onToggleLine: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Selectable Lyrics List
     LazyColumn(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))

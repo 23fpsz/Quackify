@@ -196,13 +196,11 @@ fun SpotifyPlaylistScreen(
     val bottomPadding = rememberBottomPadding()
     val scope = rememberCoroutineScope()
 
-    // Handle back button when in search mode
     BackHandler(enabled = isSearching) {
         isSearching = false
         searchQuery = ""
     }
 
-    // Editable track list
     val currentTracks = remember(tracks) {
         mutableStateListOf<TrackItem>().apply { addAll(tracks) }
     }
@@ -265,8 +263,6 @@ fun SpotifyPlaylistScreen(
         if (shouldLoadMore) onLoadMore()
     }
 
-    // Magnetic snapping search bar physics:
-    // Tracks interactive drag in real-time, and snaps 100% open or 100% closed on release
     val maxSearchHeightDp = 50.dp
     val maxSearchPx = with(density) { maxSearchHeightDp.toPx() }
     val searchOffsetAnim = remember { Animatable(0f) }
@@ -275,8 +271,6 @@ fun SpotifyPlaylistScreen(
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // When search bar is open/partially open and user scrolls up (available.y < 0),
-                // consume scroll to collapse search bar with the finger
                 if (searchOffsetAnim.value > 0f && available.y < 0f) {
                     val target = (searchOffsetAnim.value + available.y).coerceAtLeast(0f)
                     val consumedY = target - searchOffsetAnim.value
@@ -291,8 +285,6 @@ fun SpotifyPlaylistScreen(
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
-                // When at the very top of playlist and pulling down (available.y > 0),
-                // drag search bar down interactively with the finger
                 if (available.y > 0f && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
                     val target = (searchOffsetAnim.value + available.y).coerceAtMost(maxSearchPx)
                     val consumedY = target - searchOffsetAnim.value
@@ -303,7 +295,6 @@ fun SpotifyPlaylistScreen(
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                // Magnetic snapping: on finger release, never leave in half - snap 100% open or closed
                 if (searchOffsetAnim.value > 0f && searchOffsetAnim.value < maxSearchPx) {
                     val snapTarget = if (available.y > 250f || searchOffsetAnim.value > maxSearchPx * 0.45f) {
                         maxSearchPx
@@ -324,7 +315,6 @@ fun SpotifyPlaylistScreen(
         }
     }
 
-    // Scroll calculations for fluid header collapse and artwork shrink
     val scrollPx by remember {
         derivedStateOf {
             if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 2000f
@@ -372,9 +362,6 @@ fun SpotifyPlaylistScreen(
                 }
             )
         } else if (isSearching) {
-            // ==========================================
-            // SEARCH MODE (Image 3)
-            // ==========================================
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -504,9 +491,6 @@ fun SpotifyPlaylistScreen(
                 }
             }
         } else {
-            // ==========================================
-            // NORMAL PLAYLIST MODE
-            // ==========================================
 
             val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val toolbarHeight = 54.dp
@@ -519,9 +503,6 @@ fun SpotifyPlaylistScreen(
             val toolbarBottomPx = with(density) { toolbarBottom.toPx() }
             val chipsScrollState = rememberScrollState()
 
-            // Dynamic top offset for header:
-            // When search bar is hidden (progress 0), artwork is tucked up at statusBarTop + 8.dp (under top bar).
-            // When search bar is revealed (progress 1), offset smoothly drops to 0 so search bar sits cleanly below the top bar!
             val searchProgress = (currentSearchHeightDp / maxSearchHeightDp).coerceIn(0f, 1f)
             val dynamicTopOffsetDp = (toolbarHeight - 8.dp) * (1f - searchProgress)
             val dynamicTopOffsetPx = with(density) { dynamicTopOffsetDp.toPx().toInt() }
@@ -563,9 +544,6 @@ fun SpotifyPlaylistScreen(
                     .fillMaxSize()
                     .background(Color(0xFF121212))
             ) {
-                // Header Gradient Background: dynamically bounded by the Add/Edit filter chips row (chipsRowYInRoot)
-                // Never extends past the Add/Edit row, eliminating any gradient bleed onto tracks when scrolling,
-                // and smoothly contracts to toolbarBottom without any abrupt jump or disappearance.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -583,7 +561,6 @@ fun SpotifyPlaylistScreen(
                         )
                 )
 
-                // Scrollable LazyColumn with Collapsing Header, Sticky Chips Bar, and Tracks
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -592,8 +569,6 @@ fun SpotifyPlaylistScreen(
                         bottom = bottomPadding
                     )
                 ) {
-                    // Header Item: drawn shifted up by dynamicTopOffsetPx so artwork sits directly at statusBarTop + 8.dp,
-                    // but search bar appears cleanly below the top bar when pulled down
                     item {
                         Box(
                             modifier = Modifier
@@ -625,7 +600,6 @@ fun SpotifyPlaylistScreen(
                                     }
                                 )
                             } else {
-                                // Interactive Pull-Down Snapping Search Bar
                             if (currentSearchHeightDp > 0.dp) {
                                 Box(
                                     modifier = Modifier
@@ -669,7 +643,6 @@ fun SpotifyPlaylistScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Large Centered Cover Artwork (shrinks dynamically in size and fades out on scroll)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -707,7 +680,6 @@ fun SpotifyPlaylistScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Playlist Title (Left-aligned, bold, 24sp)
                             Text(
                                 text = currentTitle,
                                 style = SpotifyTheme.typography.headlineLarge.copy(
@@ -722,13 +694,11 @@ fun SpotifyPlaylistScreen(
 
                             Spacer(modifier = Modifier.height(6.dp))
 
-                            // Author / Collaborator Row
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             ) {
-                                // (+) Save-to-library circle button next to the owner info
                                 Box(
                                     modifier = Modifier
                                         .size(26.dp)
@@ -756,7 +726,6 @@ fun SpotifyPlaylistScreen(
                                 }
 
                                 if (creator.isNotBlank()) {
-                                    // Avatar Circle
                                     Box(
                                         modifier = Modifier
                                             .size(24.dp)
@@ -783,7 +752,6 @@ fun SpotifyPlaylistScreen(
                                         }
                                     }
 
-                                    // Creator Name
                                     Text(
                                         text = creator,
                                         style = SpotifyTheme.typography.bodyMedium.copy(
@@ -813,7 +781,6 @@ fun SpotifyPlaylistScreen(
 
                             Spacer(modifier = Modifier.height(6.dp))
 
-                            // Metadata Row: Globe + Save Count & Duration
                             val metadataText = buildString {
                                 if (saveCount.isNotBlank()) append(saveCount)
                                 val duration = formatCollectionDuration(totalDurationMs, totalIsEstimate)
@@ -859,7 +826,6 @@ fun SpotifyPlaylistScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Action Controls Row
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -871,7 +837,6 @@ fun SpotifyPlaylistScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
-                                    // Mini Stacked Playlist Preview Card
                                     Box(
                                         modifier = Modifier
                                             .size(width = 30.dp, height = 38.dp)
@@ -898,7 +863,6 @@ fun SpotifyPlaylistScreen(
                                         }
                                     }
 
-                                    // Download Button (Matches official Spotify 1:1)
                                     Box(
                                         modifier = Modifier
                                             .size(32.dp)
@@ -916,7 +880,6 @@ fun SpotifyPlaylistScreen(
                                         )
                                     }
 
-                                    // Share Button (<) — shares the playlist right away
                                     Box(
                                         modifier = Modifier
                                             .size(32.dp)
@@ -954,7 +917,6 @@ fun SpotifyPlaylistScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    // Shuffle Button
                                     Box(
                                         modifier = Modifier
                                             .size(36.dp)
@@ -993,7 +955,6 @@ fun SpotifyPlaylistScreen(
                     }
                 }
 
-                // In-List Filter Chips Bar matching Spotify specs:
                 if (displayedTracks.isNotEmpty() && isEditable) {
                     stickyHeader(key = "filter_chips_row") {
                     Box(
@@ -1016,7 +977,6 @@ fun SpotifyPlaylistScreen(
                 }
                 }
 
-                // Track Rows (Solid pure #121212 background, 60dp standard row height, scrolls under sticky chips)
                 if (loading && displayedTracks.isEmpty()) {
                     item(key = "playlist_loading") {
                         TrackListSkeleton(
@@ -1076,7 +1036,6 @@ fun SpotifyPlaylistScreen(
                     }
                 }
 
-                // "Recommended Songs" Section (add_more_row_blend_playlist.xml)
                 if (!loading && !loadFailed && isEditable && (recommendedTracks.isNotEmpty() || recommendationsLoading)) {
                     item {
                         Column(
@@ -1176,7 +1135,6 @@ fun SpotifyPlaylistScreen(
                     }
 
                     item {
-                        // Refresh Recommendations Button (Solid white pill button)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1207,7 +1165,6 @@ fun SpotifyPlaylistScreen(
                 }
             }
 
-            // Collapsing Header Background covering status bar + top bar (Solid transition)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1220,7 +1177,6 @@ fun SpotifyPlaylistScreen(
                     .zIndex(9.8f)
             )
 
-            // Pinned Top Navigation Bar (Overlays top of screen, transparent at rest, solid when scrolled)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1232,7 +1188,6 @@ fun SpotifyPlaylistScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Back Button (Locked at 16dp from left border)
                 Box(
                     modifier = Modifier
                         .size(38.dp)
@@ -1249,7 +1204,6 @@ fun SpotifyPlaylistScreen(
                     )
                 }
 
-                // Centered Title in Top Bar when scrolled
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -1270,7 +1224,6 @@ fun SpotifyPlaylistScreen(
                     )
                 }
 
-                // 3-Dots Button (smoothly cross-fades out as play button docks)
                 Box(
                     modifier = Modifier.size(38.dp),
                     contentAlignment = Alignment.Center
@@ -1315,13 +1268,10 @@ fun SpotifyPlaylistScreen(
                 }
             }
 
-            // Pinned Filter Chips Bar directly below the Top Bar:
-            // Locks at toolbarBottom as soon as list scrolls beneath the top bar
         }
     }
 }
 
-    // Sort Bottom Sheet matching sort_filter_bottom_sheet_layout.xml
     com.quackify.compose.sheets.PlaylistSortSheet(
         isOpen = isSortSheetOpen,
         currentSort = sortOption,
@@ -1333,7 +1283,6 @@ fun SpotifyPlaylistScreen(
         onDismiss = { isSortSheetOpen = false }
     )
 
-    // Name & Details Bottom Sheet matching edit_playlist_metadata
     com.quackify.compose.sheets.EditPlaylistSheet(
         isOpen = isEditDetailsOpen,
         initialName = currentTitle,
@@ -1491,7 +1440,6 @@ private fun PlaylistEmptyCurationHeader(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Square Cover placeholder (120dp square with centered pencil icon)
             Box(
                 modifier = Modifier
                     .size(120.dp)
@@ -1519,7 +1467,6 @@ private fun PlaylistEmptyCurationHeader(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Title & Change Button & User Info Column
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center
@@ -1543,7 +1490,6 @@ private fun PlaylistEmptyCurationHeader(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // "Change" pill button
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
@@ -1565,12 +1511,10 @@ private fun PlaylistEmptyCurationHeader(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // User / Creator Row
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // (+) Add collaborator circle
                     Box(
                         modifier = Modifier
                             .size(24.dp)
@@ -1586,7 +1530,6 @@ private fun PlaylistEmptyCurationHeader(
                         )
                     }
 
-                    // User Profile Avatar
                     Box(
                         modifier = Modifier
                             .size(24.dp)
@@ -1618,7 +1561,6 @@ private fun PlaylistEmptyCurationHeader(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Actions Row: Globe + Share icon
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -1641,7 +1583,6 @@ private fun PlaylistEmptyCurationHeader(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Big Centered White Pill Button: "+ Add to this playlist"
         Box(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center

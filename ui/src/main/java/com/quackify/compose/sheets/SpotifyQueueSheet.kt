@@ -88,7 +88,6 @@ fun SpotifyQueueSheet(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // Header Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -127,7 +126,6 @@ fun SpotifyQueueSheet(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // Now Playing Section
                 item {
                     Text(
                         text = "Now playing",
@@ -176,7 +174,6 @@ fun SpotifyQueueSheet(
                     Spacer(modifier = Modifier.height(EncoreSpacers.Base))
                 }
 
-                // User Queue Section
                 if (userQueue.isNotEmpty()) {
                     item {
                         Text(
@@ -200,7 +197,6 @@ fun SpotifyQueueSheet(
                     }
                 }
 
-                // Next From Context Section
                 if (nextFromContext.isNotEmpty()) {
                     item {
                         Text(

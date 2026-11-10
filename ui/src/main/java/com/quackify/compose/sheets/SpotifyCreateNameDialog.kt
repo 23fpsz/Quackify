@@ -113,7 +113,6 @@ fun SpotifyCreateNameDialog(
                     ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Title (e.g. "Give your playlist a name" / "Give your folder a name")
                 Text(
                     text = title,
                     style = SpotifyTheme.typography.titleLarge.copy(
@@ -127,7 +126,6 @@ fun SpotifyCreateNameDialog(
 
                 Spacer(modifier = Modifier.height(40.dp))
 
-                // Centered Input Box
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -162,7 +160,6 @@ fun SpotifyCreateNameDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Horizontal Underline Bar (subtle white/grey matching Spotify)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -173,12 +170,10 @@ fun SpotifyCreateNameDialog(
 
                 Spacer(modifier = Modifier.height(48.dp))
 
-                // Action Buttons Row (Cancel / Create)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Cancel Button
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(24.dp))
@@ -198,7 +193,6 @@ fun SpotifyCreateNameDialog(
 
                     val canConfirm = textFieldValue.text.trim().isNotBlank()
 
-                    // Create Green Pill Button
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(24.dp))

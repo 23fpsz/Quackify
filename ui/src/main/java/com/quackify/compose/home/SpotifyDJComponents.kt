@@ -97,7 +97,6 @@ fun SpotifyDJCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Pulsating DJ Avatar
                 Box(
                     modifier = Modifier
                         .size(52.dp)
@@ -156,7 +155,6 @@ fun SpotifyDJCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Speech Bubble / Vibe description
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -177,7 +175,6 @@ fun SpotifyDJCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Action Row: Play Button & Change Vibe Pill
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

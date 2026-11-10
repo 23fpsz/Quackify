@@ -81,7 +81,6 @@ fun FolderOptionsSheet(
                 .fillMaxWidth()
                 .navigationBarsPadding()
         ) {
-            // Header: Folder icon in square + Title + X playlists
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
