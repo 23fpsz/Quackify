@@ -1861,7 +1861,7 @@ class PlaybackBridge(private val context: Context) {
         if (cluster.activeDevice?.id != deviceId) {
             log.v("prefetch skipped, another device owns the stream")
         } else {
-            player.prefetchAhead(cluster.nextTracks.take(KEY_LOOKAHEAD), connect.spclientHost)
+            player.prefetchAhead(cluster.nextTracks.take(KEY_LOOKAHEAD), connect.spclientHost, cluster.track.uri)
         }
         if (cluster.activeDeviceId.isNotBlank() && cluster.activeDeviceId != activeSeen) {
             activeSeen = cluster.activeDeviceId
