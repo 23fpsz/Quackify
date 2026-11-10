@@ -976,16 +976,12 @@ fun SpotifyAppShell(
             onSkipNext = handleSkipNext,
             onSkipPrevious = handleSkipPrevious,
             onLike = {
-                val playingUri = playbackState?.trackUri.orEmpty()
-                if (!isLiked) {
-                    if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = true
-                }
                 val playingTrack = TrackItem(
                     title = currentTrackTitle,
                     artist = currentArtist,
-                    uri = playingUri,
+                    uri = playbackState?.trackUri.orEmpty(),
                     imageUrl = currentCoverUrl.takeIf { it.isNotBlank() },
-                    saved = true
+                    saved = isLiked
                 )
                 local.addTrackTarget = playingTrack
                 onAddToPlaylist?.invoke(playingTrack)

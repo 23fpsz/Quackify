@@ -9,12 +9,27 @@ object SecurePrefs {
 
     private const val FILE = "quackify_secure"
 
+    @Volatile
     private var cached: SharedPreferences? = null
+
+    private val gate = Any()
+
+    fun warmup(context: Context) {
+        get(context)
+    }
 
     fun get(context: Context): SharedPreferences {
         cached?.let { return it }
         val app = context.applicationContext
-        val prefs = runCatching {
+        return synchronized(gate) {
+            cached ?: create(app).also { prefs ->
+                cached = prefs
+            }
+        }
+    }
+
+    private fun create(app: Context): SharedPreferences =
+        runCatching {
             val key = MasterKey.Builder(app)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
@@ -28,7 +43,4 @@ object SecurePrefs {
         }.getOrElse {
             app.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         }
-        cached = prefs
-        return prefs
-    }
 }

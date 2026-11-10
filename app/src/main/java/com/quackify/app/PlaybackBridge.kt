@@ -496,6 +496,7 @@ class PlaybackBridge(private val context: Context) {
                 log.i("the other app is done, the volume is back")
         }
         player.warm()
+        if (autoplayOnStartup) player.resumeLast(connect.spclientHost)
         connect.holdsStream = false
         deviceWatch = scope.launch {
             while (true) {
@@ -1858,7 +1859,7 @@ class PlaybackBridge(private val context: Context) {
         if (cluster.activeDevice?.id != deviceId) {
             log.v("prefetch skipped, another device owns the stream")
         } else {
-            player.prefetchAhead(cluster.nextTracks.take(KEY_LOOKAHEAD), connect.spclientHost)
+            player.prefetchAhead(cluster.nextTracks.take(KEY_LOOKAHEAD), connect.spclientHost, cluster.track.uri)
         }
         if (cluster.activeDeviceId.isNotBlank() && cluster.activeDeviceId != activeSeen) {
             activeSeen = cluster.activeDeviceId

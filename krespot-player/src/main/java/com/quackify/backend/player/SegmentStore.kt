@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -21,13 +22,15 @@ private val log = Logs.of(Logs.Module.SOURCE)
  */
 internal object SegmentStore {
 
-    private const val KEEP_FILES = 3
+    private const val KEEP_FILES = 2
 
     private const val PRELOAD_SEGMENTS = 2
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val entries = LinkedHashMap<String, Entry>()
+
+    private val preloadJobs = ConcurrentHashMap<String, Job>()
 
     internal class Entry(val fileId: String) {
         @Volatile
@@ -42,6 +45,11 @@ internal object SegmentStore {
         entries.remove(fileId)?.also { entries[fileId] = it }
     }
 
+    fun evict(fileId: String) {
+        preloadJobs.remove(fileId)?.cancel()
+        synchronized(entries) { entries.remove(fileId) }
+    }
+
     /**
      * Makes sure the init segment is local and kicks the first audio segments
      * off in the background; neither waits on the other.
@@ -49,7 +57,8 @@ internal object SegmentStore {
     suspend fun warm(source: AudioSource, fromMs: Long): Entry {
         val entry = touch(source.fileId)
         trim()
-        scope.launch { preload(source, fromMs) }
+        preloadJobs.remove(source.fileId)?.cancel()
+        preloadJobs[source.fileId] = scope.launch { preload(source, fromMs) }
         if (entry.init == null) {
             entry.init = Net.fetch(source.url, 0, source.seektable.offset - 1)
         }

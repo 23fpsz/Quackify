@@ -14,6 +14,7 @@ glide = "1.0.0-beta01"
 palette = "1.1.0"
 coil = "2.7.0"
 media3 = "1.11.1"
+profileinstaller = "1.4.1"
 coroutines = "1.10.2"
 securityCrypto = "1.1.0"
 webkit = "1.18.0"
@@ -47,6 +48,7 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 androidx-media = { group = "androidx.media", name = "media", version.ref = "androidxMedia" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

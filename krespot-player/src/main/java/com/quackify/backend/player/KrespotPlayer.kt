@@ -30,11 +30,23 @@ private const val FILE_ID_CACHE = 64
 
 private const val SOURCE_CACHE = 8
 
-private const val DEEP_LOOKAHEAD = 2
+private const val DEEP_LOOKAHEAD = 1
 
 private const val KEY_SETTLE_MS = 300L
 
 private const val DUCK_LEVEL = 0.2f
+
+private const val PLAYER_PREFS = "quackify.player"
+
+private const val KEY_RESUME_URI = "resumeUri"
+
+private const val KEY_RESUME_FILE = "resumeFile"
+
+private const val KEY_RESUME_FORMAT = "resumeFormat"
+
+private const val KEY_RESUME_AT = "resumeAt"
+
+private const val RESUME_WRITE_MS = 5_000L
 
 sealed interface PlayerEvent {
     data object Started : PlayerEvent
@@ -134,6 +146,12 @@ class KrespotPlayer(private val context: Context) {
     @Volatile
     private var deepTarget: String = ""
 
+    private val deepWarmed = LinkedHashSet<String>()
+
+    private var resumeWrittenUri = ""
+
+    private var resumeWrittenMs = -1L
+
     fun rememberFile(trackUri: String, fileId: String) {
         if (trackUri.isBlank() || fileId.length < 32) return
         synchronized(fileIdOrder) {
@@ -156,8 +174,20 @@ class KrespotPlayer(private val context: Context) {
         manifests[trackUri] = scope.async { SourceResolver.manifest(context, spclient, trackUri) }
     }
 
-    fun prefetchAhead(tracks: List<com.quackify.backend.connect.cluster.ClusterTrack>, spclient: String) {
-        if (tracks.isEmpty() || spclient.isBlank()) return
+    fun prefetchAhead(
+        tracks: List<com.quackify.backend.connect.cluster.ClusterTrack>,
+        spclient: String,
+        nowPlaying: String = "",
+    ) {
+        val window = windowOf(tracks)
+        if (tracks.isEmpty() || spclient.isBlank()) {
+            if (window.isEmpty()) {
+                deepJob?.cancel()
+                deepTarget = ""
+            }
+            dropStaleWarmups(window, nowPlaying)
+            return
+        }
         tracks.forEach { track ->
             if (track.isAd || track.isMeta || !track.isVisible) return@forEach
             if (!track.uri.startsWith("spotify:track:")) return@forEach
@@ -168,22 +198,50 @@ class KrespotPlayer(private val context: Context) {
                 rememberFile(track.uri, file.fileId)
             }
         }
-        val target = tracks.firstOrNull { track ->
-            !track.isAd && !track.isMeta && track.isVisible && track.uri.startsWith("spotify:track:")
-        }?.uri.orEmpty()
+        val target = window.firstOrNull().orEmpty()
         if (target.isBlank()) {
             deepJob?.cancel()
             deepTarget = ""
+            dropStaleWarmups(window, nowPlaying)
             return
         }
-        if (deepJob?.isActive == true && deepTarget == target) return
+        if (deepJob?.isActive == true && deepTarget == target) {
+            dropStaleWarmups(window, nowPlaying)
+            return
+        }
         deepJob?.cancel()
         deepTarget = target
+        dropStaleWarmups(window, nowPlaying)
         deepJob = scope.launch { deepWarm(tracks, spclient) }
     }
 
+    private fun windowOf(
+        tracks: List<com.quackify.backend.connect.cluster.ClusterTrack>,
+    ): List<String> = tracks.asSequence()
+        .filter { !it.isAd && !it.isMeta && it.isVisible && it.uri.startsWith("spotify:track:") }
+        .take(DEEP_LOOKAHEAD)
+        .map { it.uri }
+        .toList()
+
+    private fun dropStaleWarmups(window: List<String>, nowPlaying: String) {
+        val keep = window.toHashSet()
+        val playing = _state.value.trackUri
+        val stale = synchronized(deepWarmed) {
+            val drop = deepWarmed.filter { it != playing && it != nowPlaying && it !in keep }
+            deepWarmed.removeAll(drop)
+            drop
+        }
+        if (stale.isEmpty()) return
+        stale.forEach { uri ->
+            val fileId = sourceFor(uri)?.fileId ?: fileIds[uri] ?: return@forEach
+            SegmentStore.evict(fileId)
+        }
+        log.i("dropped ${stale.size} stale warmup(s): " +
+                stale.joinToString { it.takeLast(12) })
+    }
+
     /**
-     * Resolves, licenses and preloads the next couple of tracks so advancing
+     * Resolves, licenses and preloads the next few tracks so advancing
      * the queue starts from warm bytes instead of a cold pipeline.
      */
     private suspend fun deepWarm(
@@ -210,6 +268,7 @@ class KrespotPlayer(private val context: Context) {
                 rememberSource(track.uri, source)
                 widevine.open(source.seektable.pssh)
                 SegmentStore.warm(source, 0L)
+                synchronized(deepWarmed) { deepWarmed.add(track.uri) }
                 log.i("deep warm '${track.title}' file=${source.fileId.take(8)}")
             }
     }
@@ -266,6 +325,7 @@ class KrespotPlayer(private val context: Context) {
             val decoder = warmDecoder()
             log.i("audio sink warmed in ${sink}ms, decoder in ${decoder}ms")
         }
+        scope.launch { widevine.warm() }
     }
 
     private fun warmDecoder(): Long {
@@ -284,6 +344,51 @@ class KrespotPlayer(private val context: Context) {
             }
         }
         return android.os.SystemClock.elapsedRealtime() - started
+    }
+
+    fun resumeLast(spclient: String) {
+        scope.launch {
+            val prefs = context.getSharedPreferences(PLAYER_PREFS, Context.MODE_PRIVATE)
+            val uri = prefs.getString(KEY_RESUME_URI, "").orEmpty()
+            val file = prefs.getString(KEY_RESUME_FILE, "").orEmpty()
+            val format = prefs.getInt(KEY_RESUME_FORMAT, 0)
+            val at = prefs.getLong(KEY_RESUME_AT, 0L).coerceAtLeast(0L)
+            if (!uri.startsWith("spotify:track:") || file.length < 32) {
+                log.i("resume: no remembered track to prefetch")
+                return@launch
+            }
+            if (sourceFor(uri) != null) return@launch
+            val source = runCatching {
+                SourceResolver.resolve(context, spclient, uri, fileId = file, format = format)
+            }.getOrNull()
+            if (source == null) {
+                log.i("resume: '${uri.takeLast(12)}' did not resolve, autoplay takes the cold path")
+                return@launch
+            }
+            rememberSource(uri, source)
+            widevine.open(source.seektable.pssh)
+            SegmentStore.warm(source, at)
+            log.i("resume: '${uri.takeLast(12)}' file=${source.fileId.take(8)} " +
+                    "licence and segments warmed at ${at}ms"
+            )
+        }
+    }
+
+    private fun persistResume() {
+        val current = _state.value
+        val file = current.fileId
+        if (file.isBlank() || !current.trackUri.startsWith("spotify:track:")) return
+        if (current.trackUri == resumeWrittenUri &&
+            kotlin.math.abs(current.positionMs - resumeWrittenMs) < RESUME_WRITE_MS
+        ) return
+        resumeWrittenUri = current.trackUri
+        resumeWrittenMs = current.positionMs
+        context.getSharedPreferences(PLAYER_PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_RESUME_URI, current.trackUri)
+            .putString(KEY_RESUME_FILE, file)
+            .putInt(KEY_RESUME_FORMAT, current.format)
+            .putLong(KEY_RESUME_AT, current.positionMs)
+            .apply()
     }
 
     val positionMs: Long
@@ -564,5 +669,6 @@ class KrespotPlayer(private val context: Context) {
                 is PlayerEvent.Failed -> current.copy(playing = false, buffering = false, trackUri = "")
             }
         }
+        persistResume()
     }
 }
