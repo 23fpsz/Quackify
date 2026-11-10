@@ -72,10 +72,6 @@ data class SettingsLocks(
     val otherVideos: Boolean = false,
 )
 
-// The switches this screen draws are the ones the server actually stores. Streaming quality, the
-// equalizer, compact library and the now-playing panel were removed: the first two are never
-// persisted by the web player, and the last two were only ever stored in the browser's localStorage,
-// so there is nothing behind them in this app.
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit,
@@ -104,9 +100,6 @@ fun SettingsScreen(
         }.getOrDefault("")
     }
 
-    // Local-only "Autoplay on startup" flag: stored in the app's private
-    // client prefs (the same file the playback bridge reads at start-up),
-    // so no server round trip is involved.
     val clientPrefs = remember {
         context.getSharedPreferences("quackify.client", Context.MODE_PRIVATE)
     }
@@ -120,15 +113,10 @@ fun SettingsScreen(
         mutableStateOf(clientPrefs.getBoolean("fullArtworkPlayer", true))
     }
 
-    // Hidden developer entry: five taps on the Version row open the log viewer.
-    // Like the Android build-number gesture, each tap toasts the remaining count,
-    // the counter resets itself five seconds after the last tap, and leaving
-    // Settings always starts the gesture over.
     val haptics = LocalHapticFeedback.current
     var versionTaps by remember { mutableIntStateOf(0) }
     var lastVersionTapAt by remember { mutableLongStateOf(0L) }
 
-    // Five seconds without a tap puts the counter back to zero on its own.
     LaunchedEffect(versionTaps) {
         if (versionTaps > 0) {
             delay(5_000L)
@@ -136,7 +124,6 @@ fun SettingsScreen(
         }
     }
 
-    // Leaving Settings (back, log viewer, anything else) forgets the progress.
     DisposableEffect(Unit) {
         onDispose { versionTaps = 0 }
     }

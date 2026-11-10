@@ -24,23 +24,16 @@ object ClientToken {
 
     private val mutex = Mutex()
 
-    // Mirrors the refresh deadline stored in prefs so the hot path answers
-    // without a keybox decrypt; -1 means "not loaded yet". Written only by
-    // mint() and invalidate(), both under the mutex or single-threaded.
     @Volatile
     private var refreshAtMemo: Long = -1L
 
     suspend fun get(context: Context, force: Boolean = false): String {
-        // The valid-token path must not queue every caller behind the mint
-        // mutex: a burst of requests would serialize on a cache read.
         if (!force) {
             val stored = SpotifyAuth.clientToken(context)
             if (stored.isNotBlank() && !stale(context)) return stored
         }
         mutex.lock()
         try {
-            // Re-read under the lock: another caller may have minted while
-            // this one waited outside.
             val stored = SpotifyAuth.clientToken(context)
             if (!force && stored.isNotBlank() && !stale(context)) return stored
             val minted = mint(context)

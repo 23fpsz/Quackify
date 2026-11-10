@@ -116,9 +116,6 @@ object Browse {
         val content = node.optJSONObject("content") ?: return null
         val data = content.optJSONObject("data") ?: return null
         val nodeUri = node.optString("uri")
-        // BrowseClientFeature is the client-owned entry (Live Events today): it
-        // carries the same cardRepresentation fields but under featureUri, and
-        // its own uri is an opaque xlink that the page loader cannot resolve.
         if (data.optString("__typename") == "BrowseClientFeature") {
             val title = label(data.optJSONObject("title"))
             val target = data.optString("featureUri").takeIf { it.startsWith("spotify:") }

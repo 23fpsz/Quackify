@@ -173,8 +173,6 @@ internal object SourceResolver {
             return null
         }
         val segments = json.optJSONArray("segments") ?: return null
-        // One pass, one filter: dropping only from `sizes` used to desync the
-        // two parallel arrays and end the track early without an event.
         val usable = (0 until segments.length())
             .mapNotNull { segments.optJSONObject(it) }
             .filter { it.optInt("size", 0) > 0 }

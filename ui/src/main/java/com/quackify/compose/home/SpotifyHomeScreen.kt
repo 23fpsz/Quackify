@@ -123,9 +123,6 @@ fun SpotifyHomeScreen(
 
     val quickItems = quickAccessItems.orEmpty()
 
-    // The chip row mirrors whatever the server sent: an "All" entry with no
-    // facet, then one chip per homeChips node. Selecting one refetches the feed
-    // with that facet, so the filtering stays server-side.
     val filterChips = remember(chips) {
         buildList {
             add(HomeChip(id = "", label = "All"))
@@ -137,9 +134,6 @@ fun SpotifyHomeScreen(
         shelves.orEmpty().filter { it.cards.isNotEmpty() || it.artists.isNotEmpty() }
     }
 
-    // The tint comes from the first cover on screen, so the backdrop belongs
-    // to the artwork instead of a fixed accent. A missing or dull cover falls
-    // back to the surface, which keeps the header and the feed one colour.
     val tintSeed = quickItems.firstOrNull()?.coverColor
     val resolvedTint = remember(tintSeed) {
         if (tintSeed == null) {
@@ -171,7 +165,6 @@ fun SpotifyHomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = bottomPadding)
         ) {
-        // Sticky Header: Profile Avatar & Filter Chips (funkis_home.xml & funkis_filter_chips_header.xml)
         stickyHeader {
             Box(
                 modifier = Modifier
@@ -186,7 +179,6 @@ fun SpotifyHomeScreen(
                         .height(48.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Profile Avatar (Clickable -> Opens Profile Drawer) matching faceheader_image
                     EncoreProfileAvatar(
                         userDisplayName = userDisplayName,
                         avatarUrl = userAvatarUrl.ifBlank { null },
@@ -194,7 +186,6 @@ fun SpotifyHomeScreen(
                         modifier = Modifier.padding(start = 16.dp)
                     )
 
-                    // Filter Chips Row Container with start gradient fade (funkis_filter_chips_header.xml)
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -220,9 +211,6 @@ fun SpotifyHomeScreen(
                             }
                         }
 
-                        // Start edge fade: the chips dissolve into the header
-                        // tint they sit on, not into the page background, so
-                        // no dark band shows up ahead of the first chip.
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
@@ -242,8 +230,6 @@ fun SpotifyHomeScreen(
             }
         }
 
-        // The greeting and the shortcut grid belong to the unfiltered feed; a
-        // facet query answers with a different set of shelves entirely.
         if (selectedFacet.isEmpty() && !(loading && quickItems.isEmpty())) {
             item {
                 Column(
@@ -355,7 +341,6 @@ private fun QuickAccessCard(
             modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Artwork (56dp full left bleed with rounded corner start)
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -386,7 +371,6 @@ private fun QuickAccessCard(
                 }
             }
 
-            // Title (2 lines max, BodySmallBold 13sp)
             Text(
                 text = item.title,
                 style = SpotifyTheme.typography.bodySmallBold.copy(color = Color.White),
@@ -397,7 +381,6 @@ private fun QuickAccessCard(
                     .weight(1f)
             )
 
-            // Accessory Slot: Equalizer (12dp) or Freshness Blue Dot (8dp)
             if (item.isPlaying) {
                 EncorePlayIndicator(
                     isPlaying = true,
@@ -416,7 +399,6 @@ private fun QuickAccessCard(
             }
         }
 
-        // Optional Episode Progress Bar placeholder (4dp height from dimens.xml)
         if (item.progress != null) {
             Box(
                 modifier = Modifier
@@ -549,7 +531,6 @@ private fun ShelfSection(
                             )
                         }
 
-                        // Corner tag if present (e.g. "MIX")
                         if (card.tag.isNotEmpty()) {
                             Box(
                                 modifier = Modifier
@@ -570,7 +551,6 @@ private fun ShelfSection(
                             }
                         }
 
-                        // Floating Quick Play Button matching actions_medium_card_default_bar.xml
                         EncorePlayButton(
                             isPlaying = false,
                             onClick = { onCardClick(card.title, card.uri.ifEmpty { "spotify:search:${card.title}" }) },

@@ -91,16 +91,13 @@ fun PlaylistEditModeContent(
         mutableStateListOf<EditableTrackItem>().apply { addAll(initialItems) }
     }
 
-    // Undo / Redo stacks
     val undoStack = remember { mutableStateListOf<PlaylistEditAction>() }
     val redoStack = remember { mutableStateListOf<PlaylistEditAction>() }
 
-    // Multi-select mode state
     var isSelectMode by remember { mutableStateOf(false) }
     val selectedIndices = remember { mutableStateListOf<Int>() }
     var isMoveSubmenu by remember { mutableStateOf(false) }
 
-    // Discard confirmation dialog
     var showDiscardDialog by remember { mutableStateOf(false) }
 
     val hasChanges by remember {
@@ -141,7 +138,6 @@ fun PlaylistEditModeContent(
         }
     )
 
-    // Back handling: If in move submenu, return to action bar. If in select mode, exit select mode. If dirty, show discard dialog. Else exit.
     BackHandler {
         if (isMoveSubmenu) {
             isMoveSubmenu = false
@@ -209,9 +205,6 @@ fun PlaylistEditModeContent(
             .background(Color(0xFF121212))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ==========================================
-            // TOP BAR (Matches Image 2, 3 & 4)
-            // ==========================================
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -221,7 +214,6 @@ fun PlaylistEditModeContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Left: Back Chevron / Arrow
                 IconButton(
                     onClick = {
                         if (isMoveSubmenu) {
@@ -244,7 +236,6 @@ fun PlaylistEditModeContent(
                     )
                 }
 
-                // Center Title / Action Capsule
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
@@ -255,7 +246,6 @@ fun PlaylistEditModeContent(
                         label = "TopBarCenter"
                     ) { (inSelect, selCount, dirty) ->
                         if (inSelect) {
-                            // Image 4: "N selected" (Medium bold, white, centered)
                             Text(
                                 text = "$selCount selected",
                                 style = SpotifyTheme.typography.titleMedium.copy(
@@ -265,7 +255,6 @@ fun PlaylistEditModeContent(
                                 )
                             )
                         } else if (dirty || canUndo || canRedo) {
-                            // Image 3: Capsule with Undo / Redo buttons
                             Row(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(24.dp))
@@ -274,7 +263,6 @@ fun PlaylistEditModeContent(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Undo Button
                                 IconButton(
                                     onClick = { applyUndo() },
                                     enabled = canUndo,
@@ -288,7 +276,6 @@ fun PlaylistEditModeContent(
                                     )
                                 }
 
-                                // Redo Button (mirrored undo icon)
                                 IconButton(
                                     onClick = { applyRedo() },
                                     enabled = canRedo,
@@ -305,7 +292,6 @@ fun PlaylistEditModeContent(
                                 }
                             }
                         } else {
-                            // Image 2: "Edit playlist"
                             Text(
                                 text = "Edit playlist",
                                 style = SpotifyTheme.typography.titleMedium.copy(
@@ -318,7 +304,6 @@ fun PlaylistEditModeContent(
                     }
                 }
 
-                // Right: "Save" Button
                 if (!isSelectMode) {
                     Box(
                         modifier = Modifier
@@ -340,9 +325,6 @@ fun PlaylistEditModeContent(
                 }
             }
 
-            // ==========================================
-            // TRACKS LIST
-            // ==========================================
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -409,10 +391,6 @@ fun PlaylistEditModeContent(
             }
         }
 
-        // ==========================================
-        // BOTTOM ACTION BARS (1:1 Spotify Mobile Encore Layout)
-        // Consistent height (48dp), styling (#282828 pill container, 15sp Bold), and smooth transitions
-        // ==========================================
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -422,7 +400,6 @@ fun PlaylistEditModeContent(
             contentAlignment = Alignment.Center
         ) {
             if (!isSelectMode) {
-                // State 1: Floating "Select" Pill Button (Image 2 & 3)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -446,14 +423,12 @@ fun PlaylistEditModeContent(
                     )
                 }
             } else if (!isMoveSubmenu) {
-                // State 2: Multi-select Action Bar (Image 4: [✕] [Move] [Remove])
                 val hasSelection = selectedIndices.isNotEmpty()
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Circular ✕ Button (exits select mode)
                     Box(
                         modifier = Modifier
                             .size(48.dp)
@@ -474,7 +449,6 @@ fun PlaylistEditModeContent(
                         )
                     }
 
-                    // "Move" Pill Button (Opens [←] [To top] [To bottom] submenu)
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -496,7 +470,6 @@ fun PlaylistEditModeContent(
                         )
                     }
 
-                    // "Remove" Pill Button
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -526,14 +499,11 @@ fun PlaylistEditModeContent(
                     }
                 }
             } else {
-                // State 3: Move Submenu ([← Back] [To top] [To bottom])
-                // Follows the exact same layout, 48dp height, circular back button, and equal-width pill buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Circular ← Back Button (returns to [✕] [Move] [Remove])
                     Box(
                         modifier = Modifier
                             .size(48.dp)
@@ -552,7 +522,6 @@ fun PlaylistEditModeContent(
                         )
                     }
 
-                    // "To top" Pill Button
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -582,7 +551,6 @@ fun PlaylistEditModeContent(
                         )
                     }
 
-                    // "To bottom" Pill Button
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -615,9 +583,6 @@ fun PlaylistEditModeContent(
             }
         }
 
-        // ==========================================
-        // DISCARD CHANGES DIALOG (Image 1)
-        // ==========================================
         DiscardChangesDialog(
             isOpen = showDiscardDialog,
             onKeepEditing = { showDiscardDialog = false },
@@ -657,9 +622,7 @@ private fun EditTrackRow(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left Column: Minus button or Checkbox
         if (!isSelectMode) {
-            // Circular Minus ⊖ (Subdued grey, matching Image 2 & 3)
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -675,7 +638,6 @@ private fun EditTrackRow(
                 )
             }
         } else {
-            // Square Checkbox ☐ / ☑ (Image 4)
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -708,7 +670,6 @@ private fun EditTrackRow(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Album Artwork with Centered Play Preview Triangle ▶
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -723,7 +684,6 @@ private fun EditTrackRow(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Centered Play Preview Triangle Overlay
             Box(
                 modifier = Modifier
                     .size(22.dp)
@@ -742,7 +702,6 @@ private fun EditTrackRow(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Title and Artist Column
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
@@ -771,7 +730,6 @@ private fun EditTrackRow(
             )
         }
 
-        // Right Handle: Sort Handle ≡ (encore_icon_sort_24) with long-press drag gesture
         Box(
             modifier = Modifier
                 .size(40.dp)

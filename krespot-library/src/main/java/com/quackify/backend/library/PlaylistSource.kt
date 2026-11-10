@@ -63,8 +63,6 @@ object PlaylistSource {
         val out = ArrayList<PlaylistChoice>()
         var skipped = 0
         var offset = 0
-        // The answer pages by 50 rows; keep pulling until the library or the
-        // folder is exhausted so big collections never silently drop rows.
         while (offset < 500) {
             val variables = JSONObject()
                 .put("offset", offset)
@@ -89,8 +87,6 @@ object PlaylistSource {
                 val entry = items.optJSONObject(i) ?: continue
                 val wrapper = entry.optJSONObject("item") ?: continue
                 val data = wrapper.optJSONObject("data") ?: continue
-                // "curates" is the answer's per-row flag for the uris the request
-                // carried: true when that playlist already holds the track.
                 val contains = entry.optBoolean("curates", false)
                 val parsed = when (wrapper.optString("__typename")) {
                     "PlaylistResponseWrapper" -> {
@@ -107,7 +103,6 @@ object PlaylistSource {
                             )
                         } else null
                     }
-                    // The pinned pseudo playlist at the root: Liked Songs.
                     "LibraryPseudoPlaylistResponseWrapper" -> {
                         if (data.optString("uri") == PlaylistChoice.LIKED_SONGS_URI) {
                             PlaylistChoice(
@@ -119,7 +114,6 @@ object PlaylistSource {
                             )
                         } else null
                     }
-                    // A library folder: picking it drills into its playlists.
                     "LibraryFolderResponseWrapper" -> {
                         val uri = data.optString("uri")
                         val name = data.optString("name")
@@ -169,7 +163,6 @@ object PlaylistSource {
             "playlist/length",
         ) ?: return -1
         val json = response.json()
-        // length sits at the top of the playlist/v2 answer next to revision.
         val count = json?.optInt("length", -1) ?: -1
         log.i("trackCount $uri -> $count http=${response.code}")
         if (count >= 0) countCache[uri] = System.currentTimeMillis() to count
@@ -193,8 +186,6 @@ object PlaylistSource {
     }
 
     suspend fun defaultName(context: Context): String {
-        // Only real playlists number the default name; folders and the liked
-        // songs entry ride along in the answer but never create one.
         val taken = editable(context, "").count { it.kind == PlaylistChoice.Kind.PLAYLIST }
         val name = "My Playlist #${taken + 1}"
         log.i("defaultName: $taken writable playlist(s), picking '$name'")

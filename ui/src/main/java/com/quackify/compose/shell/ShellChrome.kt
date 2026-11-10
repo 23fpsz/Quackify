@@ -83,8 +83,6 @@ internal fun ShellBottomBar(
             .fillMaxWidth()
             .clickable(enabled = false) {}
     ) {
-        // Offline banner (like the Spotify app's "You're offline" bar): appears
-        // above the mini player whenever the device loses its validated network.
         AnimatedVisibility(
             visible = isOffline,
             enter = fadeIn(animationSpec = tween(EncoreAnimation.ButtonDuration)) +
@@ -168,9 +166,6 @@ private fun SpotifyBottomNavItem(
     onDoubleTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    // A single tap behaves exactly like before; a second tap inside the system
-    // double-tap window also fires the double-tap action on top of it, so the
-    // search tab can focus its field without delaying every plain tap.
     val doubleTapTimeoutMillis = LocalViewConfiguration.current.doubleTapTimeoutMillis
     var lastTapAtMillis by remember { mutableLongStateOf(0L) }
     Column(

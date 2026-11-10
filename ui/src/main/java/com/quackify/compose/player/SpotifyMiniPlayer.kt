@@ -147,7 +147,6 @@ fun SpotifyMiniPlayer(
                     .padding(start = 8.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left interactive region (Cover art + Carousel container): captures horizontal swipe gestures
                 Row(
                     modifier = Modifier
                         .weight(1f)
@@ -183,7 +182,6 @@ fun SpotifyMiniPlayer(
                         },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 40dp Album Cover Art with 4dp radius (stays stationary, does not slide)
                     com.quackify.compose.components.SpotifyArtworkImage(
                         imageUrl = coverUrl,
                         contentDescription = title,
@@ -194,8 +192,6 @@ fun SpotifyMiniPlayer(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // Track title & artist container (matching Spotify CarouselView):
-                    // Bounded between artwork and buttons, strictly clipping swiping translations and marquee inside
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -275,7 +271,6 @@ fun SpotifyMiniPlayer(
                     }
                 }
 
-                // Connect device icon button (now_playing_bar_actions_button_size = 40dp)
                 val hasConnectedDevice = !connectedDeviceName.isNullOrBlank()
                 val connectIconRes = if (hasConnectedDevice) {
                     resolveDeviceIcon(connectedDeviceKind)
@@ -293,7 +288,6 @@ fun SpotifyMiniPlayer(
                     tint = connectIconTint
                 )
 
-                // Like / Heart button with signature bouncy physics (now_playing_bar_actions_button_size = 40dp)
                 EncoreHeartButton(
                     isLiked = isLiked,
                     onLikeToggle = onLikeClick,
@@ -301,7 +295,6 @@ fun SpotifyMiniPlayer(
                     iconSize = 22.dp
                 )
 
-                // Play / Pause button (now_playing_bar_actions_button_size = 40dp)
                 EncoreIconButton(
                     iconRes = if (isPlaying) R.drawable.encore_icon_pause_24 else R.drawable.encore_icon_play_24,
                     contentDescription = if (isPlaying) "Pause" else "Play",
@@ -314,7 +307,6 @@ fun SpotifyMiniPlayer(
                 )
             }
 
-            // 2dp horizontal progress indicator pinned to the bottom of the bar
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier

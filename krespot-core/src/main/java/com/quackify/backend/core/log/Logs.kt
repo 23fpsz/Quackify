@@ -171,9 +171,6 @@ object Logs {
     fun dump(): String = snapshot().joinToString("\n") { format(it) }
 
     internal fun write(module: Module, level: Level, message: String, error: Throwable?) {
-        // The in-app ring buffer follows the LogViewer toggle, but logcat
-        // always receives the line: the whole point is being able to see in
-        // Android Studio what happened while capture was off.
         if (capturing) record(module, level, message, error)
         val line = "[${module.label}] $message"
         when (level) {

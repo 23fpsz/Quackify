@@ -353,8 +353,6 @@ object Rootlist {
     suspend fun saved(context: Context, uri: String): Boolean? {
         if (uri.isBlank()) return null
         val json = read(context, "rootlist/read") ?: return null
-        // The saved set is exactly the top-level contents.items, the same
-        // rows published() walks; no need to visit every nested node.
         val items = json.optJSONObject("contents")?.optJSONArray("items")
         var count = 0
         for (i in 0 until (items?.length() ?: 0)) {
