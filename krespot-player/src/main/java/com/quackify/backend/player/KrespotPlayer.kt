@@ -30,7 +30,7 @@ private const val FILE_ID_CACHE = 64
 
 private const val SOURCE_CACHE = 8
 
-private const val DEEP_LOOKAHEAD = 2
+private const val DEEP_LOOKAHEAD = 3
 
 private const val KEY_SETTLE_MS = 300L
 
@@ -148,6 +148,8 @@ class KrespotPlayer(private val context: Context) {
     @Volatile
     private var deepTarget: String = ""
 
+    private val deepWarmed = LinkedHashSet<String>()
+
     private var resumeWrittenUri = ""
 
     private var resumeWrittenMs = -1L
@@ -174,8 +176,20 @@ class KrespotPlayer(private val context: Context) {
         manifests[trackUri] = scope.async { SourceResolver.manifest(context, spclient, trackUri) }
     }
 
-    fun prefetchAhead(tracks: List<com.quackify.backend.connect.cluster.ClusterTrack>, spclient: String) {
-        if (tracks.isEmpty() || spclient.isBlank()) return
+    fun prefetchAhead(
+        tracks: List<com.quackify.backend.connect.cluster.ClusterTrack>,
+        spclient: String,
+        nowPlaying: String = "",
+    ) {
+        val window = windowOf(tracks)
+        if (tracks.isEmpty() || spclient.isBlank()) {
+            if (window.isEmpty()) {
+                deepJob?.cancel()
+                deepTarget = ""
+            }
+            dropStaleWarmups(window, nowPlaying)
+            return
+        }
         tracks.forEach { track ->
             if (track.isAd || track.isMeta || !track.isVisible) return@forEach
             if (!track.uri.startsWith("spotify:track:")) return@forEach
@@ -186,22 +200,54 @@ class KrespotPlayer(private val context: Context) {
                 rememberFile(track.uri, file.fileId)
             }
         }
-        val target = tracks.firstOrNull { track ->
-            !track.isAd && !track.isMeta && track.isVisible && track.uri.startsWith("spotify:track:")
-        }?.uri.orEmpty()
+        val target = window.firstOrNull().orEmpty()
         if (target.isBlank()) {
             deepJob?.cancel()
             deepTarget = ""
+            dropStaleWarmups(window, nowPlaying)
             return
         }
-        if (deepJob?.isActive == true && deepTarget == target) return
+        if (deepJob?.isActive == true && deepTarget == target) {
+            dropStaleWarmups(window, nowPlaying)
+            return
+        }
         deepJob?.cancel()
         deepTarget = target
+        dropStaleWarmups(window, nowPlaying)
         deepJob = scope.launch { deepWarm(tracks, spclient) }
     }
 
+    private fun windowOf(
+        tracks: List<com.quackify.backend.connect.cluster.ClusterTrack>,
+    ): List<String> = tracks.asSequence()
+        .filter { !it.isAd && !it.isMeta && it.isVisible && it.uri.startsWith("spotify:track:") }
+        .take(DEEP_LOOKAHEAD)
+        .map { it.uri }
+        .toList()
+
     /**
-     * Resolves, licenses and preloads the next couple of tracks so advancing
+     * Frees the warm bytes of tracks the queue moved out of the deep warm window.
+     * The track the cluster just named stays: play() may not have loaded it yet.
+     */
+    private fun dropStaleWarmups(window: List<String>, nowPlaying: String) {
+        val keep = window.toHashSet()
+        val playing = _state.value.trackUri
+        val stale = synchronized(deepWarmed) {
+            val drop = deepWarmed.filter { it != playing && it != nowPlaying && it !in keep }
+            deepWarmed.removeAll(drop)
+            drop
+        }
+        if (stale.isEmpty()) return
+        stale.forEach { uri ->
+            val fileId = sourceFor(uri)?.fileId ?: fileIds[uri] ?: return@forEach
+            SegmentStore.evict(fileId)
+        }
+        log.i("dropped ${stale.size} stale warmup(s): " +
+                stale.joinToString { it.takeLast(12) })
+    }
+
+    /**
+     * Resolves, licenses and preloads the next few tracks so advancing
      * the queue starts from warm bytes instead of a cold pipeline.
      */
     private suspend fun deepWarm(
@@ -228,6 +274,7 @@ class KrespotPlayer(private val context: Context) {
                 rememberSource(track.uri, source)
                 widevine.open(source.seektable.pssh)
                 SegmentStore.warm(source, 0L)
+                synchronized(deepWarmed) { deepWarmed.add(track.uri) }
                 log.i("deep warm '${track.title}' file=${source.fileId.take(8)}")
             }
     }

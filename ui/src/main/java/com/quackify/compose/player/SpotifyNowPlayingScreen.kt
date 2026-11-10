@@ -215,6 +215,7 @@ fun SpotifyNowPlayingScreen(
     onSkipNextClick: () -> Unit,
     onSkipPreviousClick: () -> Unit,
     onLikeClick: () -> Unit,
+    onLikeLongClick: (() -> Unit)? = null,
     onShuffleClick: () -> Unit,
     onRepeatClick: () -> Unit,
     onSeek: (Float) -> Unit,
@@ -472,6 +473,7 @@ fun SpotifyNowPlayingScreen(
                             onTitleClick = onTitleClick,
                             onArtistClick = onArtistClick,
                             onLikeClick = onLikeClick,
+                            onLikeLongClick = onLikeLongClick,
                             onBanClick = onBanClick
                         )
 
@@ -659,6 +661,7 @@ fun SpotifyNowPlayingScreen(
                                 onTitleClick = onTitleClick,
                                 onArtistClick = onArtistClick,
                                 onLikeClick = onLikeClick,
+                                onLikeLongClick = onLikeLongClick,
                                 onBanClick = onBanClick
                             )
 
@@ -1141,6 +1144,7 @@ private fun NowPlayingTrackInfoRow(
     onTitleClick: () -> Unit,
     onArtistClick: () -> Unit,
     onLikeClick: () -> Unit,
+    onLikeLongClick: (() -> Unit)? = null,
     onBanClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -1196,6 +1200,7 @@ private fun NowPlayingTrackInfoRow(
             EncoreHeartButton(
                 isLiked = isLiked,
                 onLikeToggle = onLikeClick,
+                onLikeLongClick = onLikeLongClick,
                 size = 48.dp,
                 iconSize = 28.dp
             )
