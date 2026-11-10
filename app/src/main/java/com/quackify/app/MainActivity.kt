@@ -1424,8 +1424,13 @@ class MainActivity : ComponentActivity() {
                             },
                             onAddAccount = {
                                 log.i("add account tapped")
-                                SpotifyAuth.beginAddAccount(context)
-                                addingAccount = true
+                                scope.launch {
+                                    SpotifyAuth.userId(context, force = true)
+                                    SpotifyAuth.storeCurrentAccount(context)
+                                    savedAccountsList = SpotifyAuth.savedAccounts(context)
+                                    SpotifyAuth.beginAddAccount(context)
+                                    addingAccount = true
+                                }
                             },
                             onRemoveAccount = { id ->
                                 log.i("remove account tapped id=$id")
