@@ -102,8 +102,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Logs.capturing = getSharedPreferences(Logs.PREFS_NAME, MODE_PRIVATE)
-            .getBoolean(Logs.CAPTURE_PREF_KEY, false)
         if (intent?.getBooleanExtra(PlaybackService.EXTRA_OPEN_PLAYER, false) == true) {
             openPlayerSignal++
         }
