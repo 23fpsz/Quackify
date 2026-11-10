@@ -516,32 +516,7 @@ fun SpotifyPlaylistScreen(
             val pinnedTop = toolbarBottom - playButtonHalf
             val pinnedTopPx = with(density) { pinnedTop.toPx() }
 
-            var playButtonRestAnchorYInRoot by remember { mutableFloatStateOf(-1f) }
-            var chipsRowRestAnchorYInRoot by remember { mutableFloatStateOf(Float.MAX_VALUE) }
-
-            val statusBarTopPx = with(density) { statusBarTop.toPx() }
-            val toolbarHeightPx = with(density) { toolbarHeight.toPx() }
             val toolbarBottomPx = with(density) { toolbarBottom.toPx() }
-
-            val isPlayButtonSlotMeasured by remember {
-                derivedStateOf { playButtonRestAnchorYInRoot > 0f }
-            }
-            val playButtonSlotYInRoot by remember {
-                derivedStateOf {
-                    if (listState.firstVisibleItemIndex > 0 || playButtonRestAnchorYInRoot <= 0f) -1f else
-                        playButtonRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
-                }
-            }
-            val chipsRowYInRoot by remember {
-                derivedStateOf {
-                    when {
-                        listState.firstVisibleItemIndex > 1 -> -1f
-                        listState.firstVisibleItemIndex == 1 -> statusBarTopPx + toolbarHeightPx - listState.firstVisibleItemScrollOffset
-                        chipsRowRestAnchorYInRoot != Float.MAX_VALUE -> chipsRowRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
-                        else -> Float.MAX_VALUE
-                    }
-                }
-            }
             val chipsScrollState = rememberScrollState()
 
             // Dynamic top offset for header:
@@ -551,62 +526,35 @@ fun SpotifyPlaylistScreen(
             val dynamicTopOffsetDp = (toolbarHeight - 8.dp) * (1f - searchProgress)
             val dynamicTopOffsetPx = with(density) { dynamicTopOffsetDp.toPx().toInt() }
 
-            val isHeaderOffScreen by remember {
-                derivedStateOf { listState.firstVisibleItemIndex > 0 }
-            }
-
-            val dockDistancePx by remember {
-                derivedStateOf {
-                    if (isHeaderOffScreen) {
-                        0f
-                    } else if (isPlayButtonSlotMeasured) {
-                        (playButtonSlotYInRoot - pinnedTopPx).coerceAtLeast(0f)
-                    } else {
-                        with(density) { 300.dp.toPx() }
-                    }
-                }
-            }
-            val dockThresholdPx = with(density) { 56.dp.toPx() }
-            val dockFraction by remember {
-                derivedStateOf { (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f) }
+            val playDockStartPx = with(density) { 290.dp.toPx() }
+            val playFadePx = with(density) { 50.dp.toPx() }
+            val playFraction by remember {
+                derivedStateOf { ((scrollPx - playDockStartPx) / playFadePx).coerceIn(0f, 1f) }
             }
 
             val topBarThreeDotsAlpha by remember {
-                derivedStateOf { if (isHeaderOffScreen) 0f else dockFraction }
+                derivedStateOf { 1f - playFraction }
             }
             val topBarTitleAlpha by remember {
                 derivedStateOf {
-                    if (isHeaderOffScreen) {
-                        1f
-                    } else {
-                        val titleScrollStartPx = with(density) { 160.dp.toPx() }
-                        val titleScrollFadeRangePx = with(density) { 60.dp.toPx() }
-                        ((listState.firstVisibleItemScrollOffset.toFloat() - titleScrollStartPx) / titleScrollFadeRangePx).coerceIn(0f, 1f)
-                    }
+                    val titleScrollStartPx = with(density) { 160.dp.toPx() }
+                    val titleScrollFadeRangePx = with(density) { 60.dp.toPx() }
+                    ((scrollPx - titleScrollStartPx) / titleScrollFadeRangePx).coerceIn(0f, 1f)
                 }
             }
             val topBarAlpha by remember {
                 derivedStateOf {
-                    if (isHeaderOffScreen) {
-                        1f
-                    } else {
-                        (listState.firstVisibleItemScrollOffset.toFloat() / with(density) { 90.dp.toPx() }).coerceIn(0f, 1f)
-                    }
+                    (scrollPx / with(density) { 90.dp.toPx() }).coerceIn(0f, 1f)
                 }
             }
             val circleBtnAlpha by remember {
                 derivedStateOf { ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f) }
             }
 
+            val approxHeaderBottomPx = with(density) { (470.dp + currentSearchHeightDp).toPx() }
             val currentGradientHeightDp by remember {
                 derivedStateOf {
-                    if (isHeaderOffScreen) {
-                        toolbarBottom
-                    } else if (chipsRowYInRoot != Float.MAX_VALUE && chipsRowYInRoot > 0f) {
-                        maxOf(toolbarBottom, with(density) { chipsRowYInRoot.toDp() })
-                    } else {
-                        470.dp + currentSearchHeightDp
-                    }
+                    maxOf(toolbarBottom, with(density) { (approxHeaderBottomPx - scrollPx).toDp() })
                 }
             }
 
@@ -1022,27 +970,19 @@ fun SpotifyPlaylistScreen(
                                         )
                                     }
 
-                                    // Play Button Slot: rendered directly in the Action Controls row
                                     Box(
                                         modifier = Modifier
                                             .size(playButtonSize)
-                                            .onGloballyPositioned { coords ->
-                                                if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
-                                                    playButtonRestAnchorYInRoot = coords.positionInRoot().y
-                                                }
-                                            },
+                                            .graphicsLayer { alpha = 1f - playFraction },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        // Visible directly in the row whenever below the top bar
-                                        if (!isPlayButtonSlotMeasured || playButtonSlotYInRoot > toolbarBottomPx) {
-                                            EncorePlayButton(
-                                                isPlaying = isPlaying,
-                                                onClick = onPlayPauseClick,
-                                                size = playButtonSize,
-                                                iconSize = 24.dp,
-                                                showShuffleBadge = false
-                                            )
-                                        }
+                                        EncorePlayButton(
+                                            isPlaying = isPlaying,
+                                            onClick = onPlayPauseClick,
+                                            size = playButtonSize,
+                                            iconSize = 24.dp,
+                                            showShuffleBadge = false
+                                        )
                                     }
                                 }
                             }
@@ -1055,16 +995,11 @@ fun SpotifyPlaylistScreen(
 
                 // In-List Filter Chips Bar matching Spotify specs:
                 if (displayedTracks.isNotEmpty() && isEditable) {
-                    item(key = "filter_chips_row") {
+                    stickyHeader(key = "filter_chips_row") {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color(0xFF121212))
-                            .onGloballyPositioned { coords ->
-                                if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
-                                    chipsRowRestAnchorYInRoot = coords.positionInRoot().y
-                                }
-                            }
                             .padding(vertical = 8.dp)
                     ) {
                         PlaylistChipsRow(
@@ -1359,20 +1294,14 @@ fun SpotifyPlaylistScreen(
                 }
             }
 
-            // Pinned Play Button (matching Spotify ComposePlayButtonBehavior):
-            // Floats above top bar at zIndex(20f) as soon as it reaches toolbar, docking at pinnedTopPx
-            if (isPlayButtonSlotMeasured && (playButtonSlotYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
-                val targetY = if (isHeaderOffScreen || playButtonSlotYInRoot < pinnedTopPx) {
-                    pinnedTopPx
-                } else {
-                    playButtonSlotYInRoot
-                }
+            if (playFraction > 0f) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(end = 16.dp)
                         .graphicsLayer {
-                            translationY = targetY
+                            translationY = pinnedTopPx
+                            alpha = playFraction
                         }
                         .zIndex(20f)
                 ) {
@@ -1388,30 +1317,6 @@ fun SpotifyPlaylistScreen(
 
             // Pinned Filter Chips Bar directly below the Top Bar:
             // Locks at toolbarBottom as soon as list scrolls beneath the top bar
-            if (displayedTracks.isNotEmpty() && isEditable && (chipsRowYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .graphicsLayer {
-                            translationY = toolbarBottomPx
-                        }
-                        .background(Color(0xFF121212))
-                        .zIndex(9f)
-                        .padding(vertical = 8.dp)
-                ) {
-                    PlaylistChipsRow(
-                        scrollState = chipsScrollState,
-                        onAddClick = {
-                            scope.launch {
-                                listState.animateScrollToItem(displayedTracks.size + 2)
-                            }
-                        },
-                        onEditClick = { isEditMode = true; onEditModeChange(true) },
-                        onNameDetailsClick = { isEditDetailsOpen = true }
-                    )
-                }
-            }
         }
     }
 }
