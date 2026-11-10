@@ -82,6 +82,8 @@ fun TrackOptionsSheet(
     /** null while the taste-profile check is still loading (row hidden). */
     isTasteExcluded: Boolean? = null,
     onToggleTasteExclusion: (Boolean) -> Unit = {},
+    onRemoveFromPlaylist: (() -> Unit)? = null,
+    onSongRadio: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || track == null) return
@@ -264,6 +266,17 @@ fun TrackOptionsSheet(
             )
 
             // Context Menu List Items (matching Spotify decompiled strings & icons)
+            if (onRemoveFromPlaylist != null) {
+                ContextMenuRowItem(
+                    title = "Remove from this playlist",
+                    iconRes = R.drawable.encore_icon_minus_alt_24,
+                    onClick = {
+                        onDismiss()
+                        onRemoveFromPlaylist()
+                    }
+                )
+            }
+
             ContextMenuRowItem(
                 title = "Hide this song",
                 iconRes = R.drawable.encore_icon_ban_24,
@@ -299,6 +312,17 @@ fun TrackOptionsSheet(
                     onAddToPlaylist()
                 }
             )
+
+            if (onSongRadio != null) {
+                ContextMenuRowItem(
+                    title = "Go to song radio",
+                    iconRes = R.drawable.encore_icon_radio_24,
+                    onClick = {
+                        onDismiss()
+                        onSongRadio()
+                    }
+                )
+            }
 
             ContextMenuRowItem(
                 title = "Go to artist",

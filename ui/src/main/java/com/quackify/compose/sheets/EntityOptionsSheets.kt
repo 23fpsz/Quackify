@@ -49,6 +49,8 @@ fun AlbumOptionsSheet(
     onAddToLibrary: () -> Unit = {},
     onDownload: () -> Unit = {},
     onAddToQueue: () -> Unit = {},
+    onAddToPlaylist: (() -> Unit)? = null,
+    onAlbumRadio: (() -> Unit)? = null,
     onGoToArtist: (String) -> Unit = {},
     onShare: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -149,6 +151,28 @@ fun AlbumOptionsSheet(
                     onAddToQueue()
                 }
             )
+
+            if (onAddToPlaylist != null) {
+                ContextMenuRowItem(
+                    title = "Add to playlist",
+                    iconRes = R.drawable.encore_icon_add_to_playlist_24,
+                    onClick = {
+                        onDismiss()
+                        onAddToPlaylist()
+                    }
+                )
+            }
+
+            if (onAlbumRadio != null) {
+                ContextMenuRowItem(
+                    title = "Go to album radio",
+                    iconRes = R.drawable.encore_icon_radio_24,
+                    onClick = {
+                        onDismiss()
+                        onAlbumRadio()
+                    }
+                )
+            }
 
             ContextMenuRowItem(
                 title = "Go to artist",
@@ -279,7 +303,7 @@ fun ArtistOptionsSheet(
 
             ContextMenuRowItem(
                 title = "Go to artist radio",
-                iconRes = R.drawable.encore_icon_tune_24,
+                iconRes = R.drawable.encore_icon_radio_24,
                 onClick = {
                     onDismiss()
                     onGoToRadio()

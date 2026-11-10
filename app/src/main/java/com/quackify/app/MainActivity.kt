@@ -1137,6 +1137,15 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             },
+                            onRemoveTrackFromPlaylist = { pUri, tUri ->
+                                scope.launch {
+                                    val ok = Krespot.playlists.removeTrack(context, pUri, tUri)
+                                    log.i("remove track '$tUri' from playlist '$pUri' ok=$ok")
+                                    if (ok && pUri == playlistUri) {
+                                        playlistTracks = playlistTracks?.filterNot { it.uri == tUri }
+                                    }
+                                }
+                            },
                             onRemoveLibraryItem = { uri ->
                                 scope.launch {
                                     val ok = if (uri.startsWith("spotify:playlist:")) {

@@ -117,6 +117,10 @@ internal fun ShellSheets(
     onRemoveFromQueue: (TrackItem) -> Unit,
     onClearQueue: () -> Unit,
     onSleepTimerSelected: (SleepTimerOption) -> Unit,
+    onRemoveTrackFromPlaylist: (() -> Unit)? = null,
+    onSongRadio: (() -> Unit)? = null,
+    onAlbumRadio: (() -> Unit)? = null,
+    onAddToPlaylistFromAlbum: (() -> Unit)? = null,
 ) {
     ProfileDrawerSheet(
         isOpen = flags.profileDrawer,
@@ -157,7 +161,9 @@ internal fun ShellSheets(
         isCanvasEnabled = isCanvasEnabled,
         onCanvasToggle = onCanvasToggle,
         isTasteExcluded = trackTasteExcluded,
-        onToggleTasteExclusion = onToggleTasteExclusion
+        onToggleTasteExclusion = onToggleTasteExclusion,
+        onRemoveFromPlaylist = onRemoveTrackFromPlaylist,
+        onSongRadio = onSongRadio
     )
 
     EntityOptionsSheet(
@@ -181,6 +187,8 @@ internal fun ShellSheets(
         isOpen = flags.albumOptions,
         onDismiss = onDismissAlbumOptions,
         onGoToArtist = onGoToArtist,
+        onAddToPlaylist = onAddToPlaylistFromAlbum,
+        onAlbumRadio = onAlbumRadio,
         onShare = { albumUri.takeIf { it.startsWith("spotify:album:") }?.let(onShare) }
     )
 
