@@ -56,6 +56,7 @@ import com.quackify.compose.components.LibraryGridSkeleton
 import com.quackify.compose.components.LibraryListSkeleton
 import com.quackify.compose.components.SpotifyArtworkImage
 import com.quackify.compose.sheets.LibrarySortOption
+import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import com.quackify.compose.theme.SpotifyTheme
@@ -103,6 +104,7 @@ fun SpotifyLibraryScreen(
     onItemLongPress: (LibraryItem) -> Unit = {},
     onFolderClick: (LibraryItem) -> Unit = {},
     currentSort: LibrarySortOption = LibrarySortOption.RECENTS,
+    sortDirection: SortDirection = SortDirection.DESCENDING,
     loading: Boolean = false,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
@@ -123,7 +125,7 @@ fun SpotifyLibraryScreen(
     val filters = listOf("Playlists", "Podcasts", "Albums", "Artists", "Downloaded")
 
     val allLibraryItems = items.orEmpty()
-    val filteredItems = remember(allLibraryItems, selectedFilter, searchFilterText, currentSort) {
+    val filteredItems = remember(allLibraryItems, selectedFilter, searchFilterText, currentSort, sortDirection) {
         var result = allLibraryItems.filter { item ->
             val matchesFilter = when (selectedFilter) {
                 "Playlists" -> item.type == LibraryItemType.PLAYLIST || item.type == LibraryItemType.FOLDER
@@ -141,9 +143,34 @@ fun SpotifyLibraryScreen(
 
         // Apply sort
         result = when (currentSort) {
-            LibrarySortOption.ALPHABETICAL -> result.sortedBy { it.title }
-            LibrarySortOption.CREATOR -> result.sortedBy { it.subtitle }
-            else -> result // Recents / Recently added keeps default pinned order
+            LibrarySortOption.ALPHABETICAL -> {
+                if (sortDirection == SortDirection.ASCENDING) {
+                    result.sortedBy { it.title.lowercase() }
+                } else {
+                    result.sortedByDescending { it.title.lowercase() }
+                }
+            }
+            LibrarySortOption.CREATOR -> {
+                if (sortDirection == SortDirection.ASCENDING) {
+                    result.sortedBy { it.subtitle.lowercase() }
+                } else {
+                    result.sortedByDescending { it.subtitle.lowercase() }
+                }
+            }
+            LibrarySortOption.RECENTLY_ADDED -> {
+                if (sortDirection == SortDirection.DESCENDING) {
+                    result
+                } else {
+                    result.reversed()
+                }
+            }
+            LibrarySortOption.RECENTS -> {
+                if (sortDirection == SortDirection.DESCENDING) {
+                    result
+                } else {
+                    result.reversed()
+                }
+            }
         }
         result
     }
@@ -388,6 +415,21 @@ fun SpotifyLibraryScreen(
                             text = currentSort.displayName,
                             style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
                         )
+                        if (currentSort.reversible) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                painter = painterResource(
+                                    id = if (sortDirection == SortDirection.ASCENDING) {
+                                        R.drawable.encore_icon_arrow_up_24
+                                    } else {
+                                        R.drawable.encore_icon_arrow_down_24
+                                    }
+                                ),
+                                contentDescription = if (sortDirection == SortDirection.ASCENDING) "Sorted ascending" else "Sorted descending",
+                                tint = EncoreColors.TextPrimary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
                     }
 
                     // Grid / List View Toggle Button

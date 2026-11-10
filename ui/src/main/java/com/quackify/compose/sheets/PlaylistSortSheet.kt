@@ -34,15 +34,16 @@ import com.quackify.compose.theme.SpotifyTheme
 /**
  * Spotify Playlist Sort Bottom Sheet matching decompiled specs:
  * - sort_filter_bottom_sheet_layout.xml
- * - Options: Custom order, Title, Artist, Recently added
- * - Active option highlighted in Encore Green with encore_icon_check_24
+ * - Options: Custom order, Title, Artist, Album, Recently added
+ * - Active option highlighted in Encore Green with direction arrow (for reversible) or checkmark (for non-reversible)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaylistSortSheet(
     isOpen: Boolean,
     currentSort: PlaylistSort,
-    onSortSelected: (PlaylistSort) -> Unit,
+    currentDirection: SortDirection = SortDirection.ASCENDING,
+    onSortSelected: (PlaylistSort, SortDirection) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -91,8 +92,12 @@ fun PlaylistSortSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            onSortSelected(option)
-                            onDismiss()
+                            val newDirection = if (isSelected && option.reversible) {
+                                currentDirection.toggle()
+                            } else {
+                                option.defaultDirection
+                            }
+                            onSortSelected(option, newDirection)
                         }
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -108,12 +113,27 @@ fun PlaylistSortSheet(
                     )
 
                     if (isSelected) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.encore_icon_check_24),
-                            contentDescription = "Selected",
-                            tint = EncoreColors.Green,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        if (option.reversible) {
+                            Icon(
+                                painter = painterResource(
+                                    id = if (currentDirection == SortDirection.ASCENDING) {
+                                        R.drawable.encore_icon_arrow_up_24
+                                    } else {
+                                        R.drawable.encore_icon_arrow_down_24
+                                    }
+                                ),
+                                contentDescription = if (currentDirection == SortDirection.ASCENDING) "Sorted ascending" else "Sorted descending",
+                                tint = EncoreColors.Green,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_check_24),
+                                contentDescription = "Selected",
+                                tint = EncoreColors.Green,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
