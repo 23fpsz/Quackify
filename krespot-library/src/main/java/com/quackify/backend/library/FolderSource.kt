@@ -144,8 +144,11 @@ object FolderSource {
             log.w("moveIntoFolder: target folder $hash sits inside the source block [$from..${from + length - 1}]")
             return false
         }
-        log.i("moveIntoFolder $uri from=$from length=$length to=$end endGroup=$end")
-        return Rootlist.move(context, from, end, length, snap.revision)
+        val to = if (from < end) end - length else end
+        log.i(
+            "moveIntoFolder $uri from=$from length=$length intoEndGroup=$end spliceToIndex=$to"
+        )
+        return Rootlist.move(context, from, to, length, snap.revision)
     }
 
     suspend fun removeFromFolder(context: Context, uri: String): Boolean {
