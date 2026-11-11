@@ -295,6 +295,12 @@ class PlaybackBridge(private val context: Context) {
         }
 
         override fun onPlayUri(uri: String) {
+            val enhanced = enhancedQueue(chainContext)
+            val at = enhanced.indexOfFirst { it.uri == uri }
+            if (at >= 0) {
+                scope.launch { playTrack(uri, chainContext, at) }
+                return
+            }
             val context = screenContext(uri)
             captureChain(context)
             scope.launch {
@@ -923,14 +929,18 @@ class PlaybackBridge(private val context: Context) {
         if (row == null) return
         scope.launch {
             val lens = resolveLens(contextUri) ?: return@launch
-            val ok = SmartShuffleSource.tap(
+            val rows = SmartShuffleSource.tap(
                 context,
                 SpotifyAuth.token(context),
                 connect.spclientHost,
                 lens,
                 row.uid.ifBlank { uid },
             )
-            log.i("smart shuffle tap on '${uri.takeLast(12)}' ok=$ok")
+            log.i("smart shuffle tap on '${uri.takeLast(12)}' ok=${rows.isNotEmpty()} rows=${rows.size}")
+            if (rows.isNotEmpty()) {
+                enhancedRows = rows
+                publishQueue(connect.cluster.value)
+            }
         }
     }
 
@@ -1691,6 +1701,8 @@ class PlaybackBridge(private val context: Context) {
             player.prefetch(uri, connect.spclientHost)
         }
         sendSmartTap(uri, uid)
+        val enhancedNow = enhancedQueue(context).any { it.uri == uri && it.enhanced }
+        if (state.isEnhanced != enhancedNow) state = state.copy(isEnhanced = enhancedNow)
         val remote = remoteTarget()
         if (remote.isNotBlank()) {
             markPending(uri, index, context)
@@ -2348,7 +2360,8 @@ class PlaybackBridge(private val context: Context) {
             emptyList()
         }
         val tailUris = if (enhancedTail.isNotEmpty()) enhancedTail else chainTail
-        val sparse = (serverRows + queued).filter { it.title.isBlank() }.map { it.uri }
+        val sparse = ((if (enhancedTail.isNotEmpty()) emptyList() else serverRows) + queued)
+            .filter { it.title.isBlank() }.map { it.uri }
         val missing = (sparse + tailUris.filterNot { it in knownUpcoming })
             .filterNot { decorated.containsKey(it) || it in undecoratable }
             .distinct()
@@ -2357,9 +2370,13 @@ class PlaybackBridge(private val context: Context) {
             (decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri))
                 .copy(isEnhanced = enhanced.firstOrNull { it.uri == uri }?.enhanced == true)
         }
-        val upcoming = (serverRows.map { if (it.title.isBlank()) decorated[it.uri] ?: it else it } +
+        val upcoming = if (enhancedTail.isNotEmpty()) {
+            tailRowsFilled
+        } else {
+            (serverRows.map { if (it.title.isBlank()) decorated[it.uri] ?: it else it } +
                 tailRowsFilled)
-            .filterNot { it.uri == anchor }
+                .filterNot { it.uri == anchor }
+        }
         if (queued == state.queue && upcoming == state.queueFromContext &&
             context == state.queueContext && label == state.queueContextLabel
         ) {
