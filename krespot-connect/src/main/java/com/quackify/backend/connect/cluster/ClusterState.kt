@@ -10,6 +10,7 @@ private const val DELIMITER = "spotify:delimiter"
 private const val META_PREFIX = "spotify:meta:"
 
 internal const val QUEUE_PROVIDER = "queue"
+internal const val ENHANCED_PROVIDER = "enhanced_recommendation"
 
 private const val LOCAL_ORIGIN = "local"
 
@@ -64,6 +65,8 @@ data class ClusterTrack(
 
     val isQueued: Boolean get() = queued || provider == QUEUE_PROVIDER
 
+    val isEnhanced: Boolean get() = provider == ENHANCED_PROVIDER
+
     val isAutoplay: Boolean get() = provider == AUTOPLAY_PROVIDER
 
     val isVisible: Boolean get() = !hidden && !hiddenInQueue && !removed && !isMeta
@@ -92,6 +95,11 @@ data class ClusterState(
     val shuffle: Boolean = false,
     val repeatContext: Boolean = false,
     val repeatTrack: Boolean = false,
+    val enhancement: String = "",
+    val canShuffle: Boolean = true,
+    val canRepeatContext: Boolean = true,
+    val canRepeatTrack: Boolean = true,
+    val canSmartShuffle: Boolean = false,
     /** Server clock of the snapshot this state was taken at, in ms. */
     val stateAtMs: Long = 0L,
 ) {
@@ -180,6 +188,15 @@ private fun JSONObject.long(name: String): Long = text(name).toLongOrNull() ?: 0
 
 private fun JSONObject.bool(name: String): Boolean = text(name).equals("true", ignoreCase = true)
 
+private fun allowed(reasons: org.json.JSONArray?): Boolean {
+    if (reasons == null) return true
+    for (i in 0 until reasons.length()) {
+        val reason = reasons.optString(i)
+        if (reason.isNotBlank() && reason != "already_set") return false
+    }
+    return true
+}
+
 private fun parseTrack(node: JSONObject?): ClusterTrack? {
     if (node == null) return null
     val metadata = node.optJSONObject("metadata") ?: JSONObject()
@@ -261,6 +278,17 @@ object ClusterParser {
             shuffle = options.bool("shuffling_context"),
             repeatContext = options.bool("repeating_context"),
             repeatTrack = options.bool("repeating_track"),
+            enhancement = options.optJSONObject("modes")?.text("context_enhancement").orEmpty(),
+            canShuffle = allowed(restrictions?.optJSONArray("disallow_toggling_shuffle_reasons")),
+            canRepeatContext = allowed(restrictions?.optJSONArray("disallow_toggling_repeat_context_reasons")),
+            canRepeatTrack = allowed(restrictions?.optJSONArray("disallow_toggling_repeat_track_reasons")),
+            canSmartShuffle = allowed(
+                restrictions?.optJSONObject("disallow_setting_modes")
+                    ?.optJSONObject("context_enhancement")
+                    ?.optJSONObject("values")
+                    ?.optJSONObject("RECOMMENDATION")
+                    ?.optJSONArray("reasons"),
+            ),
             stateAtMs = player.optLong("timestamp", 0L),
         )
     }

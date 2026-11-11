@@ -317,6 +317,7 @@ class KrespotConnect(private val context: Context) {
         shuffle: Boolean = false,
         repeatContext: Boolean = false,
         repeatTrack: Boolean = false,
+        enhancement: String = "",
         queueRevision: String = "",
         nextRows: List<ClusterTrack> = emptyList(),
     ): Boolean {
@@ -330,7 +331,7 @@ class KrespotConnect(private val context: Context) {
         val state = withContext(Dispatchers.Default) {
             localPlayerState(
                 track, contextUri, contextIndex, positionMs, playing, durationMs,
-                shuffle, repeatContext, repeatTrack, queueRevision, nextRows,
+                shuffle, repeatContext, repeatTrack, enhancement, queueRevision, nextRows,
             )
         }
         val response = Registration.connectState(
@@ -381,6 +382,7 @@ class KrespotConnect(private val context: Context) {
         shuffle: Boolean,
         repeatContext: Boolean,
         repeatTrack: Boolean,
+        enhancement: String,
         queueRevision: String,
         nextRows: List<ClusterTrack>,
     ): JSONObject {
@@ -445,7 +447,14 @@ class KrespotConnect(private val context: Context) {
                 JSONObject()
                     .put("shuffling_context", shuffle)
                     .put("repeating_context", repeatContext)
-                    .put("repeating_track", repeatTrack),
+                    .put("repeating_track", repeatTrack)
+                    .put(
+                        "modes",
+                        JSONObject().put(
+                            "context_enhancement",
+                            enhancement.ifBlank { "NONE" },
+                        ),
+                    ),
             )
             .put("suppressions", JSONObject())
             .put("queue_revision", queueRevision)
@@ -674,16 +683,26 @@ class KrespotConnect(private val context: Context) {
     }
 
     /** Turns context shuffle on/off on the target device (blank = this one). */
-    suspend fun setShuffleOn(targetDeviceId: String, value: Boolean): Boolean {
+    suspend fun setShuffleOn(targetDeviceId: String, value: Boolean, smart: Boolean = false): Boolean {
         if (spclient.isBlank()) {
             log.w("shuffle: the dealer is not connected yet")
             return false
         }
         val target = targetDeviceId.ifBlank { deviceId }
-        val response = CommandClient.setPlayerOption(
-            context, spclient, deviceId, target, CommandClient.ENDPOINT_SHUFFLE, value,
+        val response = CommandClient.setOptions(
+            context, spclient, deviceId, target,
+            shuffle = value,
+            enhancement = if (smart) CommandClient.ENHANCEMENT_SMART else CommandClient.ENHANCEMENT_NONE,
         )
-        return response?.ok == true
+        val ok = response?.ok == true
+        if (ok && smart) {
+            val cluster = _cluster.value
+            val contextUri = cluster?.contextUri.orEmpty()
+            if (contextUri.isNotBlank()) {
+                CommandClient.updateContext(context, spclient, deviceId, target, contextUri, "enhance")
+            }
+        }
+        return ok
     }
 
     /** Sets the repeat options on the target device (blank = this one). */
@@ -697,13 +716,12 @@ class KrespotConnect(private val context: Context) {
             return false
         }
         val target = targetDeviceId.ifBlank { deviceId }
-        val contextResponse = CommandClient.setPlayerOption(
-            context, spclient, deviceId, target, CommandClient.ENDPOINT_REPEAT_CONTEXT, repeatContext,
+        val response = CommandClient.setOptions(
+            context, spclient, deviceId, target,
+            repeatContext = repeatContext,
+            repeatTrack = repeatTrack,
         )
-        val trackResponse = CommandClient.setPlayerOption(
-            context, spclient, deviceId, target, CommandClient.ENDPOINT_REPEAT_TRACK, repeatTrack,
-        )
-        return (contextResponse?.ok ?: false) && (trackResponse?.ok ?: false)
+        return response?.ok == true
     }
 
     suspend fun setVolumeOn(targetDeviceId: String, level: Int): Boolean {

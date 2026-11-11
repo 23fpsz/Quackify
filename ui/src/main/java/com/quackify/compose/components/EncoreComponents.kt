@@ -521,7 +521,8 @@ fun EncoreSmartShuffleButton(
     mode: ShuffleMode,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 40.dp
+    size: Dp = 40.dp,
+    enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -536,7 +537,11 @@ fun EncoreSmartShuffleButton(
     } else {
         R.drawable.encore_icon_shuffle_24
     }
-    val tint = if (isActive) EncoreColors.Green else EncoreColors.TextSecondary
+    val tint = when {
+        !enabled -> EncoreColors.TextDisabled
+        isActive -> EncoreColors.Green
+        else -> EncoreColors.TextSecondary
+    }
 
     Box(
         modifier = modifier
@@ -546,6 +551,7 @@ fun EncoreSmartShuffleButton(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                enabled = enabled,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -589,7 +595,8 @@ fun EncoreRepeatButton(
     mode: RepeatMode,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 40.dp
+    size: Dp = 40.dp,
+    enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -604,7 +611,11 @@ fun EncoreRepeatButton(
     } else {
         R.drawable.encore_icon_repeat_24
     }
-    val tint = if (isActive) EncoreColors.Green else EncoreColors.TextSecondary
+    val tint = when {
+        !enabled -> EncoreColors.TextDisabled
+        isActive -> EncoreColors.Green
+        else -> EncoreColors.TextSecondary
+    }
 
     Box(
         modifier = modifier
@@ -614,6 +625,7 @@ fun EncoreRepeatButton(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                enabled = enabled,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center

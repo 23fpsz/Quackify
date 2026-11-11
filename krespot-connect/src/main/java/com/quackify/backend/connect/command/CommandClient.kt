@@ -230,6 +230,76 @@ object CommandClient {
     const val ENDPOINT_SHUFFLE = "set_shuffling_context"
     const val ENDPOINT_REPEAT_CONTEXT = "set_repeating_context"
     const val ENDPOINT_REPEAT_TRACK = "set_repeating_track"
+    const val ENDPOINT_SET_OPTIONS = "set_options"
+    const val ENDPOINT_UPDATE_CONTEXT = "update_context"
+    const val ENHANCEMENT_NONE = "NONE"
+    const val ENHANCEMENT_SMART = "RECOMMENDATION"
+
+    /**
+     * One set_options command carrying every mode that changed: shuffling_context,
+     * repeating_context, repeating_track and the context_enhancement mode that
+     * stands for smart shuffle. Blank booleans stay out of the payload.
+     */
+    suspend fun setOptions(
+        context: Context,
+        spclient: String,
+        localDeviceId: String,
+        targetDeviceId: String,
+        shuffle: Boolean? = null,
+        enhancement: String? = null,
+        repeatContext: Boolean? = null,
+        repeatTrack: Boolean? = null,
+    ): Net.Response? {
+        val command = JSONObject()
+        if (shuffle != null) command.put("shuffling_context", shuffle)
+        if (enhancement != null || shuffle != null) {
+            val modes = JSONObject()
+            if (enhancement != null) modes.put("context_enhancement", enhancement)
+            if (modes.length() > 0) command.put("modes", modes)
+        }
+        if (repeatContext != null) command.put("repeating_context", repeatContext)
+        if (repeatTrack != null) command.put("repeating_track", repeatTrack)
+        command
+            .put("logging_params", JSONObject().put("command_id", commandId()))
+            .put("endpoint", ENDPOINT_SET_OPTIONS)
+        val to = targetDeviceId.ifBlank { localDeviceId }
+        val url = "https://$spclient/connect-state/v1/player/command/from/$localDeviceId/to/$to"
+        val body = JSONObject().put("command", command).toString()
+        val response = Net.postJson(url, body, ConnectHeaders.of(context), tag = ENDPOINT_SET_OPTIONS)
+        log.i(
+            "set_options shuffle=$shuffle enhancement=$enhancement " +
+                "repeatContext=$repeatContext repeatTrack=$repeatTrack on ${to.take(8)} -> ${response?.code ?: "no response"}"
+        )
+        return response
+    }
+
+    /**
+     * Tells the server to (re)read the playback context through a lens: the
+     * smart shuffle flow points the context url at
+     * 'context://{uri}?spotify-apply-lenses=enhance' so the queue picks up the
+     * enhanced rows the lens adds.
+     */
+    suspend fun updateContext(
+        context: Context,
+        spclient: String,
+        localDeviceId: String,
+        targetDeviceId: String,
+        contextUri: String,
+        lens: String? = null,
+    ): Net.Response? {
+        val url = if (lens.isNullOrBlank()) "context://$contextUri"
+        else "context://$contextUri?spotify-apply-lenses=$lens"
+        val command = JSONObject()
+            .put("context", JSONObject().put("url", url))
+            .put("logging_params", JSONObject().put("command_id", commandId()))
+            .put("endpoint", ENDPOINT_UPDATE_CONTEXT)
+        val to = targetDeviceId.ifBlank { localDeviceId }
+        val endpoint = "https://$spclient/connect-state/v1/player/command/from/$localDeviceId/to/$to"
+        val body = JSONObject().put("command", command).toString()
+        val response = Net.postJson(endpoint, body, ConnectHeaders.of(context), tag = ENDPOINT_UPDATE_CONTEXT)
+        log.i("update_context '${contextUri.takeLast(20)}' lens=$lens on ${to.take(8)} -> ${response?.code ?: "no response"}")
+        return response
+    }
 
     const val RESTORE = "restore"
     const val VOLUME_MAX = 65535

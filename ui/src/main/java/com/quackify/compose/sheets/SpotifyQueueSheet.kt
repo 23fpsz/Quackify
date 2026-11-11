@@ -259,6 +259,16 @@ private fun QueueTrackRow(
                 if (track.isExplicit) {
                     EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
                 }
+                if (track.isEnhanced) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_enhance_badge_16),
+                        contentDescription = "Smart Shuffle recommendation",
+                        tint = EncoreColors.Green,
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .size(12.dp)
+                    )
+                }
                 Text(
                     text = track.artist,
                     style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),

@@ -81,7 +81,7 @@ fun CanvasVideoPlayer(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
-                log.w(
+                log.d(
                     "canvas state=$playbackState posMs=${player.currentPosition} " +
                         "durMs=${player.duration}"
                 )
@@ -92,7 +92,7 @@ fun CanvasVideoPlayer(
                 newPosition: Player.PositionInfo,
                 reason: Int,
             ) {
-                log.w(
+                log.d(
                     "canvas jump ${oldPosition.positionMs} -> ${newPosition.positionMs} " +
                         "reason=$reason"
                 )
@@ -215,10 +215,9 @@ private class CanvasVideoRenderer(
         joining: Boolean,
         sampleStreamIsResetToKeyFrame: Boolean,
     ) {
-        log.w(
+        log.d(
             "canvas position reset posUs=$positionUs joining=$joining " +
-                "toKeyFrame=$sampleStreamIsResetToKeyFrame",
-            Exception("canvas reset trace"),
+                "toKeyFrame=$sampleStreamIsResetToKeyFrame"
         )
         super.onPositionReset(positionUs, joining, sampleStreamIsResetToKeyFrame)
     }

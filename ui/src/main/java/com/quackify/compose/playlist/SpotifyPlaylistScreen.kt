@@ -114,7 +114,8 @@ data class TrackItem(
     val albumName: String = "",
     val discNumber: Int = 1,
     val trackNumber: Int = 0,
-    val hasVideo: Boolean = false
+    val hasVideo: Boolean = false,
+    val isEnhanced: Boolean = false,
 )
 
 private val trackSearchEngine = GenericSearchEngine<TrackItem>(maxResult = Int.MAX_VALUE)

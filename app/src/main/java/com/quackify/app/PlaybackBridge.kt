@@ -45,7 +45,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.filter
 import androidx.compose.runtime.snapshotFlow
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.library.Krespot
+import com.quackify.backend.library.SmartShuffleSource
 import com.quackify.backend.library.TrackSource
 import com.quackify.backend.api.Library
 import android.os.SystemClock
@@ -163,6 +165,15 @@ class PlaybackBridge(private val context: Context) {
 
     @Volatile
     private var pendingModeAt = 0L
+
+    @Volatile
+    private var pendingSmart: Boolean? = null
+
+    @Volatile
+    private var enhanceLens = ""
+
+    @Volatile
+    private var enhanceLensFor = ""
 
     private val decorated = java.util.concurrent.ConcurrentHashMap<String, TrackItem>()
 
@@ -767,46 +778,166 @@ class PlaybackBridge(private val context: Context) {
         return cluster?.repeatTrack == true
     }
 
-    private fun rememberModes(shuffle: Boolean?, repeatContext: Boolean?, repeatTrack: Boolean?) {
-        pendingShuffle = shuffle
-        pendingRepeatContext = repeatContext
-        pendingRepeatTrack = repeatTrack
-        pendingModeAt = if (shuffle != null || repeatContext != null || repeatTrack != null) {
-            System.currentTimeMillis()
-        } else {
-            0L
-        }
+    private fun smartOn(cluster: ClusterState?): Boolean {
+        if (modeOverrideFresh()) pendingSmart?.let { return it }
+        return cluster?.enhancement == ENHANCEMENT_SMART
     }
+
+    private fun rememberModes(
+        shuffle: Boolean?,
+        smart: Boolean?,
+        repeatContext: Boolean?,
+        repeatTrack: Boolean?,
+    ) {
+        if (shuffle != null) pendingShuffle = shuffle
+        if (smart != null) pendingSmart = smart
+        if (repeatContext != null) pendingRepeatContext = repeatContext
+        if (repeatTrack != null) pendingRepeatTrack = repeatTrack
+        pendingModeAt = System.currentTimeMillis()
+    }
+
+    private fun smartShuffleContext(contextUri: String): Boolean =
+        contextUri.startsWith("spotify:playlist:") ||
+            (contextUri.startsWith("spotify:user:") && contextUri.endsWith(":collection")) ||
+            contextUri == "spotify:collection:tracks"
+
+    private fun smartAvailable(cluster: ClusterState?): Boolean =
+        cluster?.canSmartShuffle == true &&
+            smartShuffleContext(cluster.contextUri.ifBlank { state.contextUri })
 
     private fun publishModes() {
         val cluster = connect.cluster.value
         val shuffle = shuffleOn(cluster)
+        val smart = smartOn(cluster)
         val repeatContext = repeatContextOn(cluster)
         val repeatTrack = repeatTrackOn(cluster)
-        val shuffleMode = if (shuffle) ShuffleMode.SHUFFLE else ShuffleMode.OFF
+        val shuffleMode = when {
+            smart -> ShuffleMode.SMART_SHUFFLE
+            shuffle -> ShuffleMode.SHUFFLE
+            else -> ShuffleMode.OFF
+        }
         val repeatMode = when {
             repeatTrack -> RepeatMode.REPEAT_ONE
             repeatContext -> RepeatMode.REPEAT_ALL
             else -> RepeatMode.OFF
         }
-        if (state.shuffleMode != shuffleMode || state.repeatMode != repeatMode) {
-            state = state.copy(shuffleMode = shuffleMode, repeatMode = repeatMode)
+        val canShuffle = cluster?.canShuffle ?: true
+        val canSmartShuffle = smartAvailable(cluster)
+        val canRepeat = (cluster?.canRepeatContext ?: true) || (cluster?.canRepeatTrack ?: true)
+        val currentEnhanced = currentTrackEnhanced(cluster)
+        if (state.shuffleMode != shuffleMode || state.repeatMode != repeatMode ||
+            state.canShuffle != canShuffle || state.canSmartShuffle != canSmartShuffle ||
+            state.canRepeat != canRepeat || state.isEnhanced != currentEnhanced
+        ) {
+            log.i(
+                "modes -> shuffle=$shuffleMode repeat=$repeatMode enhancement='${cluster?.enhancement.orEmpty()}' " +
+                    "canShuffle=$canShuffle canSmart=$canSmartShuffle canRepeat=$canRepeat enhanced=$currentEnhanced"
+            )
+            state = state.copy(
+                shuffleMode = shuffleMode,
+                repeatMode = repeatMode,
+                canShuffle = canShuffle,
+                canSmartShuffle = canSmartShuffle,
+                canRepeat = canRepeat,
+                isEnhanced = currentEnhanced,
+            )
         }
+    }
+
+    /**
+     * The sparkle badge belongs to the track, not to the mode: only the rows
+     * the enhance lens added carry 'enhanced_recommendation' as their provider.
+     */
+    private fun currentTrackEnhanced(cluster: ClusterState?): Boolean {
+        if (cluster == null) return false
+        val uri = cluster.track.uri
+        if (uri.isBlank()) return false
+        if (cluster.track.isEnhanced) return true
+        return cluster.window().any { it.uri == uri && it.isEnhanced } ||
+            cluster.nextTracks.any { it.uri == uri && it.isEnhanced } ||
+            cluster.queued.any { it.uri == uri && it.isEnhanced }
     }
 
     private suspend fun toggleShuffle() {
         val cluster = connect.cluster.value
         val target = cluster?.activeDevice?.id?.takeIf { it.isNotBlank() } ?: deviceId
-        val next = !shuffleOn(cluster)
-        log.i("shuffle toggle on '${target.take(8)}' -> $next")
-        if (!connect.setShuffleOn(target, next)) {
+        val now = shuffleOn(cluster)
+        val nowSmart = smartOn(cluster)
+        val smartAllowed = smartAvailable(cluster)
+        val next: Boolean
+        val nextSmart: Boolean
+        when {
+            !now -> {
+                next = true
+                nextSmart = false
+            }
+            now && !nowSmart && smartAllowed -> {
+                if (resolveLens(cluster?.contextUri.orEmpty().ifBlank { chainContext }) == null) {
+                    next = false
+                    nextSmart = false
+                } else {
+                    next = true
+                    nextSmart = true
+                }
+            }
+            else -> {
+                next = false
+                nextSmart = false
+            }
+        }
+        log.i("shuffle toggle on '${target.take(8)}' -> $next smart=$nextSmart")
+        if (!connect.setShuffleOn(target, next, nextSmart)) {
             log.w("shuffle: '${target.take(8)}' refused the option, applying it locally anyway")
         }
-        rememberModes(shuffle = next, repeatContext = null, repeatTrack = null)
+        rememberModes(shuffle = next, smart = nextSmart, repeatContext = null, repeatTrack = null)
         publishModes()
+        if (nextSmart) enhanceReset(cluster)
         delay(MODE_SETTLE_MS)
         runCatching { connect.refreshCluster() }
         publishModes()
+    }
+
+    /**
+     * Tells the enhance lens that a recommendation was actually consumed: the
+     * server only keeps feeding rows while the taps keep coming.
+     */
+    private fun sendSmartTap(uri: String, uid: String) {
+        val cluster = connect.cluster.value
+        if (!smartOn(cluster)) return
+        val contextUri = cluster?.contextUri.orEmpty().ifBlank { chainContext }
+        if (contextUri.isBlank()) return
+        val enhanced = cluster?.track?.isEnhanced == true ||
+            cluster?.nextTracks?.any { it.uri == uri && it.isEnhanced } == true ||
+            cluster?.queued?.any { it.uri == uri && it.isEnhanced } == true
+        if (!enhanced) return
+        scope.launch {
+            val lens = resolveLens(contextUri) ?: return@launch
+            val ok = SmartShuffleSource.tap(context, SpotifyAuth.token(context), connect.spclientHost, lens, uid)
+            log.i("smart shuffle tap on '${uri.takeLast(12)}' ok=$ok")
+        }
+    }
+
+    private suspend fun resolveLens(contextUri: String): String? {
+        if (enhanceLens.isNotBlank() && enhanceLensFor == contextUri) return enhanceLens
+        val eligibility = SmartShuffleSource.eligibility(context, SpotifyAuth.token(context), contextUri)
+        if (!eligibility.canSmartShuffle || eligibility.lensUri.isBlank()) {
+            log.i("smart shuffle: '$contextUri' is not eligible")
+            return null
+        }
+        enhanceLens = eligibility.lensUri
+        enhanceLensFor = contextUri
+        return enhanceLens
+    }
+
+    private suspend fun enhanceReset(cluster: ClusterState?): Boolean {
+        val contextUri = cluster?.contextUri.orEmpty().ifBlank { chainContext }
+        if (contextUri.isBlank()) return false
+        val lens = resolveLens(contextUri) ?: return false
+        scope.launch {
+            val ok = SmartShuffleSource.reset(context, SpotifyAuth.token(context), connect.spclientHost, lens)
+            log.i("smart shuffle reset on '${lens.takeLast(24)}' ok=$ok")
+        }
+        return true
     }
 
     private suspend fun toggleRepeat() {
@@ -834,7 +965,7 @@ class PlaybackBridge(private val context: Context) {
         if (!connect.setRepeatOn(target, nextContext, nextTrack)) {
             log.w("repeat: '${target.take(8)}' refused the option, applying it locally anyway")
         }
-        rememberModes(shuffle = null, repeatContext = nextContext, repeatTrack = nextTrack)
+        rememberModes(shuffle = null, smart = null, repeatContext = nextContext, repeatTrack = nextTrack)
         publishModes()
         delay(MODE_SETTLE_MS)
         runCatching { connect.refreshCluster() }
@@ -1173,9 +1304,10 @@ class PlaybackBridge(private val context: Context) {
             positionMs = if (positionMs >= 0L) positionMs else player.positionMs,
             playing = playing ?: player.isPlaying,
             durationMs = player.durationMs.takeIf { it > 0L } ?: track.durationMs,
-            shuffle = shuffleOn(at),
-            repeatContext = repeatContextOn(at),
-            repeatTrack = repeatTrackOn(at),
+            shuffle = state.shuffleMode != ShuffleMode.OFF,
+            repeatContext = state.repeatMode == RepeatMode.REPEAT_ALL,
+            repeatTrack = state.repeatMode == RepeatMode.REPEAT_ONE,
+            enhancement = if (state.shuffleMode == ShuffleMode.SMART_SHUFFLE) ENHANCEMENT_SMART else "NONE",
             queueRevision = at?.queueRevision.orEmpty(),
             nextRows = queueTailRows(contextUri),
         )
@@ -1351,7 +1483,7 @@ class PlaybackBridge(private val context: Context) {
                 return
             }
         }
-        if (forward && shuffleOn(cluster)) {
+        if (forward && shuffleOn(cluster) && !smartOn(cluster)) {
             val pool = window.indices.filter { i ->
                 window[i].isVisible && window[i].uri != here
             }
@@ -1509,6 +1641,7 @@ class PlaybackBridge(private val context: Context) {
         if (uri.startsWith("spotify:track:") || uri.startsWith("spotify:episode:")) {
             player.prefetch(uri, connect.spclientHost)
         }
+        sendSmartTap(uri, uid)
         val remote = remoteTarget()
         if (remote.isNotBlank()) {
             markPending(uri, index, context)
@@ -2341,7 +2474,15 @@ class PlaybackBridge(private val context: Context) {
         }
         val rows = screen
         if (rows.size < 2) {
-            log.w("chain: the list on screen has ${rows.size} rows, nothing to follow")
+            if (chainRows.isNotEmpty() || chainContext != contextUri) {
+                chainRows = emptyList()
+                chainContext = contextUri
+                rememberChain(contextUri)
+                resumeRow = -1
+                log.i("chain: '${contextUri.takeLast(16)}' holds ${rows.size} row(s), " +
+                    "the old chain does not follow"
+                )
+            }
             return
         }
         chainRows = rows
@@ -2707,7 +2848,7 @@ class PlaybackBridge(private val context: Context) {
             )
             return
         }
-        if (shuffleOn(server) && !ended.startsWith(AD_PREFIX)) {
+        if (shuffleOn(server) && !smartOn(server) && !ended.startsWith(AD_PREFIX)) {
             val pool = rows.ifEmpty {
                 server?.window()?.filter { it.isVisible }?.map { it.uri }.orEmpty()
             }.filter { it.isNotBlank() && it != ended }
@@ -2879,6 +3020,7 @@ class PlaybackBridge(private val context: Context) {
         const val PENDING_MS = 10_000L
         const val ADVANCE_WAIT_MS = 900L
         const val LIVE_STATE_MS = 30_000L
+        const val ENHANCEMENT_SMART = "RECOMMENDATION"
         const val MODE_SETTLE_MS = 1200L
         const val MODE_OVERRIDE_MS = 8000L
         const val REMOTE_INTENT_MS = 10_000L

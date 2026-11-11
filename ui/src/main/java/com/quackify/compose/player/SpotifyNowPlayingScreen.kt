@@ -209,6 +209,9 @@ fun SpotifyNowPlayingScreen(
     isLiked: Boolean,
     isShuffle: Boolean = false,
     isRepeat: Boolean = false,
+    canShuffle: Boolean = true,
+    canSmartShuffle: Boolean = false,
+    canRepeat: Boolean = true,
     connectedDeviceName: String,
     onCollapseClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
@@ -233,6 +236,7 @@ fun SpotifyNowPlayingScreen(
     onBanClick: (() -> Unit)? = null,
     contextHeaderTitle: String? = null,
     isExplicit: Boolean = false,
+    isEnhancedTrack: Boolean = false,
     shuffleMode: ShuffleMode = if (isShuffle) ShuffleMode.SHUFFLE else ShuffleMode.OFF,
     repeatMode: RepeatMode = if (isRepeat) RepeatMode.REPEAT_ALL else RepeatMode.OFF,
     dominantColor: Color = Color(0xFF432371),
@@ -469,6 +473,7 @@ fun SpotifyNowPlayingScreen(
                             artist = artist,
                             isExplicit = isExplicit,
                             isLiked = isLiked,
+                            showSmartShuffleBadge = isEnhancedTrack,
                             onTitleClick = onTitleClick,
                             onArtistClick = onArtistClick,
                             onLikeClick = onLikeClick,
@@ -492,6 +497,9 @@ fun SpotifyNowPlayingScreen(
                             repeatMode = repeatMode,
                             isPlaying = isPlaying,
                             isLoading = effectiveIsLoading,
+                            canShuffle = canShuffle,
+                            canSmartShuffle = canSmartShuffle,
+                            canRepeat = canRepeat,
                             onShuffleClick = onShuffleClick,
                             onSkipPreviousClick = onSkipPreviousClick,
                             onPlayPauseClick = onPlayPauseClick,
@@ -656,6 +664,7 @@ fun SpotifyNowPlayingScreen(
                                 artist = artist,
                                 isExplicit = isExplicit,
                                 isLiked = isLiked,
+                                showSmartShuffleBadge = isEnhancedTrack,
                                 onTitleClick = onTitleClick,
                                 onArtistClick = onArtistClick,
                                 onLikeClick = onLikeClick,
@@ -679,6 +688,9 @@ fun SpotifyNowPlayingScreen(
                                 repeatMode = repeatMode,
                                 isPlaying = isPlaying,
                                 isLoading = effectiveIsLoading,
+                                canShuffle = canShuffle,
+                                canSmartShuffle = canSmartShuffle,
+                                canRepeat = canRepeat,
                                 onShuffleClick = onShuffleClick,
                                 onSkipPreviousClick = onSkipPreviousClick,
                                 onPlayPauseClick = onPlayPauseClick,
@@ -1138,6 +1150,7 @@ private fun NowPlayingTrackInfoRow(
     artist: String,
     isExplicit: Boolean,
     isLiked: Boolean,
+    showSmartShuffleBadge: Boolean,
     onTitleClick: () -> Unit,
     onArtistClick: () -> Unit,
     onLikeClick: () -> Unit,
@@ -1170,6 +1183,16 @@ private fun NowPlayingTrackInfoRow(
                         size = 16.dp,
                         cornerRadius = 3.dp,
                         fontSize = 10.sp
+                    )
+                }
+                if (showSmartShuffleBadge) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_enhance_badge_16),
+                        contentDescription = "Smart Shuffle on",
+                        tint = EncoreColors.Green,
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .size(14.dp)
                     )
                 }
                 Text(
@@ -1264,6 +1287,9 @@ private fun NowPlayingControlsRow(
     repeatMode: RepeatMode,
     isPlaying: Boolean,
     isLoading: Boolean,
+    canShuffle: Boolean,
+    canSmartShuffle: Boolean,
+    canRepeat: Boolean,
     onShuffleClick: () -> Unit,
     onSkipPreviousClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
@@ -1281,7 +1307,8 @@ private fun NowPlayingControlsRow(
         EncoreSmartShuffleButton(
             mode = shuffleMode,
             onClick = onShuffleClick,
-            size = 48.dp
+            size = 48.dp,
+            enabled = canShuffle
         )
 
         EncoreIconButton(
@@ -1315,7 +1342,8 @@ private fun NowPlayingControlsRow(
         EncoreRepeatButton(
             mode = repeatMode,
             onClick = onRepeatClick,
-            size = 48.dp
+            size = 48.dp,
+            enabled = canRepeat
         )
     }
 }
