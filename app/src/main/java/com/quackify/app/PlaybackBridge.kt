@@ -962,7 +962,9 @@ class PlaybackBridge(private val context: Context) {
     }
 
     private fun enhancedQueue(contextUri: String): List<SmartShuffleRow> =
-        if (contextUri.isNotBlank() && contextUri == enhancedFor) enhancedRows else emptyList()
+        if (contextUri.isNotBlank() &&
+            contextUri.substringAfterLast(':') == enhancedFor.substringAfterLast(':')
+        ) enhancedRows else emptyList()
 
     private suspend fun toggleRepeat() {
         val cluster = connect.cluster.value
@@ -1659,11 +1661,15 @@ class PlaybackBridge(private val context: Context) {
                 return
             }
         }
-        val context = contextUri.ifBlank { if (uri.startsWith("spotify:")) uri else "spotify:track:$uri" }
+        val fallback = contextUri.ifBlank { if (uri.startsWith("spotify:")) uri else "spotify:track:$uri" }
+        val enhanced = if (fallback.startsWith("spotify:track:")) enhancedQueue(chainContext) else emptyList()
+        val at = enhanced.indexOfFirst { it.uri == uri }
+        val context = if (at >= 0 && chainContext.isNotBlank()) chainContext else fallback
         val single = context.startsWith("spotify:track:") || context.startsWith("spotify:episode:")
         val known = if (chainContext == context) chainRows.indexOfFirst { it == uri } else -1
         val index = when {
             single -> -1
+            at >= 0 -> at
             known >= 0 -> known
             hint >= 0 -> hint
             else -> 0
@@ -2527,6 +2533,10 @@ class PlaybackBridge(private val context: Context) {
                 resumeRow = -1
                 log.i("chain: reset, this play carries no context")
             }
+            return
+        }
+        if (contextUri.startsWith("spotify:track:") || contextUri.startsWith("spotify:episode:")) {
+            log.d("chain: a single track carries no chain, keeping '${chainContext.takeLast(16)}'")
             return
         }
         val rows = screen
