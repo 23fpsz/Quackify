@@ -2,6 +2,7 @@
 package com.quackify.app
 
 import android.content.Context
+import com.quackify.backend.core.store.AppPrefs
 import com.quackify.compose.playlist.TrackItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -133,9 +134,5 @@ object PlayHistory {
             .apply()
     }
 
-    private fun prefs(context: Context) =
-        context.getSharedPreferences(
-            PREFS,
-            Context.MODE_PRIVATE
-        )
+    private fun prefs(context: Context) = AppPrefs.prefs(context, PREFS)
 }

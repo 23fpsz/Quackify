@@ -348,7 +348,7 @@ class KrespotPlayer(private val context: Context) {
 
     fun resumeLast(spclient: String) {
         scope.launch {
-            val prefs = context.getSharedPreferences(PLAYER_PREFS, Context.MODE_PRIVATE)
+            val prefs = com.quackify.backend.core.store.AppPrefs.prefs(context, PLAYER_PREFS)
             val uri = prefs.getString(KEY_RESUME_URI, "").orEmpty()
             val file = prefs.getString(KEY_RESUME_FILE, "").orEmpty()
             val format = prefs.getInt(KEY_RESUME_FORMAT, 0)
@@ -383,7 +383,7 @@ class KrespotPlayer(private val context: Context) {
         ) return
         resumeWrittenUri = current.trackUri
         resumeWrittenMs = current.positionMs
-        context.getSharedPreferences(PLAYER_PREFS, Context.MODE_PRIVATE).edit()
+        com.quackify.backend.core.store.AppPrefs.prefs(context, PLAYER_PREFS).edit()
             .putString(KEY_RESUME_URI, current.trackUri)
             .putString(KEY_RESUME_FILE, file)
             .putInt(KEY_RESUME_FORMAT, current.format)

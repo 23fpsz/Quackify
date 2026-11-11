@@ -216,8 +216,7 @@ object Pathfinder {
         prefs(context).edit().putLong(KEY_ATTEMPT, System.currentTimeMillis()).apply()
     }
 
-    private fun prefs(context: Context) =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = com.quackify.backend.core.store.AppPrefs.prefs(context, PREFS)
 
     private fun save(context: Context) {
         val root = JSONObject()

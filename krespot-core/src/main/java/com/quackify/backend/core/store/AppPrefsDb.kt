@@ -5,21 +5,21 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [SecureEntry::class], version = 1, exportSchema = false)
-abstract class SecureStoreDb : RoomDatabase() {
-    abstract fun dao(): SecureStoreDao
+@Database(entities = [AppPrefEntry::class], version = 1, exportSchema = false)
+abstract class AppPrefsDb : RoomDatabase() {
+    abstract fun dao(): AppPrefsDao
 
     companion object {
         @Volatile
-        private var instance: SecureStoreDb? = null
+        private var instance: AppPrefsDb? = null
 
-        fun get(context: Context): SecureStoreDb {
+        fun get(context: Context): AppPrefsDb {
             instance?.let { return it }
             return synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
-                    SecureStoreDb::class.java,
-                    "secure_store.db"
+                    AppPrefsDb::class.java,
+                    "app_prefs.db"
                 ).allowMainThreadQueries().build().also { instance = it }
             }
         }

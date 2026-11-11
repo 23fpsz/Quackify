@@ -139,7 +139,7 @@ fun LogViewerScreen(
 
     fun setCapture(next: Boolean) {
         if (next == captureOn) return
-        val prefs = context.getSharedPreferences(Logs.PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = com.quackify.backend.core.store.AppPrefs.prefs(context, Logs.PREFS_NAME)
         if (next) {
             Logs.capturing = true
             prefs.edit().putBoolean(Logs.CAPTURE_PREF_KEY, true).apply()

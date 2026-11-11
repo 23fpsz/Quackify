@@ -727,7 +727,7 @@ class MainActivity : ComponentActivity() {
                         }
                         var canvasFile by remember { mutableStateOf<String?>(null) }
                         val canvasAllowed = settingsSwitches.canvas
-                        val clientPrefs = remember { context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE) }
+                        val clientPrefs = remember { com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS) }
                         var canvasEnabled by remember { mutableStateOf(clientPrefs.getBoolean("canvasNpvEnabled", true)) }
                         var fullArtworkPlayer by remember {
                             mutableStateOf(clientPrefs.getBoolean("fullArtworkPlayer", true))
