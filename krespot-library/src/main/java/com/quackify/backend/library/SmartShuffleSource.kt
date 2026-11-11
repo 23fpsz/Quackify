@@ -64,8 +64,11 @@ object SmartShuffleSource {
         return rows
     }
 
-    suspend fun tap(context: Context, token: String, spclient: String, lensUri: String, uid: String): Boolean =
-        send(context, token, spclient, lensUri, "tap", uid)
+    suspend fun tap(context: Context, token: String, spclient: String, lensUri: String, uid: String): List<SmartShuffleRow> {
+        val response = post(context, token, spclient, lensUri, "tap", uid) ?: return emptyList()
+        if (!response.ok) return emptyList()
+        return runCatching { extractRows(response.bytes) }.getOrElse { emptyList() }
+    }
 
     suspend fun plus(context: Context, token: String, spclient: String, lensUri: String, uid: String): Boolean =
         send(context, token, spclient, lensUri, "plus", uid)
