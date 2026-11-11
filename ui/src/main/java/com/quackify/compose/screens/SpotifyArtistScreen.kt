@@ -676,7 +676,7 @@ fun SpotifyArtistScreen(
                         contentPadding = PaddingValues(horizontal = EncoreSpacers.Base),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(gallery.take(10)) { photo ->
+                        items(gallery.take(10), key = { it }) { photo ->
                             Box(
                                 modifier = Modifier
                                     .width(232.dp)
@@ -847,7 +847,7 @@ private fun ArtistReleaseCarousel(
         contentPadding = PaddingValues(horizontal = EncoreSpacers.Base),
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(releases) { release ->
+        items(releases, key = { it.title + it.year }) { release ->
             ArtistReleaseCard(release, onReleaseClick)
         }
     }
