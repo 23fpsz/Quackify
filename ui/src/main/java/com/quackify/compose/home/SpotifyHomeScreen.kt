@@ -503,7 +503,7 @@ private fun ShelfSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(cards) { card ->
+            items(cards, key = { it.uri }) { card ->
                 Column(
                     modifier = Modifier
                         .width(148.dp)
@@ -603,7 +603,7 @@ private fun ArtistShelfSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(artists) { artist ->
+            items(artists, key = { it.uri }) { artist ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
