@@ -360,7 +360,7 @@ fun SpotifyLibraryScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(filters) { filter ->
+                    items(filters, key = { it }) { filter ->
                         val isSelected = selectedFilter == filter
                         EncoreChip(
                             text = filter,
@@ -504,7 +504,7 @@ fun SpotifyLibraryScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(filteredItems) { item ->
+                items(filteredItems, key = { it.uri }) { item ->
                     val isArtist = item.type == LibraryItemType.ARTIST
                     Column(
                         modifier = Modifier
@@ -591,7 +591,7 @@ fun SpotifyLibraryScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = bottomPadding)
             ) {
-                items(filteredItems) { item ->
+                items(filteredItems, key = { it.uri }) { item ->
                     val isArtist = item.type == LibraryItemType.ARTIST
                     Row(
                         modifier = Modifier
