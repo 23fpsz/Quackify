@@ -17,11 +17,18 @@ data class SmartShuffleEligibility(
     val lensUri: String,
 )
 
+data class SmartShuffleRow(
+    val uri: String,
+    val uid: String,
+    val enhanced: Boolean,
+)
+
 object SmartShuffleSource {
 
     private const val LIKED_SONGS = "spotify:collection:tracks"
     private const val LENS_ENHANCE = "enhance"
     private const val BASE = "https://spclient.wg.spotify.com"
+    private const val ENHANCED_PROVIDER = "enhanced_recommendation"
 
     suspend fun eligibility(context: Context, token: String, contextUri: String): SmartShuffleEligibility {
         val uri = lensCandidate(contextUri)
@@ -46,8 +53,16 @@ object SmartShuffleSource {
         return SmartShuffleEligibility(canSmartShuffle = available, lensUri = lens)
     }
 
-    suspend fun reset(context: Context, token: String, spclient: String, lensUri: String): Boolean =
-        send(context, token, spclient, lensUri, "reset")
+    suspend fun reset(context: Context, token: String, spclient: String, lensUri: String): List<SmartShuffleRow> {
+        val response = post(context, token, spclient, lensUri, "reset") ?: return emptyList()
+        if (!response.ok) return emptyList()
+        val rows = runCatching { extractRows(response.bytes) }.getOrElse {
+            log.w("signal 'reset': the enhanced context did not parse (${it.message})")
+            emptyList()
+        }
+        log.i("signal 'reset': ${rows.size} row(s), ${rows.count { it.enhanced }} enhanced")
+        return rows
+    }
 
     suspend fun tap(context: Context, token: String, spclient: String, lensUri: String, uid: String): Boolean =
         send(context, token, spclient, lensUri, "tap", uid)
@@ -66,10 +81,24 @@ object SmartShuffleSource {
         identifier: String,
         uid: String = "",
     ): Boolean {
-        if (spclient.isBlank() || lensUri.isBlank()) return false
+        val response = post(context, token, spclient, lensUri, identifier, uid)
+        val ok = response?.ok == true
+        log.i("signal '$identifier' -> ${response?.code ?: "no response"} ok=$ok")
+        return ok
+    }
+
+    private suspend fun post(
+        context: Context,
+        token: String,
+        spclient: String,
+        lensUri: String,
+        identifier: String,
+        uid: String = "",
+    ): Net.Blob? {
+        if (spclient.isBlank() || lensUri.isBlank()) return null
         val type = lensUri.substringAfter("spotify:").substringBefore(":")
         val id = lensUri.substringAfterLast(":")
-        if (type.isBlank() || id.isBlank()) return false
+        if (type.isBlank() || id.isBlank()) return null
         val base = when (type) {
             "playlist" -> "$BASE/playlist/v2/playlist/$id"
             else -> "$BASE/$type/$id"
@@ -81,16 +110,95 @@ object SmartShuffleSource {
         val body = JSONObject()
             .put("emittedSignals", JSONArray().put(signal))
             .toString()
-        val headers = mapOf(
-            "Authorization" to "Bearer $token",
-            "Content-Type" to "application/json",
-        )
-        val response = withContext(Dispatchers.IO) {
-            Net.postJson(url, body, headers, tag = "smart-shuffle/$identifier")
+        val headers = mapOf("Authorization" to "Bearer $token")
+        return withContext(Dispatchers.IO) {
+            Net.postBlob(url, body.toByteArray(), "application/json", headers, tag = "smart-shuffle/$identifier")
         }
-        val ok = response?.ok == true
-        log.i("signal '$identifier' on '$id' -> ${response?.code ?: "no response"} ok=$ok")
-        return ok
+    }
+
+    /**
+     * The reset answer is a binary context proto: one message per row, each
+     * carrying its track uri as a plain string field and the recommendations
+     * marked with provider 'enhanced_recommendation' somewhere in their
+     * metadata. The walk keeps document order so the list is the play order.
+     */
+    private fun extractRows(bytes: ByteArray): List<SmartShuffleRow> {
+        val rows = mutableListOf<SmartShuffleRow>()
+        walk(bytes, 0, bytes.size, rows, 0)
+        return rows
+    }
+
+    private fun walk(bytes: ByteArray, from: Int, to: Int, rows: MutableList<SmartShuffleRow>, depth: Int) {
+        if (depth > 8) return
+        var i = from
+        var uri = ""
+        var uid = ""
+        while (i < to) {
+            val tag = varint(bytes, i) ?: return
+            i = tag.second
+            when (tag.first and 0x07) {
+                0 -> {
+                    val value = varint(bytes, i) ?: return
+                    i = value.second
+                }
+                1 -> i += 8
+                5 -> i += 4
+                2 -> {
+                    val length = varint(bytes, i) ?: return
+                    i = length.second
+                    val end = i + length.first
+                    if (end > to) return
+                    val text = text(bytes, i, end)
+                    if (text != null) {
+                        if (text.startsWith("spotify:track:")) uri = text
+                    } else if (tag.first ushr 3 == 2 && uid.isBlank()) {
+                        uid = Base64.encodeToString(bytes.copyOfRange(i, end), Base64.NO_WRAP or Base64.URL_SAFE)
+                    } else {
+                        walk(bytes, i, end, rows, depth + 1)
+                    }
+                    i = end
+                }
+                else -> return
+            }
+        }
+        if (uri.isNotBlank()) {
+            rows.add(SmartShuffleRow(uri, uid, contains(bytes, from, to, ENHANCED_PROVIDER)))
+        }
+    }
+
+    private fun text(bytes: ByteArray, from: Int, to: Int): String? {
+        if (to - from <= 0) return null
+        val out = String(bytes, from, to - from, Charsets.UTF_8)
+        if (out.indexOf('\uFFFD') >= 0) return null
+        out.forEach { if (it < ' ') return null }
+        return out
+    }
+
+    private fun varint(bytes: ByteArray, at: Int): Pair<Int, Int>? {
+        var value = 0
+        var shift = 0
+        var i = at
+        while (i < bytes.size) {
+            val raw = bytes[i].toInt()
+            value = value or ((raw and 0x7F) shl shift)
+            i++
+            if (raw >= 0) return value to i
+            shift += 7
+            if (shift > 28) return null
+        }
+        return null
+    }
+
+    private fun contains(bytes: ByteArray, from: Int, to: Int, needle: String): Boolean {
+        val target = needle.toByteArray(Charsets.UTF_8)
+        if (target.isEmpty() || to - from < target.size) return false
+        outer@ for (i in from..to - target.size) {
+            for (j in target.indices) {
+                if (bytes[i + j] != target[j]) continue@outer
+            }
+            return true
+        }
+        return false
     }
 
     private fun signalData(uid: String): ByteArray {
