@@ -650,7 +650,7 @@ fun SpotifyPodcastScreen(
                                 Spacer(modifier = Modifier.height(14.dp))
                             }
 
-                            items(RelatedPodcastShows) { (title, host) ->
+                            items(RelatedPodcastShows, key = { it.first }) { (title, host) ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
