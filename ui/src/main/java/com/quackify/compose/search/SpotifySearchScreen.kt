@@ -970,7 +970,7 @@ fun SpotifySearchScreen(
                                 )
                             }
 
-                            items(filteredTracks.take(4)) { track ->
+                            items(filteredTracks.take(4), key = { it.uri }) { track ->
                                 val isThisPlaying = isPlaying &&
                                     matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                                 SearchTrackRow(
@@ -996,7 +996,7 @@ fun SpotifySearchScreen(
                                 )
                             }
 
-                            items(filteredArtists.take(2)) { artist ->
+                            items(filteredArtists.take(2), key = { it.uri }) { artist ->
                                 ArtistRow(
                                     artist = artist,
                                     onArtistClick = { onArtistClick(artist.name, artist.uri) },
@@ -1018,7 +1018,7 @@ fun SpotifySearchScreen(
                                 )
                             }
 
-                            items(filteredAlbums.take(2)) { album ->
+                            items(filteredAlbums.take(2), key = { it.uri }) { album ->
                                 AlbumRow(
                                     album = album,
                                     onClick = { onAlbumClick(album.title, album.artist, album.uri) },
@@ -1040,7 +1040,7 @@ fun SpotifySearchScreen(
                                 )
                             }
 
-                            items(filteredPlaylists.take(2)) { playlist ->
+                            items(filteredPlaylists.take(2), key = { it.uri }) { playlist ->
                                 PlaylistRow(
                                     playlist = playlist,
                                     onClick = { onPlaylistClick(playlist.title, playlist.uri) }
@@ -1061,7 +1061,7 @@ fun SpotifySearchScreen(
                                 )
                             }
 
-                            items(filteredPodcasts.take(2)) { podcast ->
+                            items(filteredPodcasts.take(2), key = { it.uri }) { podcast ->
                                 PodcastRow(
                                     podcast = podcast,
                                     onClick = { onPodcastClick(podcast.title, podcast.uri) }
