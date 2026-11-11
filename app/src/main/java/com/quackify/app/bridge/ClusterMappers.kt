@@ -32,4 +32,5 @@ fun ClusterTrack.asTrackItem(): TrackItem = TrackItem(
     isExplicit = explicit,
     albumUri = albumUri,
     artistUri = artistUri,
+    isEnhanced = isEnhanced,
 )

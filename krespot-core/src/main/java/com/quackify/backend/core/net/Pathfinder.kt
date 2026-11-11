@@ -120,6 +120,8 @@ object Pathfinder {
             "d889c8c936ab192af8ced595427f5ba2acdf63478fdc0a181c8d477f8322630e",
         "SetItemsStateInWhatsNewFeed" to
             "d889c8c936ab192af8ced595427f5ba2acdf63478fdc0a181c8d477f8322630e",
+        "smartShuffle" to
+            "3384085be84fbf2f855b024f99bc06cded1c0fd71af3a8fb8abb84e9656faba2",
     )
 
     data class Op(
