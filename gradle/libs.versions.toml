@@ -16,7 +16,6 @@ coil = "2.7.0"
 media3 = "1.11.1"
 profileinstaller = "1.4.1"
 coroutines = "1.10.2"
-securityCrypto = "1.1.0"
 webkit = "1.18.0"
 okhttp = "4.12.0"
 androidxMedia = "1.7.0"
@@ -44,7 +43,6 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", v
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 glide-compose = { group = "com.github.bumptech.glide", name = "compose", version.ref = "glide" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
-androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 androidx-media = { group = "androidx.media", name = "media", version.ref = "androidxMedia" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
