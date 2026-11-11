@@ -99,7 +99,7 @@ internal fun FolderSheet(
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(draft.folders) { folder ->
+                    items(draft.folders, key = { it.first }) { folder ->
                         PickerRow(
                             title = folder.second,
                             subtitle = "",
