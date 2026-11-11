@@ -84,6 +84,7 @@ fun SpotifyArtworkImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(resolvedUrl)
                     .crossfade(true)
+                    .size(256)
                     .build(),
                 contentDescription = contentDescription,
                 contentScale = contentScale,
