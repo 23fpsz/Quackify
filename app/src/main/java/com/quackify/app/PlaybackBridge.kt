@@ -2390,8 +2390,9 @@ class PlaybackBridge(private val context: Context) {
         val knownUpcoming = serverRows.mapTo(HashSet()) { it.uri }
         val enhanced = if (chainFits) enhancedQueue(context) else emptyList()
         val enhancedTail = if (enhanced.isNotEmpty()) {
+            val at = enhanced.indexOfFirst { it.uri == anchor }
             enhanced.asSequence()
-                .filter { it.uri != anchor }
+                .drop(if (at >= 0) at + 1 else 0)
                 .filterNot { it.uri in queuedUris }
                 .map { it.uri }
                 .distinct()
