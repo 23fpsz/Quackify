@@ -1,6 +1,7 @@
 package com.quackify.backend.core.auth
 
 import android.content.Context
+import com.quackify.backend.core.store.SecureStore
 import android.util.Base64
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.webview.cookieManagerOrNull
@@ -36,9 +37,7 @@ object SpotifyAuth {
     private const val KEY_TOKEN_EXP = "access_token_exp"
     private const val KEY_CLIENT_TOKEN = "client_token"
     private const val KEY_CLIENT_TOKEN_EXP = "client_token_exp"
-    private const val PREFS = "quackify_secure"
-
-    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = SecureStore.prefs(context)
 
     @Volatile
     private var tokenMemo: String? = null

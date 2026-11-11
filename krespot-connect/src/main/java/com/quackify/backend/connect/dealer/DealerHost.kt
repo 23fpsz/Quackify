@@ -1,6 +1,7 @@
 package com.quackify.backend.connect.dealer
 
 import android.content.Context
+import com.quackify.backend.core.store.SecureStore
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
 
@@ -16,7 +17,6 @@ private const val KEY_AT = "apresolve_at"
 
 private const val TTL_MS = 6 * 60 * 60 * 1000L
 
-private const val PREFS = "quackify_secure"
 
 object DealerHost {
 
@@ -52,7 +52,7 @@ object DealerHost {
 
     fun forget(context: Context) {
         cached = null
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        SecureStore.edit(context)
             .remove(KEY_DEALER)
             .remove(KEY_SPCLIENT)
             .remove(KEY_AT)
@@ -60,7 +60,7 @@ object DealerHost {
     }
 
     private fun persisted(context: Context, ignoreAge: Boolean = false): Pair<String, String>? {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = SecureStore.prefs(context)
         val dealer = prefs.getString(KEY_DEALER, "").orEmpty()
         val spclient = prefs.getString(KEY_SPCLIENT, "").orEmpty()
         if (dealer.isBlank() || spclient.isBlank()) return null
@@ -71,7 +71,7 @@ object DealerHost {
     }
 
     private fun store(context: Context, pair: Pair<String, String>) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        SecureStore.edit(context)
             .putString(KEY_DEALER, pair.first)
             .putString(KEY_SPCLIENT, pair.second)
             .putLong(KEY_AT, System.currentTimeMillis())

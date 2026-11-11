@@ -1,6 +1,7 @@
 package com.quackify.backend.connect.cluster
 
 import android.content.Context
+import com.quackify.backend.core.store.SecureStore
 import java.security.SecureRandom
 import com.quackify.backend.core.log.Logs
 
@@ -12,7 +13,6 @@ object Device {
 
     private const val KEY_ID = "connect_device_id"
 
-    private const val PREFS = "quackify_secure"
 
     private val random = SecureRandom()
 
@@ -21,7 +21,7 @@ object Device {
 
     fun id(context: Context): String {
         cached?.let { return it }
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = SecureStore.prefs(context)
         val stored = prefs.getString(KEY_ID, "").orEmpty()
         if (stored.isNotBlank()) {
             cached = stored
@@ -37,7 +37,7 @@ object Device {
 
     fun forget(context: Context) {
         cached = null
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_ID).apply()
+        SecureStore.edit(context).remove(KEY_ID).apply()
         log.i("device id dropped")
     }
 
