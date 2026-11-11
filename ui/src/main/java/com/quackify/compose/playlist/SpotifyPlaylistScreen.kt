@@ -1389,33 +1389,6 @@ private fun PlaylistChip(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewSpotifyPlaylistScreen() {
-    SpotifyEncoreTheme {
-        val dummyTracks = listOf(
-            TrackItem("Faasle", "Aditya Rikhari", false),
-            TrackItem("Alag Aasmaan", "Anuv Jain", false),
-            TrackItem("Another Love", "Tom Odell", true),
-            TrackItem("Tu hai kahan", "AUR", false),
-            TrackItem("Maybe My Soulmate Died", "iamnotshane", false)
-        )
-
-        SpotifyPlaylistScreen(
-            title = "\\_(°_o)_/¯",
-            description = "",
-            creator = "中 • OV32LO2D • 中",
-            saveCount = "2 saves",
-            tracks = dummyTracks,
-            currentTrackTitle = "Faasle",
-            isPlaying = true,
-            onBackClick = {},
-            onPlayPauseClick = {},
-            onTrackSelect = {}
-        )
-    }
-}
-
 
 /**
  * 1:1 Spotify Empty Playlist Curation Header:
