@@ -564,7 +564,7 @@ fun SpotifyAlbumScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(moreByArtist) { release ->
+                        items(moreByArtist, key = { it.title + it.year }) { release ->
                             Column(
                                 modifier = Modifier
                                     .width(140.dp)
