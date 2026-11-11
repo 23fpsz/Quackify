@@ -2996,6 +2996,15 @@ class PlaybackBridge(private val context: Context) {
             log.i("advance: the engine already moved to '${engine.takeLast(12)}', nothing to do")
             return
         }
+        if (repeatTrackOn(server) && ended.isNotBlank() && !ended.startsWith(AD_PREFIX)) {
+            log.i("advance -> repeating '${ended.takeLast(12)}' (repeat one)")
+            playTrack(
+                ended,
+                chainContext.ifBlank { server?.contextUri.orEmpty() },
+                if (at >= 0) at else -1,
+            )
+            return
+        }
         val fromQueue = moved != null &&
                 (moved.uri == queued?.uri || serverQueued.any { it.uri == moved.uri })
         if (next != null && moved != null) {
@@ -3028,15 +3037,6 @@ class PlaybackBridge(private val context: Context) {
             log.i("advance -> the queued '${queued.title.ifBlank { queued.uri.takeLast(12) }}', " +
                     "the list resumes at row $resumeRow of ${rows.size}")
             playTrack(queued.uri, chainContext.ifBlank { server?.contextUri.orEmpty() }, -1)
-            return
-        }
-        if (repeatTrackOn(server) && ended.isNotBlank() && !ended.startsWith(AD_PREFIX)) {
-            log.i("advance -> repeating '${ended.takeLast(12)}' (repeat one)")
-            playTrack(
-                ended,
-                chainContext.ifBlank { server?.contextUri.orEmpty() },
-                if (at >= 0) at else -1,
-            )
             return
         }
         if (shuffleOn(server) && !smartOn(server) && !ended.startsWith(AD_PREFIX)) {
