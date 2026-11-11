@@ -225,7 +225,7 @@ fun SpotifyConnectDeviceSheet(
             LazyColumn(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                items(devices.filter { !it.isCurrent }) { device ->
+                items(devices.filter { !it.isCurrent }, key = { it.id }) { device ->
                     DeviceRow(
                         device = device,
                         onClick = { onSelectDevice(device) }
