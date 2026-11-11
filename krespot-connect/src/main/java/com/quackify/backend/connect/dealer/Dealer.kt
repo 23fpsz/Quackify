@@ -55,16 +55,39 @@ class Dealer {
                     }
                     "pong" -> return
                 }
+                val ident = json.optString("message_ident")
+                if (ident.isNotBlank()) {
+                    val key = json.optString("key")
+                    val compressed = json.optJSONObject("payload")?.optString("compressed").orEmpty()
+                    val gzip = json.optJSONObject("headers")
+                        ?.optString("Transfer-Encoding").equals("gzip", true)
+                    val decoded = runCatching {
+                        val raw = java.util.Base64.getDecoder().decode(compressed)
+                        val bytes = if (gzip) java.util.zip.GZIPInputStream(raw.inputStream()).readBytes() else raw
+                        String(bytes, Charsets.UTF_8)
+                    }.getOrNull()
+                    if (key.isNotBlank()) {
+                        webSocket.send("""{"type":"reply","key":"$key","payload":{"success":true}}""")
+                    }
+                    if (decoded != null) {
+                        trySend(DealerFrame(uri = ident, headers = emptyMap(), payloads = listOf(decoded)))
+                    } else {
+                        log.w("request $ident did not decode, ${compressed.length}B")
+                    }
+                    return
+                }
                 val uri = json.optString("uri")
                 if (uri.isBlank()) return
                 val headers = json.optJSONObject("headers")?.let { node ->
                     node.keys().asSequence().associateWith { node.optString(it) }
                 }.orEmpty()
+                val gzip = headers.entries.any { it.key.equals("Transfer-Encoding", true) &&
+                        it.value.equals("gzip", true) }
                 val payloads = json.optJSONArray("payloads")?.let { array ->
                     (0 until array.length()).mapNotNull { index ->
                         when (val item = array.opt(index)) {
                             null -> null
-                            is String -> item
+                            is String -> decodePayload(item, gzip)
                             else -> item.toString()
                         }
                     }
@@ -101,5 +124,20 @@ class Dealer {
             pinger.cancel()
             socket.close(1000, null)
         }
+    }
+
+    private fun decodeGzipBase64(payload: String): String? = runCatching {
+        val raw = java.util.Base64.getDecoder().decode(payload)
+        String(java.util.zip.GZIPInputStream(raw.inputStream()).readBytes(), Charsets.UTF_8)
+    }.getOrNull()
+
+    private fun decodeBase64Utf8(payload: String): String? = runCatching {
+        String(java.util.Base64.getDecoder().decode(payload), Charsets.UTF_8)
+    }.getOrNull()
+
+    private fun decodePayload(item: String, gzip: Boolean): String {
+        if (item.trimStart().startsWith("{")) return item
+        if (gzip) return decodeGzipBase64(item) ?: item
+        return decodeGzipBase64(item) ?: decodeBase64Utf8(item) ?: item
     }
 }
