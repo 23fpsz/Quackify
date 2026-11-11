@@ -1,7 +1,6 @@
 package com.quackify.backend.connect.dealer
 
 import android.content.Context
-import com.quackify.backend.core.auth.SecurePrefs
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
 
@@ -16,6 +15,8 @@ private const val KEY_SPCLIENT = "apresolve_spclient"
 private const val KEY_AT = "apresolve_at"
 
 private const val TTL_MS = 6 * 60 * 60 * 1000L
+
+private const val PREFS = "quackify_secure"
 
 object DealerHost {
 
@@ -51,7 +52,7 @@ object DealerHost {
 
     fun forget(context: Context) {
         cached = null
-        SecurePrefs.get(context).edit()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .remove(KEY_DEALER)
             .remove(KEY_SPCLIENT)
             .remove(KEY_AT)
@@ -59,7 +60,7 @@ object DealerHost {
     }
 
     private fun persisted(context: Context, ignoreAge: Boolean = false): Pair<String, String>? {
-        val prefs = SecurePrefs.get(context)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val dealer = prefs.getString(KEY_DEALER, "").orEmpty()
         val spclient = prefs.getString(KEY_SPCLIENT, "").orEmpty()
         if (dealer.isBlank() || spclient.isBlank()) return null
@@ -70,7 +71,7 @@ object DealerHost {
     }
 
     private fun store(context: Context, pair: Pair<String, String>) {
-        SecurePrefs.get(context).edit()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_DEALER, pair.first)
             .putString(KEY_SPCLIENT, pair.second)
             .putLong(KEY_AT, System.currentTimeMillis())

@@ -2,7 +2,6 @@ package com.quackify.backend.player
 
 import android.content.Context
 import com.quackify.backend.connect.command.AudioFile
-import com.quackify.backend.core.auth.SecurePrefs
 import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ClientToken
@@ -29,6 +28,8 @@ private const val KEY_HOST = "license_endpoint_host"
 private const val KEY_URL = "license_endpoint_url"
 
 private const val KEY_EXP = "license_endpoint_exp"
+
+private const val PREFS = "quackify_secure"
 
 internal object PlayerHeaders {
 
@@ -242,7 +243,7 @@ internal object LicenseEndpoint {
     }
 
     private fun stored(context: Context, host: String, now: Long): String? {
-        val prefs = SecurePrefs.get(context)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (host.isNotBlank() && prefs.getString(KEY_HOST, "") != host) return null
         val url = prefs.getString(KEY_URL, "").orEmpty()
         val expires = prefs.getLong(KEY_EXP, 0L)
@@ -254,7 +255,7 @@ internal object LicenseEndpoint {
     }
 
     private fun persist(context: Context, host: String, url: String, expires: Long) {
-        SecurePrefs.get(context).edit()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_HOST, host)
             .putString(KEY_URL, url)
             .putLong(KEY_EXP, expires)
