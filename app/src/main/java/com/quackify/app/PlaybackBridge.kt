@@ -182,6 +182,9 @@ class PlaybackBridge(private val context: Context) {
     @Volatile
     private var enhancedFor = ""
 
+    @Volatile
+    private var enhanceInFlight = false
+
     private val decorated = java.util.concurrent.ConcurrentHashMap<String, TrackItem>()
 
     private val undecoratable = java.util.Collections.newSetFromMap(
@@ -960,13 +963,18 @@ class PlaybackBridge(private val context: Context) {
         val contextUri = cluster?.contextUri.orEmpty().ifBlank { chainContext }
         if (contextUri.isBlank()) return false
         val lens = resolveLens(contextUri) ?: return false
+        enhanceInFlight = true
         scope.launch {
-            val rows = SmartShuffleSource.reset(context, SpotifyAuth.token(context), connect.spclientHost, lens)
-            enhancedRows = rows
-            enhancedFor = contextUri
-            log.i("smart shuffle reset on '${lens.takeLast(24)}' rows=${rows.size} " +
-                "enhanced=${rows.count { it.enhanced }}")
-            publishQueue(connect.cluster.value)
+            try {
+                val rows = SmartShuffleSource.reset(context, SpotifyAuth.token(context), connect.spclientHost, lens)
+                enhancedRows = rows
+                enhancedFor = contextUri
+                log.i("smart shuffle reset on '${lens.takeLast(24)}' rows=${rows.size} " +
+                    "enhanced=${rows.count { it.enhanced }}")
+                publishQueue(connect.cluster.value)
+            } finally {
+                enhanceInFlight = false
+            }
         }
         return true
     }
@@ -975,6 +983,38 @@ class PlaybackBridge(private val context: Context) {
         if (contextUri.isNotBlank() &&
             contextUri.substringAfterLast(':') == enhancedFor.substringAfterLast(':')
         ) enhancedRows else emptyList()
+
+    /**
+     * A cold start restores the modes from the cluster but not the enhance
+     * session: the first play in a smart context re-arms the lens and pulls
+     * a fresh enhanced queue.
+     */
+    private fun rearmSmart(contextUri: String) {
+        if (enhanceInFlight || contextUri.isBlank() || !smartShuffleContext(contextUri)) return
+        if (enhancedQueue(contextUri).isNotEmpty()) return
+        if (!smartOn(connect.cluster.value)) return
+        enhanceInFlight = true
+        scope.launch {
+            try {
+                val lens = resolveLens(contextUri) ?: return@launch
+                val target = connect.cluster.value?.activeDevice?.id?.takeIf { it.isNotBlank() } ?: deviceId
+                val ok = connect.setShuffleOn(target, true, true)
+                if (!ok) {
+                    log.w("smart shuffle re-arm: the server refused the options")
+                    return@launch
+                }
+                val rows = SmartShuffleSource.reset(context, SpotifyAuth.token(context), connect.spclientHost, lens)
+                enhancedRows = rows
+                enhancedFor = contextUri
+                log.i("smart shuffle re-armed on '${contextUri.takeLast(16)}' " +
+                    "rows=${rows.size} enhanced=${rows.count { it.enhanced }}"
+                )
+                publishQueue(connect.cluster.value)
+            } finally {
+                enhanceInFlight = false
+            }
+        }
+    }
 
     private suspend fun toggleRepeat() {
         val cluster = connect.cluster.value
@@ -1701,6 +1741,7 @@ class PlaybackBridge(private val context: Context) {
             player.prefetch(uri, connect.spclientHost)
         }
         sendSmartTap(uri, uid)
+        rearmSmart(chainContext.ifBlank { context })
         val enhancedNow = enhancedQueue(context).any { it.uri == uri && it.enhanced }
         if (state.isEnhanced != enhancedNow) state = state.copy(isEnhanced = enhancedNow)
         val remote = remoteTarget()
