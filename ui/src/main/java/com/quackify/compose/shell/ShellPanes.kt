@@ -1005,7 +1005,7 @@ internal fun ShellAddTracksPane(
                 )
             }
             else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(items) { item ->
+                items(items, key = { it.uri }) { item ->
                     AddTrackRow(
                         item = item,
                         added = item.uri in added,
