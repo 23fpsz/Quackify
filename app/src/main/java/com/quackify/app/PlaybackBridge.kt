@@ -989,6 +989,20 @@ class PlaybackBridge(private val context: Context) {
         ) enhancedRows else emptyList()
 
     /**
+     * The enhanced list is the context view (playlist rows first, then the
+     * injected recommendations), not 'current plus upcoming': the server drops
+     * a recommendation once its tap is sent, so the playing row may not be in
+     * the list at all. Anything at or before the current row is already played.
+     */
+    private fun enhancedUpcoming(contextUri: String, current: String): List<SmartShuffleRow> {
+        val rows = enhancedQueue(contextUri)
+        if (rows.isEmpty()) return emptyList()
+        val at = rows.indexOfFirst { it.uri == current }
+        if (at >= 0) return rows.drop(at + 1)
+        return rows.filter { it.enhanced && it.uri != current }
+    }
+
+    /**
      * A cold start restores the modes from the cluster but not the enhance
      * session: the first play in a smart context re-arms the lens and pulls
      * a fresh enhanced queue.
@@ -1540,12 +1554,11 @@ class PlaybackBridge(private val context: Context) {
         }
         val here = playingUri(cluster)
         if (forward) {
-            val enhanced = enhancedQueue(chainContext.ifBlank { cluster.contextUri })
-            val at = enhanced.indexOfFirst { it.uri == here }
-            val pick = enhanced.getOrNull(at + 1)?.uri
+            val upcoming = enhancedUpcoming(chainContext.ifBlank { cluster.contextUri }, here)
+            val pick = upcoming.firstOrNull()?.uri
             if (!pick.isNullOrBlank() && pick != here) {
-                log.i("skip next from the enhanced queue: row ${at + 1} of ${enhanced.size} " +
-                    "'${pick.takeLast(12)}'"
+                log.i("skip next from the enhanced queue: '${pick.takeLast(12)}' " +
+                    "of ${upcoming.size} upcoming"
                 )
                 playTrack(pick, chainContext.ifBlank { cluster.contextUri }, -1)
                 return
@@ -2394,9 +2407,8 @@ class PlaybackBridge(private val context: Context) {
         val knownUpcoming = serverRows.mapTo(HashSet()) { it.uri }
         val enhanced = if (chainFits) enhancedQueue(context) else emptyList()
         val enhancedTail = if (enhanced.isNotEmpty()) {
-            val at = enhanced.indexOfFirst { it.uri == anchor }
-            enhanced.asSequence()
-                .drop(if (at >= 0) at + 1 else 0)
+            enhancedUpcoming(context, anchor)
+                .asSequence()
                 .filterNot { it.uri in queuedUris }
                 .map { it.uri }
                 .distinct()
@@ -2958,15 +2970,14 @@ class PlaybackBridge(private val context: Context) {
             startFromServer(next, moved)
             return
         }
-        val enhanced = enhancedQueue(chainContext.ifBlank { server?.contextUri.orEmpty() })
-        if (enhanced.isNotEmpty()) {
-            val at = enhanced.indexOfFirst { it.uri == ended }
-            val pick = enhanced.getOrNull(at + 1)?.uri
+        val enhancedContext = chainContext.ifBlank { server?.contextUri.orEmpty() }
+        if (enhancedQueue(enhancedContext).isNotEmpty()) {
+            val pick = enhancedUpcoming(enhancedContext, ended).firstOrNull()?.uri
             if (!pick.isNullOrBlank() && pick != ended) {
                 log.i("advance -> '${pick.takeLast(12)}' from the enhanced queue, " +
-                        "row ${at + 1} of ${enhanced.size}"
+                        "${enhancedUpcoming(enhancedContext, ended).size} upcoming"
                 )
-                playTrack(pick, chainContext.ifBlank { server?.contextUri.orEmpty() }, -1)
+                playTrack(pick, enhancedContext, -1)
                 return
             }
             log.i("advance: the enhanced queue ran out after '${ended.takeLast(12)}'")
