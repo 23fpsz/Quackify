@@ -178,6 +178,7 @@ class PlaybackBridge(private val context: Context) {
 
     @Volatile
     private var enhancedRows: List<SmartShuffleRow> = emptyList()
+    private var playedSmart = mutableSetOf<String>()
 
     @Volatile
     private var enhancedFor = ""
@@ -917,6 +918,7 @@ class PlaybackBridge(private val context: Context) {
         if (!nextSmart) {
             enhancedRows = emptyList()
             enhancedFor = ""
+            playedSmart.clear()
             if (enhanceWasOn) {
                 val contextUri = cluster?.contextUri.orEmpty().ifBlank { chainContext }
                 if (contextUri.isNotBlank()) {
@@ -949,11 +951,12 @@ class PlaybackBridge(private val context: Context) {
                 SpotifyAuth.token(context),
                 connect.spclientHost,
                 lens,
-                row.uid.ifBlank { uid },
+                row,
             )
             log.i("smart shuffle tap on '${uri.takeLast(12)}' ok=${rows.isNotEmpty()} rows=${rows.size}")
             if (rows.isNotEmpty()) {
-                enhancedRows = rows
+                val known = enhancedRows.mapTo(HashSet()) { it.uri }
+                enhancedRows = enhancedRows + rows.filter { it.uri !in known }
                 publishQueue(connect.cluster.value)
             }
         }
@@ -981,6 +984,7 @@ class PlaybackBridge(private val context: Context) {
                 val rows = SmartShuffleSource.reset(context, SpotifyAuth.token(context), connect.spclientHost, lens)
                 enhancedRows = rows
                 enhancedFor = contextUri
+                playedSmart.clear()
                 log.i("smart shuffle reset on '${lens.takeLast(24)}' rows=${rows.size} " +
                     "enhanced=${rows.count { it.enhanced }}")
                 publishQueue(connect.cluster.value)
@@ -997,16 +1001,19 @@ class PlaybackBridge(private val context: Context) {
         ) enhancedRows else emptyList()
 
     /**
-     * The enhanced list is the context view (playlist rows first, then the
-     * injected recommendations), not 'current plus upcoming': the server drops
-     * a recommendation once its tap is sent, so the playing row may not be in
-     * the list at all. Anything at or before the current row is already played.
+     * The next candidates are the enhanced rows we have not played in this
+     * session, in local insertion order: the reset sets the order and each
+     * tap appends the server's new feed at the end. The local play history
+     * is what prevents repeats; when the pool runs out it resets and the
+     * server's view takes over again.
      */
     private fun enhancedUpcoming(contextUri: String, current: String): List<SmartShuffleRow> {
         val rows = enhancedQueue(contextUri)
         if (rows.isEmpty()) return emptyList()
-        val at = rows.indexOfFirst { it.uri == current }
-        if (at >= 0) return rows.drop(at + 1)
+        val fresh = rows
+            .filter { it.enhanced && it.uri != current && it.uri !in playedSmart }
+        if (fresh.isNotEmpty()) return fresh
+        playedSmart.clear()
         return rows.filter { it.enhanced && it.uri != current }
     }
 
@@ -1032,6 +1039,7 @@ class PlaybackBridge(private val context: Context) {
                 val rows = SmartShuffleSource.reset(context, SpotifyAuth.token(context), connect.spclientHost, lens)
                 enhancedRows = rows
                 enhancedFor = contextUri
+                playedSmart.clear()
                 log.i("smart shuffle re-armed on '${contextUri.takeLast(16)}' " +
                     "rows=${rows.size} enhanced=${rows.count { it.enhanced }}"
                 )
@@ -1562,6 +1570,15 @@ class PlaybackBridge(private val context: Context) {
         }
         val here = playingUri(cluster)
         if (forward) {
+            val queuedUri = queuedTail.firstOrNull()?.uri ?: cluster.queued.firstOrNull()?.uri
+            if (!queuedUri.isNullOrBlank() && queuedUri != here) {
+                log.i("skip next to the queued '${queuedUri.takeLast(12)}' of " +
+                    "${queuedTail.size + cluster.queued.size} queued"
+                )
+                queuedTail = queuedTail.drop(1)
+                playTrack(queuedUri, chainContext.ifBlank { cluster.contextUri }, -1)
+                return
+            }
             val upcoming = enhancedUpcoming(chainContext.ifBlank { cluster.contextUri }, here)
             val pick = upcoming.firstOrNull()?.uri
             if (!pick.isNullOrBlank() && pick != here) {
@@ -1589,7 +1606,7 @@ class PlaybackBridge(private val context: Context) {
         }
         val step = if (forward) 1 else -1
         var cursor = at + step
-        while (cursor in window.indices && !window[cursor].isVisible) cursor += step
+        while (cursor in window.indices && (!window[cursor].isVisible || untitled(window[cursor]))) cursor += step
         if (cursor !in window.indices) {
             if (repeatContextOn(cluster)) {
                 cursor = if (forward) {
@@ -1605,7 +1622,7 @@ class PlaybackBridge(private val context: Context) {
         }
         if (forward && shuffleOn(cluster) && !smartOn(cluster)) {
             val pool = window.indices.filter { i ->
-                window[i].isVisible && window[i].uri != here
+                window[i].isVisible && window[i].uri != here && !untitled(window[i])
             }
             if (pool.isNotEmpty()) cursor = pool.random()
         }
@@ -1768,6 +1785,13 @@ class PlaybackBridge(private val context: Context) {
         sendSmartTap(uri, uid)
         rearmSmart(chainContext.ifBlank { context })
         val enhancedNow = enhancedQueue(context).any { it.uri == uri && it.enhanced }
+        if (enhancedNow) {
+            val current = connect.cluster.value?.let { playingUri(it) }.orEmpty()
+            val upcoming = enhancedUpcoming(chainContext.ifBlank { context }, current)
+            val ahead = upcoming.indexOfFirst { it.uri == uri }
+            if (ahead > 0) upcoming.take(ahead).forEach { playedSmart.add(it.uri) }
+            playedSmart.add(uri)
+        }
         if (state.isEnhanced != enhancedNow) state = state.copy(isEnhanced = enhancedNow)
         val remote = remoteTarget()
         if (remote.isNotBlank()) {
@@ -2487,6 +2511,10 @@ class PlaybackBridge(private val context: Context) {
         }
     }
 
+    /** Lens-added rows reach the cluster without metadata; never play those blind. */
+    private fun untitled(row: ClusterTrack): Boolean =
+        row.title.isBlank() && decorated[row.uri] == null
+
     private fun screenContext(uri: String): String {
         val known = connect.playback?.currentTrack?.contextUri.orEmpty()
         if (known.isNotBlank() && !known.startsWith("spotify:track:")) return known
@@ -2980,10 +3008,11 @@ class PlaybackBridge(private val context: Context) {
         }
         val enhancedContext = chainContext.ifBlank { server?.contextUri.orEmpty() }
         if (enhancedQueue(enhancedContext).isNotEmpty()) {
-            val pick = enhancedUpcoming(enhancedContext, ended).firstOrNull()?.uri
+            val upcoming = enhancedUpcoming(enhancedContext, ended)
+            val pick = upcoming.firstOrNull()?.uri
             if (!pick.isNullOrBlank() && pick != ended) {
                 log.i("advance -> '${pick.takeLast(12)}' from the enhanced queue, " +
-                        "${enhancedUpcoming(enhancedContext, ended).size} upcoming"
+                        "${upcoming.size} upcoming"
                 )
                 playTrack(pick, enhancedContext, -1)
                 return
