@@ -24,6 +24,8 @@ import com.quackify.backend.connect.cluster.Device
 import com.quackify.backend.connect.command.CommandClient
 import com.quackify.backend.connect.command.CommandParser
 import com.quackify.backend.connect.command.PlaybackCommand
+import com.quackify.backend.connect.command.RemoteCommand
+import com.quackify.backend.connect.command.RemoteCommandParser
 import com.quackify.backend.connect.command.Registration
 import com.quackify.backend.connect.command.TrackUid
 import com.quackify.backend.connect.dealer.Dealer
@@ -70,6 +72,9 @@ class KrespotConnect(private val context: Context) {
 
     private val _command = MutableStateFlow<PlaybackCommand?>(null)
     val command: StateFlow<PlaybackCommand?> = _command
+
+    private val _remoteCommands = MutableSharedFlow<RemoteCommand>(extraBufferCapacity = 16)
+    val remoteCommands: SharedFlow<RemoteCommand> = _remoteCommands
 
     private val _cluster = MutableStateFlow<ClusterState?>(null)
     val cluster: StateFlow<ClusterState?> = _cluster
@@ -221,6 +226,20 @@ class KrespotConnect(private val context: Context) {
             frame.uri.startsWith(PLAYER_COMMAND_URI) ||
                     frame.uri.startsWith(CONNECT_TRANSFER_URI) ->
                 frame.payloads.forEach { payload ->
+                    val remote = withContext(Dispatchers.Default) { RemoteCommandParser.parse(payload) }
+                    if (remote != null) {
+                        log.i("remote command '${remote.endpoint}' from '${remote.sentByDeviceId.take(8)}' " +
+                                (if (remote.isTransfer) "" else "value=${remote.value} seek=${remote.seekToMs} " +
+                                "track=${remote.trackUri.takeLast(12)} shuffle=${remote.shuffle} " +
+                                "repeat=${remote.repeatContext}/${remote.repeatTrack}")
+                        )
+                        if (remote.isTransfer) {
+                            _transfers.tryEmit(Unit)
+                        } else {
+                            _remoteCommands.tryEmit(remote)
+                        }
+                        return@forEach
+                    }
                     val parsed = withContext(Dispatchers.Default) { CommandParser.parse(payload) }
                     when {
                         parsed?.isTransfer == true || isTransferOptions(payload) -> {

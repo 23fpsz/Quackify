@@ -26,6 +26,7 @@ import com.quackify.backend.model.ConnectDevice
 import com.quackify.backend.model.DeviceKind
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.connect.command.PlaybackCommand
+import com.quackify.backend.connect.command.RemoteCommand
 import com.quackify.backend.connect.command.TrackUid
 import com.quackify.backend.connect.state.DebugSource
 import com.quackify.backend.connect.state.Snapshot
@@ -427,31 +428,7 @@ class PlaybackBridge(private val context: Context) {
         }
 
         override fun onQueueAdd(uri: String) {
-            scope.launch {
-                if (uri.isBlank()) return@launch
-                if (queuedTail.none { it.uri == uri }) {
-                    queuedTail = queuedTail + TrackItem(title = "", artist = "", uri = uri)
-                }
-                publishQueue(connect.cluster.value)
-                var added = connect.addToQueue(uri)
-                if (!added) {
-                    connect.refreshCluster()
-                    delay(QUEUE_RETRY_MS)
-                    added = connect.addToQueue(uri)
-                }
-                log.i("queue += '$uri' ok=$added")
-                val cluster = connect.cluster.value
-                val written = added || (cluster != null && writeQueue(queueTailUris(uri), cluster))
-                if (!added && cluster != null) log.i("queue += '$uri' through set_queue ok=$written")
-                if (!written) {
-                    queuedTail = queuedTail.filterNot { it.uri == uri }
-                    publishQueue(cluster)
-                    return@launch
-                }
-                publishQueue(cluster)
-                connect.refreshCluster()
-                scheduleDecorate(listOf(uri))
-            }
+            queueAdd(uri)
         }
 
         override fun onQueueSet(uris: List<String>) {
@@ -588,6 +565,7 @@ class PlaybackBridge(private val context: Context) {
                     takeBackHere()
                 }
             }
+            launch { connect.remoteCommands.collect(::onRemoteCommand) }
             launch { connect.registered.collect { log.i("registered=$it") } }
             launch {
                 connect.connectionId.collect {
@@ -1166,6 +1144,105 @@ class PlaybackBridge(private val context: Context) {
         )
         delay(SKIP_SETTLE_MS)
         connect.refreshCluster()
+    }
+
+    private fun queueAdd(uri: String) {
+        scope.launch {
+            if (uri.isBlank()) return@launch
+            if (queuedTail.none { it.uri == uri }) {
+                queuedTail = queuedTail + TrackItem(title = "", artist = "", uri = uri)
+            }
+            publishQueue(connect.cluster.value)
+            var added = connect.addToQueue(uri)
+            if (!added) {
+                connect.refreshCluster()
+                delay(QUEUE_RETRY_MS)
+                added = connect.addToQueue(uri)
+            }
+            log.i("queue += '$uri' ok=$added")
+            val cluster = connect.cluster.value
+            val written = added || (cluster != null && writeQueue(queueTailUris(uri), cluster))
+            if (!added && cluster != null) log.i("queue += '$uri' through set_queue ok=$written")
+            if (!written) {
+                queuedTail = queuedTail.filterNot { it.uri == uri }
+                publishQueue(cluster)
+                return@launch
+            }
+            publishQueue(cluster)
+            connect.refreshCluster()
+            scheduleDecorate(listOf(uri))
+        }
+    }
+
+    private suspend fun onRemoteCommand(command: RemoteCommand) {
+        if (command.isTransfer) return
+        when (command.endpoint) {
+            "pause" -> {
+                if (!player.hasSource) return
+                if (player.isPlaying) player.pause()
+                reportPaused()
+            }
+            "resume" -> {
+                if (!player.hasSource) return
+                if (!player.isPlaying) player.resume()
+                reportResumed()
+            }
+            "skip_next" -> skipTo(true)
+            "skip_prev" -> skipTo(false)
+            "seek_to" -> {
+                if (command.seekToMs < 0L || !player.hasSource) return
+                val duration = player.durationMs.takeIf { it > 0L } ?: state.durationMs
+                val target = if (duration > 0L) command.seekToMs.coerceIn(0L, duration) else command.seekToMs
+                state = state.copy(
+                    positionMs = target,
+                    durationMs = duration,
+                    progress = progressOf(target, duration),
+                )
+                player.seekTo(target)
+                publishLocalFromEngine(target)
+            }
+            "set_shuffling_context" -> {
+                val value = command.value ?: return
+                if (shuffleOn(connect.cluster.value) != value) toggleShuffle()
+            }
+            "set_repeating_context" -> {
+                val value = command.value ?: return
+                setRepeatExplicit(context = value, track = null)
+            }
+            "set_repeating_track" -> {
+                val value = command.value ?: return
+                setRepeatExplicit(context = null, track = value)
+            }
+            "set_options" -> {
+                command.shuffle?.let { if (shuffleOn(connect.cluster.value) != it) toggleShuffle() }
+                if (command.repeatContext != null || command.repeatTrack != null) {
+                    setRepeatExplicit(context = command.repeatContext, track = command.repeatTrack)
+                }
+            }
+            "add_to_queue" -> {
+                val uri = command.trackUri
+                if (uri.isNotBlank()) queueAdd(uri)
+            }
+            else -> log.i("remote command '${command.endpoint}' is not handled here yet")
+        }
+    }
+
+    private suspend fun setRepeatExplicit(context: Boolean?, track: Boolean?) {
+        if (context == null && track == null) return
+        val cluster = connect.cluster.value
+        val target = cluster?.activeDevice?.id?.takeIf { it.isNotBlank() } ?: deviceId
+        val nextContext = context ?: repeatContextOn(cluster)
+        val nextTrack = track ?: repeatTrackOn(cluster)
+        if (nextContext == repeatContextOn(cluster) && nextTrack == repeatTrackOn(cluster)) return
+        log.i("repeat set on '${target.take(8)}' -> context=$nextContext track=$nextTrack")
+        if (!connect.setRepeatOn(target, nextContext, nextTrack)) {
+            log.w("repeat: '${target.take(8)}' refused the option, applying it locally anyway")
+        }
+        rememberModes(shuffle = null, smart = null, repeatContext = nextContext, repeatTrack = nextTrack)
+        publishModes()
+        delay(MODE_SETTLE_MS)
+        runCatching { connect.refreshCluster() }
+        publishModes()
     }
 
     /** Toggle the canvas loop and push it into the next playback state report. */
