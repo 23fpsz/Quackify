@@ -1,7 +1,6 @@
 package com.quackify.backend.core.net
 
 import android.content.Context
-import com.quackify.backend.core.auth.SecurePrefs
 import com.quackify.backend.core.auth.SpotifyAuth
 import kotlinx.coroutines.sync.Mutex
 import org.json.JSONObject
@@ -21,6 +20,8 @@ object ClientToken {
     private const val KEY_DEVICE = "client_device_id"
 
     private const val SKEW_MS = 60_000L
+
+    private const val PREFS = "quackify_secure"
 
     private val mutex = Mutex()
 
@@ -48,7 +49,7 @@ object ClientToken {
     }
 
     fun deviceId(context: Context): String {
-        val prefs = SecurePrefs.get(context)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs.getString(KEY_DEVICE, null)?.takeIf { it.isNotBlank() }?.let { return it }
         val generated = UUID.randomUUID().toString()
         prefs.edit().putString(KEY_DEVICE, generated).apply()
@@ -58,7 +59,7 @@ object ClientToken {
 
     fun invalidate(context: Context) {
         log.w("client-token dropped, the next call mints a new one")
-        SecurePrefs.get(context).edit()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .remove(KEY_REFRESH)
             .remove(KEY_MINTED_AT)
             .apply()
@@ -67,13 +68,13 @@ object ClientToken {
     }
 
     fun remainingMs(context: Context): Long {
-        val refreshAt = SecurePrefs.get(context).getLong(KEY_REFRESH, 0L)
+        val refreshAt = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_REFRESH, 0L)
         if (refreshAt <= 0L) return -1L
         return refreshAt - System.currentTimeMillis()
     }
 
     fun ageMs(context: Context): Long {
-        val at = SecurePrefs.get(context).getLong(KEY_MINTED_AT, 0L)
+        val at = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_MINTED_AT, 0L)
         if (at <= 0L) return -1L
         return System.currentTimeMillis() - at
     }
@@ -87,7 +88,7 @@ object ClientToken {
     private fun refreshDeadline(context: Context): Long {
         val memo = refreshAtMemo
         if (memo >= 0L) return memo
-        val value = SecurePrefs.get(context).getLong(KEY_REFRESH, 0L)
+        val value = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_REFRESH, 0L)
         refreshAtMemo = value
         return value
     }
@@ -140,7 +141,7 @@ object ClientToken {
         val expiresAt = if (expires > 0L) now + expires * 1000L else 0L
         val refreshAt = if (refresh > 0L) now + refresh * 1000L else expiresAt
         SpotifyAuth.saveClientToken(context, token, expiresAt)
-        SecurePrefs.get(context).edit()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putLong(KEY_REFRESH, refreshAt)
             .putLong(KEY_MINTED_AT, now)
             .apply()

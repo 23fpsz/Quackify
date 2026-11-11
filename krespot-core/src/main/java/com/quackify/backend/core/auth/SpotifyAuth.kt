@@ -36,6 +36,9 @@ object SpotifyAuth {
     private const val KEY_TOKEN_EXP = "access_token_exp"
     private const val KEY_CLIENT_TOKEN = "client_token"
     private const val KEY_CLIENT_TOKEN_EXP = "client_token_exp"
+    private const val PREFS = "quackify_secure"
+
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     @Volatile
     private var tokenMemo: String? = null
@@ -61,7 +64,7 @@ object SpotifyAuth {
 
     /** All accounts the user has logged into on this device. */
     fun savedAccounts(context: Context): List<Account> {
-        val p = SecurePrefs.get(context)
+        val p = prefs(context)
         val ids = runCatching {
             JSONArray(p.getString(KEY_MULTI_INDEX, "[]"))
         }.getOrNull() ?: JSONArray()
@@ -82,7 +85,7 @@ object SpotifyAuth {
     }
 
     fun activeAccountId(context: Context): String =
-        SecurePrefs.get(context).getString(KEY_MULTI_ACTIVE, "").orEmpty()
+        prefs(context).getString(KEY_MULTI_ACTIVE, "").orEmpty()
 
     /**
      * Snapshots the currently active session + profile into the multi-account
@@ -94,7 +97,7 @@ object SpotifyAuth {
             log.w("storeCurrentAccount: no account id yet, skipping")
             return
         }
-        val p = SecurePrefs.get(context)
+        val p = prefs(context)
         p.edit()
             .putString("multi.${account.id}.session", p.getString(KEY_SESSION, null))
             .putString("multi.${account.id}.name", account.name)
@@ -109,7 +112,7 @@ object SpotifyAuth {
     }
 
     private fun upsertIndex(context: Context, id: String) {
-        val p = SecurePrefs.get(context)
+        val p = prefs(context)
         val ids = runCatching {
             JSONArray(p.getString(KEY_MULTI_INDEX, "[]"))
         }.getOrDefault(JSONArray())
@@ -127,7 +130,7 @@ object SpotifyAuth {
      * is re-seeded. Returns false when the id is unknown.
      */
     fun switchAccount(context: Context, id: String): Boolean {
-        val p = SecurePrefs.get(context)
+        val p = prefs(context)
         val session = p.getString("multi.$id.session", null)
         val name = p.getString("multi.$id.name", "").orEmpty()
         if (session.isNullOrBlank() || name.isBlank()) {
@@ -170,7 +173,7 @@ object SpotifyAuth {
      * or log out completely).
      */
     fun forgetAccount(context: Context, id: String): Boolean {
-        val p = SecurePrefs.get(context)
+        val p = prefs(context)
         val wasActive = activeAccountId(context) == id
         p.edit()
             .remove("multi.$id.session")
@@ -211,7 +214,7 @@ object SpotifyAuth {
         if (previous == token && expiresAtMs <= 0L) return
         val now = System.currentTimeMillis()
         val exp = if (expiresAtMs > 0L) expiresAtMs else jwtExpiryMs(token)
-        SecurePrefs.get(context).edit()
+        prefs(context).edit()
             .putString(KEY_TOKEN, token)
             .putLong(KEY_TOKEN_AT, now)
             .putLong(KEY_TOKEN_EXP, exp)
@@ -224,14 +227,14 @@ object SpotifyAuth {
 
     fun markTokenSeen(context: Context) {
         if (token(context).isBlank()) return
-        SecurePrefs.get(context).edit()
+        prefs(context).edit()
             .putLong(KEY_TOKEN_AT, System.currentTimeMillis())
             .apply()
     }
 
     fun invalidateToken(context: Context) {
         log.w("access token rejected, clearing it so the next pass re-captures")
-        SecurePrefs.get(context).edit()
+        prefs(context).edit()
             .remove(KEY_TOKEN)
             .remove(KEY_TOKEN_AT)
             .remove(KEY_TOKEN_EXP)
@@ -242,14 +245,14 @@ object SpotifyAuth {
 
     fun token(context: Context): String {
         tokenMemo?.let { return it }
-        val value = SecurePrefs.get(context).getString(KEY_TOKEN, "").orEmpty()
+        val value = prefs(context).getString(KEY_TOKEN, "").orEmpty()
         tokenMemo = value
         return value
     }
 
     fun tokenExpiresAt(context: Context): Long {
         tokenExpMemo?.let { return it }
-        val value = SecurePrefs.get(context).getLong(KEY_TOKEN_EXP, 0L)
+        val value = prefs(context).getLong(KEY_TOKEN_EXP, 0L)
         tokenExpMemo = value
         return value
     }
@@ -265,13 +268,13 @@ object SpotifyAuth {
     }
 
     fun tokenAgeMs(context: Context): Long {
-        val at = SecurePrefs.get(context).getLong(KEY_TOKEN_AT, 0L)
+        val at = prefs(context).getLong(KEY_TOKEN_AT, 0L)
         return if (at == 0L) -1L else System.currentTimeMillis() - at
     }
 
     fun saveClientToken(context: Context, token: String, expiresAtMs: Long = 0L) {
         if (token.isBlank()) {
-            SecurePrefs.get(context).edit()
+            prefs(context).edit()
                 .remove(KEY_CLIENT_TOKEN)
                 .remove(KEY_CLIENT_TOKEN_EXP)
                 .apply()
@@ -281,7 +284,7 @@ object SpotifyAuth {
         }
         if (clientToken(context) == token && expiresAtMs <= 0L) return
         val exp = if (expiresAtMs > 0L) expiresAtMs else jwtExpiryMs(token)
-        SecurePrefs.get(context).edit()
+        prefs(context).edit()
             .putString(KEY_CLIENT_TOKEN, token)
             .putLong(KEY_CLIENT_TOKEN_EXP, exp)
             .apply()
@@ -293,7 +296,7 @@ object SpotifyAuth {
 
     fun clientToken(context: Context): String {
         clientTokenMemo?.let { return it }
-        val value = SecurePrefs.get(context).getString(KEY_CLIENT_TOKEN, "").orEmpty()
+        val value = prefs(context).getString(KEY_CLIENT_TOKEN, "").orEmpty()
         clientTokenMemo = value
         return value
     }
@@ -305,7 +308,7 @@ object SpotifyAuth {
 
     private fun clientTokenExpiresAt(context: Context): Long {
         clientTokenExpMemo?.let { return it }
-        val value = SecurePrefs.get(context).getLong(KEY_CLIENT_TOKEN_EXP, 0L)
+        val value = prefs(context).getLong(KEY_CLIENT_TOKEN_EXP, 0L)
         clientTokenExpMemo = value
         return value
     }
@@ -342,7 +345,7 @@ object SpotifyAuth {
     }
 
     fun spDc(context: Context): String {
-        val session = SecurePrefs.get(context).getString(KEY_SESSION, null) ?: return ""
+        val session = prefs(context).getString(KEY_SESSION, null) ?: return ""
         return spDcOf(session)
     }
 
@@ -377,7 +380,7 @@ object SpotifyAuth {
 
     fun account(context: Context): Account? {
         if (!isLoggedIn(context)) return null
-        val p = SecurePrefs.get(context)
+        val p = prefs(context)
         val name = p.getString(KEY_NAME, "").orEmpty()
         if (name.isBlank()) return null
         return Account(
@@ -405,14 +408,14 @@ object SpotifyAuth {
 
     suspend fun userId(context: Context, force: Boolean = false): String {
         resolvedUserId.takeIf { it.isNotBlank() }?.let { return it }
-        val stored = SecurePrefs.get(context).getString(KEY_ID, "").orEmpty()
+        val stored = prefs(context).getString(KEY_ID, "").orEmpty()
         plausibleId(stored)?.let {
             resolvedUserId = it
             return it
         }
         if (stored.isNotBlank()) {
             log.i("userId: dropping the alias '$stored' an older build stored, resolving for real")
-            SecurePrefs.get(context).edit().remove(KEY_ID).apply()
+            prefs(context).edit().remove(KEY_ID).apply()
         }
         val now = System.currentTimeMillis()
         if (!force && now - lastUserIdAttempt < USER_ID_RETRY_MS) return ""
@@ -472,13 +475,13 @@ object SpotifyAuth {
     }
 
     private fun persistIdentity(context: Context, id: String, name: String, imageUrl: String) {
-        val editor = SecurePrefs.get(context).edit().putString(KEY_ID, id)
+        val editor = prefs(context).edit().putString(KEY_ID, id)
         if (name.isNotBlank()) editor.putString(KEY_NAME, name)
         if (imageUrl.isNotBlank()) editor.putString(KEY_IMAGE, imageUrl)
         editor.apply()
     }
 
-    fun savedAt(context: Context): Long = SecurePrefs.get(context).getLong(KEY_SAVED_AT, 0L)
+    fun savedAt(context: Context): Long = prefs(context).getLong(KEY_SAVED_AT, 0L)
 
     fun captureCookies(context: Context): String? {
         val manager = cookieManagerOrNull() ?: return null
@@ -497,7 +500,7 @@ object SpotifyAuth {
 
     fun saveLogin(context: Context, cookies: String, account: Account) {
         log.i("saveLogin name=${account.name} id=${account.id} product=${account.product} avatar=${account.imageUrl.isNotBlank()}")
-        SecurePrefs.get(context).edit()
+        prefs(context).edit()
             .putString(KEY_SESSION, cookies)
             .putString(KEY_NAME, account.name)
             .putString(KEY_ID, account.id)
@@ -512,7 +515,7 @@ object SpotifyAuth {
     }
 
     fun applySession(context: Context) {
-        val session = SecurePrefs.get(context).getString(KEY_SESSION, null) ?: return
+        val session = prefs(context).getString(KEY_SESSION, null) ?: return
         val map = runCatching { JSONObject(session) }.getOrNull() ?: return
         val manager = cookieManagerOrNull() ?: run {
             log.w("applySession skipped, the cookie jar is unavailable")
@@ -535,7 +538,7 @@ object SpotifyAuth {
         if (active.isNotBlank()) {
             forgetAccount(context, active)
         }
-        SecurePrefs.get(context).edit()
+        prefs(context).edit()
             .remove(KEY_SESSION)
             .remove(KEY_NAME)
             .remove(KEY_ID)
