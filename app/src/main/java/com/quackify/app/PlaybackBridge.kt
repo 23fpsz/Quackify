@@ -887,6 +887,7 @@ class PlaybackBridge(private val context: Context) {
         val now = shuffleOn(cluster)
         val nowSmart = smartOn(cluster)
         val smartAllowed = smartAvailable(cluster)
+        val enhanceWasOn = enhancedFor.isNotBlank() || cluster?.enhancement == ENHANCEMENT_SMART
         val next: Boolean
         val nextSmart: Boolean
         when {
@@ -916,6 +917,13 @@ class PlaybackBridge(private val context: Context) {
         if (!nextSmart) {
             enhancedRows = emptyList()
             enhancedFor = ""
+            if (enhanceWasOn) {
+                val contextUri = cluster?.contextUri.orEmpty().ifBlank { chainContext }
+                if (contextUri.isNotBlank()) {
+                    val dropped = connect.clearContextLens(target, contextUri)
+                    log.i("shuffle: dropped the enhance lens from '${contextUri.takeLast(16)}' ok=$dropped")
+                }
+            }
         }
         publishModes()
         if (nextSmart) enhanceReset(cluster)
