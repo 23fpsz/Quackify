@@ -367,6 +367,13 @@ class PlaybackBridge(private val context: Context) {
                         if (backHome) "taking the stream back here" else "transfer"
                 )
                 if (backHome) {
+                    state = state.copy(
+                        controllingRemote = false,
+                        activeDeviceName = "Quackify",
+                        activeDeviceId = deviceId,
+                        connectedDevice = "Quackify",
+                        devices = state.devices.map { it.copy(active = it.id == deviceId) }
+                    )
                     takeBackHere()
                     return@launch
                 }
@@ -375,6 +382,14 @@ class PlaybackBridge(private val context: Context) {
                     log.w("device select: the transfer to '" + target.name + "' was refused")
                     return@launch
                 }
+                connect.holdsStream = false
+                state = state.copy(
+                    controllingRemote = true,
+                    activeDeviceName = target.name,
+                    activeDeviceId = target.id,
+                    connectedDevice = target.name,
+                    devices = state.devices.map { it.copy(active = it.id == target.id) }
+                )
             }
         }
 
@@ -1332,6 +1347,10 @@ class PlaybackBridge(private val context: Context) {
             progress = progressOf(positionMs, duration),
             contextUri = contextUri,
             controllingRemote = false,
+            activeDeviceName = "Quackify",
+            activeDeviceId = deviceId,
+            connectedDevice = "Quackify",
+            devices = state.devices.map { it.copy(active = it.id == deviceId) },
         )
         player.play(row.asCommandTrack(), connect.spclientHost, positionMs)
         if (!playing) player.pause()
@@ -1519,6 +1538,10 @@ class PlaybackBridge(private val context: Context) {
             else !command.paused,
             isBuffering = if (loaded == track.uri && player.hasSource) state.isBuffering else false,
             controllingRemote = false,
+            activeDeviceName = "Quackify",
+            activeDeviceId = deviceId,
+            connectedDevice = "Quackify",
+            devices = state.devices.map { it.copy(active = it.id == deviceId) },
             positionMs = position,
             progress = progressOf(position, state.durationMs),
         )
@@ -1668,6 +1691,13 @@ class PlaybackBridge(private val context: Context) {
                 log.i("back home: nothing to take over, claiming the engine's stream")
                 connect.holdsStream = true
                 publishLocalFromEngine()
+                state = state.copy(
+                    controllingRemote = false,
+                    activeDeviceName = "Quackify",
+                    activeDeviceId = deviceId,
+                    connectedDevice = "Quackify",
+                    devices = state.devices.map { it.copy(active = it.id == deviceId) }
+                )
             } else {
                 log.w("back home: nothing to take over yet")
             }
@@ -1688,6 +1718,13 @@ class PlaybackBridge(private val context: Context) {
             if (playing && !player.isPlaying) player.resume()
             if (!playing && player.isPlaying) player.pause()
             publishLocalFromEngine(where, playing)
+            state = state.copy(
+                controllingRemote = false,
+                activeDeviceName = "Quackify",
+                activeDeviceId = deviceId,
+                connectedDevice = "Quackify",
+                devices = state.devices.map { it.copy(active = it.id == deviceId) }
+            )
             return
         }
         log.i("back home: taking the stream at ${at.positionNow()}ms of '${track.title}' " +
@@ -2328,10 +2365,17 @@ class PlaybackBridge(private val context: Context) {
 
     private fun publishDevices(cluster: ClusterState) {
         val active = cluster.activeDevice
-        val mine = active != null && active.id == deviceId
-        val label = active?.name.orEmpty()
+        val localPlaybackActive = connect.holdsStream || (player.hasSource && !state.controllingRemote)
+        val mine = (active != null && active.id == deviceId) || localPlaybackActive
+        val label = if (localPlaybackActive) "Quackify" else active?.name.orEmpty()
+        val effectiveActiveId = if (localPlaybackActive) deviceId else active?.id.orEmpty()
         val remote = cluster.remote.map { it.name }
-        val devices = withLocalDevice(cluster)
+        val rawDevices = withLocalDevice(cluster)
+        val devices = if (localPlaybackActive) {
+            rawDevices.map { it.copy(active = it.id == deviceId) }
+        } else {
+            rawDevices
+        }
         if (state.devices != devices || state.activeDeviceName != label ||
             state.controllingRemote != !mine
         ) {
@@ -2340,12 +2384,12 @@ class PlaybackBridge(private val context: Context) {
                     "inferred=${cluster.activeInferred} remote=${remote.joinToString("|")}"
             )
         }
-        val noneActive = active == null && !player.hasSource
-        val remoteActive = (!mine || noneActive) && !player.hasSource
+        val noneActive = active == null && !player.hasSource && !localPlaybackActive
+        val remoteActive = (!mine || noneActive) && !player.hasSource && !localPlaybackActive
         state = state.copy(
             devices = devices,
             activeDeviceName = label,
-            activeDeviceId = active?.id.orEmpty(),
+            activeDeviceId = effectiveActiveId,
             controllingRemote = remoteActive,
             remoteCanSeek = !remoteActive || !cluster.disallowSeeking,
             remoteCanSkipPrev = !remoteActive || cluster.canSkipPrev,
@@ -2369,14 +2413,25 @@ class PlaybackBridge(private val context: Context) {
      */
     private fun withLocalDevice(cluster: ClusterState): List<ConnectDevice> {
         val fromServer = cluster.devices
-        if (fromServer.any { it.id == deviceId }) return fromServer
-        return fromServer + localDeviceRow(active = cluster.activeDeviceId == deviceId)
+        val isMineActive = cluster.activeDeviceId == deviceId ||
+                connect.holdsStream ||
+                (player.hasSource && !state.controllingRemote)
+        if (fromServer.any { it.id == deviceId }) {
+            return fromServer.map { dev ->
+                if (dev.id == deviceId) {
+                    dev.copy(kind = DeviceKind.PHONE, local = true, active = isMineActive)
+                } else {
+                    if (isMineActive) dev.copy(active = false) else dev
+                }
+            }
+        }
+        return fromServer + localDeviceRow(active = isMineActive)
     }
 
     private fun localDeviceRow(active: Boolean): ConnectDevice = ConnectDevice(
         id = deviceId,
         name = "Quackify",
-        kind = DeviceKind.COMPUTER,
+        kind = DeviceKind.PHONE,
         canPlay = true,
         volume = 0,
         volumeSteps = 64,
