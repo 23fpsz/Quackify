@@ -840,7 +840,11 @@ class PlaybackBridge(private val context: Context) {
         val canShuffle = cluster?.canShuffle ?: true
         val canSmartShuffle = smartAvailable(cluster)
         val canRepeat = (cluster?.canRepeatContext ?: true) || (cluster?.canRepeatTrack ?: true)
-        val currentEnhanced = currentTrackEnhanced(cluster)
+        val currentEnhanced = if (cluster?.track?.uri == state.trackUri && state.trackUri.isNotBlank()) {
+            state.isEnhanced
+        } else {
+            currentTrackEnhanced(cluster)
+        }
         if (state.shuffleMode != shuffleMode || state.repeatMode != repeatMode ||
             state.canShuffle != canShuffle || state.canSmartShuffle != canSmartShuffle ||
             state.canRepeat != canRepeat || state.isEnhanced != currentEnhanced
