@@ -172,7 +172,7 @@ fun SpotifyBrowseScreen(
                 }
             }
 
-            items(sections) { section ->
+            items(sections, key = { it.title }) { section ->
                 Column(modifier = Modifier.padding(bottom = 20.dp)) {
                     if (section.title.isNotBlank()) {
                         Text(
@@ -189,7 +189,7 @@ fun SpotifyBrowseScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(section.cards) { card ->
+                        items(section.cards, key = { it.uri }) { card ->
                             BrowseCardTile(card = card, onClick = { onCardClick(card.title, card.uri) })
                         }
                     }
