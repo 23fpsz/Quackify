@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.store.AppPrefs
 import org.json.JSONObject
 
 private val log = Logs.of(Logs.Module.HASHES)
@@ -37,7 +38,7 @@ object BundleHashes {
     private fun load(context: Context) {
         if (loaded) return
         loaded = true
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = AppPrefs.prefs(context, PREFS)
         at = prefs.getLong(KEY_AT, 0L)
         val raw = prefs.getString(KEY_TABLE, null) ?: return
         runCatching {
@@ -140,7 +141,7 @@ object BundleHashes {
     private fun persist(context: Context) {
         val root = JSONObject()
         table.forEach { (name, hash) -> root.put(name, hash) }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        AppPrefs.prefs(context, PREFS).edit()
             .putString(KEY_TABLE, root.toString())
             .putLong(KEY_AT, at)
             .apply()

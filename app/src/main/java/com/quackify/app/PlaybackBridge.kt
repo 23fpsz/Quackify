@@ -484,7 +484,7 @@ class PlaybackBridge(private val context: Context) {
     fun start() {
         if (dealer != null) return
         log.i("start device=" + deviceId)
-        autoplayOnStartup = context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+        autoplayOnStartup = com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .getBoolean(AUTOPLAY_ON_STARTUP_PREF, false)
         autoplayPending = true
         autoplayArmedAt = SystemClock.elapsedRealtime()
@@ -2230,15 +2230,15 @@ class PlaybackBridge(private val context: Context) {
         if (contextUri == rememberedChain && rows == rememberedRows) return
         rememberedChain = contextUri
         rememberedRows = rows
-        context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+        com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .edit()
             .putString(CHAIN_CONTEXT_PREF, contextUri)
             .putString(CHAIN_ROWS_PREF, rows.joinToString("\n"))
             .apply()
     }
 
-    private fun restoredRows(): List<String> = context
-        .getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+    private fun restoredRows(): List<String> = com.quackify.backend.core.store.AppPrefs
+        .prefs(context, CLIENT_PREFS)
         .getString(CHAIN_ROWS_PREF, "").orEmpty()
         .split("\n")
         .filter { it.startsWith("spotify:") }
@@ -2249,7 +2249,7 @@ class PlaybackBridge(private val context: Context) {
         val fromCluster = cluster.contextUri.takeIf { usableContext(it) }
         val contextUri = fromCluster
             ?: rememberedChain.takeIf { usableContext(it) }
-            ?: context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+            ?: com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
                 .getString(CHAIN_CONTEXT_PREF, "").orEmpty().takeIf { usableContext(it) }
             ?: return
         if (cluster.nextTracks.isNotEmpty()) return
@@ -2257,7 +2257,7 @@ class PlaybackBridge(private val context: Context) {
         if (anchor.isBlank()) return
         if (anchor in restoreTried) return
         restoreTried += anchor
-        val keptFor = context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+        val keptFor = com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .getString(CHAIN_CONTEXT_PREF, "").orEmpty()
         val remembered = if (keptFor == contextUri) restoredRows() else emptyList()
         if (remembered.isNotEmpty() && anchor in remembered) {
@@ -2804,7 +2804,7 @@ class PlaybackBridge(private val context: Context) {
     }
 
     private fun autoplayEnabled(): Boolean =
-        context.getSharedPreferences(CLIENT_PREFS, Context.MODE_PRIVATE)
+        com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .getBoolean(AUTOPLAY_ON_END_PREF, true)
 
     private fun serverNext(ended: String): PlaybackCommand? {

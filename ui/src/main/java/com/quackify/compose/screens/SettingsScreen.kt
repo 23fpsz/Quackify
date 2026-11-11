@@ -101,7 +101,7 @@ fun SettingsScreen(
     }
 
     val clientPrefs = remember {
-        context.getSharedPreferences("quackify.client", Context.MODE_PRIVATE)
+        com.quackify.backend.core.store.AppPrefs.prefs(context, "quackify.client")
     }
     var autoplayOnStartup by remember {
         mutableStateOf(clientPrefs.getBoolean("autoplayOnStartup", false))
