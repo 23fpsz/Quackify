@@ -20,7 +20,6 @@ android {
 
 dependencies {
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.webkit)
     implementation(libs.okhttp)
 }
