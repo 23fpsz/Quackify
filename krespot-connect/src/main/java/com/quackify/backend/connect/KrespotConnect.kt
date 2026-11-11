@@ -705,8 +705,18 @@ class KrespotConnect(private val context: Context) {
         return ok
     }
 
-    /** Sets the repeat options on the target device (blank = this one). */
-    suspend fun setRepeatOn(
+    /** Drops the enhance lens from the active context (plain update_context). */
+    suspend fun clearContextLens(targetDeviceId: String, contextUri: String): Boolean {
+        if (spclient.isBlank()) {
+            log.w("context lens: the dealer is not connected yet")
+            return false
+        }
+        val target = targetDeviceId.ifBlank { deviceId }
+        val response = CommandClient.updateContext(context, spclient, deviceId, target, contextUri, null)
+        return response?.ok == true
+    }
+
+    /** Sets the repeat options on the target device (blank = this one). */    suspend fun setRepeatOn(
         targetDeviceId: String,
         repeatContext: Boolean,
         repeatTrack: Boolean,
