@@ -64,7 +64,8 @@ data class SpotifyDevice(
     val type: DeviceType,
     val isCurrent: Boolean = false,
     val protocol: String = "Spotify Connect",
-    val volumeFraction: Float = -1f
+    val volumeFraction: Float = -1f,
+    val local: Boolean = false
 )
 
 /**
@@ -86,6 +87,7 @@ fun SpotifyConnectDeviceSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var volume by remember { mutableFloatStateOf(initialVolume.coerceIn(0f, 1f)) }
+    val volumeEnabled = devices.firstOrNull { it.isCurrent }?.local ?: true
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -186,7 +188,7 @@ fun SpotifyConnectDeviceSheet(
                                 id = if (volume == 0f) R.drawable.encore_icon_volume_off_24 else R.drawable.encore_icon_volume_24
                             ),
                             contentDescription = "Volume",
-                            tint = EncoreColors.Green,
+                            tint = if (volumeEnabled) EncoreColors.Green else EncoreColors.TextDisabled,
                             modifier = Modifier.size(20.dp)
                         )
 
@@ -201,6 +203,7 @@ fun SpotifyConnectDeviceSheet(
                                     onVolumeChange(target.id, (volume * 65535f).toInt())
                                 }
                             },
+                            enabled = volumeEnabled,
                             modifier = Modifier.weight(1f),
                             colors = SliderDefaults.colors(
                                 thumbColor = EncoreColors.TextPrimary,
@@ -302,7 +305,8 @@ fun ConnectDevice.toSpotifyDevice(): SpotifyDevice = SpotifyDevice(
     },
     isCurrent = active,
     protocol = if (brand.isBlank()) "Spotify Connect" else brand,
-    volumeFraction = if (volumeSteps > 0) (volume.toFloat() / volumeSteps.toFloat()).coerceIn(0f, 1f) else -1f
+    volumeFraction = if (volumeSteps > 0) (volume.toFloat() / volumeSteps.toFloat()).coerceIn(0f, 1f) else -1f,
+    local = local
 )
 
 @Preview

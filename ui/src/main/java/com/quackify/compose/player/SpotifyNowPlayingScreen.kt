@@ -212,6 +212,8 @@ fun SpotifyNowPlayingScreen(
     canShuffle: Boolean = true,
     canSmartShuffle: Boolean = false,
     canRepeat: Boolean = true,
+    canSkipPrevious: Boolean = true,
+    canSeek: Boolean = true,
     connectedDeviceName: String,
     onCollapseClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
@@ -487,7 +489,8 @@ fun SpotifyNowPlayingScreen(
                             durationMs = durationMs,
                             currentPositionMs = currentPositionMs,
                             onSeek = onSeek,
-                            isLoading = effectiveIsLoading
+                            isLoading = effectiveIsLoading,
+                            canSeek = canSeek
                         )
 
                         Spacer(modifier = Modifier.height(20.dp))
@@ -500,6 +503,7 @@ fun SpotifyNowPlayingScreen(
                             canShuffle = canShuffle,
                             canSmartShuffle = canSmartShuffle,
                             canRepeat = canRepeat,
+                            canSkipPrevious = canSkipPrevious,
                             onShuffleClick = onShuffleClick,
                             onSkipPreviousClick = onSkipPreviousClick,
                             onPlayPauseClick = onPlayPauseClick,
@@ -678,7 +682,8 @@ fun SpotifyNowPlayingScreen(
                                 durationMs = durationMs,
                                 currentPositionMs = currentPositionMs,
                                 onSeek = onSeek,
-                                isLoading = effectiveIsLoading
+                                isLoading = effectiveIsLoading,
+                                canSeek = canSeek
                             )
 
                             Spacer(modifier = Modifier.height(20.dp))
@@ -691,6 +696,7 @@ fun SpotifyNowPlayingScreen(
                                 canShuffle = canShuffle,
                                 canSmartShuffle = canSmartShuffle,
                                 canRepeat = canRepeat,
+                                canSkipPrevious = canSkipPrevious,
                                 onShuffleClick = onShuffleClick,
                                 onSkipPreviousClick = onSkipPreviousClick,
                                 onPlayPauseClick = onPlayPauseClick,
@@ -1238,6 +1244,7 @@ private fun NowPlayingSeekBarSection(
     currentPositionMs: Long,
     onSeek: (Float) -> Unit,
     isLoading: Boolean,
+    canSeek: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -1246,6 +1253,7 @@ private fun NowPlayingSeekBarSection(
             durationMs = durationMs,
             onSeek = onSeek,
             isLoading = isLoading,
+            enabled = canSeek,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
@@ -1290,6 +1298,7 @@ private fun NowPlayingControlsRow(
     canShuffle: Boolean,
     canSmartShuffle: Boolean,
     canRepeat: Boolean,
+    canSkipPrevious: Boolean = true,
     onShuffleClick: () -> Unit,
     onSkipPreviousClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
@@ -1317,7 +1326,8 @@ private fun NowPlayingControlsRow(
             onClick = onSkipPreviousClick,
             tint = EncoreColors.TextPrimary,
             size = 48.dp,
-            iconSize = 30.dp
+            iconSize = 30.dp,
+            enabled = canSkipPrevious
         )
 
         EncorePlayButton(
