@@ -197,7 +197,7 @@ fun ArtistAboutSheet(
                     contentPadding = PaddingValues(end = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter)
                 ) {
-                    items(gallery) { url ->
+                    items(gallery, key = { it }) { url ->
                         SpotifyArtworkImage(
                             imageUrl = url,
                             contentDescription = artistName,
