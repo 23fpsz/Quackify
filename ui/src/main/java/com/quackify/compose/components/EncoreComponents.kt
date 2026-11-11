@@ -156,7 +156,8 @@ fun EncoreIconButton(
     iconSize: Dp = 24.dp,
     isActive: Boolean = false,
     activeTint: Color = EncoreColors.Green,
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -168,7 +169,11 @@ fun EncoreIconButton(
         ),
         label = "iconBtnScale"
     )
-    val effectiveTint = if (isActive) activeTint else tint
+    val effectiveTint = when {
+        !enabled -> EncoreColors.TextDisabled
+        isActive -> activeTint
+        else -> tint
+    }
 
     Box(
         modifier = modifier
@@ -176,7 +181,7 @@ fun EncoreIconButton(
             .scale(scale)
             .clip(CircleShape)
             .clickable(
-                enabled = !isLoading,
+                enabled = enabled && !isLoading,
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick

@@ -70,7 +70,8 @@ fun SpotifySeekBar(
     activeColor: Color = Color.White,
     inactiveColor: Color = Color.White.copy(alpha = 0.30f),
     bufferProgress: Float = 0f,
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    enabled: Boolean = true
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(progress) }
@@ -125,29 +126,31 @@ fun SpotifySeekBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(24.dp)
-                .pointerInput(widthPx) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        isDragging = true
-                        dragProgress = (down.position.x / widthPx).coerceIn(0f, 1f)
-                        var released = false
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (change.changedToUpIgnoreConsumed()) {
-                                change.consume()
-                                released = true
-                                break
+                .then(
+                    if (enabled) Modifier.pointerInput(widthPx) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            isDragging = true
+                            dragProgress = (down.position.x / widthPx).coerceIn(0f, 1f)
+                            var released = false
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (change.changedToUpIgnoreConsumed()) {
+                                    change.consume()
+                                    released = true
+                                    break
+                                }
+                                if (change.pressed) {
+                                    change.consume()
+                                    dragProgress = (change.position.x / widthPx).coerceIn(0f, 1f)
+                                }
                             }
-                            if (change.pressed) {
-                                change.consume()
-                                dragProgress = (change.position.x / widthPx).coerceIn(0f, 1f)
-                            }
+                            isDragging = false
+                            if (released) commit(dragProgress)
                         }
-                        isDragging = false
-                        if (released) commit(dragProgress)
-                    }
-                },
+                    } else Modifier
+                ),
             contentAlignment = Alignment.CenterStart
         ) {
             if (isLoading) {

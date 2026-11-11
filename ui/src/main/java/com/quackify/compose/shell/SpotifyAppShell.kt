@@ -938,6 +938,12 @@ fun SpotifyAppShell(
             artistName = active.artistName,
             searchQuery = searchQuery,
         )
+        val remoteCtl = playbackState?.controllingRemote == true
+        val effectiveCanShuffle = if (remoteCtl) playbackState?.remoteCanShuffle ?: true else playbackState?.canShuffle ?: true
+        val effectiveCanRepeat = if (remoteCtl) playbackState?.remoteCanRepeat ?: true else playbackState?.canRepeat ?: true
+        val effectiveCanSkipPrevious = if (remoteCtl) playbackState?.remoteCanSkipPrev ?: true else true
+        val effectiveCanSeek = if (remoteCtl) playbackState?.remoteCanSeek ?: true else true
+
         ShellNowPlaying(
             visible = isPlayerExpanded,
             title = playerIdentity.title,
@@ -970,9 +976,11 @@ fun SpotifyAppShell(
             isEnhancedTrack = playbackState?.isEnhanced ?: false,
             shuffleMode = currentShuffleMode,
             repeatMode = currentRepeatMode,
-            canShuffle = playbackState?.canShuffle ?: true,
+            canShuffle = effectiveCanShuffle,
             canSmartShuffle = playbackState?.canSmartShuffle ?: false,
-            canRepeat = playbackState?.canRepeat ?: true,
+            canRepeat = effectiveCanRepeat,
+            canSkipPrevious = effectiveCanSkipPrevious,
+            canSeek = effectiveCanSeek,
             connectedDevice = connectedDevice,
             coverUrl = currentCoverUrl,
             onCollapse = { isPlayerExpanded = false },

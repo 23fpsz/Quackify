@@ -99,6 +99,7 @@ data class ClusterState(
     val canShuffle: Boolean = true,
     val canRepeatContext: Boolean = true,
     val canRepeatTrack: Boolean = true,
+    val canSkipPrev: Boolean = true,
     val canSmartShuffle: Boolean = false,
     /** Server clock of the snapshot this state was taken at, in ms. */
     val stateAtMs: Long = 0L,
@@ -282,6 +283,7 @@ object ClusterParser {
             canShuffle = allowed(restrictions?.optJSONArray("disallow_toggling_shuffle_reasons")),
             canRepeatContext = allowed(restrictions?.optJSONArray("disallow_toggling_repeat_context_reasons")),
             canRepeatTrack = allowed(restrictions?.optJSONArray("disallow_toggling_repeat_track_reasons")),
+            canSkipPrev = allowed(restrictions?.optJSONArray("disallow_skipping_prev_reasons")),
             canSmartShuffle = allowed(
                 restrictions?.optJSONObject("disallow_setting_modes")
                     ?.optJSONObject("context_enhancement")

@@ -1141,7 +1141,14 @@ class PlaybackBridge(private val context: Context) {
             return
         }
         rememberRemoteIntent(!playing)
-        state = state.copy(isPlaying = !playing)
+        val at = fresh.positionNow()
+        val duration = fresh.durationMs.takeIf { it > 0L } ?: state.durationMs
+        state = state.copy(
+            isPlaying = !playing,
+            positionMs = at,
+            durationMs = duration,
+            progress = progressOf(at, duration),
+        )
         delay(SKIP_SETTLE_MS)
         connect.refreshCluster()
     }
@@ -2118,7 +2125,11 @@ class PlaybackBridge(private val context: Context) {
                 val changed = cluster.track.uri != state.trackUri
                 val intent = remoteIntent()
                 val effPlaying = intent ?: cluster.isPlaying
-                val live = if (intent == false) cluster.positionMs else cluster.positionNow()
+                val live = when {
+                    intent != null && intent != cluster.isPlaying -> state.positionMs
+                    intent == false -> cluster.positionMs
+                    else -> cluster.positionNow()
+                }
                 val resync = changed || state.isPlaying != effPlaying ||
                         kotlin.math.abs(live - state.positionMs) > RESYNC_MS
                 val position = if (resync) live else state.positionMs
@@ -2206,6 +2217,7 @@ class PlaybackBridge(private val context: Context) {
         }
         val position = when {
             local -> state.positionMs
+            intent != null && intent != cluster.isPlaying -> state.positionMs
             followPlaying -> cluster.positionNow()
             else -> cluster.positionMs
         }
@@ -2336,16 +2348,16 @@ class PlaybackBridge(private val context: Context) {
             activeDeviceId = active?.id.orEmpty(),
             controllingRemote = remoteActive,
             remoteCanSeek = !remoteActive || !cluster.disallowSeeking,
-            remoteCanSkipPrev = !remoteActive || !cluster.licenseRestricted,
-            remoteCanShuffle = !remoteActive || !cluster.licenseRestricted,
-            remoteCanRepeat = !remoteActive || !cluster.licenseRestricted,
+            remoteCanSkipPrev = !remoteActive || cluster.canSkipPrev,
+            remoteCanShuffle = !remoteActive || cluster.canShuffle,
+            remoteCanRepeat = !remoteActive || (cluster.canRepeatContext || cluster.canRepeatTrack),
             connectedDevice = label.ifBlank {
                 if (mine || player.hasSource || noneActive) "Quackify" else ""
             },
         )
-        if (active != null && !mine && player.hasSource && player.isPlaying) {
-            log.i("the stream moved to '$label', stopping this device")
-            player.pause()
+        if (active != null && !mine && player.hasSource && held == null) {
+            log.i("the stream moved to '$label', releasing this device's engine")
+            player.stop()
         }
     }
 
@@ -3204,6 +3216,7 @@ class PlaybackBridge(private val context: Context) {
         const val SKIP_SETTLE_MS = 600L
         const val REMOTE_TICK_MS = 1_000L
         const val RESYNC_MS = 3_000L
+
         const val SKIP_TRIES = 5
         const val SKIP_RETRY_MS = 400L
         const val CLUSTER_RETRY_MS = 400L
