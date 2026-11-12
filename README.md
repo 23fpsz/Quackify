@@ -26,11 +26,19 @@ cd Quackify
 
 ### 2. Build & run
 
+Quackify has build flavors, so pick one when building:
+
 ```bash
-./gradlew assembleDebug
+# standard flavor (com.quackify.app)
+./gradlew installStandardDebug
+
+# or build without installing
+./gradlew assembleStandardDebug
 ```
 
-Or open Android Studio, select the **app** configuration, and hit **Run** (`Shift + F10`).
+Other flavors: `installSpotifyDebug` and `installAppleDebug` (cloned island variants).
+
+Or open Android Studio, select the **app** configuration with the **standardDebug** build variant, and hit **Run** (`Shift + F10`).
 
 ## Releases
 
