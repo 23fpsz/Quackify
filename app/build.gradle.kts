@@ -49,37 +49,42 @@ android {
     signingConfigs {
         create("quackify") {
             val envStoreFile = System.getenv("RELEASE_STORE_FILE")
-            if (envStoreFile != null && file(envStoreFile).exists()) {
-                storeFile = file(envStoreFile)
+            val propsStoreFile = keystoreProperties["signing.storeFile"] as String?
+            val storePath = when {
+                envStoreFile != null && file(envStoreFile).exists() -> envStoreFile
+                propsStoreFile != null && file(propsStoreFile).exists() -> propsStoreFile
+                else -> null
+            }
+            if (storePath != null) {
+                storeFile = file(storePath)
                 storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+                    ?: keystoreProperties["signing.storePassword"] as String?
                 keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                    ?: keystoreProperties["signing.keyAlias"] as String?
                 keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+                    ?: keystoreProperties["signing.keyPassword"] as String?
             } else {
-                val path = keystoreProperties["signing.storeFile"] as String?
-                if (path != null && file(path).exists()) {
-                    storeFile = file(path)
-                    storePassword = keystoreProperties["signing.storePassword"] as String?
-                    keyAlias = keystoreProperties["signing.keyAlias"] as String?
-                    keyPassword = keystoreProperties["signing.keyPassword"] as String?
-                } else {
-                    storeFile = rootProject.file("keystore/Quackify.jks")
-                    storePassword = "quackifyrebranded"
-                    keyAlias = "quackify"
-                    keyPassword = "quackifyrebranded"
-                }
+                storeFile = null
+                storePassword = null
+                keyAlias = null
+                keyPassword = null
             }
         }
     }
+
+    val releaseSigning = signingConfigs.getByName("quackify")
+        .takeIf { it.storeFile != null }
+        ?: signingConfigs.getByName("debug")
 
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
             manifestPlaceholders["appName"] = "Quackify β"
-            signingConfig = signingConfigs.getByName("quackify")
+            signingConfig = releaseSigning
         }
         release {
             manifestPlaceholders["appName"] = "Quackify"
-            signingConfig = signingConfigs.getByName("quackify")
+            signingConfig = releaseSigning
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
