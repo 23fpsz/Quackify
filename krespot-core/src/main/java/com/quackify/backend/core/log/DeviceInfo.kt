@@ -15,7 +15,7 @@ import android.os.SystemClock
 import android.telephony.TelephonyManager
 import android.view.WindowManager
 import android.webkit.WebView
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -64,9 +64,9 @@ object DeviceInfo {
         }
 
         section(out, "Session")
-        line(out, "loggedIn", runCatching { SpotifyAuth.isLoggedIn(app) }.getOrDefault(false).toString())
-        line(out, "spDcLength", SpotifyAuth.spDc(app).length.toString())
-        val account = runCatching { SpotifyAuth.account(app) }.getOrNull()
+        line(out, "loggedIn", runCatching { EncoreAuth.isLoggedIn(app) }.getOrDefault(false).toString())
+        line(out, "spDcLength", EncoreAuth.spDc(app).length.toString())
+        val account = runCatching { EncoreAuth.account(app) }.getOrNull()
         if (account != null) {
             line(out, "account", account.name.ifBlank { "unknown" })
             line(out, "accountId", account.id.ifBlank { "unknown" })
@@ -74,22 +74,22 @@ object DeviceInfo {
             if (account.product.isNotBlank()) line(out, "product", account.product)
             if (account.country.isNotBlank()) line(out, "country", account.country)
         }
-        val saved = runCatching { SpotifyAuth.savedAccounts(app) }.getOrDefault(emptyList())
+        val saved = runCatching { EncoreAuth.savedAccounts(app) }.getOrDefault(emptyList())
         line(out, "savedAccounts", saved.size.toString())
         saved.forEachIndexed { i, one ->
             line(out, "  account[$i]", "${one.name.ifBlank { "unknown" }} <${one.email.ifBlank { "-" }}> ${one.product}")
         }
-        val tokenLeft = runCatching { SpotifyAuth.tokenRemainingMs(app) }.getOrDefault(-2L)
+        val tokenLeft = runCatching { EncoreAuth.tokenRemainingMs(app) }.getOrDefault(-2L)
         line(out, "accessToken", when {
             tokenLeft == -2L -> "unknown"
-            SpotifyAuth.token(app).isBlank() -> "none"
+            EncoreAuth.token(app).isBlank() -> "none"
             tokenLeft < 0L -> "present (no expiry)"
             else -> "present, ${formatDuration(tokenLeft)} left"
         })
-        val clientLeft = runCatching { SpotifyAuth.clientTokenRemainingMs(app) }.getOrDefault(-2L)
+        val clientLeft = runCatching { EncoreAuth.clientTokenRemainingMs(app) }.getOrDefault(-2L)
         line(out, "clientToken", when {
             clientLeft == -2L -> "unknown"
-            SpotifyAuth.clientToken(app).isBlank() -> "none"
+            EncoreAuth.clientToken(app).isBlank() -> "none"
             clientLeft < 0L -> "present (no expiry)"
             else -> "present, ${formatDuration(clientLeft)} left"
         })

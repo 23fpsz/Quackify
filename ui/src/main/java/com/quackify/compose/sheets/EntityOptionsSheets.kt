@@ -30,9 +30,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * Spotify Album 3-Dot Options Bottom Sheet.
@@ -83,7 +83,7 @@ fun AlbumOptionsSheet(
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            SpotifyArtworkImage(
+            EncoreArtworkImage(
                 imageUrl = coverUrl,
                 contentDescription = title,
                 cornerRadius = 8.dp,
@@ -94,7 +94,7 @@ fun AlbumOptionsSheet(
 
             Text(
                 text = title,
-                style = SpotifyTheme.typography.titleLarge.copy(
+                style = EncoreTheme.typography.titleLarge.copy(
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     color = EncoreColors.TextPrimary
@@ -109,7 +109,7 @@ fun AlbumOptionsSheet(
 
             Text(
                 text = "Album • $artist",
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontSize = 14.sp,
                     color = EncoreColors.TextSecondary
                 ),
@@ -242,7 +242,7 @@ fun ArtistOptionsSheet(
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            SpotifyArtworkImage(
+            EncoreArtworkImage(
                 imageUrl = avatarUrl,
                 contentDescription = artistName,
                 shape = CircleShape,
@@ -253,7 +253,7 @@ fun ArtistOptionsSheet(
 
             Text(
                 text = artistName,
-                style = SpotifyTheme.typography.titleLarge.copy(
+                style = EncoreTheme.typography.titleLarge.copy(
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = EncoreColors.TextPrimary
@@ -268,7 +268,7 @@ fun ArtistOptionsSheet(
 
             Text(
                 text = "Artist",
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontSize = 14.sp,
                     color = EncoreColors.TextSecondary
                 ),

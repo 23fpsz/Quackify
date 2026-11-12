@@ -48,10 +48,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.components.InlineLoadingDots
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.backend.model.ShelfItem
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.backend.library.Krespot
 
 private data class DiscographyTab(val key: String, val label: String)
@@ -156,11 +156,11 @@ fun DiscographySheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Discography",
-                        style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp)
+                        style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
                     )
                     Text(
                         text = artistName,
-                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -270,7 +270,7 @@ private fun DiscographyChip(
     ) {
         Text(
             text = label,
-            style = SpotifyTheme.typography.bodySmall.copy(
+            style = EncoreTheme.typography.bodySmall.copy(
                 color = foreground,
                 fontWeight = FontWeight.Medium
             )
@@ -279,7 +279,7 @@ private fun DiscographyChip(
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = count.toString(),
-                style = SpotifyTheme.typography.marginal.copy(
+                style = EncoreTheme.typography.marginal.copy(
                     color = if (selected) Color.Black.copy(alpha = 0.6f) else EncoreColors.TextSecondary
                 )
             )
@@ -291,7 +291,7 @@ private fun DiscographyChip(
 private fun SheetPill(text: String, onClick: () -> Unit) {
     Text(
         text = text,
-        style = SpotifyTheme.typography.bodySmall.copy(
+        style = EncoreTheme.typography.bodySmall.copy(
             color = EncoreColors.Green,
             fontWeight = FontWeight.Bold
         ),
@@ -305,7 +305,7 @@ private fun SheetPill(text: String, onClick: () -> Unit) {
 @Composable
 private fun ReleaseTile(row: ShelfItem, onClick: () -> Unit) {
     Column(modifier = Modifier.clickable(onClick = onClick)) {
-        SpotifyArtworkImage(
+        EncoreArtworkImage(
             imageUrl = row.imageUrl.takeIf { it.isNotBlank() },
             contentDescription = row.title,
             modifier = Modifier
@@ -317,14 +317,14 @@ private fun ReleaseTile(row: ShelfItem, onClick: () -> Unit) {
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = row.title,
-            style = SpotifyTheme.typography.bodySmallBold,
+            style = EncoreTheme.typography.bodySmallBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         if (row.subtitle.isNotBlank()) {
             Text(
                 text = row.subtitle,
-                style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -343,7 +343,7 @@ private fun StatusTile(failed: Boolean) {
         if (failed) {
             Text(
                 text = "Could not load this section",
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
         } else {
             InlineLoadingDots(color = EncoreColors.TextSecondary)
@@ -361,7 +361,7 @@ private fun EmptyTile() {
     ) {
         Text(
             text = "Nothing here yet",
-            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
         )
     }
 }
@@ -375,7 +375,7 @@ private fun ReleaseRow(row: ShelfItem, onClick: () -> Unit) {
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SpotifyArtworkImage(
+        EncoreArtworkImage(
             imageUrl = row.imageUrl.takeIf { it.isNotBlank() },
             contentDescription = row.title,
             modifier = Modifier.size(52.dp),
@@ -385,14 +385,14 @@ private fun ReleaseRow(row: ShelfItem, onClick: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = row.title,
-                style = SpotifyTheme.typography.bodyMediumBold,
+                style = EncoreTheme.typography.bodyMediumBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             if (row.subtitle.isNotBlank()) {
                 Text(
                     text = row.subtitle,
-                    style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

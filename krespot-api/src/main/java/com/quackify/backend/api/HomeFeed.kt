@@ -3,7 +3,7 @@ package com.quackify.backend.api
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.model.*
 import org.json.JSONArray
@@ -37,7 +37,7 @@ object HomeFeed {
     )
 
     suspend fun load(context: Context, facet: String = ""): HomeFeedPayload {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("no token, cannot load the home feed")
             return HomeFeedPayload()

@@ -39,7 +39,7 @@ object LoginFlow {
                 lastLogAt = elapsed
                 log(
                     "harvest ${elapsed}ms ops=${Pathfinder.count()} " +
-                        "token=${SpotifyAuth.token(context).isNotBlank()}",
+                        "token=${EncoreAuth.token(context).isNotBlank()}",
                 )
             }
             delay(250)

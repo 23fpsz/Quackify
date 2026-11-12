@@ -65,11 +65,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreExplicitTag
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -100,7 +100,7 @@ private val RelatedPodcastShows = emptyList<Pair<String, String>>()
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SpotifyPodcastScreen(
+fun EncorePodcastScreen(
     showTitle: String = "",
     publisherName: String = "",
     rankBadge: String? = null,
@@ -276,7 +276,7 @@ fun SpotifyPodcastScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (!coverUrl.isNullOrBlank()) {
-                            SpotifyArtworkImage(
+                            EncoreArtworkImage(
                                 imageUrl = coverUrl,
                                 contentDescription = showTitle,
                                 modifier = Modifier.fillMaxSize(),
@@ -297,7 +297,7 @@ fun SpotifyPodcastScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = showTitle,
-                            style = SpotifyTheme.typography.headlineLarge.copy(
+                            style = EncoreTheme.typography.headlineLarge.copy(
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 lineHeight = 24.sp,
@@ -311,7 +311,7 @@ fun SpotifyPodcastScreen(
 
                         Text(
                             text = publisherName,
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 color = Color.White.copy(alpha = 0.9f),
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 14.sp
@@ -331,7 +331,7 @@ fun SpotifyPodcastScreen(
                     if (!rankBadge.isNullOrBlank()) {
                         Text(
                             text = rankBadge,
-                            style = SpotifyTheme.typography.marginal.copy(
+                            style = EncoreTheme.typography.marginal.copy(
                                 color = EncoreColors.TextSecondary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
@@ -339,7 +339,7 @@ fun SpotifyPodcastScreen(
                         )
                         Text(
                             text = " • ",
-                            style = SpotifyTheme.typography.marginal.copy(
+                            style = EncoreTheme.typography.marginal.copy(
                                 color = EncoreColors.TextSecondary,
                                 fontSize = 12.sp
                             )
@@ -348,7 +348,7 @@ fun SpotifyPodcastScreen(
 
                     Text(
                         text = "★ $rating",
-                        style = SpotifyTheme.typography.marginal.copy(
+                        style = EncoreTheme.typography.marginal.copy(
                             color = EncoreColors.TextSecondary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
@@ -357,7 +357,7 @@ fun SpotifyPodcastScreen(
 
                     Text(
                         text = " • ",
-                        style = SpotifyTheme.typography.marginal.copy(
+                        style = EncoreTheme.typography.marginal.copy(
                             color = EncoreColors.TextSecondary,
                             fontSize = 12.sp
                         )
@@ -365,7 +365,7 @@ fun SpotifyPodcastScreen(
 
                     Text(
                         text = category,
-                        style = SpotifyTheme.typography.marginal.copy(
+                        style = EncoreTheme.typography.marginal.copy(
                             color = EncoreColors.TextSecondary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
@@ -407,7 +407,7 @@ fun SpotifyPodcastScreen(
                     ) {
                         Text(
                             text = if (isFollowing) "Following" else "Follow",
-                            style = SpotifyTheme.typography.bodySmallBold.copy(
+                            style = EncoreTheme.typography.bodySmallBold.copy(
                                 color = followTextColor,
                                 fontSize = 13.sp
                             )
@@ -477,7 +477,7 @@ fun SpotifyPodcastScreen(
                         ) {
                             Text(
                                 text = title,
-                                style = SpotifyTheme.typography.bodyMedium.copy(
+                                style = EncoreTheme.typography.bodyMedium.copy(
                                     color = if (isSelected) Color.White else EncoreColors.TextSecondary,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                     fontSize = 15.sp
@@ -535,7 +535,7 @@ fun SpotifyPodcastScreen(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
                                                 text = "All episodes • Newest",
-                                                style = SpotifyTheme.typography.bodySmallBold.copy(
+                                                style = EncoreTheme.typography.bodySmallBold.copy(
                                                     color = Color.White,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.SemiBold
@@ -584,7 +584,7 @@ fun SpotifyPodcastScreen(
                                 if (aboutDescription.isNotBlank()) {
                                     Text(
                                         text = "About",
-                                        style = SpotifyTheme.typography.titleMedium.copy(
+                                        style = EncoreTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White,
                                             fontSize = 18.sp
@@ -593,7 +593,7 @@ fun SpotifyPodcastScreen(
                                     Spacer(modifier = Modifier.height(10.dp))
                                     Text(
                                         text = aboutDescription,
-                                        style = SpotifyTheme.typography.bodySmall.copy(
+                                        style = EncoreTheme.typography.bodySmall.copy(
                                             color = EncoreColors.TextSecondary,
                                             lineHeight = 20.sp,
                                             fontSize = 14.sp
@@ -605,7 +605,7 @@ fun SpotifyPodcastScreen(
                                 if (rating.isNotBlank() || category.isNotBlank()) {
                                     Text(
                                         text = "Ratings & Reviews",
-                                        style = SpotifyTheme.typography.titleMedium.copy(
+                                        style = EncoreTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White,
                                             fontSize = 16.sp
@@ -618,7 +618,7 @@ fun SpotifyPodcastScreen(
                                     ).joinToString(" • ")
                                     Text(
                                         text = ratingCategoryText,
-                                        style = SpotifyTheme.typography.bodyMedium.copy(
+                                        style = EncoreTheme.typography.bodyMedium.copy(
                                             color = EncoreColors.TextSecondary,
                                             fontSize = 13.sp
                                         )
@@ -641,7 +641,7 @@ fun SpotifyPodcastScreen(
                             item {
                                 Text(
                                     text = "More Like This",
-                                    style = SpotifyTheme.typography.titleMedium.copy(
+                                    style = EncoreTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White,
                                         fontSize = 18.sp
@@ -676,14 +676,14 @@ fun SpotifyPodcastScreen(
                                     Column {
                                         Text(
                                             text = title,
-                                            style = SpotifyTheme.typography.bodyMedium.copy(
+                                            style = EncoreTheme.typography.bodyMedium.copy(
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color.White
                                             )
                                         )
                                         Text(
                                             text = "Podcast • $host",
-                                            style = SpotifyTheme.typography.bodySmall.copy(
+                                            style = EncoreTheme.typography.bodySmall.copy(
                                                 color = EncoreColors.TextSecondary
                                             )
                                         )
@@ -733,7 +733,7 @@ fun SpotifyPodcastScreen(
                 if (topBarTitleAlpha > 0.01f) {
                     Text(
                         text = showTitle,
-                        style = SpotifyTheme.typography.titleMedium.copy(
+                        style = EncoreTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             fontSize = 17.sp
@@ -803,7 +803,7 @@ private fun PodcastEpisodeRow(
                 contentAlignment = Alignment.Center
             ) {
                 if (!episode.imageUrl.isNullOrBlank()) {
-                    SpotifyArtworkImage(
+                    EncoreArtworkImage(
                         imageUrl = episode.imageUrl,
                         contentDescription = episode.title,
                         modifier = Modifier.fillMaxSize(),
@@ -823,7 +823,7 @@ private fun PodcastEpisodeRow(
 
             Text(
                 text = episode.title,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = if (isPlaying) EncoreColors.Green else Color.White,
                     fontSize = 15.sp,
@@ -839,7 +839,7 @@ private fun PodcastEpisodeRow(
 
         Text(
             text = episode.description,
-            style = SpotifyTheme.typography.bodySmall.copy(
+            style = EncoreTheme.typography.bodySmall.copy(
                 color = EncoreColors.TextSecondary,
                 fontSize = 13.sp,
                 lineHeight = 17.sp
@@ -870,7 +870,7 @@ private fun PodcastEpisodeRow(
 
             Text(
                 text = metaText,
-                style = SpotifyTheme.typography.marginal.copy(
+                style = EncoreTheme.typography.marginal.copy(
                     color = EncoreColors.TextSecondary,
                     fontSize = 12.sp
                 )
@@ -976,8 +976,8 @@ private fun PodcastEpisodeRow(
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun PreviewSpotifyPodcastScreen() {
-    SpotifyEncoreTheme {
-        SpotifyPodcastScreen()
+fun PreviewEncorePodcastScreen() {
+    EncoreAppTheme {
+        EncorePodcastScreen()
     }
 }

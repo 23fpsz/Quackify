@@ -1,7 +1,7 @@
 package com.quackify.backend.api
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
 import com.quackify.backend.core.net.Pathfinder
@@ -20,7 +20,7 @@ object Settings {
     private const val PRIVACY_STORE = "/profile-privacy/v2/store-settings"
 
     suspend fun attributes(context: Context): AccountAttributes? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("attributes: no token")
             return null
@@ -53,7 +53,7 @@ object Settings {
     }
 
     suspend fun setAttribute(context: Context, field: String, value: Boolean): Boolean {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return false
         val variables = JSONObject()
             .put("input", JSONObject().put(field, value))
@@ -67,7 +67,7 @@ object Settings {
     }
 
     suspend fun privacy(context: Context, username: String): ProfilePrivacy? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank() || username.isBlank()) return null
         val body = writer().apply { tag(1, 2); bytes(username.toByteArray()) }.finish()
         val answer = Net.postBlob(
@@ -95,7 +95,7 @@ object Settings {
         showPublishedPlaylists: Boolean? = null,
         allowFollows: Boolean? = null,
     ): Boolean {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank() || username.isBlank()) return false
         val mask = ArrayList<String>(3)
         if (showFollows != null) mask += "show_follows"

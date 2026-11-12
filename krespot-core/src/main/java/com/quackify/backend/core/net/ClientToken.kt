@@ -2,7 +2,7 @@ package com.quackify.backend.core.net
 
 import android.content.Context
 import com.quackify.backend.core.store.SecureStore
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import kotlinx.coroutines.sync.Mutex
 import org.json.JSONObject
 import java.util.UUID
@@ -30,12 +30,12 @@ object ClientToken {
 
     suspend fun get(context: Context, force: Boolean = false): String {
         if (!force) {
-            val stored = SpotifyAuth.clientToken(context)
+            val stored = EncoreAuth.clientToken(context)
             if (stored.isNotBlank() && !stale(context)) return stored
         }
         mutex.lock()
         try {
-            val stored = SpotifyAuth.clientToken(context)
+            val stored = EncoreAuth.clientToken(context)
             if (!force && stored.isNotBlank() && !stale(context)) return stored
             val minted = mint(context)
             if (minted.isNotBlank()) return minted
@@ -64,7 +64,7 @@ object ClientToken {
             .remove(KEY_MINTED_AT)
             .apply()
         refreshAtMemo = -1L
-        SpotifyAuth.saveClientToken(context, "", 0L)
+        EncoreAuth.saveClientToken(context, "", 0L)
     }
 
     fun remainingMs(context: Context): Long {
@@ -81,7 +81,7 @@ object ClientToken {
 
     private fun stale(context: Context): Boolean {
         val refreshAt = refreshDeadline(context)
-        if (refreshAt <= 0L) return SpotifyAuth.clientTokenRemainingMs(context) <= SKEW_MS
+        if (refreshAt <= 0L) return EncoreAuth.clientTokenRemainingMs(context) <= SKEW_MS
         return System.currentTimeMillis() >= refreshAt - SKEW_MS
     }
 
@@ -140,7 +140,7 @@ object ClientToken {
         val now = System.currentTimeMillis()
         val expiresAt = if (expires > 0L) now + expires * 1000L else 0L
         val refreshAt = if (refresh > 0L) now + refresh * 1000L else expiresAt
-        SpotifyAuth.saveClientToken(context, token, expiresAt)
+        EncoreAuth.saveClientToken(context, token, expiresAt)
         SecureStore.prefs(context).edit()
             .putLong(KEY_REFRESH, refreshAt)
             .putLong(KEY_MINTED_AT, now)

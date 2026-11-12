@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import kotlinx.coroutines.delay
 
 /**
@@ -53,7 +53,7 @@ import kotlinx.coroutines.delay
  * ("Give your playlist a name" / "Give your folder a name")
  */
 @Composable
-fun SpotifyCreateNameDialog(
+fun EncoreCreateNameDialog(
     isOpen: Boolean,
     title: String,
     initialName: String,
@@ -115,7 +115,7 @@ fun SpotifyCreateNameDialog(
             ) {
                 Text(
                     text = title,
-                    style = SpotifyTheme.typography.titleLarge.copy(
+                    style = EncoreTheme.typography.titleLarge.copy(
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
@@ -136,7 +136,7 @@ fun SpotifyCreateNameDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(focusRequester),
-                        textStyle = SpotifyTheme.typography.headlineMedium.copy(
+                        textStyle = EncoreTheme.typography.headlineMedium.copy(
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
@@ -183,7 +183,7 @@ fun SpotifyCreateNameDialog(
                     ) {
                         Text(
                             text = cancelLabel,
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
                                 fontSize = 14.sp
@@ -208,7 +208,7 @@ fun SpotifyCreateNameDialog(
                     ) {
                         Text(
                             text = confirmLabel,
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = if (canConfirm) Color.Black else Color.Black.copy(alpha = 0.6f),
                                 fontSize = 14.sp

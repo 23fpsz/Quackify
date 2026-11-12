@@ -35,7 +35,7 @@ import com.quackify.backend.connect.dealer.DealerUri
 import com.quackify.backend.connect.state.Melody
 import com.quackify.backend.connect.state.Snapshot
 import com.quackify.backend.connect.state.StateReporter
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.webview.SilentTokenRefresh
 import org.json.JSONArray
@@ -124,7 +124,7 @@ class KrespotConnect(private val context: Context) {
                 continue
             }
             spclient = host.second
-            val token = SpotifyAuth.token(context)
+            val token = EncoreAuth.token(context)
             log.i("device=$deviceId dealer=${host.first} token=${token.length}B")
             if (_cluster.value == null) {
                 runCatching { seedCluster() }

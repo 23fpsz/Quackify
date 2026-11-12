@@ -89,12 +89,12 @@ import com.quackify.compose.components.ShimmerBlock
 import com.quackify.compose.components.ShimmerHost
 import com.quackify.compose.components.ShimmerText
 import com.quackify.compose.components.rememberSmoothColor
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.format.formatCollectionDuration
 import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import com.quackify.compose.util.search.GenericSearchEngine
 import com.quackify.compose.util.search.SearchableFieldExtractor
@@ -148,7 +148,7 @@ enum class PlaylistSort(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SpotifyPlaylistScreen(
+fun EncorePlaylistScreen(
     title: String,
     description: String,
     creator: String,
@@ -413,7 +413,7 @@ fun SpotifyPlaylistScreen(
                             if (searchQuery.isEmpty()) {
                                 Text(
                                     text = "Find in playlist",
-                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                    style = EncoreTheme.typography.bodyMedium.copy(
                                         color = EncoreColors.TextSecondary,
                                         fontSize = 14.sp
                                     )
@@ -470,13 +470,13 @@ fun SpotifyPlaylistScreen(
                         ) {
                             Text(
                                 text = "Couldn't find \"$searchQuery\"",
-                                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = Color.White
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "Try searching for a different track title or artist",
-                                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                             )
                         }
                     }
@@ -636,7 +636,7 @@ fun SpotifyPlaylistScreen(
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
                                                     text = "Find in playlist",
-                                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                                    style = EncoreTheme.typography.bodyMedium.copy(
                                                         color = Color.White.copy(alpha = 0.85f),
                                                         fontSize = 13.5.sp,
                                                         fontWeight = FontWeight.Medium
@@ -669,7 +669,7 @@ fun SpotifyPlaylistScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (!coverUrl.isNullOrBlank()) {
-                                        SpotifyArtworkImage(
+                                        EncoreArtworkImage(
                                             imageUrl = coverUrl,
                                             contentDescription = currentTitle,
                                             modifier = Modifier.fillMaxSize(),
@@ -689,7 +689,7 @@ fun SpotifyPlaylistScreen(
 
                             Text(
                                 text = currentTitle,
-                                style = SpotifyTheme.typography.headlineLarge.copy(
+                                style = EncoreTheme.typography.headlineLarge.copy(
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -741,7 +741,7 @@ fun SpotifyPlaylistScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (creatorAvatarUrl.isNotBlank()) {
-                                            SpotifyArtworkImage(
+                                            EncoreArtworkImage(
                                                 imageUrl = creatorAvatarUrl,
                                                 contentDescription = creator,
                                                 modifier = Modifier
@@ -761,7 +761,7 @@ fun SpotifyPlaylistScreen(
 
                                     Text(
                                         text = creator,
-                                        style = SpotifyTheme.typography.bodyMedium.copy(
+                                        style = EncoreTheme.typography.bodyMedium.copy(
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White,
                                             fontSize = 13.sp
@@ -811,7 +811,7 @@ fun SpotifyPlaylistScreen(
                                     )
                                     Text(
                                         text = metadataText,
-                                        style = SpotifyTheme.typography.bodySmall.copy(
+                                        style = EncoreTheme.typography.bodySmall.copy(
                                             color = EncoreColors.TextSecondary,
                                             fontSize = 12.5.sp
                                         )
@@ -852,7 +852,7 @@ fun SpotifyPlaylistScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (!coverUrl.isNullOrBlank()) {
-                                            SpotifyArtworkImage(
+                                            EncoreArtworkImage(
                                                 imageUrl = coverUrl,
                                                 contentDescription = null,
                                                 modifier = Modifier.fillMaxSize(),
@@ -1002,14 +1002,14 @@ fun SpotifyPlaylistScreen(
                         ) {
                             Text(
                                 text = "Couldn't load this playlist",
-                                style = SpotifyTheme.typography.titleMedium.copy(
+                                style = EncoreTheme.typography.titleMedium.copy(
                                     color = EncoreColors.TextPrimary
                                 )
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "Check your internet connection and try again.",
-                                style = SpotifyTheme.typography.bodySmall.copy(
+                                style = EncoreTheme.typography.bodySmall.copy(
                                     color = EncoreColors.TextSecondary
                                 )
                             )
@@ -1053,7 +1053,7 @@ fun SpotifyPlaylistScreen(
                         ) {
                             Text(
                                 text = "Recommended Songs",
-                                style = SpotifyTheme.typography.titleLarge.copy(
+                                style = EncoreTheme.typography.titleLarge.copy(
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -1063,7 +1063,7 @@ fun SpotifyPlaylistScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "Based on what's in this playlist",
-                                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                                 )
                             }
                         }
@@ -1084,7 +1084,7 @@ fun SpotifyPlaylistScreen(
                                     .background(Color(0xFF242424)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                SpotifyArtworkImage(
+                                EncoreArtworkImage(
                                     imageUrl = recTrack.imageUrl,
                                     contentDescription = recTrack.title,
                                     modifier = Modifier.fillMaxSize(),
@@ -1097,7 +1097,7 @@ fun SpotifyPlaylistScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = recTrack.title,
-                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                    style = EncoreTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color.White,
                                         fontSize = 15.sp
@@ -1114,7 +1114,7 @@ fun SpotifyPlaylistScreen(
                                     }
                                     Text(
                                         text = recTrack.artist,
-                                        style = SpotifyTheme.typography.bodySmall.copy(
+                                        style = EncoreTheme.typography.bodySmall.copy(
                                             color = EncoreColors.TextSecondary,
                                             fontSize = 13.sp
                                         ),
@@ -1161,7 +1161,7 @@ fun SpotifyPlaylistScreen(
                                 } else {
                                     Text(
                                         text = "Refresh",
-                                        style = SpotifyTheme.typography.bodySmallBold.copy(
+                                        style = EncoreTheme.typography.bodySmallBold.copy(
                                             fontWeight = FontWeight.Bold,
                                             color = Color.Black
                                         )
@@ -1220,7 +1220,7 @@ fun SpotifyPlaylistScreen(
                 ) {
                     Text(
                         text = title,
-                        style = SpotifyTheme.typography.titleMedium.copy(
+                        style = EncoreTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             fontSize = 17.sp
@@ -1382,7 +1382,7 @@ private fun PlaylistChip(
             Spacer(modifier = Modifier.width(7.dp))
             Text(
                 text = label,
-                style = SpotifyTheme.typography.bodySmallBold.copy(
+                style = EncoreTheme.typography.bodySmallBold.copy(
                     fontSize = 13.sp,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -1430,7 +1430,7 @@ private fun PlaylistEmptyCurationHeader(
                 contentAlignment = Alignment.Center
             ) {
                 if (!coverUrl.isNullOrBlank()) {
-                    SpotifyArtworkImage(
+                    EncoreArtworkImage(
                         imageUrl = coverUrl,
                         contentDescription = title,
                         modifier = Modifier.fillMaxSize(),
@@ -1459,7 +1459,7 @@ private fun PlaylistEmptyCurationHeader(
                 ) {
                     Text(
                         text = title,
-                        style = SpotifyTheme.typography.titleLarge.copy(
+                        style = EncoreTheme.typography.titleLarge.copy(
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -1481,7 +1481,7 @@ private fun PlaylistEmptyCurationHeader(
                     ) {
                         Text(
                             text = "Change",
-                            style = SpotifyTheme.typography.bodySmall.copy(
+                            style = EncoreTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
                                 fontSize = 12.sp
@@ -1528,7 +1528,7 @@ private fun PlaylistEmptyCurationHeader(
 
                     Text(
                         text = creator,
-                        style = SpotifyTheme.typography.bodySmall.copy(
+                        style = EncoreTheme.typography.bodySmall.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             fontSize = 12.sp
@@ -1586,7 +1586,7 @@ private fun PlaylistEmptyCurationHeader(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Add to this playlist",
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.Black,
                             fontSize = 15.sp

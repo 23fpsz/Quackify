@@ -50,7 +50,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.filter
 import androidx.compose.runtime.snapshotFlow
 import com.quackify.backend.core.log.Logs
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.library.Krespot
 import com.quackify.backend.library.SmartShuffleRow
 import com.quackify.backend.library.SmartShuffleSource
@@ -1132,7 +1132,7 @@ class PlaybackBridge(private val context: Context) {
             val lens = resolveLens(contextUri) ?: return@launch
             val rows = SmartShuffleSource.tap(
                 context,
-                SpotifyAuth.token(context),
+                EncoreAuth.token(context),
                 connect.spclientHost,
                 lens,
                 row,
@@ -1148,7 +1148,7 @@ class PlaybackBridge(private val context: Context) {
 
     private suspend fun resolveLens(contextUri: String): String? {
         if (enhanceLens.isNotBlank() && enhanceLensFor == contextUri) return enhanceLens
-        val eligibility = SmartShuffleSource.eligibility(context, SpotifyAuth.token(context), contextUri)
+        val eligibility = SmartShuffleSource.eligibility(context, EncoreAuth.token(context), contextUri)
         if (!eligibility.canSmartShuffle || eligibility.lensUri.isBlank()) {
             log.i("smart shuffle: '$contextUri' is not eligible")
             return null
@@ -1165,7 +1165,7 @@ class PlaybackBridge(private val context: Context) {
         enhanceInFlight = true
         scope.launch {
             try {
-                val rows = SmartShuffleSource.reset(context, SpotifyAuth.token(context), connect.spclientHost, lens)
+                val rows = SmartShuffleSource.reset(context, EncoreAuth.token(context), connect.spclientHost, lens)
                 enhancedRows = rows
                 enhancedFor = contextUri
                 playedSmart.clear()
@@ -1220,7 +1220,7 @@ class PlaybackBridge(private val context: Context) {
                     log.w("smart shuffle re-arm: the server refused the options")
                     return@launch
                 }
-                val rows = SmartShuffleSource.reset(context, SpotifyAuth.token(context), connect.spclientHost, lens)
+                val rows = SmartShuffleSource.reset(context, EncoreAuth.token(context), connect.spclientHost, lens)
                 enhancedRows = rows
                 enhancedFor = contextUri
                 playedSmart.clear()

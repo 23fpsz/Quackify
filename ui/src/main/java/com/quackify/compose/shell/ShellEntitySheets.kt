@@ -8,7 +8,7 @@ import com.quackify.compose.sheets.DeleteConfirmDialog
 import com.quackify.compose.sheets.FolderOptionsSheet
 import com.quackify.compose.sheets.FolderSheet
 import com.quackify.compose.sheets.EntityOptionsSheet
-import com.quackify.compose.sheets.SpotifyCreateNameDialog
+import com.quackify.compose.sheets.EncoreCreateNameDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -107,7 +107,7 @@ internal fun ShellEntitySheets(
                 }
             )
         } else {
-            SpotifyCreateNameDialog(
+            EncoreCreateNameDialog(
                 isOpen = true,
                 title = if (draft.mode == FolderMode.CREATE) "Give your folder a name" else "Rename folder",
                 initialName = if (draft.mode == FolderMode.CREATE) "New folder" else draft.title,
@@ -182,7 +182,7 @@ internal fun ShellEntitySheets(
         )
     }
 
-    SpotifyCreateNameDialog(
+    EncoreCreateNameDialog(
         isOpen = flags.isRenamePlaylistDialogOpen,
         title = "Give your playlist a name",
         initialName = active.playlistTitle,

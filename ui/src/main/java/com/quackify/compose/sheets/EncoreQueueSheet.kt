@@ -40,13 +40,13 @@ import com.quackify.compose.R
 import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayIndicator
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * Spotify Queue Screen & Bottom Sheet matching `layout_queue_sheet_content.xml`
@@ -57,7 +57,7 @@ import com.quackify.compose.theme.SpotifyTheme
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpotifyQueueSheet(
+fun EncoreQueueSheet(
     currentTrackTitle: String,
     currentTrackArtist: String,
     currentTrackCoverUrl: String? = null,
@@ -106,14 +106,14 @@ fun SpotifyQueueSheet(
 
                 Text(
                     text = "Queue",
-                    style = SpotifyTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    style = EncoreTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
 
                 if (userQueue.isNotEmpty()) {
                     TextButton(onClick = onClearQueue) {
                         Text(
                             text = "Clear queue",
-                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.Green)
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.Green)
                         )
                     }
                 } else {
@@ -129,7 +129,7 @@ fun SpotifyQueueSheet(
                 item {
                     Text(
                         text = "Now playing",
-                        style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                         modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                     )
 
@@ -139,7 +139,7 @@ fun SpotifyQueueSheet(
                             .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter2),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        SpotifyArtworkImage(
+                        EncoreArtworkImage(
                             imageUrl = currentTrackCoverUrl,
                             contentDescription = currentTrackTitle,
                             modifier = Modifier.size(48.dp),
@@ -151,14 +151,14 @@ fun SpotifyQueueSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = currentTrackTitle,
-                                style = SpotifyTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green),
+                                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = currentTrackArtist,
-                                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -178,7 +178,7 @@ fun SpotifyQueueSheet(
                     item {
                         Text(
                             text = "Next in queue",
-                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                         )
                     }
@@ -205,7 +205,7 @@ fun SpotifyQueueSheet(
                             } else {
                                 "Next from: $queueSourceContext"
                             },
-                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                         )
                     }
@@ -238,7 +238,7 @@ private fun QueueTrackRow(
             .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter2),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SpotifyArtworkImage(
+        EncoreArtworkImage(
             imageUrl = track.imageUrl,
             contentDescription = track.title,
             modifier = Modifier.size(44.dp),
@@ -250,7 +250,7 @@ private fun QueueTrackRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title,
-                style = SpotifyTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary),
+                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -271,7 +271,7 @@ private fun QueueTrackRow(
                 }
                 Text(
                     text = track.artist,
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -302,9 +302,9 @@ private fun QueueTrackRow(
 
 @Preview
 @Composable
-fun PreviewSpotifyQueueSheet() {
-    SpotifyEncoreTheme {
-        SpotifyQueueSheet(
+fun PreviewEncoreQueueSheet() {
+    EncoreAppTheme {
+        EncoreQueueSheet(
             currentTrackTitle = "Starboy",
             currentTrackArtist = "The Weeknd, Daft Punk",
             queueSourceContext = "Today's Top Hits",

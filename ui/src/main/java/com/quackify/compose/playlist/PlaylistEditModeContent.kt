@@ -59,9 +59,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * 1:1 Pixel-Perfect Spotify Mobile Playlist Edit Mode Content matching:
@@ -248,7 +248,7 @@ fun PlaylistEditModeContent(
                         if (inSelect) {
                             Text(
                                 text = "$selCount selected",
-                                style = SpotifyTheme.typography.titleMedium.copy(
+                                style = EncoreTheme.typography.titleMedium.copy(
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -294,7 +294,7 @@ fun PlaylistEditModeContent(
                         } else {
                             Text(
                                 text = "Edit playlist",
-                                style = SpotifyTheme.typography.titleMedium.copy(
+                                style = EncoreTheme.typography.titleMedium.copy(
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -313,7 +313,7 @@ fun PlaylistEditModeContent(
                     ) {
                         Text(
                             text = "Save",
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = EncoreColors.Green
@@ -415,7 +415,7 @@ fun PlaylistEditModeContent(
                 ) {
                     Text(
                         text = "Select",
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -462,7 +462,7 @@ fun PlaylistEditModeContent(
                     ) {
                         Text(
                             text = "Move",
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (hasSelection) Color.White else Color(0xFF666666)
@@ -490,7 +490,7 @@ fun PlaylistEditModeContent(
                     ) {
                         Text(
                             text = "Remove",
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (hasSelection) Color.White else Color(0xFF666666)
@@ -543,7 +543,7 @@ fun PlaylistEditModeContent(
                     ) {
                         Text(
                             text = "To top",
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -572,7 +572,7 @@ fun PlaylistEditModeContent(
                     ) {
                         Text(
                             text = "To bottom",
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -677,7 +677,7 @@ private fun EditTrackRow(
                 .background(Color(0xFF282828)),
             contentAlignment = Alignment.Center
         ) {
-            SpotifyArtworkImage(
+            EncoreArtworkImage(
                 imageUrl = track.imageUrl,
                 contentDescription = track.title,
                 cornerRadius = 4.dp,
@@ -708,7 +708,7 @@ private fun EditTrackRow(
         ) {
             Text(
                 text = track.title,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White
@@ -721,7 +721,7 @@ private fun EditTrackRow(
 
             Text(
                 text = track.artist,
-                style = SpotifyTheme.typography.bodySmall.copy(
+                style = EncoreTheme.typography.bodySmall.copy(
                     fontSize = 13.sp,
                     color = EncoreColors.TextSecondary
                 ),

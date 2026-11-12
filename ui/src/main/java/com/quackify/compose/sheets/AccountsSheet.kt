@@ -28,12 +28,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreProfileAvatar
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * Account switcher sheet opened from the profile drawer: lists every account
@@ -47,7 +47,7 @@ import com.quackify.compose.theme.SpotifyTheme
 fun AccountsSheet(
     isOpen: Boolean,
     onDismiss: () -> Unit,
-    accounts: List<SpotifyAuth.Account>,
+    accounts: List<EncoreAuth.Account>,
     activeAccountId: String,
     onSwitchAccount: (String) -> Unit,
     onAddAccount: () -> Unit,
@@ -83,7 +83,7 @@ fun AccountsSheet(
         ) {
             Text(
                 text = "Accounts",
-                style = SpotifyTheme.typography.titleLarge.copy(
+                style = EncoreTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 ),
@@ -119,7 +119,7 @@ fun AccountsSheet(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = account.name.ifBlank { "Spotify user" },
-                            style = SpotifyTheme.typography.titleMedium.copy(
+                            style = EncoreTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -127,7 +127,7 @@ fun AccountsSheet(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = account.email,
-                                style = SpotifyTheme.typography.bodySmall.copy(
+                                style = EncoreTheme.typography.bodySmall.copy(
                                     color = EncoreColors.TextSecondary
                                 )
                             )
@@ -135,7 +135,7 @@ fun AccountsSheet(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Current account",
-                                style = SpotifyTheme.typography.bodySmall.copy(
+                                style = EncoreTheme.typography.bodySmall.copy(
                                     color = EncoreColors.TextSecondary
                                 )
                             )
@@ -196,7 +196,7 @@ fun AccountsSheet(
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = "Add account",
-                    style = SpotifyTheme.typography.bodyMedium.copy(
+                    style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Medium,
                         fontSize = 16.sp
                     )
@@ -211,13 +211,13 @@ fun AccountsSheet(
 @Preview
 @Composable
 fun PreviewAccountsSheet() {
-    SpotifyEncoreTheme {
+    EncoreAppTheme {
         AccountsSheet(
             isOpen = true,
             onDismiss = {},
             accounts = listOf(
-                SpotifyAuth.Account(id = "a1", name = "Duck User", email = "duck@quackify.app"),
-                SpotifyAuth.Account(id = "a2", name = "Second Account"),
+                EncoreAuth.Account(id = "a1", name = "Duck User", email = "duck@quackify.app"),
+                EncoreAuth.Account(id = "a2", name = "Second Account"),
             ),
             activeAccountId = "a1",
             onSwitchAccount = {},

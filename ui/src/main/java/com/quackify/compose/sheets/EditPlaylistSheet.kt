@@ -52,7 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.theme.EncoreColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -216,7 +216,7 @@ fun EditPlaylistSheet(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            hasCover && !coverUrl.isNullOrBlank() -> SpotifyArtworkImage(
+                            hasCover && !coverUrl.isNullOrBlank() -> EncoreArtworkImage(
                                 imageUrl = coverUrl,
                                 contentDescription = "Current cover",
                                 modifier = Modifier.fillMaxSize(),

@@ -3,7 +3,7 @@ package com.quackify.backend.player
 import android.content.Context
 import com.quackify.backend.core.store.SecureStore
 import com.quackify.backend.connect.command.AudioFile
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.Net
@@ -38,7 +38,7 @@ internal object PlayerHeaders {
     private const val WEB_LANGUAGES = "en-US,en;q=0.9,fr-FR;q=0.8,fr;q=0.7"
 
     suspend fun of(context: Context, force: Boolean = false): Map<String, String> = mapOf(
-        "Authorization" to "Bearer ${SpotifyAuth.token(context)}",
+        "Authorization" to "Bearer ${EncoreAuth.token(context)}",
         "client-token" to ClientToken.get(context, force),
         "app-platform" to "WebPlayer",
         "spotify-app-version" to APP_VERSION,
@@ -48,7 +48,7 @@ internal object PlayerHeaders {
     )
 
     suspend fun license(context: Context, force: Boolean = false): Map<String, String> = mapOf(
-        "Authorization" to "Bearer ${SpotifyAuth.token(context)}",
+        "Authorization" to "Bearer ${EncoreAuth.token(context)}",
         "client-token" to ClientToken.get(context, force),
         "Origin" to WEB_ORIGIN,
         "Referer" to "$WEB_ORIGIN/",

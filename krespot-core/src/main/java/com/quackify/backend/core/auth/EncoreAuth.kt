@@ -13,7 +13,7 @@ import org.json.JSONObject
 
 private val log = Logs.of(Logs.Module.AUTH)
 
-object SpotifyAuth {
+object EncoreAuth {
 
     data class Account(
         val id: String = "",

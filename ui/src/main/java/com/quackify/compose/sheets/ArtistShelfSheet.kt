@@ -39,11 +39,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.components.InlineLoadingDots
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.backend.model.ShelfItem
 import com.quackify.backend.model.ShelfKind
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.backend.library.Krespot
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -127,14 +127,14 @@ fun ArtistShelfSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp),
+                        style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (total > 0) {
                         Text(
                             text = "$total items",
-                            style = SpotifyTheme.typography.bodySmall.copy(
+                            style = EncoreTheme.typography.bodySmall.copy(
                                 color = EncoreColors.TextSecondary
                             )
                         )
@@ -160,7 +160,7 @@ fun ArtistShelfSheet(
                             .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        SpotifyArtworkImage(
+                        EncoreArtworkImage(
                             imageUrl = row.imageUrl.takeIf { it.isNotBlank() },
                             contentDescription = row.title,
                             modifier = Modifier.size(52.dp),
@@ -170,14 +170,14 @@ fun ArtistShelfSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = row.title,
-                                style = SpotifyTheme.typography.bodyMediumBold,
+                                style = EncoreTheme.typography.bodyMediumBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             if (row.subtitle.isNotBlank()) {
                                 Text(
                                     text = row.subtitle,
-                                    style = SpotifyTheme.typography.marginal.copy(
+                                    style = EncoreTheme.typography.marginal.copy(
                                         color = EncoreColors.TextSecondary
                                     ),
                                     maxLines = 1,
@@ -198,7 +198,7 @@ fun ArtistShelfSheet(
                             if (failed) {
                                 Text(
                                     text = "Could not load this list",
-                                    style = SpotifyTheme.typography.bodySmall.copy(
+                                    style = EncoreTheme.typography.bodySmall.copy(
                                         color = EncoreColors.TextSecondary
                                     )
                                 )

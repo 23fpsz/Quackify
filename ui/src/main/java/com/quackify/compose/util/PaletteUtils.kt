@@ -15,7 +15,7 @@ import androidx.palette.graphics.Palette
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
-import com.quackify.compose.components.resolveSpotifyImageUrl
+import com.quackify.compose.components.resolveRemoteImageUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -87,7 +87,7 @@ fun rememberDominantColor(
     val colorState = remember(imageUrl) { mutableStateOf(fallback) }
 
     LaunchedEffect(imageUrl) {
-        val resolved = resolveSpotifyImageUrl(imageUrl)
+        val resolved = resolveRemoteImageUrl(imageUrl)
         if (resolved.isNullOrBlank()) {
             colorState.value = fallback
             return@LaunchedEffect

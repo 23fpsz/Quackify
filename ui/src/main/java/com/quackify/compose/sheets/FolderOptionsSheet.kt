@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * 1:1 Spotify Mobile Folder Options Sheet (Three-dots menu / Long press).
@@ -107,7 +107,7 @@ fun FolderOptionsSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = folderTitle,
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             fontSize = 16.sp
@@ -117,7 +117,7 @@ fun FolderOptionsSheet(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = playlistSubtitle,
-                        style = SpotifyTheme.typography.bodySmall.copy(
+                        style = EncoreTheme.typography.bodySmall.copy(
                             color = EncoreColors.TextSecondary,
                             fontSize = 13.sp
                         )
@@ -194,7 +194,7 @@ private fun FolderActionItem(
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = title,
-            style = SpotifyTheme.typography.bodyMedium.copy(
+            style = EncoreTheme.typography.bodyMedium.copy(
                 fontWeight = FontWeight.Medium,
                 color = Color.White,
                 fontSize = 15.sp

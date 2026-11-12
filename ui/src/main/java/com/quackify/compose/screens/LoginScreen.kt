@@ -41,10 +41,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.auth.LoginFlow
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.backend.core.webview.LOGIN_URL
 import com.quackify.backend.core.webview.LoginWebViewHost
 import com.quackify.backend.core.webview.PLAYER_URL
@@ -56,7 +56,7 @@ import com.quackify.backend.core.log.Logs
 private val log = Logs.of(Logs.Module.LOGIN)
 
 private sealed interface Resolve {
-    data class Ok(val account: SpotifyAuth.Account) : Resolve
+    data class Ok(val account: EncoreAuth.Account) : Resolve
     data object Guest : Resolve
     data object NotReady : Resolve
 }
@@ -78,8 +78,8 @@ private sealed interface Resolve {
 @Composable
 fun LoginScreen(
     onLoggedIn: () -> Unit,
-    isDuplicateAccount: ((SpotifyAuth.Account) -> Boolean)? = null,
-    onDuplicateLogin: ((SpotifyAuth.Account) -> Unit)? = null,
+    isDuplicateAccount: ((EncoreAuth.Account) -> Boolean)? = null,
+    onDuplicateLogin: ((EncoreAuth.Account) -> Unit)? = null,
     onBackExhausted: (() -> Unit)? = null,
 ) {
 
@@ -147,8 +147,8 @@ fun LoginScreen(
                 splash = false
                 continue
             }
-            val cookies = SpotifyAuth.captureCookies(context)
-            val spDc = cookies?.let { SpotifyAuth.spDcOf(it) }.orEmpty()
+            val cookies = EncoreAuth.captureCookies(context)
+            val spDc = cookies?.let { EncoreAuth.spDcOf(it) }.orEmpty()
             if (spDc.isBlank()) continue
 
             val now = SystemClock.elapsedRealtime()
@@ -173,8 +173,8 @@ fun LoginScreen(
                         onDuplicateLogin?.invoke(result.account)
                         return@LaunchedEffect
                     }
-                    SpotifyAuth.saveLogin(context, cookies!!, result.account)
-                    val userId = SpotifyAuth.userId(context)
+                    EncoreAuth.saveLogin(context, cookies!!, result.account)
+                    val userId = EncoreAuth.userId(context)
                     log.i("account id resolved='$userId'")
                     LoginFlow.harvest(context, log = { log.i(it) })
                     onLoggedIn()
@@ -230,7 +230,7 @@ fun LoginScreen(
             ) {
                 Text(
                     text = "LOGS",
-                    style = SpotifyTheme.typography.marginal.copy(
+                    style = EncoreTheme.typography.marginal.copy(
                         color = EncoreColors.TextSecondary,
                         letterSpacing = 1.2.sp,
                     ),
@@ -277,7 +277,7 @@ private fun WebViewUnavailableScreen(onRetry: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "System WebView unavailable",
-                style = SpotifyTheme.typography.titleMedium,
+                style = EncoreTheme.typography.titleMedium,
                 color = EncoreColors.TextPrimary,
                 textAlign = TextAlign.Center,
             )
@@ -287,7 +287,7 @@ private fun WebViewUnavailableScreen(onRetry: () -> Unit) {
                         "or updating on this device, so the login page can't open. " +
                         "Enable or update Android System WebView in system settings, " +
                         "then retry.",
-                style = SpotifyTheme.typography.bodyMedium,
+                style = EncoreTheme.typography.bodyMedium,
                 color = EncoreColors.TextSecondary,
                 textAlign = TextAlign.Center,
             )
@@ -302,7 +302,7 @@ private fun WebViewUnavailableScreen(onRetry: () -> Unit) {
             ) {
                 Text(
                     text = "RETRY",
-                    style = SpotifyTheme.typography.marginalBold.copy(
+                    style = EncoreTheme.typography.marginalBold.copy(
                         color = EncoreColors.PureBlack,
                         letterSpacing = 1.2.sp,
                     ),
@@ -326,8 +326,8 @@ private suspend fun resolveAccount(
     val token = session?.token
     log(if (token != null) "session token ok (${token.length})" else "no session token")
     if (session != null) {
-        SpotifyAuth.saveToken(host.context, session.token, session.expiresAtMs)
-        val account = SpotifyAuth.fetchAccount(session.token)
+        EncoreAuth.saveToken(host.context, session.token, session.expiresAtMs)
+        val account = EncoreAuth.fetchAccount(session.token)
         log(if (account != null) "/v1/me ok (${account.name})" else "/v1/me failed")
         if (account != null && account.name.isNotBlank()) return Resolve.Ok(account)
     }
@@ -340,15 +340,15 @@ private suspend fun resolveAccount(
             return Resolve.Guest
         }
         log("user widget ok (${user.name})")
-        return Resolve.Ok(SpotifyAuth.Account(name = user.name, imageUrl = user.avatarUrl))
+        return Resolve.Ok(EncoreAuth.Account(name = user.name, imageUrl = user.avatarUrl))
     }
     log("user widget not found")
 
     log("token over http")
-    val httpToken = SpotifyAuth.fetchToken(host.context, spDc)
+    val httpToken = EncoreAuth.fetchToken(host.context, spDc)
     log(if (httpToken != null) "http token ok (${httpToken.length})" else "http token: none")
     if (httpToken != null) {
-        SpotifyAuth.fetchAccount(httpToken)?.let { account ->
+        EncoreAuth.fetchAccount(httpToken)?.let { account ->
             if (account.name.isNotBlank()) return Resolve.Ok(account)
         }
     }

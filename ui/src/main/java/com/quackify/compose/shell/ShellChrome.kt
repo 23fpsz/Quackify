@@ -38,10 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.backend.model.DeviceKind
 import com.quackify.compose.R
-import com.quackify.compose.player.SpotifyMiniPlayer
+import com.quackify.compose.player.EncoreMiniPlayer
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.util.rememberIsOffline
 
 private const val NAV_BAR_TOP_ALPHA = 0.70f
@@ -108,7 +108,7 @@ internal fun ShellBottomBar(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "You're offline. Check your internet connection.",
-                    style = SpotifyTheme.typography.bodySmall.copy(
+                    style = EncoreTheme.typography.bodySmall.copy(
                         color = EncoreColors.TextPrimary,
                         fontWeight = FontWeight.Medium
                     ),
@@ -117,7 +117,7 @@ internal fun ShellBottomBar(
             }
         }
 
-        SpotifyMiniPlayer(
+        EncoreMiniPlayer(
             title = title,
             artist = artist,
             isPlaying = isPlaying,
@@ -146,7 +146,7 @@ internal fun ShellBottomBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             navItems.forEachIndexed { index, item ->
-                SpotifyBottomNavItem(
+                EncoreBottomNavItem(
                     item = item,
                     isSelected = currentNavIndex == index,
                     onClick = { onNavSelect(index) },
@@ -159,7 +159,7 @@ internal fun ShellBottomBar(
 }
 
 @Composable
-private fun SpotifyBottomNavItem(
+private fun EncoreBottomNavItem(
     item: NavItem,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -190,7 +190,7 @@ private fun SpotifyBottomNavItem(
         )
         Text(
             text = item.title,
-            style = SpotifyTheme.typography.tagLabel.copy(fontSize = 10.sp),
+            style = EncoreTheme.typography.tagLabel.copy(fontSize = 10.sp),
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             color = if (isSelected) EncoreColors.TextPrimary else EncoreColors.TextSecondary
         )

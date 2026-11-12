@@ -1,7 +1,7 @@
 package com.quackify.backend.api
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
@@ -172,7 +172,7 @@ object Browse {
     }
 
     private suspend fun call(context: Context, operation: String, variables: String): JSONObject? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("$operation: no token")
             return null

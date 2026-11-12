@@ -22,7 +22,7 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -136,7 +136,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     }
 
     init {
-        log.i("init ua=${SpotifyAuth.DESKTOP_UA}")
+        log.i("init ua=${EncoreAuth.DESKTOP_UA}")
         container.addView(
             webView,
             FrameLayout.LayoutParams(
@@ -525,7 +525,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 manager.setAcceptThirdPartyCookies(view, true)
             }
             view.settings.apply {
-                userAgentString = SpotifyAuth.DESKTOP_UA
+                userAgentString = EncoreAuth.DESKTOP_UA
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true

@@ -47,8 +47,8 @@ import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 
 enum class DeviceType {
     PHONE,
@@ -58,7 +58,7 @@ enum class DeviceType {
     CAR
 }
 
-data class SpotifyDevice(
+data class EncoreDevice(
     val id: String,
     val name: String,
     val type: DeviceType,
@@ -76,11 +76,11 @@ data class SpotifyDevice(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpotifyConnectDeviceSheet(
+fun EncoreConnectDeviceSheet(
     onDismissRequest: () -> Unit,
     currentDeviceName: String,
-    onSelectDevice: (SpotifyDevice) -> Unit,
-    devices: List<SpotifyDevice> = emptyList(),
+    onSelectDevice: (EncoreDevice) -> Unit,
+    devices: List<EncoreDevice> = emptyList(),
     initialVolume: Float = 0.7f,
     onVolumeChange: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
@@ -114,7 +114,7 @@ fun SpotifyConnectDeviceSheet(
             ) {
                 Text(
                     text = "Listening on",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
 
                 EncoreIconButton(
@@ -162,11 +162,11 @@ fun SpotifyConnectDeviceSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Current Device",
-                                style = SpotifyTheme.typography.marginalBold.copy(color = EncoreColors.Green)
+                                style = EncoreTheme.typography.marginalBold.copy(color = EncoreColors.Green)
                             )
                             Text(
                                 text = currentDeviceName,
-                                style = SpotifyTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary)
+                                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary)
                             )
                         }
 
@@ -219,7 +219,7 @@ fun SpotifyConnectDeviceSheet(
 
             Text(
                 text = "Select another device",
-                style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                 modifier = Modifier.padding(horizontal = EncoreSpacers.Base)
             )
 
@@ -241,7 +241,7 @@ fun SpotifyConnectDeviceSheet(
 
 @Composable
 private fun DeviceRow(
-    device: SpotifyDevice,
+    device: EncoreDevice,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -272,26 +272,26 @@ private fun DeviceRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = device.name,
-                style = SpotifyTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary)
+                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary)
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = device.protocol,
-                style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
             )
         }
     }
 }
 
-private fun defaultDeviceList(): List<SpotifyDevice> = listOf(
-    SpotifyDevice("1", "This Phone", DeviceType.PHONE, isCurrent = true),
-    SpotifyDevice("2", "Living Room Speaker", DeviceType.SPEAKER, protocol = "Google Cast"),
-    SpotifyDevice("3", "MacBook Pro", DeviceType.COMPUTER, protocol = "Spotify Connect"),
-    SpotifyDevice("4", "Kitchen Echo", DeviceType.SPEAKER, protocol = "Spotify Connect"),
-    SpotifyDevice("5", "Tesla Model 3", DeviceType.CAR, protocol = "Bluetooth")
+private fun defaultDeviceList(): List<EncoreDevice> = listOf(
+    EncoreDevice("1", "This Phone", DeviceType.PHONE, isCurrent = true),
+    EncoreDevice("2", "Living Room Speaker", DeviceType.SPEAKER, protocol = "Google Cast"),
+    EncoreDevice("3", "MacBook Pro", DeviceType.COMPUTER, protocol = "Spotify Connect"),
+    EncoreDevice("4", "Kitchen Echo", DeviceType.SPEAKER, protocol = "Spotify Connect"),
+    EncoreDevice("5", "Tesla Model 3", DeviceType.CAR, protocol = "Bluetooth")
 )
 
-fun ConnectDevice.toSpotifyDevice(): SpotifyDevice = SpotifyDevice(
+fun ConnectDevice.toEncoreDevice(): EncoreDevice = EncoreDevice(
     id = id,
     name = name.ifBlank { "Unknown device" },
     type = when (kind) {
@@ -311,9 +311,9 @@ fun ConnectDevice.toSpotifyDevice(): SpotifyDevice = SpotifyDevice(
 
 @Preview
 @Composable
-fun PreviewSpotifyConnectDeviceSheet() {
-    SpotifyEncoreTheme {
-        SpotifyConnectDeviceSheet(
+fun PreviewEncoreConnectDeviceSheet() {
+    EncoreAppTheme {
+        EncoreConnectDeviceSheet(
             onDismissRequest = {},
             currentDeviceName = "Galaxy S24 Ultra",
             onSelectDevice = {}

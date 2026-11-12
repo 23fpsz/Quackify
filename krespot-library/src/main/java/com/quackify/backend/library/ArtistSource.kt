@@ -1,7 +1,7 @@
 package com.quackify.backend.library
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.GraphQl
@@ -31,7 +31,7 @@ object ArtistSource {
     private const val DISCOGRAPHY_PAGE = 20
 
     suspend fun artist(context: Context, uri: String): ArtistDetail? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val variables = JSONObject()
             .put("uri", uri)
@@ -122,7 +122,7 @@ object ArtistSource {
     }
 
     suspend fun discographyCounts(context: Context, uri: String): Map<String, Int> {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return emptyMap()
         val variables = JSONObject().put("uri", uri).toString()
         val json = Pathfinder.queryPost(context, token, OP_DISCOGRAPHY_COUNTS, variables) ?: return emptyMap()
@@ -144,7 +144,7 @@ object ArtistSource {
         order: String = "DATE_DESC",
         limit: Int = DISCOGRAPHY_PAGE,
     ): ReleasePage? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val operation = when (section) {
             "albums" -> "queryArtistDiscographyAlbums"
@@ -181,7 +181,7 @@ object ArtistSource {
         offset: Int = 0,
         limit: Int = DISCOGRAPHY_PAGE,
     ): ReleasePage? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val operation = when (section) {
             "featuring" -> "queryArtistFeaturing"
@@ -219,7 +219,7 @@ object ArtistSource {
     }
 
     suspend fun artistRadio(context: Context, uri: String): String? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val url = "$SPCLIENT/inspiredby-mix/v2/seed_to_playlist/$uri?response-format=json"
         val response = Net.get(url, spHeaders(context), "artist/radio") ?: return null
@@ -231,7 +231,7 @@ object ArtistSource {
     }
 
     private suspend fun spHeaders(context: Context): Map<String, String> = buildMap {
-        put("Authorization", "Bearer ${SpotifyAuth.token(context)}")
+        put("Authorization", "Bearer ${EncoreAuth.token(context)}")
         put("Accept", "application/json")
         put("app-platform", "WebPlayer")
         put("User-Agent", Net.DESKTOP_UA)

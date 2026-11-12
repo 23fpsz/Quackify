@@ -109,18 +109,18 @@ import com.quackify.compose.components.FullArtworkBackdrop
 import com.quackify.compose.components.dissolveInto
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.rememberFullArtworkBlur
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
-import com.quackify.compose.theme.SpotifyEncoreTheme
+import com.quackify.compose.theme.EncoreAppTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.util.rememberDominantColor
 
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
@@ -208,7 +208,7 @@ private fun rememberRevealProgress(): Float {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpotifyNowPlayingScreen(
+fun EncoreNowPlayingScreen(
     title: String,
     artist: String,
     albumOrPlaylistContext: String,
@@ -1056,7 +1056,7 @@ private fun NowPlayingHeaderRow(
         ) {
             Text(
                 text = resolvedContextTitle,
-                style = SpotifyTheme.typography.marginal.copy(
+                style = EncoreTheme.typography.marginal.copy(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Normal,
                     color = ink
@@ -1067,7 +1067,7 @@ private fun NowPlayingHeaderRow(
             if (contextSubtitle != null) {
                 Text(
                     text = contextSubtitle,
-                    style = SpotifyTheme.typography.bodySmallBold.copy(
+                    style = EncoreTheme.typography.bodySmallBold.copy(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = ink
@@ -1222,7 +1222,7 @@ private fun NowPlayingArtworkCard(
                 )
             }
             else -> {
-                SpotifyArtworkImage(
+                EncoreArtworkImage(
                     imageUrl = coverUrl,
                     contentDescription = title,
                     fallbackColor = dominantColor,
@@ -1287,7 +1287,7 @@ private fun MusicVideoSwitchPill(
         Spacer(modifier = Modifier.width(5.dp))
         Text(
             text = label,
-            style = SpotifyTheme.typography.bodySmall,
+            style = EncoreTheme.typography.bodySmall,
             color = Color.White
         )
     }
@@ -1330,7 +1330,7 @@ private fun NowPlayingSyncedLyricLine(
             ) { lyricLine ->
                 Text(
                     text = lyricLine,
-                    style = SpotifyTheme.typography.titleMedium.copy(
+                    style = EncoreTheme.typography.titleMedium.copy(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -1374,7 +1374,7 @@ private fun NowPlayingTrackInfoRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = SpotifyTheme.typography.titleLarge.copy(
+                style = EncoreTheme.typography.titleLarge.copy(
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -1405,7 +1405,7 @@ private fun NowPlayingTrackInfoRow(
                 }
                 Text(
                     text = artist,
-                    style = SpotifyTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.70f)),
+                    style = EncoreTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.70f)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.clickable(onClick = onArtistClick)
@@ -1451,7 +1451,7 @@ private fun NowPlayingSeekBarSection(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        SpotifySeekBar(
+        EncoreSeekBar(
             progress = progress,
             durationMs = durationMs,
             onSeek = onSeek,
@@ -1471,7 +1471,7 @@ private fun NowPlayingSeekBarSection(
         ) {
             Text(
                 text = formatTime(currentPositionMs),
-                style = SpotifyTheme.typography.marginal.copy(
+                style = EncoreTheme.typography.marginal.copy(
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.70f),
                     fontFeatureSettings = "tnum"
@@ -1479,7 +1479,7 @@ private fun NowPlayingSeekBarSection(
             )
             Text(
                 text = formatTime(durationMs),
-                style = SpotifyTheme.typography.marginal.copy(
+                style = EncoreTheme.typography.marginal.copy(
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.70f),
                     fontFeatureSettings = "tnum"
@@ -1590,12 +1590,12 @@ private fun SpeedPill(
         ) {
             Text(
                 text = if (speed == 1f) "1" else String.format(java.util.Locale.US, "%.1f", speed),
-                style = SpotifyTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                style = EncoreTheme.typography.bodyMedium.copy(fontSize = 13.sp),
                 color = Color.White
             )
             Text(
                 text = "×",
-                style = SpotifyTheme.typography.marginal.copy(
+                style = EncoreTheme.typography.marginal.copy(
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold
                 ),
@@ -1730,7 +1730,7 @@ private fun NowPlayingFooterRow(
             )
             Text(
                 text = connectedDeviceName,
-                style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.Green),
+                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.Green),
                 modifier = Modifier.padding(start = 2.dp)
             )
         }
@@ -1806,7 +1806,7 @@ private fun NowPlayingLyricsPeekCard(
                 ) {
                     Text(
                         text = "Lyrics preview",
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = ink)
+                        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = ink)
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         EncoreIconButton(
@@ -1846,7 +1846,7 @@ private fun NowPlayingLyricsPeekCard(
                         val isActive = i == activeIndex
                         Text(
                             text = lyric.text,
-                            style = SpotifyTheme.typography.titleMedium.copy(
+                            style = EncoreTheme.typography.titleMedium.copy(
                                 fontSize = 18.sp,
                                 lineHeight = 30.sp,
                                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
@@ -1899,7 +1899,7 @@ private fun NowPlayingAboutArtistCard(
             ) {
                 Text(
                     text = "About the artist",
-                    style = SpotifyTheme.typography.titleMedium.copy(
+                    style = EncoreTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -1929,7 +1929,7 @@ private fun NowPlayingAboutArtistCard(
                         contentAlignment = Alignment.Center
                     ) {
                         if (!artistImageUrl.isNullOrBlank()) {
-                            SpotifyArtworkImage(
+                            EncoreArtworkImage(
                                 imageUrl = artistImageUrl,
                                 contentDescription = artist,
                                 modifier = Modifier.fillMaxSize(),
@@ -1944,7 +1944,7 @@ private fun NowPlayingAboutArtistCard(
                             ) {
                                 Text(
                                     text = artist.firstOrNull()?.uppercase() ?: "A",
-                                    style = SpotifyTheme.typography.titleMedium.copy(color = Color.White)
+                                    style = EncoreTheme.typography.titleMedium.copy(color = Color.White)
                                 )
                             }
                         }
@@ -1954,7 +1954,7 @@ private fun NowPlayingAboutArtistCard(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = artist,
-                                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
@@ -1969,7 +1969,7 @@ private fun NowPlayingAboutArtistCard(
                         }
                         Text(
                             text = monthlyListeners,
-                            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                         )
                     }
                 }
@@ -1988,7 +1988,7 @@ private fun NowPlayingAboutArtistCard(
                 ) {
                     Text(
                         text = if (isFollowingArtist) "Following" else "Follow",
-                        style = SpotifyTheme.typography.bodySmallBold.copy(
+                        style = EncoreTheme.typography.bodySmallBold.copy(
                             color = if (isFollowingArtist) EncoreColors.Green else EncoreColors.TextPrimary
                         )
                     )
@@ -1999,7 +1999,7 @@ private fun NowPlayingAboutArtistCard(
 
             Text(
                 text = artistBio,
-                style = SpotifyTheme.typography.bodySmall.copy(
+                style = EncoreTheme.typography.bodySmall.copy(
                     color = EncoreColors.TextSecondary,
                     lineHeight = 18.sp
                 ),
@@ -2062,13 +2062,13 @@ private fun FullscreenLyricsView(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = title,
-                    style = SpotifyTheme.typography.bodySmallBold.copy(color = ink),
+                    style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = artist,
-                    style = SpotifyTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
+                    style = EncoreTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -2093,7 +2093,7 @@ private fun FullscreenLyricsView(
                 val isCurrentLine = index == activeIndex
                 Text(
                     text = line.text,
-                    style = SpotifyTheme.typography.titleLarge.copy(
+                    style = EncoreTheme.typography.titleLarge.copy(
                         fontSize = 24.sp,
                         lineHeight = 34.sp,
                         fontWeight = FontWeight.Bold,
@@ -2118,14 +2118,14 @@ private fun formatTime(ms: Long): String {
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun PreviewSpotifyNowPlayingScreen() {
-    SpotifyEncoreTheme {
+fun PreviewEncoreNowPlayingScreen() {
+    EncoreAppTheme {
         var isPlaying by remember { mutableStateOf(true) }
         var isLiked by remember { mutableStateOf(true) }
         var isShuffle by remember { mutableStateOf(false) }
         var isRepeat by remember { mutableStateOf(true) }
 
-        SpotifyNowPlayingScreen(
+        EncoreNowPlayingScreen(
             title = "Starboy",
             artist = "The Weeknd, Daft Punk",
             albumOrPlaylistContext = "Today's Top Hits",
@@ -2154,14 +2154,14 @@ fun PreviewSpotifyNowPlayingScreen() {
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212, widthDp = 800, heightDp = 360)
 @Composable
-fun PreviewSpotifyNowPlayingScreenLandscape() {
-    SpotifyEncoreTheme {
+fun PreviewEncoreNowPlayingScreenLandscape() {
+    EncoreAppTheme {
         var isPlaying by remember { mutableStateOf(true) }
         var isLiked by remember { mutableStateOf(true) }
         var isShuffle by remember { mutableStateOf(false) }
         var isRepeat by remember { mutableStateOf(true) }
 
-        SpotifyNowPlayingScreen(
+        EncoreNowPlayingScreen(
             title = "Starboy",
             artist = "The Weeknd, Daft Punk",
             albumOrPlaylistContext = "Today's Top Hits",

@@ -22,7 +22,7 @@ object WebToken {
     private const val MODULUS = 1_000_000
 
     suspend fun mint(context: Context, spDc: String = ""): String? {
-        val cookie = cookieHeader(context, spDc.ifBlank { SpotifyAuth.spDc(context) })
+        val cookie = cookieHeader(context, spDc.ifBlank { EncoreAuth.spDc(context) })
         if (cookie.isBlank()) {
             log.w("api/token skipped, there is no sp_dc to mint with")
             return null
@@ -48,8 +48,8 @@ object WebToken {
             return null
         }
         val expires = json.optLong("accessTokenExpirationTimestampMs", 0L)
-        val previous = SpotifyAuth.token(context)
-        SpotifyAuth.saveToken(context, token, expires)
+        val previous = EncoreAuth.token(context)
+        EncoreAuth.saveToken(context, token, expires)
         val ttl = if (expires > 0L) "${(expires - System.currentTimeMillis()) / 1000L}s" else "?"
         log.i("api/token ${response.code} ${token.length}B client=${json.optString("clientId").take(8)}… " +
                 "ttl=$ttl totp=$totp changed=${previous != token}"
@@ -93,7 +93,7 @@ object WebToken {
             SERVER_TIME,
             mapOf(
                 "Cookie" to cookie,
-                "User-Agent" to SpotifyAuth.DESKTOP_UA,
+                "User-Agent" to EncoreAuth.DESKTOP_UA,
                 "Accept" to "application/json, text/plain, */*",
                 "Referer" to "$ORIGIN/",
                 "Origin" to ORIGIN,
@@ -106,7 +106,7 @@ object WebToken {
 
     private fun headers(cookie: String): Map<String, String> = mapOf(
         "Cookie" to cookie,
-        "User-Agent" to SpotifyAuth.DESKTOP_UA,
+        "User-Agent" to EncoreAuth.DESKTOP_UA,
         "Accept" to "application/json, text/plain, */*",
         "Accept-Language" to "en-US,en;q=0.9",
         "Referer" to "$ORIGIN/",

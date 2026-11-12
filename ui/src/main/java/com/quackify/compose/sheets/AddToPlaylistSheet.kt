@@ -51,9 +51,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.InlineLoadingDots
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.util.search.GenericSearchEngine
 import com.quackify.compose.util.search.SearchableFieldExtractor
 import com.quackify.backend.model.PlaylistChoice
@@ -225,7 +225,7 @@ fun AddToPlaylistSheet(
             ) {
                 Text(
                     text = "Cancel",
-                    style = SpotifyTheme.typography.bodyMedium.copy(
+                    style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = EncoreColors.TextPrimary,
                         fontSize = 15.sp
@@ -237,7 +237,7 @@ fun AddToPlaylistSheet(
 
                 Text(
                     text = "Done",
-                    style = SpotifyTheme.typography.bodyMedium.copy(
+                    style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = EncoreColors.TextPrimary,
                         fontSize = 15.sp
@@ -258,7 +258,7 @@ fun AddToPlaylistSheet(
                 Text(
                     text = if (inFolder) currentFolder?.name.orEmpty()
                     else if (savedCount > 0) "Saved in" else "Save in",
-                    style = SpotifyTheme.typography.titleLarge.copy(
+                    style = EncoreTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
                         color = EncoreColors.TextPrimary
@@ -268,7 +268,7 @@ fun AddToPlaylistSheet(
                 if (!inFolder) {
                     Text(
                         text = "New playlist",
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.SemiBold,
                             color = EncoreColors.Green,
                             fontSize = 14.sp
@@ -322,7 +322,7 @@ fun AddToPlaylistSheet(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = parentName?.let { "Back to $it" } ?: "Back to your playlists",
-                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                    style = EncoreTheme.typography.bodyMedium.copy(
                                         color = EncoreColors.TextSecondary,
                                         fontWeight = FontWeight.Medium
                                     ),
@@ -341,7 +341,7 @@ fun AddToPlaylistSheet(
                                     inFolder -> "This folder is empty"
                                     else -> "No playlists you can add to"
                                 },
-                                style = SpotifyTheme.typography.bodyMedium.copy(
+                                style = EncoreTheme.typography.bodyMedium.copy(
                                     color = EncoreColors.TextSecondary
                                 ),
                                 modifier = Modifier
@@ -392,7 +392,7 @@ fun AddToPlaylistSheet(
                                 }
                                 Text(
                                     text = "New playlist",
-                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                    style = EncoreTheme.typography.bodyMedium.copy(
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Medium
                                     ),
@@ -424,7 +424,7 @@ fun AddToPlaylistSheet(
                 ) {
                     Text(
                         text = "Done",
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
                             color = Color.Black
@@ -462,7 +462,7 @@ private fun AddToPlaylistSearchBox(
             value = query,
             onValueChange = onQueryChange,
             singleLine = true,
-            textStyle = SpotifyTheme.typography.bodyMedium.copy(
+            textStyle = EncoreTheme.typography.bodyMedium.copy(
                 color = EncoreColors.TextPrimary,
                 fontSize = 15.sp
             ),
@@ -477,7 +477,7 @@ private fun AddToPlaylistSearchBox(
                     if (query.isEmpty()) {
                         Text(
                             text = "Search",
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 color = EncoreColors.TextSecondary,
                                 fontSize = 15.sp
                             )
@@ -540,7 +540,7 @@ private fun AddToPlaylistRow(
                 )
             }
         } else {
-            SpotifyArtworkImage(
+            EncoreArtworkImage(
                 imageUrl = choice.imageUrl.takeIf { it.isNotBlank() },
                 contentDescription = choice.name,
                 modifier = Modifier.size(48.dp),
@@ -551,7 +551,7 @@ private fun AddToPlaylistRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = choice.name,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
                 ),
@@ -563,7 +563,7 @@ private fun AddToPlaylistRow(
             if (songCount != null && songCount >= 0) {
                 Text(
                     text = "$songCount song" + if (songCount == 1) "" else "s",
-                    style = SpotifyTheme.typography.bodySmall.copy(
+                    style = EncoreTheme.typography.bodySmall.copy(
                         color = EncoreColors.TextSecondary,
                         fontSize = 13.sp
                     ),
@@ -639,7 +639,7 @@ private fun AddToFolderRow(
         }
         Text(
             text = folder.name,
-            style = SpotifyTheme.typography.bodyMedium.copy(
+            style = EncoreTheme.typography.bodyMedium.copy(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium
             ),

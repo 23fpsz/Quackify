@@ -31,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * Spotify Library Create Bottom Sheet (+ button).
@@ -79,7 +79,7 @@ fun LibraryCreateSheet(
             if (showHeader) {
                 Text(
                     text = "Create",
-                    style = SpotifyTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                    style = EncoreTheme.typography.titleLarge.copy(fontSize = 18.sp),
                     modifier = Modifier.padding(vertical = 12.dp)
                 )
             } else {
@@ -146,7 +146,7 @@ private fun CreateOptionItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     fontSize = 15.sp
@@ -155,7 +155,7 @@ private fun CreateOptionItem(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
-                style = SpotifyTheme.typography.bodySmall.copy(
+                style = EncoreTheme.typography.bodySmall.copy(
                     color = EncoreColors.TextSecondary,
                     fontSize = 13.sp
                 )
@@ -167,7 +167,7 @@ private fun CreateOptionItem(
 @Preview
 @Composable
 fun PreviewLibraryCreateSheet() {
-    SpotifyEncoreTheme {
+    EncoreAppTheme {
         LibraryCreateSheet(
             isOpen = true,
             onCreatePlaylist = {},

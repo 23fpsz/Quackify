@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.auth.LoginFlow
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.backend.core.log.Logs
@@ -25,7 +25,7 @@ fun PathfinderCaptureScreen(onDone: () -> Unit) {
     val context = LocalContext.current
     val host = remember {
         runCatching {
-            SpotifyAuth.applySession(context)
+            EncoreAuth.applySession(context)
             LoginFlow.markAttempt(context)
             log.i("starting capture pass on $PLAYER_URL")
             LoginWebViewHost(context, PLAYER_URL)
@@ -45,10 +45,10 @@ fun PathfinderCaptureScreen(onDone: () -> Unit) {
             context = context,
             log = { log.i(it) },
             timeoutMs = 25_000,
-            ready = { SpotifyAuth.token(context).isNotBlank() },
+            ready = { EncoreAuth.token(context).isNotBlank() },
         )
         host.readSession()?.let { session ->
-            SpotifyAuth.saveToken(context, session.token, session.expiresAtMs)
+            EncoreAuth.saveToken(context, session.token, session.expiresAtMs)
         }
         onDone()
     }

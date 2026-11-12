@@ -61,7 +61,7 @@ import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncorePlayIndicator
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.ShimmerBlock
 import com.quackify.compose.components.ShimmerHost
@@ -70,8 +70,8 @@ import com.quackify.compose.format.formatCollectionDuration
 import com.quackify.backend.model.collectionDuration
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 
 data class AlbumDisc(
@@ -90,7 +90,7 @@ data class AlbumDisc(
  * - "More by [Artist]" discography shelf
  */
 @Composable
-fun SpotifyAlbumScreen(
+fun EncoreAlbumScreen(
     albumTitle: String,
     artistName: String,
     releaseYear: String,
@@ -248,7 +248,7 @@ fun SpotifyAlbumScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (!coverUrl.isNullOrBlank()) {
-                                    SpotifyArtworkImage(
+                                    EncoreArtworkImage(
                                         imageUrl = coverUrl,
                                         contentDescription = albumTitle,
                                         modifier = Modifier.fillMaxSize(),
@@ -268,7 +268,7 @@ fun SpotifyAlbumScreen(
 
                         Text(
                             text = albumTitle,
-                            style = SpotifyTheme.typography.headlineLarge.copy(
+                            style = EncoreTheme.typography.headlineLarge.copy(
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -294,7 +294,7 @@ fun SpotifyAlbumScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (!artistImageUrl.isNullOrBlank()) {
-                                    SpotifyArtworkImage(
+                                    EncoreArtworkImage(
                                         imageUrl = artistImageUrl,
                                         contentDescription = artistName,
                                         modifier = Modifier
@@ -305,7 +305,7 @@ fun SpotifyAlbumScreen(
                                 } else {
                                     Text(
                                         text = (artistName.trim().firstOrNull() ?: 'A').uppercaseChar().toString(),
-                                        style = SpotifyTheme.typography.bodySmallBold.copy(fontSize = 11.sp, color = Color.White)
+                                        style = EncoreTheme.typography.bodySmallBold.copy(fontSize = 11.sp, color = Color.White)
                                     )
                                 }
                             }
@@ -314,7 +314,7 @@ fun SpotifyAlbumScreen(
 
                             Text(
                                 text = artistName,
-                                style = SpotifyTheme.typography.bodySmallBold.copy(
+                                style = EncoreTheme.typography.bodySmallBold.copy(
                                     color = EncoreColors.TextPrimary,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -325,7 +325,7 @@ fun SpotifyAlbumScreen(
 
                         Text(
                             text = "Album • $releaseYear",
-                            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
 
@@ -451,7 +451,7 @@ fun SpotifyAlbumScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "DISC ${disc.discNumber}",
-                                style = SpotifyTheme.typography.titleSmall.copy(
+                                style = EncoreTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
                                     color = EncoreColors.TextSecondary
@@ -509,7 +509,7 @@ fun SpotifyAlbumScreen(
                     if (releaseDate.isNotBlank()) {
                         Text(
                             text = releaseDate,
-                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                     }
@@ -522,7 +522,7 @@ fun SpotifyAlbumScreen(
                             text = listOf("${tracks.size} songs", totalDuration)
                                 .filter { it.isNotBlank() }
                                 .joinToString(" • "),
-                            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                         )
                     }
 
@@ -530,7 +530,7 @@ fun SpotifyAlbumScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = copyrightNotice,
-                            style = SpotifyTheme.typography.marginal.copy(
+                            style = EncoreTheme.typography.marginal.copy(
                                 fontSize = 10.sp,
                                 lineHeight = 14.sp,
                                 color = EncoreColors.TextSecondary
@@ -542,7 +542,7 @@ fun SpotifyAlbumScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = phonographicNotice,
-                            style = SpotifyTheme.typography.marginal.copy(
+                            style = EncoreTheme.typography.marginal.copy(
                                 fontSize = 10.sp,
                                 lineHeight = 14.sp,
                                 color = EncoreColors.TextSecondary
@@ -556,7 +556,7 @@ fun SpotifyAlbumScreen(
                 item {
                     Text(
                         text = "More by $artistName",
-                        style = SpotifyTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                        style = EncoreTheme.typography.titleLarge.copy(fontSize = 18.sp),
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                     )
 
@@ -578,7 +578,7 @@ fun SpotifyAlbumScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (release.imageUrl != null) {
-                                        SpotifyArtworkImage(
+                                        EncoreArtworkImage(
                                             imageUrl = release.imageUrl,
                                             contentDescription = release.title,
                                             modifier = Modifier.fillMaxSize(),
@@ -591,14 +591,14 @@ fun SpotifyAlbumScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = release.title,
-                                    style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "${release.type} • ${release.year}",
-                                    style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                                 )
                             }
                         }
@@ -654,7 +654,7 @@ fun SpotifyAlbumScreen(
             ) {
                 Text(
                     text = albumTitle,
-                    style = SpotifyTheme.typography.titleMedium.copy(
+                    style = EncoreTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 17.sp
@@ -749,7 +749,7 @@ private fun AlbumTrackRow(
             } else {
                 Text(
                     text = trackNumber.toString(),
-                    style = SpotifyTheme.typography.bodyMedium.copy(
+                    style = EncoreTheme.typography.bodyMedium.copy(
                         color = EncoreColors.TextSecondary,
                         fontWeight = FontWeight.Medium
                     )
@@ -764,7 +764,7 @@ private fun AlbumTrackRow(
         ) {
             Text(
                 text = track.title,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = if (isPlaying) EncoreColors.Green else EncoreColors.TextPrimary
                 ),
@@ -782,7 +782,7 @@ private fun AlbumTrackRow(
 
                 Text(
                     text = track.artist,
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -858,7 +858,7 @@ private fun AlbumLoadError(title: String, onRetry: (() -> Unit)?) {
     ) {
         Text(
             text = title,
-            style = SpotifyTheme.typography.titleMedium.copy(
+            style = EncoreTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = EncoreColors.TextPrimary
             ),
@@ -868,7 +868,7 @@ private fun AlbumLoadError(title: String, onRetry: (() -> Unit)?) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Try again",
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = EncoreColors.Green
                 ),
@@ -883,9 +883,9 @@ private fun AlbumLoadError(title: String, onRetry: (() -> Unit)?) {
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun PreviewSpotifyAlbumScreen() {
-    SpotifyEncoreTheme {
-        SpotifyAlbumScreen(
+fun PreviewEncoreAlbumScreen() {
+    EncoreAppTheme {
+        EncoreAlbumScreen(
             albumTitle = "After Hours",
             artistName = "The Weeknd",
             releaseYear = "2020",

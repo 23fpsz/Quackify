@@ -1,7 +1,7 @@
 package com.quackify.backend.library
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import org.json.JSONArray
 import org.json.JSONObject
@@ -38,10 +38,10 @@ object Rootlist {
         }
     }
 
-    internal suspend fun username(context: Context): String = SpotifyAuth.userId(context)
+    internal suspend fun username(context: Context): String = EncoreAuth.userId(context)
 
     private suspend fun headers(context: Context): Map<String, String> = buildMap {
-        put("Authorization", "Bearer ${SpotifyAuth.token(context)}")
+        put("Authorization", "Bearer ${EncoreAuth.token(context)}")
         put("Accept", "application/json")
         put("app-platform", "WebPlayer")
         put("User-Agent", Net.DESKTOP_UA)

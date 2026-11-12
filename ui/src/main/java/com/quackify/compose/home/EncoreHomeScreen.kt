@@ -45,11 +45,11 @@ import com.quackify.compose.components.EncoreProfileAvatar
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.HomeFeedSkeleton
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import java.util.Calendar
 
@@ -99,7 +99,7 @@ data class ArtistCardItem(
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun SpotifyHomeScreen(
+fun EncoreHomeScreen(
     onPlaylistClick: (String, String) -> Unit,
     onProfileClick: () -> Unit,
     onNotificationsClick: () -> Unit,
@@ -239,7 +239,7 @@ fun SpotifyHomeScreen(
                 ) {
                     Text(
                         text = getGreeting(userDisplayName, greeting),
-                        style = SpotifyTheme.typography.headlineMedium.copy(
+                        style = EncoreTheme.typography.headlineMedium.copy(
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             color = EncoreColors.TextPrimary
@@ -287,7 +287,7 @@ fun SpotifyHomeScreen(
                     ) {
                         Text(
                             text = "Couldn't load your feed",
-                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                         )
                     }
                 }
@@ -349,7 +349,7 @@ private fun QuickAccessCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (item.imageUrl != null) {
-                    SpotifyArtworkImage(
+                    EncoreArtworkImage(
                         imageUrl = item.imageUrl,
                         contentDescription = item.title,
                         modifier = Modifier.fillMaxSize(),
@@ -373,7 +373,7 @@ private fun QuickAccessCard(
 
             Text(
                 text = item.title,
-                style = SpotifyTheme.typography.bodySmallBold.copy(color = Color.White),
+                style = EncoreTheme.typography.bodySmallBold.copy(color = Color.White),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
@@ -446,7 +446,7 @@ private fun SectionHeading(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = SpotifyTheme.typography.titleLarge.copy(
+                style = EncoreTheme.typography.titleLarge.copy(
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = EncoreColors.TextPrimary
@@ -458,7 +458,7 @@ private fun SectionHeading(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    style = SpotifyTheme.typography.marginal.copy(
+                    style = EncoreTheme.typography.marginal.copy(
                         fontSize = 12.sp,
                         color = EncoreColors.TextSecondary
                     ),
@@ -517,7 +517,7 @@ private fun ShelfSection(
                         contentAlignment = Alignment.Center
                     ) {
                         if (card.imageUrl != null) {
-                            SpotifyArtworkImage(
+                            EncoreArtworkImage(
                                 imageUrl = card.imageUrl,
                                 contentDescription = card.title,
                                 modifier = Modifier.fillMaxSize(),
@@ -542,7 +542,7 @@ private fun ShelfSection(
                             ) {
                                 Text(
                                     text = card.tag,
-                                    style = SpotifyTheme.typography.tagLabel.copy(
+                                    style = EncoreTheme.typography.tagLabel.copy(
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White
@@ -565,14 +565,14 @@ private fun ShelfSection(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = card.title,
-                        style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
+                        style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = card.subtitle,
-                        style = SpotifyTheme.typography.bodySmall.copy(
+                        style = EncoreTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
                             color = EncoreColors.TextSecondary
                         ),
@@ -618,7 +618,7 @@ private fun ArtistShelfSection(
                         contentAlignment = Alignment.Center
                     ) {
                         if (artist.imageUrl != null) {
-                            SpotifyArtworkImage(
+                            EncoreArtworkImage(
                                 imageUrl = artist.imageUrl,
                                 contentDescription = artist.name,
                                 shape = CircleShape,
@@ -635,14 +635,14 @@ private fun ArtistShelfSection(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = artist.name,
-                        style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Artist",
-                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                     )
                 }
             }
@@ -672,7 +672,7 @@ private fun BaselineGridSection(
                     contentAlignment = Alignment.Center
                 ) {
                     if (card.imageUrl != null) {
-                        SpotifyArtworkImage(
+                        EncoreArtworkImage(
                             imageUrl = card.imageUrl,
                             contentDescription = card.title,
                             modifier = Modifier.fillMaxSize(),
@@ -687,7 +687,7 @@ private fun BaselineGridSection(
                     if (card.caption.isNotEmpty()) {
                         Text(
                             text = card.caption,
-                            style = SpotifyTheme.typography.bodySmall.copy(
+                            style = EncoreTheme.typography.bodySmall.copy(
                                 fontSize = 11.sp,
                                 color = EncoreColors.TextSecondary
                             ),
@@ -698,7 +698,7 @@ private fun BaselineGridSection(
                     }
                     Text(
                         text = card.title,
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = EncoreColors.TextPrimary
                         ),
@@ -709,7 +709,7 @@ private fun BaselineGridSection(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = card.subtitle,
-                            style = SpotifyTheme.typography.bodySmall.copy(
+                            style = EncoreTheme.typography.bodySmall.copy(
                                 fontSize = 12.sp,
                                 color = EncoreColors.TextSecondary
                             ),
@@ -738,9 +738,9 @@ private fun getGreeting(name: String, feedGreeting: String = ""): String {
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun PreviewSpotifyHomeScreen() {
-    SpotifyEncoreTheme {
-        SpotifyHomeScreen(
+fun PreviewEncoreHomeScreen() {
+    EncoreAppTheme {
+        EncoreHomeScreen(
             onPlaylistClick = { _, _ -> },
             onProfileClick = {},
             onNotificationsClick = {},

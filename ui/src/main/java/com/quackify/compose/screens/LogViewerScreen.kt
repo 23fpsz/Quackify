@@ -72,8 +72,8 @@ import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.theme.DmMono
 import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import java.io.File
 import java.text.SimpleDateFormat
@@ -181,7 +181,7 @@ fun LogViewerScreen(
             Column {
                 Text(
                     text = "Logs",
-                    style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp)
+                    style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
                 )
                 Text(
                     text = if (captureOn) {
@@ -189,14 +189,14 @@ fun LogViewerScreen(
                     } else {
                         "capture paused · ${all.size}/${Logs.MAX_LINES} lines kept"
                     },
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     fontSize = 11.sp
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = if (entries.size == all.size) "" else "${entries.size} shown",
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.Green),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.Green),
                 fontSize = 11.sp
             )
         }
@@ -299,7 +299,7 @@ fun LogViewerScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = if (all.isEmpty()) "No logs yet" else "Nothing matches this filter",
-                        style = SpotifyTheme.typography.titleMedium,
+                        style = EncoreTheme.typography.titleMedium,
                         color = EncoreColors.TextPrimary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -313,7 +313,7 @@ fun LogViewerScreen(
                         } else {
                             "Loosen the level filter or the search text."
                         },
-                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                         fontSize = 12.sp
                     )
                 }
@@ -401,7 +401,7 @@ private fun LogSearchField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
-        textStyle = SpotifyTheme.typography.bodySmall.copy(
+        textStyle = EncoreTheme.typography.bodySmall.copy(
             color = EncoreColors.TextPrimary,
             fontFamily = DmMono,
             fontSize = 12.sp
@@ -417,7 +417,7 @@ private fun LogSearchField(
                 if (value.isEmpty()) {
                     Text(
                         text = "Filter lines…",
-                        style = SpotifyTheme.typography.bodySmall.copy(
+                        style = EncoreTheme.typography.bodySmall.copy(
                             color = EncoreColors.TextSecondary,
                             fontFamily = DmMono,
                             fontSize = 12.sp
@@ -575,12 +575,12 @@ private fun LogDetailSheet(
         ) {
             Text(
                 text = "Log entry",
-                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = "timestamp",
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 fontSize = 11.sp
             )
             Text(
@@ -593,7 +593,7 @@ private fun LogDetailSheet(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "level / module",
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 fontSize = 11.sp
             )
             Text(
@@ -605,7 +605,7 @@ private fun LogDetailSheet(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "message",
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 fontSize = 11.sp
             )
             SelectionContainer {
@@ -621,7 +621,7 @@ private fun LogDetailSheet(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "stack",
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     fontSize = 11.sp
                 )
                 SelectionContainer {
@@ -704,7 +704,7 @@ private fun DeviceInfoSheet(
         ) {
             Text(
                 text = "Device information",
-                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
             Spacer(modifier = Modifier.height(10.dp))
             val current = report
@@ -819,7 +819,7 @@ private fun saveTextFile(context: Context, prefix: String, text: String): String
 @Preview
 @Composable
 fun PreviewLogViewerScreen() {
-    SpotifyEncoreTheme {
+    EncoreAppTheme {
         LogViewerScreen(onBackClick = {})
     }
 }

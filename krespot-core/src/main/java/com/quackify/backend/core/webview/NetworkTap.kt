@@ -5,7 +5,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Pathfinder
 import org.json.JSONObject
@@ -73,18 +73,18 @@ object NetworkTap {
             val bearer = auth.removePrefix("Bearer ").removePrefix("bearer ").trim()
             if (bearer.isNotBlank() || clientToken.isNotBlank()) credSeen = true
             if (bearer.isNotBlank()) {
-                if (bearer != SpotifyAuth.token(context)) {
+                if (bearer != EncoreAuth.token(context)) {
                     log.i("web credentials: bearer (${bearer.length}B) from ${shorten(o.optString("url"))}"
                     )
-                    SpotifyAuth.saveToken(context, bearer)
+                    EncoreAuth.saveToken(context, bearer)
                 } else {
                     log.i("web credentials: bearer (${bearer.length}B) unchanged, timestamp refreshed")
-                    SpotifyAuth.markTokenSeen(context)
+                    EncoreAuth.markTokenSeen(context)
                 }
             }
-            if (clientToken.isNotBlank() && clientToken != SpotifyAuth.clientToken(context)) {
+            if (clientToken.isNotBlank() && clientToken != EncoreAuth.clientToken(context)) {
                 log.i("web credentials: client-token (${clientToken.length}B)")
-                SpotifyAuth.saveClientToken(context, clientToken)
+                EncoreAuth.saveClientToken(context, clientToken)
             }
         }
     }

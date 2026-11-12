@@ -11,14 +11,14 @@ import com.quackify.compose.R
 /**
  * Spotify Mix Typefaces extracted from Spotify Mobile decompiled resources.
  */
-val SpotifyMixFontFamily = FontFamily(
-    Font(R.font.spotify_mix_ui_regular, FontWeight.Normal),
-    Font(R.font.spotify_mix_ui_bold, FontWeight.Bold)
+val EncoreMixFontFamily = FontFamily(
+    Font(R.font.mix_ui_regular, FontWeight.Normal),
+    Font(R.font.mix_ui_bold, FontWeight.Bold)
 )
 
-val SpotifyMixTitleFontFamily = FontFamily(
-    Font(R.font.spotify_mix_ui_title_bold, FontWeight.Bold),
-    Font(R.font.spotify_mix_ui_title_extrabold, FontWeight.ExtraBold)
+val EncoreMixTitleFontFamily = FontFamily(
+    Font(R.font.mix_ui_title_bold, FontWeight.Bold),
+    Font(R.font.mix_ui_title_extrabold, FontWeight.ExtraBold)
 )
 
 /**
@@ -37,86 +37,86 @@ val SpotifyMixTitleFontFamily = FontFamily(
  * - TagLabel: 10sp Bold Uppercase
  */
 @Immutable
-data class SpotifyTypography(
+data class EncoreTypography(
     val headlineLarge: TextStyle = TextStyle(
-        fontFamily = SpotifyMixTitleFontFamily,
+        fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 48.sp,
         lineHeight = 54.sp,
         color = EncoreColors.TextPrimary
     ),
     val headlineMedium: TextStyle = TextStyle(
-        fontFamily = SpotifyMixTitleFontFamily,
+        fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 40.sp,
         lineHeight = 46.sp,
         color = EncoreColors.TextPrimary
     ),
     val titleLarge: TextStyle = TextStyle(
-        fontFamily = SpotifyMixTitleFontFamily,
+        fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 32.sp,
         lineHeight = 38.sp,
         color = EncoreColors.TextPrimary
     ),
     val titleMedium: TextStyle = TextStyle(
-        fontFamily = SpotifyMixTitleFontFamily,
+        fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 24.sp,
         lineHeight = 30.sp,
         color = EncoreColors.TextPrimary
     ),
     val titleSmall: TextStyle = TextStyle(
-        fontFamily = SpotifyMixTitleFontFamily,
+        fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 20.sp,
         lineHeight = 26.sp,
         color = EncoreColors.TextPrimary
     ),
     val bodyMedium: TextStyle = TextStyle(
-        fontFamily = SpotifyMixFontFamily,
+        fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 22.sp,
         color = EncoreColors.TextPrimary
     ),
     val bodyMediumBold: TextStyle = TextStyle(
-        fontFamily = SpotifyMixFontFamily,
+        fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 16.sp,
         lineHeight = 22.sp,
         color = EncoreColors.TextPrimary
     ),
     val bodySmall: TextStyle = TextStyle(
-        fontFamily = SpotifyMixFontFamily,
+        fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
         lineHeight = 18.sp,
         color = EncoreColors.TextSecondary
     ),
     val bodySmallBold: TextStyle = TextStyle(
-        fontFamily = SpotifyMixFontFamily,
+        fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 13.sp,
         lineHeight = 18.sp,
         color = EncoreColors.TextPrimary
     ),
     val marginal: TextStyle = TextStyle(
-        fontFamily = SpotifyMixFontFamily,
+        fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 11.sp,
         lineHeight = 14.sp,
         color = EncoreColors.TextSecondary
     ),
     val marginalBold: TextStyle = TextStyle(
-        fontFamily = SpotifyMixFontFamily,
+        fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 11.sp,
         lineHeight = 14.sp,
         color = EncoreColors.TextPrimary
     ),
     val tagLabel: TextStyle = TextStyle(
-        fontFamily = SpotifyMixFontFamily,
+        fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 10.sp,
         lineHeight = 12.sp,

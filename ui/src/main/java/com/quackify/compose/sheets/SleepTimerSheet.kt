@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 enum class SleepTimerOption(val label: String, val minutes: Int) {
     MINUTES_5("5 minutes", 5),
@@ -79,7 +79,7 @@ fun SleepTimerSheet(
         ) {
             Text(
                 text = "Stop audio in",
-                style = SpotifyTheme.typography.titleLarge.copy(
+                style = EncoreTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 ),
@@ -115,7 +115,7 @@ fun SleepTimerSheet(
                 ) {
                     Text(
                         text = option.label,
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = if (isSelected) EncoreColors.Green else EncoreColors.TextPrimary
                         )

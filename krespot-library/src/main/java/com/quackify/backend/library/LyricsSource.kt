@@ -1,7 +1,7 @@
 package com.quackify.backend.library
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.Net
@@ -18,7 +18,7 @@ object LyricsSource {
     suspend fun lyrics(context: Context, trackUri: String): TrackLyrics? {
         val id = trackUri.substringAfterLast(":", "")
         if (!trackUri.startsWith("spotify:track:") || id.isBlank()) return null
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("lyrics: no token")
             return null
@@ -52,7 +52,7 @@ object LyricsSource {
     }
 
     private suspend fun spHeaders(context: Context): Map<String, String> = buildMap {
-        put("Authorization", "Bearer ${SpotifyAuth.token(context)}")
+        put("Authorization", "Bearer ${EncoreAuth.token(context)}")
         put("Accept", "application/json")
         put("app-platform", "WebPlayer")
         put("User-Agent", Net.DESKTOP_UA)

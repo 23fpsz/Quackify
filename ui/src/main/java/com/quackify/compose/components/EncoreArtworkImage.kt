@@ -27,13 +27,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * Resolves any Spotify image format (full URL, spotify:image:<id>, or raw hex image hash)
  * into a valid HTTPS URL pointing to Spotify's image CDN.
  */
-fun resolveSpotifyImageUrl(rawUrl: String?): String? {
+fun resolveRemoteImageUrl(rawUrl: String?): String? {
     if (rawUrl.isNullOrBlank()) return null
     val trimmed = rawUrl.trim()
     return when {
@@ -56,7 +56,7 @@ fun resolveSpotifyImageUrl(rawUrl: String?): String? {
  * elegant fallback placeholders.
  */
 @Composable
-fun SpotifyArtworkImage(
+fun EncoreArtworkImage(
     imageUrl: String?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
@@ -67,7 +67,7 @@ fun SpotifyArtworkImage(
 ) {
     val effectiveShape = shape ?: (if (cornerRadius != null && cornerRadius > 0.dp) RoundedCornerShape(cornerRadius) else null)
     val clipModifier = if (effectiveShape != null) modifier.clip(effectiveShape) else modifier
-    val resolvedUrl = resolveSpotifyImageUrl(imageUrl)
+    val resolvedUrl = resolveRemoteImageUrl(imageUrl)
     var loaded by remember(resolvedUrl) { mutableStateOf(false) }
     val artworkAlpha by animateFloatAsState(
         targetValue = if (loaded) 1f else 0f,
@@ -107,7 +107,7 @@ fun SpotifyArtworkImage(
         } else {
             Text(
                 text = "♪",
-                style = SpotifyTheme.typography.titleMedium.copy(color = Color.White.copy(alpha = 0.5f))
+                style = EncoreTheme.typography.titleMedium.copy(color = Color.White.copy(alpha = 0.5f))
             )
         }
     }

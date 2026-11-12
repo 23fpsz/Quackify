@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
-import com.quackify.compose.player.SpotifyNowPlayingScreen
+import com.quackify.compose.player.EncoreNowPlayingScreen
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.theme.EncoreAnimation
 
@@ -91,7 +91,7 @@ internal fun ShellNowPlaying(
             )
         )
     ) {
-        SpotifyNowPlayingScreen(
+        EncoreNowPlayingScreen(
             title = title,
             artist = artist,
             contextHeaderTitle = contextHeader,

@@ -39,12 +39,12 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncoreTrackRow
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 
 /**
@@ -94,7 +94,7 @@ fun HistoryScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Listening History",
-                style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp)
+                style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
             )
         }
 
@@ -115,7 +115,7 @@ fun HistoryScreen(
             ) {
                 Text(
                     text = "Tracks you play will show up here.",
-                    style = SpotifyTheme.typography.bodyMedium.copy(
+                    style = EncoreTheme.typography.bodyMedium.copy(
                         color = EncoreColors.TextSecondary,
                         textAlign = TextAlign.Center
                     )
@@ -220,7 +220,7 @@ private fun LazyListScope.historySection(
     item(key = "header-$label") {
         Text(
             text = label,
-            style = SpotifyTheme.typography.titleMedium.copy(
+            style = EncoreTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             ),
@@ -288,7 +288,7 @@ private fun HistoryArtistGroup(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SpotifyArtworkImage(
+            EncoreArtworkImage(
                 imageUrl = group.imageUrl,
                 contentDescription = group.artist,
                 modifier = Modifier.size(48.dp),
@@ -297,7 +297,7 @@ private fun HistoryArtistGroup(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = group.artist,
-                    style = SpotifyTheme.typography.bodyMedium.copy(
+                    style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
                         color = EncoreColors.TextPrimary
@@ -308,7 +308,7 @@ private fun HistoryArtistGroup(
                 Text(
                     text = "${group.tracks.size} song" +
                         if (group.tracks.size == 1) "" else "s",
-                    style = SpotifyTheme.typography.bodySmall.copy(
+                    style = EncoreTheme.typography.bodySmall.copy(
                         color = EncoreColors.TextSecondary
                     ),
                     maxLines = 1
@@ -345,7 +345,7 @@ private fun HistoryArtistGroup(
 @Preview
 @Composable
 fun PreviewHistoryScreen() {
-    SpotifyEncoreTheme {
+    EncoreAppTheme {
         HistoryScreen(
             onBackClick = {},
             onTrackSelect = {}

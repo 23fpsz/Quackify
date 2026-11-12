@@ -1,7 +1,7 @@
 package com.quackify.backend.library
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.GraphQl
 import com.quackify.backend.core.net.Pathfinder
@@ -26,7 +26,7 @@ object CollectionSource {
         if (uri.startsWith("spotify:user:") && uri.endsWith(":collection")) LIKED_URI else uri
 
     suspend fun collection(context: Context, uri: String): CollectionDetail? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val target = canonical(uri)
         return if (target.startsWith("spotify:collection:")) {
@@ -37,7 +37,7 @@ object CollectionSource {
     }
 
     suspend fun collectionMore(context: Context, uri: String, offset: Int): TrackPage? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val target = canonical(uri)
         if (target.startsWith("spotify:collection:")) {

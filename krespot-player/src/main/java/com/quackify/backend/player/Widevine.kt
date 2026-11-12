@@ -12,7 +12,7 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
 
@@ -433,8 +433,8 @@ internal class Widevine(
 
     private suspend fun postLicense(data: ByteArray): Net.Blob? {
         val headers = PlayerHeaders.license(context)
-        val age = SpotifyAuth.tokenAgeMs(context)
-        log.i("license post ${data.size}B bearer=${SpotifyAuth.token(context).take(12)}… " +
+        val age = EncoreAuth.tokenAgeMs(context)
+        log.i("license post ${data.size}B bearer=${EncoreAuth.token(context).take(12)}… " +
                 "token=${if (age >= 0L) "${age / 1000}s" else "?"} old, " +
                 headers.keys.joinToString(",")
         )

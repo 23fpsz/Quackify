@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.playlist.PlaylistSort
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * Spotify Playlist Sort Bottom Sheet matching decompiled specs:
@@ -76,7 +76,7 @@ fun PlaylistSortSheet(
         ) {
             Text(
                 text = "Sort by",
-                style = SpotifyTheme.typography.titleMedium.copy(
+                style = EncoreTheme.typography.titleMedium.copy(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = EncoreColors.TextPrimary
@@ -104,7 +104,7 @@ fun PlaylistSortSheet(
                 ) {
                     Text(
                         text = option.label,
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontSize = 15.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = if (isSelected) EncoreColors.Green else EncoreColors.TextPrimary

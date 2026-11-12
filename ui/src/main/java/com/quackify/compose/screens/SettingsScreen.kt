@@ -50,11 +50,11 @@ import android.widget.Toast
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.quackify.compose.R
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import kotlinx.coroutines.delay
 
@@ -92,7 +92,7 @@ fun SettingsScreen(
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
-    val account = remember { SpotifyAuth.account(context) }
+    val account = remember { EncoreAuth.account(context) }
     val version = remember {
         runCatching {
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -149,7 +149,7 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Settings",
-                style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp)
+                style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
             )
         }
 
@@ -170,7 +170,7 @@ fun SettingsScreen(
                 SettingsSectionHeader(title = "Videos and Canvas")
                 Text(
                     text = "It may take some time for your experience to update.",
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 SettingsToggleRow(
@@ -260,7 +260,7 @@ fun SettingsScreen(
                 }
                 Text(
                     text = "Log out",
-                    style = SpotifyTheme.typography.bodyMediumBold.copy(color = EncoreColors.Error),
+                    style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Error),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
@@ -299,7 +299,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun ProfileSummary(account: SpotifyAuth.Account?) {
+private fun ProfileSummary(account: EncoreAuth.Account?) {
     val context = LocalContext.current
     Row(
         modifier = Modifier
@@ -316,7 +316,7 @@ private fun ProfileSummary(account: SpotifyAuth.Account?) {
         ) {
             Text(
                 text = account?.name?.trim()?.firstOrNull()?.uppercase() ?: "?",
-                style = SpotifyTheme.typography.titleLarge.copy(
+                style = EncoreTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     color = EncoreColors.TextPrimary
                 )
@@ -338,14 +338,14 @@ private fun ProfileSummary(account: SpotifyAuth.Account?) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = account?.name?.takeIf { it.isNotBlank() } ?: "Not signed in",
-                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
             val detail = account?.email?.takeIf { it.isNotBlank() }
                 ?: account?.product?.replaceFirstChar { it.uppercase() }.orEmpty()
             if (detail.isNotBlank()) {
                 Text(
                     text = detail,
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                 )
             }
         }
@@ -356,7 +356,7 @@ private fun ProfileSummary(account: SpotifyAuth.Account?) {
 private fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
-        style = SpotifyTheme.typography.titleMedium.copy(
+        style = EncoreTheme.typography.titleMedium.copy(
             fontWeight = FontWeight.Bold,
             color = Color.White
         ),
@@ -382,7 +382,7 @@ private fun SettingsToggleRow(
         Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text(
                 text = title,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Medium,
                     color = if (enabled) EncoreColors.TextPrimary else EncoreColors.TextSecondary
                 )
@@ -391,7 +391,7 @@ private fun SettingsToggleRow(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                 )
             }
         }
@@ -424,11 +424,11 @@ private fun SettingsInfoRow(
     ) {
         Text(
             text = title,
-            style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+            style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
         )
         Text(
             text = value,
-            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
         )
     }
 }
@@ -436,7 +436,7 @@ private fun SettingsInfoRow(
 @Preview
 @Composable
 fun PreviewSettingsScreen() {
-    SpotifyEncoreTheme {
+    EncoreAppTheme {
         SettingsScreen(onBackClick = {})
     }
 }

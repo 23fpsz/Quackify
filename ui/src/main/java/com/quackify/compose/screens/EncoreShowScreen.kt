@@ -52,7 +52,7 @@ import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.InlineLoadingDots
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.matchesCurrent
 import com.quackify.backend.model.EpisodeRow
@@ -60,12 +60,12 @@ import com.quackify.backend.model.ShowCard
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.format.formatDuration
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 
 @Composable
-fun SpotifyShowScreen(
+fun EncoreShowScreen(
     showName: String,
     publisher: String,
     description: String,
@@ -176,7 +176,7 @@ fun SpotifyShowScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         if (!imageUrl.isNullOrBlank()) {
-                            SpotifyArtworkImage(
+                            EncoreArtworkImage(
                                 imageUrl = imageUrl,
                                 contentDescription = showName,
                                 modifier = Modifier.fillMaxSize(),
@@ -191,7 +191,7 @@ fun SpotifyShowScreen(
 
                     Text(
                         text = showName,
-                        style = SpotifyTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                        style = EncoreTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
                         color = EncoreColors.TextPrimary,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
@@ -201,7 +201,7 @@ fun SpotifyShowScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = publisher,
-                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary),
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary),
                         )
                     }
 
@@ -214,7 +214,7 @@ fun SpotifyShowScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = ratingLabel,
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                         )
                     }
 
@@ -222,7 +222,7 @@ fun SpotifyShowScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = description,
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                             maxLines = if (descriptionExpanded) Int.MAX_VALUE else 3,
                             overflow = TextOverflow.Ellipsis,
                             onTextLayout = { if (!descriptionExpanded) descriptionOverflows = it.hasVisualOverflow },
@@ -230,7 +230,7 @@ fun SpotifyShowScreen(
                         if (descriptionOverflows || descriptionExpanded) {
                             Text(
                                 text = if (descriptionExpanded) "Show less" else "Show more",
-                                style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
+                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
                                 modifier = Modifier
                                     .padding(top = 6.dp)
                                     .clickable { descriptionExpanded = !descriptionExpanded },
@@ -254,7 +254,7 @@ fun SpotifyShowScreen(
                             ) {
                                 Text(
                                     text = if (isFollowing) "Following" else "Follow",
-                                    style = SpotifyTheme.typography.bodySmallBold.copy(color = followTextColor),
+                                    style = EncoreTheme.typography.bodySmallBold.copy(color = followTextColor),
                                 )
                             }
                         }
@@ -287,13 +287,13 @@ fun SpotifyShowScreen(
                 ) {
                     Text(
                         text = "All Episodes",
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = EncoreColors.TextPrimary,
                     )
                     if (total > 0) {
                         Text(
                             text = formatCount(total.toLong()),
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                         )
                     }
                 }
@@ -329,7 +329,7 @@ fun SpotifyShowScreen(
                     Column(modifier = Modifier.padding(top = 12.dp)) {
                         Text(
                             text = "More podcasts like this",
-                            style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = EncoreColors.TextPrimary,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
@@ -368,7 +368,7 @@ fun SpotifyShowScreen(
                 )
                 Text(
                     text = showName,
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = EncoreColors.TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -410,7 +410,7 @@ private fun EpisodeListRow(
                 .background(EncoreColors.Card),
         ) {
             if (episode.imageUrl.isNotBlank()) {
-                SpotifyArtworkImage(
+                EncoreArtworkImage(
                     imageUrl = episode.imageUrl,
                     contentDescription = episode.title,
                     modifier = Modifier.fillMaxSize(),
@@ -445,7 +445,7 @@ private fun EpisodeListRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = episode.title,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold,
                     color = if (isCurrent) EncoreColors.Green else EncoreColors.TextPrimary,
                 ),
@@ -455,7 +455,7 @@ private fun EpisodeListRow(
             Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = episodeSubtitle(episode),
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -486,7 +486,7 @@ private fun RelatedShowCard(card: ShowCard, onClick: () -> Unit) {
                 .background(EncoreColors.Card),
         ) {
             if (card.imageUrl.isNotBlank()) {
-                SpotifyArtworkImage(
+                EncoreArtworkImage(
                     imageUrl = card.imageUrl,
                     contentDescription = card.name,
                     modifier = Modifier.fillMaxSize(),
@@ -497,14 +497,14 @@ private fun RelatedShowCard(card: ShowCard, onClick: () -> Unit) {
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = card.name,
-            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
+            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         if (card.publisher.isNotBlank()) {
             Text(
                 text = card.publisher,
-                style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -527,9 +527,9 @@ private fun episodeSubtitle(episode: EpisodeRow): String {
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun PreviewSpotifyShowScreen() {
-    SpotifyEncoreTheme {
-        SpotifyShowScreen(
+fun PreviewEncoreShowScreen() {
+    EncoreAppTheme {
+        EncoreShowScreen(
             showName = "The Mindset Mentor",
             publisher = "Rob Dial",
             description = "The Mindset Mentor™ podcast is designed for anyone desiring motivation, direction, " +

@@ -1,7 +1,7 @@
 package com.quackify.backend.library
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.GraphQl
 import com.quackify.backend.core.net.Pathfinder
@@ -25,7 +25,7 @@ object AlbumSource {
     private const val OP_CREDITS = "queryTrackCreditsGroupedModal"
 
     suspend fun album(context: Context, uri: String): AlbumDetail? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val album = albumPage(context, token, uri, 0, PAGE) ?: return null
         val tracks = album.optJSONObject("tracksV2")
@@ -76,7 +76,7 @@ object AlbumSource {
     }
 
     suspend fun albumMore(context: Context, uri: String, offset: Int): TrackPage? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val album = albumPage(context, token, uri, offset, PAGE) ?: return null
         val tracks = album.optJSONObject("tracksV2")
@@ -89,7 +89,7 @@ object AlbumSource {
     }
 
     suspend fun credits(context: Context, trackUri: String): Credits? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val variables = JSONObject()
             .put("trackUri", trackUri)

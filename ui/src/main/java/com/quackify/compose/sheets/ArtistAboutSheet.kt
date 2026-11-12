@@ -33,13 +33,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.backend.model.ArtistLink
 import com.quackify.backend.model.CityStat
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +87,7 @@ fun ArtistAboutSheet(
                 .navigationBarsPadding()
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SpotifyArtworkImage(
+                EncoreArtworkImage(
                     imageUrl = imageUrl,
                     contentDescription = artistName,
                     modifier = Modifier.size(72.dp),
@@ -97,11 +97,11 @@ fun ArtistAboutSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "About",
-                        style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                        style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                     )
                     Text(
                         text = artistName,
-                        style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp),
+                        style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp),
                         maxLines = 2
                     )
                 }
@@ -128,7 +128,7 @@ fun ArtistAboutSheet(
                 Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                 Text(
                     text = biography,
-                    style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                 )
             }
 
@@ -136,7 +136,7 @@ fun ArtistAboutSheet(
                 Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                 Text(
                     text = "Popular in",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
                 topCities.take(5).forEach { stat ->
@@ -148,12 +148,12 @@ fun ArtistAboutSheet(
                     ) {
                         Text(
                             text = stat.city,
-                            style = SpotifyTheme.typography.bodyMedium,
+                            style = EncoreTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f)
                         )
                         Text(
                             text = compact(stat.listeners) + " listeners",
-                            style = SpotifyTheme.typography.bodySmall.copy(
+                            style = EncoreTheme.typography.bodySmall.copy(
                                 color = EncoreColors.TextSecondary
                             )
                         )
@@ -165,7 +165,7 @@ fun ArtistAboutSheet(
                 Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                 Text(
                     text = "Links",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
                 Row(
@@ -175,7 +175,7 @@ fun ArtistAboutSheet(
                     externalLinks.forEach { link ->
                         Text(
                             text = link.name.lowercase().replaceFirstChar { it.uppercase() },
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextPrimary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextPrimary),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color(0xFF3A3A3A))
@@ -190,7 +190,7 @@ fun ArtistAboutSheet(
                 Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                 Text(
                     text = "Gallery",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
                 LazyRow(
@@ -198,7 +198,7 @@ fun ArtistAboutSheet(
                     horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter)
                 ) {
                     items(gallery, key = { it }) { url ->
-                        SpotifyArtworkImage(
+                        EncoreArtworkImage(
                             imageUrl = url,
                             contentDescription = artistName,
                             modifier = Modifier
@@ -220,11 +220,11 @@ private fun AboutStat(value: String, label: String) {
     Column {
         Text(
             text = value,
-            style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+            style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
         )
         Text(
             text = label,
-            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
         )
     }
 }

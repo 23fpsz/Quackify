@@ -1,7 +1,7 @@
 package com.quackify.backend.library
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Pathfinder
 import com.quackify.backend.api.Podcasts
@@ -24,7 +24,7 @@ object TrackSource {
         val unique = uris.filter { it.startsWith("spotify:track:") }.distinct()
         val episodes = uris.filter { it.startsWith("spotify:episode:") }.distinct()
         if (unique.isEmpty() && episodes.isEmpty()) return emptyMap()
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("decorate: no token")
             return emptyMap()

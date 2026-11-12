@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import com.quackify.backend.model.ConnectDevice
 import com.quackify.compose.playlist.TrackItem
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.compose.sheets.AccountsSheet
 import com.quackify.compose.sheets.AlbumOptionsSheet
 import com.quackify.compose.sheets.ArtistOptionsSheet
@@ -17,10 +17,10 @@ import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.sheets.ProfileDrawerSheet
 import com.quackify.compose.sheets.SleepTimerOption
 import com.quackify.compose.sheets.SleepTimerSheet
-import com.quackify.compose.sheets.SpotifyConnectDeviceSheet
-import com.quackify.compose.sheets.SpotifyQueueSheet
+import com.quackify.compose.sheets.EncoreConnectDeviceSheet
+import com.quackify.compose.sheets.EncoreQueueSheet
 import com.quackify.compose.sheets.TrackOptionsSheet
-import com.quackify.compose.sheets.toSpotifyDevice
+import com.quackify.compose.sheets.toEncoreDevice
 
 internal data class SheetFlags(
     val profileDrawer: Boolean = false,
@@ -71,7 +71,7 @@ internal fun ShellSheets(
     sleepTimer: SleepTimerOption?,
     userDisplayName: String,
     userAvatarUrl: String,
-    savedAccounts: List<SpotifyAuth.Account>,
+    savedAccounts: List<EncoreAuth.Account>,
     activeAccountId: String,
     isFolder: Boolean = false,
     canvasAvailable: Boolean = false,
@@ -223,9 +223,9 @@ internal fun ShellSheets(
 
     if (flags.device) {
         LaunchedEffect(Unit) { onDeviceVisible(true) }
-        val mapped = devices.map { it.toSpotifyDevice() }
+        val mapped = devices.map { it.toEncoreDevice() }
         val current = mapped.firstOrNull { it.isCurrent }
-        SpotifyConnectDeviceSheet(
+        EncoreConnectDeviceSheet(
             onDismissRequest = {
                 onDismissDevice()
                 onDeviceVisible(false)
@@ -244,7 +244,7 @@ internal fun ShellSheets(
             .filter { it.uri.isNotBlank() }
             .dropWhile { it.uri == currentTrackUri }
             .filter { it.title.isNotBlank() }
-        SpotifyQueueSheet(
+        EncoreQueueSheet(
             currentTrackTitle = currentTrackTitle,
             currentTrackArtist = currentTrackArtist,
             currentTrackCoverUrl = currentTrackCoverUrl,

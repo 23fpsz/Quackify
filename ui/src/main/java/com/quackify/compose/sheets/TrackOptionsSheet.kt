@@ -44,11 +44,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * Spotify Track Context Options Sheet (3-dot menu).
@@ -129,7 +129,7 @@ fun TrackOptionsSheet(
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            SpotifyArtworkImage(
+            EncoreArtworkImage(
                 imageUrl = track.imageUrl,
                 contentDescription = track.title,
                 cornerRadius = 8.dp,
@@ -140,7 +140,7 @@ fun TrackOptionsSheet(
 
             Text(
                 text = track.title,
-                style = SpotifyTheme.typography.titleLarge.copy(
+                style = EncoreTheme.typography.titleLarge.copy(
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     color = EncoreColors.TextPrimary
@@ -155,7 +155,7 @@ fun TrackOptionsSheet(
 
             Text(
                 text = track.artist,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontSize = 14.sp,
                     color = EncoreColors.TextSecondary
                 ),
@@ -195,7 +195,7 @@ fun TrackOptionsSheet(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = if (isLiked) "Liked" else "Like",
-                        style = SpotifyTheme.typography.bodySmall.copy(
+                        style = EncoreTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
                             color = if (isLiked) EncoreColors.Green else EncoreColors.TextSecondary
                         )
@@ -220,7 +220,7 @@ fun TrackOptionsSheet(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Add to playlist",
-                        style = SpotifyTheme.typography.bodySmall.copy(
+                        style = EncoreTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
                             color = EncoreColors.TextSecondary
                         )
@@ -245,7 +245,7 @@ fun TrackOptionsSheet(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Add to queue",
-                        style = SpotifyTheme.typography.bodySmall.copy(
+                        style = EncoreTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
                             color = if (canAddToQueue) EncoreColors.TextSecondary else EncoreColors.TextSecondary.copy(alpha = 0.4f)
                         )
@@ -405,7 +405,7 @@ fun ContextMenuRowItem(
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = title,
-            style = SpotifyTheme.typography.bodyMedium.copy(
+            style = EncoreTheme.typography.bodyMedium.copy(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = textColor
@@ -418,7 +418,7 @@ fun ContextMenuRowItem(
 @Preview
 @Composable
 fun PreviewTrackOptionsSheet() {
-    SpotifyEncoreTheme {
+    EncoreAppTheme {
         TrackOptionsSheet(
             track = TrackItem("Starboy", "The Weeknd, Daft Punk", true),
             isOpen = true,

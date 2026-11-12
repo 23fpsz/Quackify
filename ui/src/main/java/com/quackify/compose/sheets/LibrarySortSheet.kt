@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 
 enum class LibrarySortOption(
     val displayName: String,
@@ -94,7 +94,7 @@ fun LibrarySortSheet(
         ) {
             Text(
                 text = "Sort by",
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = EncoreColors.TextPrimary
                 ),
@@ -132,7 +132,7 @@ fun LibrarySortSheet(
                 ) {
                     Text(
                         text = option.displayName,
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) EncoreColors.Green else EncoreColors.TextPrimary,
                             fontSize = 15.sp
@@ -174,7 +174,7 @@ fun LibrarySortSheet(
 @Preview
 @Composable
 fun PreviewLibrarySortSheet() {
-    SpotifyEncoreTheme {
+    EncoreAppTheme {
         LibrarySortSheet(
             isOpen = true,
             currentSort = LibrarySortOption.RECENTS,

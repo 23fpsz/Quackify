@@ -1,7 +1,7 @@
 package com.quackify.backend.api
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.model.*
 import org.json.JSONObject
@@ -22,7 +22,7 @@ object Podcasts {
     private const val PAGE = 50
 
     suspend fun show(context: Context, uri: String): ShowDetail? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("show: no token")
             return null
@@ -61,13 +61,13 @@ object Podcasts {
     }
 
     suspend fun episodesMore(context: Context, uri: String, offset: Int): EpisodePage? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         return episodesPage(context, token, uri, offset, PAGE)
     }
 
     suspend fun episode(context: Context, uri: String): EpisodeDetail? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("episode: no token")
             return null
@@ -262,7 +262,7 @@ object Podcasts {
     private const val CHAPTERS_HOST = "https://spclient.wg.spotify.com"
 
     private suspend fun spHeaders(context: Context): Map<String, String> = buildMap {
-        put("Authorization", "Bearer ${SpotifyAuth.token(context)}")
+        put("Authorization", "Bearer ${EncoreAuth.token(context)}")
         put("Accept", "application/json")
         put("app-platform", "WebPlayer")
         put("User-Agent", Net.DESKTOP_UA)

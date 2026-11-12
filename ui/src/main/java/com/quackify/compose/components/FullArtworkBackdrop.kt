@@ -69,7 +69,7 @@ fun Modifier.dissolveInto(fraction: Float): Modifier = if (fraction <= 0f) {
 @Composable
 fun rememberFullArtworkBlur(imageUrl: String?): State<ImageBitmap?> {
     val context = LocalContext.current
-    val resolved = resolveSpotifyImageUrl(imageUrl)
+    val resolved = resolveRemoteImageUrl(imageUrl)
     val holder = remember(resolved) { mutableStateOf(resolved?.let { blurCache[it] }) }
 
     LaunchedEffect(resolved) {

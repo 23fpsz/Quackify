@@ -1,7 +1,7 @@
 package com.quackify.backend.api
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.GraphQl
 import com.quackify.backend.core.net.Pathfinder
@@ -24,7 +24,7 @@ object WhatsNew {
     private const val TYPE_EPISODE = "EPISODE"
 
     suspend fun feed(context: Context, types: List<String> = emptyList()): WhatsNewFeed? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("feed: no token")
             return null
@@ -58,7 +58,7 @@ object WhatsNew {
     }
 
     suspend fun badgeCount(context: Context): Int {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return 0
         if (!hasNew(context)) return 0
         val feed = feed(context) ?: return 0
@@ -66,7 +66,7 @@ object WhatsNew {
     }
 
     suspend fun hasNew(context: Context): Boolean {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return false
         val data = Pathfinder.queryPost(context, token, OP_NEW, "{}") ?: return false
         return data.optJSONObject("data")?.optBoolean("whatsNewFeedHasNewItems", false) ?: false
@@ -74,7 +74,7 @@ object WhatsNew {
 
     suspend fun markSeen(context: Context, ids: List<String>): Boolean {
         if (ids.isEmpty()) return true
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return false
         val items = JSONArray()
         ids.forEach { id -> items.put(JSONObject().put("id", id).put("state", "SEEN")) }

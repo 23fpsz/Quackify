@@ -30,7 +30,7 @@ object EncoreColors {
 }
 
 @Immutable
-data class SpotifyColorScheme(
+data class EncoreColorScheme(
     val background: Color = EncoreColors.Background,
     val surface: Color = EncoreColors.Surface,
     val card: Color = EncoreColors.Card,

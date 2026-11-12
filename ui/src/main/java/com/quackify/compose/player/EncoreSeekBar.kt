@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
@@ -63,7 +63,7 @@ private const val SEEK_HOLD_MS = 2000L
  * - Scrubbing time preview tooltip floating directly above the thumb during user drag
  */
 @Composable
-fun SpotifySeekBar(
+fun EncoreSeekBar(
     progress: Float, // 0.0f to 1.0f
     durationMs: Long,
     onSeek: (Float) -> Unit,
@@ -281,7 +281,7 @@ fun SpotifySeekBar(
             ) {
                 Text(
                     text = formatted,
-                    style = SpotifyTheme.typography.marginal.copy(
+                    style = EncoreTheme.typography.marginal.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 11.sp

@@ -55,8 +55,8 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreControlSizes
 import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
@@ -91,7 +91,7 @@ private fun resolveDeviceIcon(kind: DeviceKind?): Int = when (kind) {
 }
 
 @Composable
-fun SpotifyMiniPlayer(
+fun EncoreMiniPlayer(
     title: String,
     artist: String,
     isPlaying: Boolean,
@@ -182,7 +182,7 @@ fun SpotifyMiniPlayer(
                         },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    com.quackify.compose.components.SpotifyArtworkImage(
+                    com.quackify.compose.components.EncoreArtworkImage(
                         imageUrl = coverUrl,
                         contentDescription = title,
                         shape = RoundedCornerShape(EncoreCornerRadii.Base),
@@ -215,7 +215,7 @@ fun SpotifyMiniPlayer(
                         ) {
                             Text(
                                 text = title,
-                                style = SpotifyTheme.typography.bodySmallBold.copy(
+                                style = EncoreTheme.typography.bodySmallBold.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     color = EncoreColors.TextPrimary
                                 ),
@@ -242,7 +242,7 @@ fun SpotifyMiniPlayer(
                             ) {
                                 if (connectedDeviceName != null) {
                                     Icon(
-                                        painter = painterResource(id = R.drawable.encore_icon_spotify_connect_24),
+                                        painter = painterResource(id = R.drawable.encore_icon_connect_24),
                                         contentDescription = null,
                                         tint = EncoreColors.Green,
                                         modifier = Modifier.size(14.dp)
@@ -250,7 +250,7 @@ fun SpotifyMiniPlayer(
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "$connectedDeviceName • $artist",
-                                        style = SpotifyTheme.typography.marginal.copy(
+                                        style = EncoreTheme.typography.marginal.copy(
                                             color = EncoreColors.Green
                                         ),
                                         maxLines = 1,
@@ -259,7 +259,7 @@ fun SpotifyMiniPlayer(
                                 } else {
                                     Text(
                                         text = artist,
-                                        style = SpotifyTheme.typography.marginal.copy(
+                                        style = EncoreTheme.typography.marginal.copy(
                                             color = EncoreColors.TextSecondary
                                         ),
                                         maxLines = 1,
@@ -321,12 +321,12 @@ fun SpotifyMiniPlayer(
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun PreviewSpotifyMiniPlayer() {
-    SpotifyEncoreTheme {
+fun PreviewEncoreMiniPlayer() {
+    EncoreAppTheme {
         var isPlaying by remember { mutableStateOf(true) }
         var isLiked by remember { mutableStateOf(true) }
 
-        SpotifyMiniPlayer(
+        EncoreMiniPlayer(
             title = "Starboy",
             artist = "The Weeknd, Daft Punk",
             isPlaying = isPlaying,

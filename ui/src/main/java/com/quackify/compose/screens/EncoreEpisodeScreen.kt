@@ -40,16 +40,16 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.format.formatDuration
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 
 @Composable
-fun SpotifyEpisodeScreen(
+fun EncoreEpisodeScreen(
     title: String,
     showName: String,
     description: String,
@@ -137,7 +137,7 @@ fun SpotifyEpisodeScreen(
                     ) {
                         val art = wideImageUrl?.takeIf { it.isNotBlank() } ?: imageUrl
                         if (!art.isNullOrBlank()) {
-                            SpotifyArtworkImage(
+                            EncoreArtworkImage(
                                 imageUrl = art,
                                 contentDescription = title,
                                 modifier = Modifier.fillMaxSize(),
@@ -153,7 +153,7 @@ fun SpotifyEpisodeScreen(
                     if (showName.isNotBlank()) {
                         Text(
                             text = showName,
-                            style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.clickable(onClick = onShowClick),
@@ -163,7 +163,7 @@ fun SpotifyEpisodeScreen(
 
                     Text(
                         text = title,
-                        style = SpotifyTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                        style = EncoreTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                         color = EncoreColors.TextPrimary,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
@@ -173,7 +173,7 @@ fun SpotifyEpisodeScreen(
 
                     Text(
                         text = metaLabel,
-                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -187,7 +187,7 @@ fun SpotifyEpisodeScreen(
                             if (positionMs > 0L && durationMs > 0L) {
                                 Text(
                                     text = "${formatDuration(positionMs)} / ${formatDuration(durationMs)}",
-                                    style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
                                 )
                             }
                         }
@@ -203,7 +203,7 @@ fun SpotifyEpisodeScreen(
                         Spacer(modifier = Modifier.height(18.dp))
                         Text(
                             text = description,
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                             maxLines = if (descriptionExpanded) Int.MAX_VALUE else 4,
                             overflow = TextOverflow.Ellipsis,
                             onTextLayout = { if (!descriptionExpanded) descriptionOverflows = it.hasVisualOverflow },
@@ -211,7 +211,7 @@ fun SpotifyEpisodeScreen(
                         if (descriptionOverflows || descriptionExpanded) {
                             Text(
                                 text = if (descriptionExpanded) "Show less" else "Show more",
-                                style = SpotifyTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
+                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
                                 modifier = Modifier
                                     .padding(top = 6.dp)
                                     .clickable { descriptionExpanded = !descriptionExpanded },
@@ -234,14 +234,14 @@ fun SpotifyEpisodeScreen(
                             Column {
                                 Text(
                                     text = "Go to show",
-                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                    style = EncoreTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.SemiBold,
                                         color = EncoreColors.TextPrimary,
                                     ),
                                 )
                                 Text(
                                     text = showName,
-                                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -264,9 +264,9 @@ fun SpotifyEpisodeScreen(
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun PreviewSpotifyEpisodeScreen() {
-    SpotifyEncoreTheme {
-        SpotifyEpisodeScreen(
+fun PreviewEncoreEpisodeScreen() {
+    EncoreAppTheme {
+        EncoreEpisodeScreen(
             title = "How to Be Respected",
             showName = "The Mindset Mentor",
             description = "What makes someone truly worth looking up to? In this episode I share the four " +

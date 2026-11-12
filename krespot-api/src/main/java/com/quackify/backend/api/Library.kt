@@ -1,7 +1,7 @@
 package com.quackify.backend.api
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import java.util.UUID
 import com.quackify.backend.core.log.Logs
 import org.json.JSONArray
@@ -31,7 +31,7 @@ object Library {
     suspend fun saved(context: Context, uris: List<String>): Set<String> {
         val unique = uris.filter { it.isNotBlank() }.distinct()
         if (unique.isEmpty()) return emptySet()
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("saved: no token")
             return emptySet()
@@ -60,7 +60,7 @@ object Library {
             )
         }
         if (writable.isEmpty()) return false
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("setSaved: no token")
             return false

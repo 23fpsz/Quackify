@@ -33,8 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreProfileAvatar
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * Spotify Profile Side Sheet / Navigation Menu opened when tapping the user avatar.
@@ -105,7 +105,7 @@ fun ProfileDrawerSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = userDisplayName.ifEmpty { "Duck User" },
-                        style = SpotifyTheme.typography.titleLarge.copy(
+                        style = EncoreTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp
                         )
@@ -113,7 +113,7 @@ fun ProfileDrawerSheet(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Switch account",
-                        style = SpotifyTheme.typography.bodySmall.copy(
+                        style = EncoreTheme.typography.bodySmall.copy(
                             color = EncoreColors.TextSecondary
                         )
                     )
@@ -198,7 +198,7 @@ private fun ProfileDrawerItem(
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = title,
-            style = SpotifyTheme.typography.bodyMedium.copy(
+            style = EncoreTheme.typography.bodyMedium.copy(
                 fontWeight = FontWeight.Medium,
                 fontSize = 16.sp
             ),
@@ -210,7 +210,7 @@ private fun ProfileDrawerItem(
 @Preview
 @Composable
 fun PreviewProfileDrawerSheet() {
-    SpotifyEncoreTheme {
+    EncoreAppTheme {
         ProfileDrawerSheet(
             isOpen = true,
             onDismiss = {},

@@ -43,11 +43,11 @@ import com.quackify.compose.components.ShimmerBlock
 import com.quackify.compose.components.ShimmerHost
 import com.quackify.compose.components.ShimmerText
 import com.quackify.compose.components.rememberSmoothColor
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.backend.api.Browse
 import com.quackify.compose.format.parseHexColor
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.BrowseSection
@@ -55,7 +55,7 @@ import com.quackify.backend.model.BrowseSection
 private const val HEADER_TINT_WEIGHT = 0.55f
 
 @Composable
-fun SpotifyBrowseScreen(
+fun EncoreBrowseScreen(
     title: String,
     subtitle: String,
     colorHex: String,
@@ -93,7 +93,7 @@ fun SpotifyBrowseScreen(
             )
             Text(
                 text = title,
-                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(start = 8.dp)
@@ -154,7 +154,7 @@ fun SpotifyBrowseScreen(
                 ) {
                     Text(
                         text = title,
-                        style = SpotifyTheme.typography.headlineLarge.copy(
+                        style = EncoreTheme.typography.headlineLarge.copy(
                             fontSize = 30.sp,
                             fontWeight = FontWeight.Bold
                         ),
@@ -164,7 +164,7 @@ fun SpotifyBrowseScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = subtitle,
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 color = EncoreColors.TextSecondary
                             )
                         )
@@ -177,7 +177,7 @@ fun SpotifyBrowseScreen(
                     if (section.title.isNotBlank()) {
                         Text(
                             text = section.title,
-                            style = SpotifyTheme.typography.titleLarge.copy(
+                            style = EncoreTheme.typography.titleLarge.copy(
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
                             ),
@@ -222,7 +222,7 @@ fun SpotifyBrowseScreen(
                     ) {
                         Text(
                             text = "Nothing here yet",
-                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                             textAlign = TextAlign.Center
                         )
                     }
@@ -241,7 +241,7 @@ private fun BrowseCardTile(card: BrowseCard, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(bottom = 4.dp)
     ) {
-        SpotifyArtworkImage(
+        EncoreArtworkImage(
             imageUrl = card.imageUrl,
             contentDescription = card.title,
             modifier = Modifier
@@ -252,7 +252,7 @@ private fun BrowseCardTile(card: BrowseCard, onClick: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = card.title,
-            style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+            style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
             color = EncoreColors.TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -260,7 +260,7 @@ private fun BrowseCardTile(card: BrowseCard, onClick: () -> Unit) {
         if (card.subtitle.isNotBlank()) {
             Text(
                 text = card.subtitle,
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

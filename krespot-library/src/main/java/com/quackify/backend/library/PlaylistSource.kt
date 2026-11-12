@@ -1,7 +1,7 @@
 package com.quackify.backend.library
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import org.json.JSONArray
 import org.json.JSONObject
@@ -35,7 +35,7 @@ object PlaylistSource {
     private val countCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Int>>()
 
     private suspend fun headers(context: Context): Map<String, String> = buildMap {
-        put("Authorization", "Bearer ${SpotifyAuth.token(context)}")
+        put("Authorization", "Bearer ${EncoreAuth.token(context)}")
         put("Accept", "application/json")
         put("app-platform", "WebPlayer")
         put("spotify-app-version", APP_VERSION)
@@ -53,7 +53,7 @@ object PlaylistSource {
         trackUri: String,
         folderUri: String? = null,
     ): List<PlaylistChoice> {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("editable: no token")
             return emptyList()
@@ -193,7 +193,7 @@ object PlaylistSource {
     }
 
     suspend fun create(context: Context, name: String, trackUri: String): String? {
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("create: no token")
             return null
@@ -306,7 +306,7 @@ object PlaylistSource {
             log.w("moveItems: bad input '$playlistUri' uids=${uids.size}")
             return false
         }
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("moveItems: no token")
             return false
@@ -468,7 +468,7 @@ object PlaylistSource {
 
     suspend fun addTrack(context: Context, playlistUri: String, trackUri: String): Boolean {
         if (playlistUri.isBlank() || trackUri.isBlank()) return false
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("addTrack: no token")
             return false

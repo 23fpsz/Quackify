@@ -5,7 +5,7 @@ import android.content.Context
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.FrameLayout
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.auth.WebToken
 import com.quackify.backend.core.net.Net
 import kotlinx.coroutines.Dispatchers
@@ -29,15 +29,15 @@ object SilentTokenRefresh {
     private val lock = Mutex()
 
     suspend fun maybeRefresh(context: Context): Boolean {
-        if (!SpotifyAuth.isLoggedIn(context)) return false
-        val age = SpotifyAuth.tokenAgeMs(context)
+        if (!EncoreAuth.isLoggedIn(context)) return false
+        val age = EncoreAuth.tokenAgeMs(context)
         if (age in 0 until PROACTIVE_AFTER_MS) return false
         log.i("token is ${age / 1000}s old, refreshing before it 401s")
         return refresh(context, "proactive")
     }
 
     suspend fun refresh(context: Context, reason: String): Boolean {
-        if (!SpotifyAuth.isLoggedIn(context)) return false
+        if (!EncoreAuth.isLoggedIn(context)) return false
         if (WebToken.mint(context) != null) {
             log.i("token minted natively from /api/token, no webview needed ($reason)")
             return true
@@ -97,7 +97,7 @@ object SilentTokenRefresh {
     }
 
     private suspend fun waitForCookies(context: Context): String? {
-        SpotifyAuth.applySession(context)
+        EncoreAuth.applySession(context)
         val manager = cookieManagerOrNull() ?: run {
             log.w("cookie jar unavailable, cannot seed a refresh")
             return null
@@ -120,7 +120,7 @@ object SilentTokenRefresh {
         .joinToString(",")
 
     private fun freshSince(context: Context, startedAt: Long): Boolean {
-        val age = SpotifyAuth.tokenAgeMs(context)
+        val age = EncoreAuth.tokenAgeMs(context)
         if (age < 0) return false
         return System.currentTimeMillis() - age >= startedAt
     }

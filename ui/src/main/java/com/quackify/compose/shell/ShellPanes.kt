@@ -61,17 +61,17 @@ import com.quackify.compose.R
 import com.quackify.compose.components.DetailPageSkeleton
 import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreIconButton
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.format.parseHexColor
 import com.quackify.compose.home.HomeShelf
 import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.home.RecommendationCard
-import com.quackify.compose.home.SpotifyHomeScreen
+import com.quackify.compose.home.EncoreHomeScreen
 import com.quackify.compose.home.toArtistRelease
 import com.quackify.compose.library.LibraryItem
-import com.quackify.compose.library.SpotifyLibraryScreen
-import com.quackify.compose.playlist.SpotifyPlaylistScreen
+import com.quackify.compose.library.EncoreLibraryScreen
+import com.quackify.compose.playlist.EncorePlaylistScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.ArtistRelease
 import com.quackify.compose.screens.CategoryShelf
@@ -82,22 +82,22 @@ import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.SettingsLocks
 import com.quackify.compose.screens.SettingsScreen
 import com.quackify.compose.screens.SettingsSwitches
-import com.quackify.compose.screens.SpotifyAlbumScreen
-import com.quackify.compose.screens.SpotifyArtistScreen
-import com.quackify.compose.screens.SpotifyBrowseScreen
-import com.quackify.compose.screens.SpotifyEpisodeScreen
-import com.quackify.compose.screens.SpotifyNotification
-import com.quackify.compose.screens.SpotifyShowScreen
+import com.quackify.compose.screens.EncoreAlbumScreen
+import com.quackify.compose.screens.EncoreArtistScreen
+import com.quackify.compose.screens.EncoreBrowseScreen
+import com.quackify.compose.screens.EncoreEpisodeScreen
+import com.quackify.compose.screens.EncoreNotification
+import com.quackify.compose.screens.EncoreShowScreen
 import com.quackify.compose.screens.getCategoryColor
 import com.quackify.compose.search.CategoryCard
 import com.quackify.compose.search.SearchHistoryItem
-import com.quackify.compose.search.SpotifySearchScreen
+import com.quackify.compose.search.EncoreSearchScreen
 import com.quackify.compose.sheets.EditPlaylistSheet
 import com.quackify.compose.sheets.LibrarySortOption
 import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.launch
 
@@ -171,7 +171,7 @@ internal fun ShellLoadingState(loading: Boolean, onRetry: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "Couldn't load",
-                style = SpotifyTheme.typography.titleMedium,
+                style = EncoreTheme.typography.titleMedium,
                 color = EncoreColors.TextPrimary
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -184,9 +184,9 @@ internal fun ShellLoadingState(loading: Boolean, onRetry: () -> Unit) {
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun PreviewSpotifyAppShell() {
-    SpotifyEncoreTheme {
-        SpotifyAppShell()
+fun PreviewEncoreAppShell() {
+    EncoreAppTheme {
+        EncoreAppShell()
     }
 }
 
@@ -233,11 +233,11 @@ internal fun ShellLogsPane(
 @Composable
 internal fun ShellNotificationsPane(
     onBackClick: () -> Unit,
-    notifications: List<SpotifyNotification>,
+    notifications: List<EncoreNotification>,
     loading: Boolean,
     loadFailed: Boolean,
     onRetry: () -> Unit,
-    onPlay: (SpotifyNotification) -> Unit
+    onPlay: (EncoreNotification) -> Unit
 ) {
     NotificationsScreen(
         onBackClick = onBackClick,
@@ -285,7 +285,7 @@ internal fun ShellAlbumPane(
                 playerListener?.onListRendered(albumTracks.map { it.uri })
             }
         }
-        SpotifyAlbumScreen(
+        EncoreAlbumScreen(
             albumTitle = albumDetail?.title?.takeIf { it.isNotBlank() } ?: activeAlbumTitle,
             artistName = albumDetail?.artists?.takeIf { it.isNotBlank() } ?: activeAlbumArtist,
             releaseYear = albumDetail?.year ?: activeAlbumYear,
@@ -365,7 +365,7 @@ internal fun ShellSearchPane(
     onTrackOptionsClick: (TrackItem) -> Unit,
     onProfileClick: () -> Unit,
 ) {
-    SpotifySearchScreen(
+    EncoreSearchScreen(
         onCategoryClick = onCategoryClick,
         onAlbumClick = onAlbumClick,
         onArtistClick = onArtistClick,
@@ -439,7 +439,7 @@ internal fun ShellArtistPane(
     onOptionsClick: () -> Unit,
 ) {
     androidx.compose.runtime.key(artistName) {
-        SpotifyArtistScreen(
+        EncoreArtistScreen(
             artistName = artistName,
             monthlyListeners = artistMonthlyListeners?.takeIf { it.isNotBlank() }.orEmpty(),
             heroColor = artistDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card,
@@ -489,7 +489,7 @@ internal fun ShellHomePane(
     greeting: String,
     loading: Boolean,
     libraryItems: List<LibraryItem>?,
-    notifications: List<SpotifyNotification>,
+    notifications: List<EncoreNotification>,
     userDisplayName: String,
     userAvatarUrl: String,
     onFacetSelected: (String) -> Unit,
@@ -505,7 +505,7 @@ internal fun ShellHomePane(
     onOpenEpisode: (String) -> Unit,
     onOpenPlaylist: (String, String) -> Unit,
 ) {
-    SpotifyHomeScreen(
+    EncoreHomeScreen(
         onPlaylistClick = { playlist, uri ->
             val foundItem = quickAccessItems?.find { it.uri == uri || it.title == playlist }
             val foundRec = recommendations?.find { it.uri == uri || it.title == playlist }
@@ -604,7 +604,7 @@ internal fun ShellPlaylistPane(
             fallbackSeed = activePlaylistTitle,
             defaultColor = Color(0xFF144D3F)
         )
-        SpotifyPlaylistScreen(
+        EncorePlaylistScreen(
             title = playlistDetail?.title?.takeIf { it.isNotBlank() } ?: activePlaylistTitle,
             description = playlistDetail?.description.orEmpty(),
             creator = playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: if (activePlaylistUri.startsWith("spotiduck:local:playlist:") || activePlaylistUri.isEmpty()) userDisplayName else "",
@@ -728,7 +728,7 @@ internal fun ShellBrowsePane(
     onLoadMore: () -> Unit
 ) {
     if (page == null) {
-        SpotifyBrowseScreen(
+        EncoreBrowseScreen(
             title = fallbackTitle,
             subtitle = "",
             colorHex = "",
@@ -741,7 +741,7 @@ internal fun ShellBrowsePane(
             onLoadMore = {}
         )
     } else {
-        SpotifyBrowseScreen(
+        EncoreBrowseScreen(
             title = page.title.ifBlank { fallbackTitle },
             subtitle = page.subtitle,
             colorHex = page.colorHex,
@@ -784,7 +784,7 @@ internal fun ShellShowPane(
             onRetry = { onRetry(retryUri) }
         )
     } else {
-        SpotifyShowScreen(
+        EncoreShowScreen(
             showName = show.name,
             publisher = show.publisher,
             description = show.description,
@@ -825,7 +825,7 @@ internal fun ShellEpisodePane(
             onRetry = { onRetry(retryUri) }
         )
     } else {
-        SpotifyEpisodeScreen(
+        EncoreEpisodeScreen(
             title = episode.title,
             showName = episode.showName,
             description = episode.description,
@@ -865,7 +865,7 @@ internal fun ShellFolderPane(
     onFolderOptionsClick: () -> Unit = {},
     onPlayClick: () -> Unit = {}
 ) {
-    SpotifyLibraryScreen(
+    EncoreLibraryScreen(
         onItemClick = onItemClick,
         onItemLongPress = onItemLongPress,
         onFolderClick = onFolderClick,
@@ -972,11 +972,11 @@ internal fun ShellAddTracksPane(
             Column {
                 Text(
                     text = "Add tracks",
-                    style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp)
+                    style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
                 )
                 Text(
                     text = "To $targetTitle",
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                 )
             }
         }
@@ -1049,7 +1049,7 @@ private fun AddTrackRow(
                 .size(48.dp)
                 .clip(RoundedCornerShape(4.dp))
         ) {
-            SpotifyArtworkImage(
+            EncoreArtworkImage(
                 imageUrl = item.imageUrl,
                 contentDescription = item.title,
                 modifier = Modifier.fillMaxSize(),
@@ -1060,7 +1060,7 @@ private fun AddTrackRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.title,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold,
                     color = EncoreColors.TextPrimary
                 ),
@@ -1070,7 +1070,7 @@ private fun AddTrackRow(
             if (item.artist.isNotBlank()) {
                 Text(
                     text = item.artist,
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

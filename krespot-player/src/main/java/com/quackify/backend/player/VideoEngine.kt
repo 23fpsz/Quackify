@@ -39,7 +39,7 @@ private val log = Logs.of(Logs.Module.PLAYER)
 
 private const val PROGRESS_MS = 500L
 
-internal class SpotifyVideoDrmCallback(
+internal class EncoreVideoDrmCallback(
     private val context: Context,
     private val licenseUrl: String,
 ) : MediaDrmCallback {
@@ -314,7 +314,7 @@ internal class VideoEngine(
                 mediaItem = MediaItem.Builder().setUri(Uri.fromFile(file)).build()
             } else {
                 val license = VideoManifests.licenseUrl(spclient(), encryption.licenseEndpoint)
-                val drmCallback = SpotifyVideoDrmCallback(context, license)
+                val drmCallback = EncoreVideoDrmCallback(context, license)
                 var cachedManager: DrmSessionManager? = null
                 factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { _: MediaItem ->
                     val existing = cachedManager

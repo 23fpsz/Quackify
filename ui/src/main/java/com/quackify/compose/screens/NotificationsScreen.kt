@@ -42,14 +42,14 @@ import com.quackify.compose.R
 import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 
-data class SpotifyNotification(
+data class EncoreNotification(
     val title: String,
     val subtitle: String,
     val timestamp: String,
@@ -67,8 +67,8 @@ data class SpotifyNotification(
 @Composable
 fun NotificationsScreen(
     onBackClick: () -> Unit,
-    onPlayClick: (SpotifyNotification) -> Unit = {},
-    notifications: List<SpotifyNotification> = emptyList(),
+    onPlayClick: (EncoreNotification) -> Unit = {},
+    notifications: List<EncoreNotification> = emptyList(),
     loading: Boolean = false,
     loadFailed: Boolean = false,
     onRetry: () -> Unit = {},
@@ -107,7 +107,7 @@ fun NotificationsScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "What's New",
-                style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp)
+                style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
             )
         }
 
@@ -151,12 +151,12 @@ fun NotificationsScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Couldn't load What's New",
-                        style = SpotifyTheme.typography.titleLarge
+                        style = EncoreTheme.typography.titleLarge
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Check your internet connection and try again.",
-                        style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -176,12 +176,12 @@ fun NotificationsScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "You're all caught up",
-                        style = SpotifyTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        style = EncoreTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "New releases from the artists and podcasts you follow will show up here.",
-                        style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(16.dp))
@@ -216,7 +216,7 @@ fun NotificationsScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (item.imageUrl.isNotBlank()) {
-                                SpotifyArtworkImage(
+                                EncoreArtworkImage(
                                     imageUrl = item.imageUrl,
                                     contentDescription = item.title,
                                     modifier = Modifier.fillMaxSize(),
@@ -240,17 +240,17 @@ fun NotificationsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = item.title,
-                                style = SpotifyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                                style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = item.subtitle,
-                                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = relativeTime(item.timestamp),
-                                style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                             )
                         }
 
@@ -289,7 +289,7 @@ private fun relativeTime(iso: String): String {
 @Preview
 @Composable
 fun PreviewNotificationsScreen() {
-    SpotifyEncoreTheme {
+    EncoreAppTheme {
         NotificationsScreen(onBackClick = {})
     }
 }

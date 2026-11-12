@@ -44,10 +44,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncorePlayButton
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 
 /**
@@ -115,7 +115,7 @@ fun getCategoryColor(title: String): Color = when (title.trim()) {
  * - Safe mini player bottom padding via [rememberBottomPadding]
  */
 @Composable
-fun SpotifyCategoryScreen(
+fun EncoreCategoryScreen(
     categoryTitle: String,
     categoryColor: Color = getCategoryColor(categoryTitle),
     onBackClick: () -> Unit = {},
@@ -188,7 +188,7 @@ fun SpotifyCategoryScreen(
                 ) {
                     Text(
                         text = categoryTitle,
-                        style = SpotifyTheme.typography.headlineLarge.copy(
+                        style = EncoreTheme.typography.headlineLarge.copy(
                             fontSize = 34.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -201,7 +201,7 @@ fun SpotifyCategoryScreen(
                 Column(modifier = Modifier.padding(top = 18.dp)) {
                     Text(
                         text = shelf.title,
-                        style = SpotifyTheme.typography.titleLarge.copy(
+                        style = EncoreTheme.typography.titleLarge.copy(
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -211,7 +211,7 @@ fun SpotifyCategoryScreen(
                     if (!shelf.subtitle.isNullOrBlank()) {
                         Text(
                             text = shelf.subtitle,
-                            style = SpotifyTheme.typography.bodySmall.copy(
+                            style = EncoreTheme.typography.bodySmall.copy(
                                 fontSize = 13.sp,
                                 color = EncoreColors.TextSecondary
                             ),
@@ -245,7 +245,7 @@ fun SpotifyCategoryScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (!item.imageUrl.isNullOrBlank()) {
-                                        SpotifyArtworkImage(
+                                        EncoreArtworkImage(
                                             imageUrl = item.imageUrl,
                                             contentDescription = item.title,
                                             modifier = Modifier.fillMaxSize(),
@@ -284,7 +284,7 @@ fun SpotifyCategoryScreen(
 
                                 Text(
                                     text = item.title,
-                                    style = SpotifyTheme.typography.bodyMedium.copy(
+                                    style = EncoreTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = EncoreColors.TextPrimary,
                                         fontSize = 14.sp
@@ -297,7 +297,7 @@ fun SpotifyCategoryScreen(
 
                                 Text(
                                     text = item.subtitle,
-                                    style = SpotifyTheme.typography.bodySmall.copy(
+                                    style = EncoreTheme.typography.bodySmall.copy(
                                         fontSize = 12.sp,
                                         color = EncoreColors.TextSecondary,
                                         lineHeight = 16.sp
@@ -321,7 +321,7 @@ fun SpotifyCategoryScreen(
                     ) {
                         Text(
                             text = "Explore $categoryTitle",
-                            style = SpotifyTheme.typography.titleLarge.copy(
+                            style = EncoreTheme.typography.titleLarge.copy(
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -349,7 +349,7 @@ fun SpotifyCategoryScreen(
                             ) {
                                 Text(
                                     text = sub.title,
-                                    style = SpotifyTheme.typography.titleMedium.copy(
+                                    style = EncoreTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White,
                                         fontSize = 15.sp
@@ -400,7 +400,7 @@ fun SpotifyCategoryScreen(
             if (topBarTitleAlpha > 0.01f) {
                 Text(
                     text = categoryTitle,
-                    style = SpotifyTheme.typography.titleMedium.copy(
+                    style = EncoreTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White.copy(alpha = topBarTitleAlpha),
                         fontSize = 16.sp

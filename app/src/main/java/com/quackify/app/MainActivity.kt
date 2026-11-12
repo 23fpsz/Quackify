@@ -21,7 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.quackify.app.search.decorateSearchTracks
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.api.HomeFeed
 import com.quackify.backend.model.HomeSection
 import com.quackify.backend.model.HomeChip
@@ -48,7 +48,7 @@ import com.quackify.backend.api.WhatsNew
 import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.screens.SettingsLocks
 import com.quackify.backend.api.Settings
-import com.quackify.compose.screens.SpotifyNotification
+import com.quackify.compose.screens.EncoreNotification
 import com.quackify.compose.search.SearchHistoryItem
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.CategoryRecommendationItem
@@ -71,8 +71,8 @@ import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.screens.LoginScreen
 import com.quackify.compose.screens.PathfinderCaptureScreen
-import com.quackify.compose.shell.SpotifyAppShell
-import com.quackify.compose.theme.SpotifyEncoreTheme
+import com.quackify.compose.shell.EncoreAppShell
+import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.util.rememberIsOffline
 import com.quackify.backend.core.webview.SilentTokenRefresh
 import kotlinx.coroutines.Dispatchers
@@ -112,8 +112,8 @@ class MainActivity : ComponentActivity() {
         Pathfinder.silentRefresh = { context, reason -> SilentTokenRefresh.refresh(context, reason) }
         val appContext = applicationContext
         Net.onUnauthorized = { sent, reason ->
-            val current = SpotifyAuth.token(appContext)
-            val left = SpotifyAuth.tokenRemainingMs(appContext)
+            val current = EncoreAuth.token(appContext)
+            val left = EncoreAuth.tokenRemainingMs(appContext)
             when {
                 current.isNotBlank() && current != sent -> {
                     log.i("$reason 401, a newer token is already in the store")
@@ -124,7 +124,7 @@ class MainActivity : ComponentActivity() {
                     null
                 }
                 SilentTokenRefresh.refresh(appContext, reason) -> {
-                    SpotifyAuth.token(appContext).takeIf { it.isNotBlank() && it != sent }
+                    EncoreAuth.token(appContext).takeIf { it.isNotBlank() && it != sent }
                 }
                 else -> {
                     log.w("$reason 401 and the silent refresh failed, giving up on this call")
@@ -134,19 +134,19 @@ class MainActivity : ComponentActivity() {
         }
         Library.onLibraryChanged = { Krespot.library.invalidate() }
         setContent {
-            SpotifyEncoreTheme {
+            EncoreAppTheme {
                 val context = LocalContext.current
-                var loggedIn by remember { mutableStateOf(SpotifyAuth.isLoggedIn(context)) }
+                var loggedIn by remember { mutableStateOf(EncoreAuth.isLoggedIn(context)) }
 
 
                 if (loggedIn) {
                     var capturing by remember {
-                        val tokenUsable = SpotifyAuth.token(context).isNotBlank() &&
-                            !SpotifyAuth.tokenExpired(context)
+                        val tokenUsable = EncoreAuth.token(context).isNotBlank() &&
+                            !EncoreAuth.tokenExpired(context)
                         mutableStateOf(Pathfinder.shouldCapture(context, tokenUsable))
                     }
                     remember(loggedIn, capturing) {
-                        val ttl = SpotifyAuth.tokenRemainingMs(context)
+                        val ttl = EncoreAuth.tokenRemainingMs(context)
                             .let { if (it < 0L) "unknown" else "${it / 1000}s" }
                         log.v("composition loggedIn=$loggedIn capturing=$capturing " +
                                 "ops=${Pathfinder.count()} token=$ttl")
@@ -180,7 +180,7 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(resumeSignal) {
                             if (resumeSignal > 0) SilentTokenRefresh.maybeRefresh(context)
                         }
-                        val account = remember(loggedIn) { SpotifyAuth.account(context) }
+                        val account = remember(loggedIn) { EncoreAuth.account(context) }
                         val quick = remember(feed, playHistory, loading) {
                             val fromFeed = feed.toQuickAccess()
                             when {
@@ -312,19 +312,19 @@ class MainActivity : ComponentActivity() {
                             }
                             settingsLoading = false
                         }
-                        var whatsNew by remember { mutableStateOf<List<SpotifyNotification>>(emptyList()) }
+                        var whatsNew by remember { mutableStateOf<List<EncoreNotification>>(emptyList()) }
                         var whatsNewLoading by remember { mutableStateOf(false) }
                         var whatsNewFailed by remember { mutableStateOf(false) }
                         var whatsNewFetch by remember { mutableStateOf(0) }
 
-                        var savedAccountsList by remember { mutableStateOf(SpotifyAuth.savedAccounts(context)) }
-                        val activeAccountId = remember { SpotifyAuth.activeAccountId(context) }
+                        var savedAccountsList by remember { mutableStateOf(EncoreAuth.savedAccounts(context)) }
+                        val activeAccountId = remember { EncoreAuth.activeAccountId(context) }
                         var addingAccount by remember { mutableStateOf(false) }
                         LaunchedEffect(Unit) {
-                            if (SpotifyAuth.activeAccountId(context).isBlank()) {
-                                SpotifyAuth.userId(context)
-                                SpotifyAuth.storeCurrentAccount(context)
-                                savedAccountsList = SpotifyAuth.savedAccounts(context)
+                            if (EncoreAuth.activeAccountId(context).isBlank()) {
+                                EncoreAuth.userId(context)
+                                EncoreAuth.storeCurrentAccount(context)
+                                savedAccountsList = EncoreAuth.savedAccounts(context)
                             }
                         }
 
@@ -333,7 +333,7 @@ class MainActivity : ComponentActivity() {
                             val feed = WhatsNew.feed(context)
                             whatsNewFailed = feed == null
                             whatsNew = feed?.items.orEmpty().map { item ->
-                                SpotifyNotification(
+                                EncoreNotification(
                                     title = item.title,
                                     subtitle = item.subtitle,
                                     timestamp = item.timestamp,
@@ -838,7 +838,7 @@ class MainActivity : ComponentActivity() {
                                 log.i("searched '$term', recents now ${recentQueries.size}")
                             }
                         }
-                        SpotifyAppShell(
+                        EncoreAppShell(
                                 userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
                                 userAvatarUrl = account?.imageUrl.orEmpty(),
                             playbackState = bridge.state,
@@ -1329,12 +1329,12 @@ class MainActivity : ComponentActivity() {
                             historyLoading = false,
                             onLogout = {
                                 log.i("logout tapped")
-                                SpotifyAuth.logout(context)
+                                EncoreAuth.logout(context)
                                 PlaybackHost.reset(context)
                                 Krespot.library.invalidate()
-                                val remaining = SpotifyAuth.savedAccounts(context)
+                                val remaining = EncoreAuth.savedAccounts(context)
                                 if (remaining.isNotEmpty()) {
-                                    SpotifyAuth.switchAccount(context, remaining.last().id)
+                                    EncoreAuth.switchAccount(context, remaining.last().id)
                                     (context as? Activity)?.recreate()
                                 } else {
                                     loggedIn = false
@@ -1344,7 +1344,7 @@ class MainActivity : ComponentActivity() {
                             activeAccountId = activeAccountId,
                             onSwitchAccount = { id ->
                                 log.i("switch account tapped id=$id")
-                                if (SpotifyAuth.switchAccount(context, id)) {
+                                if (EncoreAuth.switchAccount(context, id)) {
                                     PlaybackHost.reset(context)
                                     Krespot.library.invalidate()
                                     (context as? Activity)?.recreate()
@@ -1353,31 +1353,31 @@ class MainActivity : ComponentActivity() {
                             onAddAccount = {
                                 log.i("add account tapped")
                                 scope.launch {
-                                    SpotifyAuth.userId(context, force = true)
-                                    SpotifyAuth.storeCurrentAccount(context)
-                                    savedAccountsList = SpotifyAuth.savedAccounts(context)
-                                    SpotifyAuth.beginAddAccount(context)
+                                    EncoreAuth.userId(context, force = true)
+                                    EncoreAuth.storeCurrentAccount(context)
+                                    savedAccountsList = EncoreAuth.savedAccounts(context)
+                                    EncoreAuth.beginAddAccount(context)
                                     addingAccount = true
                                 }
                             },
                             onRemoveAccount = { id ->
                                 log.i("remove account tapped id=$id")
-                                val wasActive = SpotifyAuth.forgetAccount(context, id)
+                                val wasActive = EncoreAuth.forgetAccount(context, id)
                                 if (wasActive) {
-                                    val remaining = SpotifyAuth.savedAccounts(context)
+                                    val remaining = EncoreAuth.savedAccounts(context)
                                     if (remaining.isNotEmpty()) {
-                                        SpotifyAuth.switchAccount(context, remaining.last().id)
+                                        EncoreAuth.switchAccount(context, remaining.last().id)
                                         PlaybackHost.reset(context)
                                         Krespot.library.invalidate()
                                         (context as? Activity)?.recreate()
                                     } else {
-                                        SpotifyAuth.logout(context)
+                                        EncoreAuth.logout(context)
                                         PlaybackHost.reset(context)
                                         Krespot.library.invalidate()
                                         loggedIn = false
                                     }
                                 } else {
-                                    savedAccountsList = SpotifyAuth.savedAccounts(context)
+                                    savedAccountsList = EncoreAuth.savedAccounts(context)
                                 }
                             }
                         )
@@ -1386,7 +1386,7 @@ class MainActivity : ComponentActivity() {
                             LoginScreen(
                                 onLoggedIn = {
                                     log.i("add account completed")
-                                    SpotifyAuth.storeCurrentAccount(context)
+                                    EncoreAuth.storeCurrentAccount(context)
                                     PlaybackHost.reset(context)
                                     Krespot.library.invalidate()
                                     addingAccount = false
@@ -1399,10 +1399,10 @@ class MainActivity : ComponentActivity() {
                                 onDuplicateLogin = { duplicate ->
                                     log.w("add account refused: '${duplicate.name}' (${duplicate.id}) is already saved")
                                     if (activeAccountId.isBlank() ||
-                                        !SpotifyAuth.switchAccount(context, activeAccountId)
+                                        !EncoreAuth.switchAccount(context, activeAccountId)
                                     ) {
-                                        SpotifyAuth.invalidateToken(context)
-                                        SpotifyAuth.applySession(context)
+                                        EncoreAuth.invalidateToken(context)
+                                        EncoreAuth.applySession(context)
                                     }
                                     addingAccount = false
                                     Toast.makeText(
@@ -1413,7 +1413,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onBackExhausted = {
                                     log.i("add account cancelled, restoring the active session")
-                                    SpotifyAuth.applySession(context)
+                                    EncoreAuth.applySession(context)
                                     addingAccount = false
                                 }
                             )
@@ -1423,16 +1423,16 @@ class MainActivity : ComponentActivity() {
                     LoginScreen(
                         onLoggedIn = {
                             log.i("login completed")
-                            SpotifyAuth.storeCurrentAccount(context)
+                            EncoreAuth.storeCurrentAccount(context)
                             PlaybackHost.reset(context)
                             Krespot.library.invalidate()
                             loggedIn = true
                         },
                         onBackExhausted = {
-                            if (SpotifyAuth.savedAccounts(context).isNotEmpty()) {
+                            if (EncoreAuth.savedAccounts(context).isNotEmpty()) {
                                 log.i("login backed out with a saved account, restoring its session")
-                                SpotifyAuth.applySession(context)
-                                if (SpotifyAuth.token(context).isNotBlank()) {
+                                EncoreAuth.applySession(context)
+                                if (EncoreAuth.token(context).isNotBlank()) {
                                     loggedIn = true
                                 } else {
                                     (context as? Activity)?.finish()

@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 @Composable
 fun ProfileAvatar(
@@ -35,7 +35,7 @@ fun ProfileAvatar(
         .let { if (onClick != null) it.clickable(onClick = onClick) else it }
 
     if (avatarUrl.isNotBlank()) {
-        SpotifyArtworkImage(
+        EncoreArtworkImage(
             imageUrl = avatarUrl,
             contentDescription = displayName,
             modifier = base,
@@ -43,7 +43,7 @@ fun ProfileAvatar(
             fallbackColor = backgroundColor
         )
     } else {
-        val style = textStyle ?: SpotifyTheme.typography.bodyMedium.copy(
+        val style = textStyle ?: EncoreTheme.typography.bodyMedium.copy(
             fontWeight = FontWeight.Bold,
             color = EncoreColors.TextPrimary,
             fontSize = (size.value * 0.36f).sp

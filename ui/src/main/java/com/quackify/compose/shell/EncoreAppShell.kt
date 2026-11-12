@@ -1,6 +1,6 @@
 package com.quackify.compose.shell
 
-import com.quackify.compose.sheets.SpotifyCreateNameDialog
+import com.quackify.compose.sheets.EncoreCreateNameDialog
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
@@ -27,14 +27,14 @@ import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.home.RecommendationCard
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.library.LibraryItemType
-import com.quackify.compose.library.SpotifyLibraryScreen
+import com.quackify.compose.library.EncoreLibraryScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.screens.ArtistRelease
 import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.screens.SettingsLocks
-import com.quackify.compose.screens.SpotifyCategoryScreen
+import com.quackify.compose.screens.EncoreCategoryScreen
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.getCategoryColor
 import com.quackify.compose.search.SearchHistoryItem
@@ -59,7 +59,7 @@ import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.ShowDetail
-import com.quackify.compose.screens.SpotifyNotification
+import com.quackify.compose.screens.EncoreNotification
 import com.quackify.compose.util.rememberDominantColor
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.home.HomeShelf
@@ -85,7 +85,7 @@ internal fun ShellOverlaySlot(content: @Composable () -> Unit) {
  * - Sub-screens: Settings, What's New notifications, Listening History, and Playlist view
  */
 @Composable
-fun SpotifyAppShell(
+fun EncoreAppShell(
     modifier: Modifier = Modifier,
     playbackState: ComposePlaybackState? = null,
     playerListener: ComposePlayerListener? = null,
@@ -134,7 +134,7 @@ fun SpotifyAppShell(
     showLoading: Boolean = false,
     episodeDetail: EpisodeDetail? = null,
     episodeLoading: Boolean = false,
-    notifications: List<SpotifyNotification> = emptyList(),
+    notifications: List<EncoreNotification> = emptyList(),
     notificationsLoading: Boolean = false,
     notificationsFailed: Boolean = false,
     onRefreshWhatsNew: (() -> Unit)? = null,
@@ -143,7 +143,7 @@ fun SpotifyAppShell(
     historyEarlier: List<TrackItem> = emptyList(),
     historyLoading: Boolean = false,
     onOpenHistory: (() -> Unit)? = null,
-    savedAccounts: List<com.quackify.backend.core.auth.SpotifyAuth.Account> = emptyList(),
+    savedAccounts: List<com.quackify.backend.core.auth.EncoreAuth.Account> = emptyList(),
     activeAccountId: String = "",
     onSwitchAccount: ((String) -> Unit)? = null,
     onAddAccount: (() -> Unit)? = null,
@@ -559,7 +559,7 @@ fun SpotifyAppShell(
                 onProfileClick = openProfileDrawer,
             )
             ShellScreen.LIBRARY -> {
-                SpotifyLibraryScreen(
+                EncoreLibraryScreen(
                     onItemClick = { itemTitle, itemUri ->
                         val foundItem = libraryItems?.find { it.uri == itemUri || it.title == itemTitle }
                         active.playlistCoverUrl = foundItem?.imageUrl
@@ -686,14 +686,14 @@ fun SpotifyAppShell(
                 onOptionsClick = { flags.isArtistOptionsOpen = true }
             )
             ShellScreen.CATEGORY -> {
-                SpotifyCategoryScreen(
+                EncoreCategoryScreen(
                     categoryTitle = active.categoryTitle,
                     categoryColor = active.categoryColor,
                     onBackClick = handleBack,
                     onPlaylistClick = { title, uri ->
                         if (uri.startsWith("spotify:show:")) {
                             openShow(uri)
-                            return@SpotifyCategoryScreen
+                            return@EncoreCategoryScreen
                         }
                         val foundItem = homeQuickAccessItems?.find { it.uri == uri || it.title == title }
                         val foundRec = homeRecommendations?.find { it.uri == uri || it.title == title }
@@ -1399,7 +1399,7 @@ fun SpotifyAppShell(
             )
         }
 
-        SpotifyCreateNameDialog(
+        EncoreCreateNameDialog(
             isOpen = flags.isCreatePlaylistOpen,
             title = "Give your playlist a name",
             initialName = local.playlistCreateName,

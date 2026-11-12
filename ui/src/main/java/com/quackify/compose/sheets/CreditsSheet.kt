@@ -29,11 +29,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.backend.model.Credits
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreSpacers
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +76,7 @@ fun CreditsSheet(
                 .navigationBarsPadding()
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SpotifyArtworkImage(
+                EncoreArtworkImage(
                     imageUrl = imageUrl,
                     contentDescription = title,
                     modifier = Modifier.size(72.dp),
@@ -86,18 +86,18 @@ fun CreditsSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Credits",
-                        style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                        style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                     )
                     Text(
                         text = title,
-                        style = SpotifyTheme.typography.titleLarge.copy(fontSize = 20.sp),
+                        style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (subtitle.isNotBlank()) {
                         Text(
                             text = subtitle,
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -109,20 +109,20 @@ fun CreditsSheet(
                 Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                 Text(
                     text = "Loading credits…",
-                    style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                 )
             } else if (credits.isEmpty) {
                 Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                 Text(
                     text = "No credits for this track",
-                    style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                 )
             } else {
                 credits.groups.forEach { group ->
                     Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                     Text(
                         text = group.name,
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(EncoreSpacers.Tighter2))
                     group.people.forEach { person ->
@@ -142,7 +142,7 @@ fun CreditsSheet(
                         ) {
                             Text(
                                 text = person.name,
-                                style = SpotifyTheme.typography.bodyMedium.copy(
+                                style = EncoreTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = EncoreColors.TextPrimary
                                 ),
@@ -154,7 +154,7 @@ fun CreditsSheet(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = person.role,
-                                    style = SpotifyTheme.typography.bodySmall.copy(
+                                    style = EncoreTheme.typography.bodySmall.copy(
                                         color = EncoreColors.TextSecondary
                                     ),
                                     maxLines = 1,
@@ -171,13 +171,13 @@ fun CreditsSheet(
                     Spacer(modifier = Modifier.height(EncoreSpacers.Base))
                     Text(
                         text = "Sources",
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(EncoreSpacers.Tighter2))
                     credits.sources.forEach { source ->
                         Text(
                             text = source,
-                            style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier.padding(vertical = 3.dp)
                         )
                     }

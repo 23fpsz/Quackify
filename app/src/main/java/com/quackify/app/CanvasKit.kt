@@ -2,7 +2,7 @@ package com.quackify.app
 
 import android.content.Context
 import com.quackify.backend.connect.dealer.DealerHost
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.Net
@@ -96,7 +96,7 @@ object CanvasKit {
     private suspend fun resolve(context: Context, trackUri: String): Target? {
         val id = trackUri.substringAfterLast(":")
         if (!trackUri.startsWith("spotify:track:") || id.isBlank()) return null
-        val token = SpotifyAuth.token(context)
+        val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val headers = mutableMapOf(
             "Authorization" to "Bearer $token",

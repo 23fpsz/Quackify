@@ -61,15 +61,15 @@ import com.quackify.backend.model.CityStat
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.ShimmerBlock
 import com.quackify.compose.components.ShimmerHost
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
-import com.quackify.compose.theme.SpotifyEncoreTheme
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 
 data class ArtistRelease(
@@ -98,7 +98,7 @@ data class PopularTrack(
  * - "Gallery" photo strip and "About the artist" biography card
  */
 @Composable
-fun SpotifyArtistScreen(
+fun EncoreArtistScreen(
     artistName: String,
     monthlyListeners: String,
     heroColor: Color = Color(0xFF7A1C28),
@@ -210,7 +210,7 @@ fun SpotifyArtistScreen(
                 }
         ) {
             if (headerImageUrl != null) {
-                SpotifyArtworkImage(
+                EncoreArtworkImage(
                     imageUrl = headerImageUrl,
                     contentDescription = artistName,
                     modifier = Modifier.fillMaxSize(),
@@ -282,7 +282,7 @@ fun SpotifyArtistScreen(
                     Column {
                         Text(
                             text = artistName,
-                            style = SpotifyTheme.typography.headlineLarge.copy(
+                            style = EncoreTheme.typography.headlineLarge.copy(
                                 color = Color.White,
                                 fontSize = 44.sp,
                                 fontWeight = FontWeight.Bold,
@@ -306,7 +306,7 @@ fun SpotifyArtistScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "Verified Artist",
-                                    style = SpotifyTheme.typography.bodySmall.copy(
+                                    style = EncoreTheme.typography.bodySmall.copy(
                                         color = Color.White,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold
@@ -319,7 +319,7 @@ fun SpotifyArtistScreen(
                         if (monthlyListeners.isNotBlank()) {
                             Text(
                                 text = "$monthlyListeners monthly listeners",
-                                style = SpotifyTheme.typography.bodySmall.copy(
+                                style = EncoreTheme.typography.bodySmall.copy(
                                     color = Color(0xFFB3B3B3),
                                     fontSize = 13.sp
                                 )
@@ -349,7 +349,7 @@ fun SpotifyArtistScreen(
                                     .clip(RoundedCornerShape(4.dp))
                                     .clickable { onReleaseClick(latestRelease) }
                             ) {
-                                SpotifyArtworkImage(
+                                EncoreArtworkImage(
                                     imageUrl = latestRelease.imageUrl,
                                     contentDescription = latestRelease.title,
                                     modifier = Modifier.fillMaxSize(),
@@ -367,7 +367,7 @@ fun SpotifyArtistScreen(
                         ) {
                             Text(
                                 text = if (isFollowing) "Following" else "Follow",
-                                style = SpotifyTheme.typography.bodySmallBold.copy(color = followTextColor)
+                                style = EncoreTheme.typography.bodySmallBold.copy(color = followTextColor)
                             )
                         }
 
@@ -427,7 +427,7 @@ fun SpotifyArtistScreen(
             item {
                 Text(
                     text = "Popular",
-                    style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                    style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
                     modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                 )
             }
@@ -459,7 +459,7 @@ fun SpotifyArtistScreen(
                         } else {
                             Text(
                                 text = "${index + 1}",
-                                style = SpotifyTheme.typography.bodyMediumBold.copy(
+                                style = EncoreTheme.typography.bodyMediumBold.copy(
                                     color = if (isCurrentTrack) EncoreColors.Green else EncoreColors.TextSecondary
                                 )
                             )
@@ -474,7 +474,7 @@ fun SpotifyArtistScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (track.imageUrl != null) {
-                            SpotifyArtworkImage(
+                            EncoreArtworkImage(
                                 imageUrl = track.imageUrl,
                                 contentDescription = track.title,
                                 modifier = Modifier.fillMaxSize(),
@@ -490,7 +490,7 @@ fun SpotifyArtistScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = track.title,
-                            style = SpotifyTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (isCurrentTrack) EncoreColors.Green else Color.White
                             ),
@@ -499,7 +499,7 @@ fun SpotifyArtistScreen(
                         )
                         Text(
                             text = popTrack.streamCount,
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                             maxLines = 1
                         )
                     }
@@ -545,11 +545,11 @@ fun SpotifyArtistScreen(
                 ) {
                     Text(
                         text = "Popular releases",
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
+                        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
                     )
                     Text(
                         text = "Discography",
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             color = EncoreColors.TextSecondary,
                             fontWeight = FontWeight.SemiBold
                         ),
@@ -565,7 +565,7 @@ fun SpotifyArtistScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = "Albums",
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
                         modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                     )
                 }
@@ -577,7 +577,7 @@ fun SpotifyArtistScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = "Singles & EPs",
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
                         modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                     )
                 }
@@ -595,7 +595,7 @@ fun SpotifyArtistScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = "About",
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
                         modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                     )
 
@@ -609,7 +609,7 @@ fun SpotifyArtistScreen(
                     ) {
                         Column {
                             gallery.firstOrNull()?.let { photo ->
-                                SpotifyArtworkImage(
+                                EncoreArtworkImage(
                                     imageUrl = photo,
                                     contentDescription = artistName,
                                     modifier = Modifier
@@ -622,7 +622,7 @@ fun SpotifyArtistScreen(
                                 if (monthlyListeners.isNotBlank()) {
                                     Text(
                                         text = "$monthlyListeners monthly listeners",
-                                        style = SpotifyTheme.typography.titleMedium.copy(
+                                        style = EncoreTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White
                                         )
@@ -634,14 +634,14 @@ fun SpotifyArtistScreen(
                                     }
                                     Text(
                                         text = aboutStatLine,
-                                        style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                                        style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                                     )
                                 }
                                 if (topCities.isNotEmpty()) {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "Popular in " + topCities.take(3).joinToString(", ") { it.city },
-                                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -650,7 +650,7 @@ fun SpotifyArtistScreen(
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = biography,
-                                        style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                                         maxLines = 3,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -667,7 +667,7 @@ fun SpotifyArtistScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = "Gallery",
-                        style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+                        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
                         modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                     )
                 }
@@ -684,7 +684,7 @@ fun SpotifyArtistScreen(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(Color(0xFF242424))
                             ) {
-                                SpotifyArtworkImage(
+                                EncoreArtworkImage(
                                     imageUrl = photo,
                                     contentDescription = "$artistName photo",
                                     modifier = Modifier.fillMaxSize(),
@@ -733,7 +733,7 @@ fun SpotifyArtistScreen(
             ) {
                 Text(
                     text = artistName,
-                    style = SpotifyTheme.typography.titleMedium.copy(
+                    style = EncoreTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         fontSize = 17.sp
@@ -810,7 +810,7 @@ private fun ArtistReleaseCard(
             contentAlignment = Alignment.Center
         ) {
             if (release.imageUrl != null) {
-                SpotifyArtworkImage(
+                EncoreArtworkImage(
                     imageUrl = release.imageUrl,
                     contentDescription = release.title,
                     modifier = Modifier.fillMaxSize(),
@@ -823,7 +823,7 @@ private fun ArtistReleaseCard(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = release.title,
-            style = SpotifyTheme.typography.bodyMedium.copy(
+            style = EncoreTheme.typography.bodyMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             ),
@@ -833,7 +833,7 @@ private fun ArtistReleaseCard(
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = "${release.type} • ${release.year}",
-            style = SpotifyTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
         )
     }
 }
@@ -907,7 +907,7 @@ private fun ArtistLoadError(title: String, onRetry: () -> Unit) {
     ) {
         Text(
             text = title,
-            style = SpotifyTheme.typography.titleMedium.copy(
+            style = EncoreTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             ),
@@ -916,7 +916,7 @@ private fun ArtistLoadError(title: String, onRetry: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Try again",
-            style = SpotifyTheme.typography.bodyMedium.copy(
+            style = EncoreTheme.typography.bodyMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = EncoreColors.Green
             ),
@@ -930,9 +930,9 @@ private fun ArtistLoadError(title: String, onRetry: () -> Unit) {
 
 @Preview
 @Composable
-fun PreviewSpotifyArtistScreen() {
-    SpotifyEncoreTheme {
-        SpotifyArtistScreen(
+fun PreviewEncoreArtistScreen() {
+    EncoreAppTheme {
+        EncoreArtistScreen(
             artistName = "The Weeknd",
             monthlyListeners = "104,239,812",
             heroColor = Color(0xFF6B1A24),

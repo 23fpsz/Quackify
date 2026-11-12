@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * Signature Spotify Encore Green Play/Pause button with press-scale animation.
@@ -240,7 +240,7 @@ fun EncoreChip(
     ) {
         Text(
             text = text,
-            style = SpotifyTheme.typography.bodySmallBold.copy(color = textAnim)
+            style = EncoreTheme.typography.bodySmallBold.copy(color = textAnim)
         )
     }
 }
@@ -372,7 +372,7 @@ fun EncoreExplicitTag(
     ) {
         Text(
             text = "E",
-            style = SpotifyTheme.typography.tagLabel.copy(
+            style = EncoreTheme.typography.tagLabel.copy(
                 fontSize = fontSize,
                 lineHeight = fontSize,
                 letterSpacing = 0.sp,
@@ -420,7 +420,7 @@ fun EncoreTrackRow(
                 } else {
                     Text(
                         text = trackNumber.toString(),
-                        style = SpotifyTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                     )
                 }
             }
@@ -431,7 +431,7 @@ fun EncoreTrackRow(
                     .clip(RoundedCornerShape(4.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                SpotifyArtworkImage(
+                EncoreArtworkImage(
                     imageUrl = imageUrl,
                     contentDescription = title,
                     modifier = Modifier.fillMaxSize(),
@@ -462,7 +462,7 @@ fun EncoreTrackRow(
         ) {
             Text(
                 text = title,
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold,
                     color = if (isPlaying) EncoreColors.Green else EncoreColors.TextPrimary
                 ),
@@ -486,7 +486,7 @@ fun EncoreTrackRow(
                 }
                 Text(
                     text = artist,
-                    style = SpotifyTheme.typography.bodySmall,
+                    style = EncoreTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -781,7 +781,7 @@ fun EncoreProfileAvatar(
         contentAlignment = Alignment.Center
     ) {
         if (!avatarUrl.isNullOrBlank()) {
-            SpotifyArtworkImage(
+            EncoreArtworkImage(
                 imageUrl = avatarUrl,
                 contentDescription = userDisplayName,
                 shape = CircleShape,
@@ -791,7 +791,7 @@ fun EncoreProfileAvatar(
         } else {
             Text(
                 text = (userDisplayName.trim().firstOrNull() ?: 'D').uppercaseChar().toString(),
-                style = SpotifyTheme.typography.bodyMedium.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )

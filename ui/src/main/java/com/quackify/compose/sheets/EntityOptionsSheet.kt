@@ -29,9 +29,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
-import com.quackify.compose.components.SpotifyArtworkImage
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 data class EntityOptions(
     val title: String,
@@ -90,7 +90,7 @@ fun EntityOptionsSheet(
                 .navigationBarsPadding()
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SpotifyArtworkImage(
+                EncoreArtworkImage(
                     imageUrl = entity.imageUrl,
                     contentDescription = entity.title,
                     modifier = Modifier.size(56.dp),
@@ -100,14 +100,14 @@ fun EntityOptionsSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = entity.title,
-                        style = SpotifyTheme.typography.titleMedium.copy(fontSize = 17.sp),
+                        style = EncoreTheme.typography.titleMedium.copy(fontSize = 17.sp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (entity.subtitle.isNotBlank()) {
                         Text(
                             text = entity.subtitle,
-                            style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -270,7 +270,7 @@ private fun EntityRow(
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = title,
-            style = SpotifyTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+            style = EncoreTheme.typography.bodyMedium.copy(fontSize = 15.sp),
             textAlign = TextAlign.Start,
             modifier = Modifier.weight(1f)
         )

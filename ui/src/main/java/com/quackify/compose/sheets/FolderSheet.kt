@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.shell.FolderDraft
 import com.quackify.compose.shell.FolderMode
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +87,7 @@ internal fun FolderSheet(
             }
             Text(
                 text = heading,
-                style = SpotifyTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                style = EncoreTheme.typography.titleLarge.copy(fontSize = 18.sp),
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(vertical = 12.dp)
             )
@@ -95,7 +95,7 @@ internal fun FolderSheet(
             if (draft.mode == FolderMode.PICKER) {
                 Text(
                     text = draft.title,
-                    style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -119,7 +119,7 @@ internal fun FolderSheet(
                         item {
                             Text(
                                 text = "No folders yet. Create one from the + button.",
-                                style = SpotifyTheme.typography.bodyMedium.copy(
+                                style = EncoreTheme.typography.bodyMedium.copy(
                                     color = EncoreColors.TextSecondary
                                 ),
                                 modifier = Modifier.padding(vertical = 16.dp)
@@ -159,7 +159,7 @@ internal fun FolderSheet(
             ) {
                 Text(
                     text = if (draft.mode == FolderMode.CREATE) "Create" else "Save",
-                    style = SpotifyTheme.typography.bodyMedium.copy(
+                    style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = if (name.isBlank()) EncoreColors.TextSecondary else Color.Black
                     ),
@@ -195,7 +195,7 @@ internal fun FolderSheet(
                         } else {
                             "Delete folder"
                         },
-                        style = SpotifyTheme.typography.bodyMedium.copy(
+                        style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = if (confirmingDelete) Color.White else EncoreColors.TextPrimary
                         ),
@@ -220,7 +220,7 @@ private fun PickerRow(title: String, subtitle: String, onClick: () -> Unit) {
     ) {
         Text(
             text = title,
-            style = SpotifyTheme.typography.bodyMedium.copy(
+            style = EncoreTheme.typography.bodyMedium.copy(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             ),
@@ -229,7 +229,7 @@ private fun PickerRow(title: String, subtitle: String, onClick: () -> Unit) {
         if (subtitle.isNotBlank()) {
             Text(
                 text = subtitle,
-                style = SpotifyTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
         }
     }

@@ -8,27 +8,27 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 
-private val LocalSpotifyColors = staticCompositionLocalOf { SpotifyColorScheme() }
-private val LocalSpotifyTypography = staticCompositionLocalOf { SpotifyTypography() }
+private val LocalEncoreColors = staticCompositionLocalOf { EncoreColorScheme() }
+private val LocalEncoreTypography = staticCompositionLocalOf { EncoreTypography() }
 
-object SpotifyTheme {
-    val colors: SpotifyColorScheme
+object EncoreTheme {
+    val colors: EncoreColorScheme
         @Composable
         @ReadOnlyComposable
-        get() = LocalSpotifyColors.current
+        get() = LocalEncoreColors.current
 
-    val typography: SpotifyTypography
+    val typography: EncoreTypography
         @Composable
         @ReadOnlyComposable
-        get() = LocalSpotifyTypography.current
+        get() = LocalEncoreTypography.current
 }
 
 @Composable
-fun SpotifyEncoreTheme(
+fun EncoreAppTheme(
     content: @Composable () -> Unit
 ) {
-    val colors = SpotifyColorScheme()
-    val typography = SpotifyTypography()
+    val colors = EncoreColorScheme()
+    val typography = EncoreTypography()
 
     val materialColorScheme = darkColorScheme(
         primary = EncoreColors.Green,
@@ -40,8 +40,8 @@ fun SpotifyEncoreTheme(
     )
 
     CompositionLocalProvider(
-        LocalSpotifyColors provides colors,
-        LocalSpotifyTypography provides typography
+        LocalEncoreColors provides colors,
+        LocalEncoreTypography provides typography
     ) {
         MaterialTheme(
             colorScheme = materialColorScheme,

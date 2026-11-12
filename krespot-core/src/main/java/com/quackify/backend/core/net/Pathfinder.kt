@@ -1,7 +1,7 @@
 package com.quackify.backend.core.net
 
 import android.content.Context
-import com.quackify.backend.core.auth.SpotifyAuth
+import com.quackify.backend.core.auth.EncoreAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -314,7 +314,7 @@ object Pathfinder {
         val refresh = silentRefresh ?: return second
         log.w("$operation still ${second.code} — the access token is dead, refreshing it silently")
         if (!refresh(context, operation)) return second
-        val fresh = SpotifyAuth.token(context)
+        val fresh = EncoreAuth.token(context)
         if (fresh.isBlank() || fresh == token) return second
         val freshHeaders = headersFor(context, fresh, operation)
         return if (post) {
@@ -395,12 +395,12 @@ object Pathfinder {
             log.w("$operation http=${response.code} even after a fresh client-token, " +
                     "so it is the access token — ${response.body.take(200)}"
             )
-            val current = SpotifyAuth.token(context)
+            val current = EncoreAuth.token(context)
             if (current.isNotBlank() && current != token) {
                 log.w("$operation failed with a stale bearer and a newer one is stored, not clearing it")
                 return null
             }
-            SpotifyAuth.invalidateToken(context)
+            EncoreAuth.invalidateToken(context)
             return null
         }
         if (!response.ok) {

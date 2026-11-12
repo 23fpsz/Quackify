@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.SpotifyTheme
+import com.quackify.compose.theme.EncoreTheme
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.launch
 import java.io.File
@@ -143,7 +143,7 @@ fun LyricsShareDialog(
 
             Text(
                 text = "Share lyrics",
-                style = SpotifyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
 
             Box(
@@ -164,7 +164,7 @@ fun LyricsShareDialog(
             ) {
                 Text(
                     text = "Share",
-                    style = SpotifyTheme.typography.bodySmallBold.copy(
+                    style = EncoreTheme.typography.bodySmallBold.copy(
                         color = EncoreColors.PureBlack,
                         fontWeight = FontWeight.Bold
                     )
@@ -326,14 +326,14 @@ private fun ShareCardPreview(
             if (selectedIndices.isEmpty()) {
                 Text(
                     text = "Tap up to 5 lines to share",
-                    style = SpotifyTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.6f)),
+                    style = EncoreTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.6f)),
                     textAlign = textAlign
                 )
             } else {
                 selectedIndices.sorted().forEach { idx ->
                     Text(
                         text = lyrics[idx].text,
-                        style = SpotifyTheme.typography.titleLarge.copy(
+                        style = EncoreTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 20.sp,
                             lineHeight = 28.sp,
@@ -357,7 +357,7 @@ private fun ShareCardPreview(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = SpotifyTheme.typography.bodySmallBold.copy(
+                        style = EncoreTheme.typography.bodySmallBold.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         ),
@@ -366,7 +366,7 @@ private fun ShareCardPreview(
                     )
                     Text(
                         text = artist,
-                        style = SpotifyTheme.typography.marginal.copy(
+                        style = EncoreTheme.typography.marginal.copy(
                             color = Color.White.copy(alpha = 0.7f)
                         ),
                         maxLines = 1,
@@ -392,7 +392,7 @@ private fun ShareCardPreview(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Spotify",
-                        style = SpotifyTheme.typography.bodySmallBold.copy(
+                        style = EncoreTheme.typography.bodySmallBold.copy(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp,
                             color = Color.White
@@ -432,7 +432,7 @@ private fun ShareFormatControls(
                         1 -> "Align: Center"
                         else -> "Align: Right"
                     },
-                    style = SpotifyTheme.typography.marginal.copy(
+                    style = EncoreTheme.typography.marginal.copy(
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White
                     )
@@ -465,7 +465,7 @@ private fun ShareFormatControls(
 
         Text(
             text = "Select up to 5 lines ($selectedCount/5)",
-            style = SpotifyTheme.typography.marginal.copy(
+            style = EncoreTheme.typography.marginal.copy(
                 fontWeight = FontWeight.Medium,
                 color = EncoreColors.TextSecondary
             )
@@ -524,7 +524,7 @@ private fun ShareLineSelector(
 
                 Text(
                     text = line.text,
-                    style = SpotifyTheme.typography.bodySmall.copy(
+                    style = EncoreTheme.typography.bodySmall.copy(
                         fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Normal,
                         color = if (isChecked) Color.White else Color.White.copy(alpha = 0.7f)
                     ),
