@@ -18,6 +18,9 @@ internal class AudioSink(
     @Volatile
     private var held = false
 
+    @Volatile
+    private var rate = 1f
+
     /** Audio-focus ducking factor, combined with [userLevel] on the track. */
     @Volatile
     private var duckLevel = 1f
@@ -104,6 +107,11 @@ internal class AudioSink(
 
     fun underruns(): Int = runCatching { track.underrunCount }.getOrDefault(-1)
 
+    fun rate(mult: Float) {
+        rate = mult.coerceIn(0.5f, 3.5f)
+        runCatching { track.playbackRate = (sampleRate * rate).toInt().coerceAtLeast(1) }
+    }
+
     fun rebuild() {
         runCatching {
             track.pause()
@@ -112,6 +120,7 @@ internal class AudioSink(
         }
         track = build()
         applyVolume()
+        if (rate != 1f) rate(rate)
         if (!held) runCatching { track.play() }
         log.i("sink rebuilt state=${track.state} play=${track.playState}")
     }
