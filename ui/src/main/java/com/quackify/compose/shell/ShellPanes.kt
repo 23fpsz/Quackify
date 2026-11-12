@@ -75,6 +75,7 @@ import com.quackify.compose.playlist.EncorePlaylistScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.ArtistRelease
 import com.quackify.compose.screens.CategoryShelf
+import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.HistoryScreen
 import com.quackify.compose.screens.LogViewerScreen
 import com.quackify.compose.screens.NotificationsScreen
@@ -703,6 +704,7 @@ internal fun ShellHistoryPane(
     todayTracks: List<TrackItem>,
     yesterdayTracks: List<TrackItem>,
     earlierTracks: List<TrackItem>,
+    stats: HistoryStats? = null,
     loading: Boolean,
     currentTrackTitle: String,
     isPlaying: Boolean
@@ -714,6 +716,7 @@ internal fun ShellHistoryPane(
         todayTracks = todayTracks,
         yesterdayTracks = yesterdayTracks,
         earlierTracks = earlierTracks,
+        stats = stats,
         loading = loading,
         currentTrackTitle = currentTrackTitle,
         isPlaying = isPlaying

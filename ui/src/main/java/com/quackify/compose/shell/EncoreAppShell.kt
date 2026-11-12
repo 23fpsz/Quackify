@@ -31,6 +31,7 @@ import com.quackify.compose.library.EncoreLibraryScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.screens.SettingsLocks
@@ -140,6 +141,7 @@ fun EncoreAppShell(
     historyToday: List<TrackItem> = emptyList(),
     historyYesterday: List<TrackItem> = emptyList(),
     historyEarlier: List<TrackItem> = emptyList(),
+    historyStats: HistoryStats? = null,
     historyLoading: Boolean = false,
     onOpenHistory: (() -> Unit)? = null,
     savedAccounts: List<com.quackify.backend.core.auth.EncoreAuth.Account> = emptyList(),
@@ -767,6 +769,7 @@ fun EncoreAppShell(
                 todayTracks = historyToday,
                 yesterdayTracks = historyYesterday,
                 earlierTracks = historyEarlier,
+                stats = historyStats,
                 loading = historyLoading,
                 currentTrackTitle = currentTrackTitle,
                 isPlaying = isPlaying
