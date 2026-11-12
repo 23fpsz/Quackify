@@ -24,6 +24,7 @@ import com.quackify.backend.connect.cluster.ClusterState
 import com.quackify.backend.connect.cluster.ClusterTrack
 import com.quackify.backend.model.ConnectDevice
 import com.quackify.backend.model.DeviceKind
+import com.quackify.backend.connect.command.CommandClient
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.connect.command.PlaybackCommand
 import com.quackify.backend.connect.command.RemoteCommand
@@ -33,6 +34,7 @@ import com.quackify.backend.connect.state.Snapshot
 import com.quackify.backend.player.KrespotPlayer
 import com.quackify.backend.player.PlayerEvent
 import com.quackify.backend.player.PlayerState
+import com.quackify.backend.player.VideoManifests
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -100,6 +102,11 @@ class PlaybackBridge(private val context: Context) {
     @Volatile
     var canvasOn: Boolean = false
         private set
+
+    private var videoFlagsUri = ""
+
+    /** The track whose video source is already being prefetched. */
+    private var videoPrefetchUri = ""
 
     private var mirrors: Job? = null
 
@@ -299,6 +306,18 @@ class PlaybackBridge(private val context: Context) {
             scope.launch { toggleRepeat() }
         }
 
+        override fun onSwitchVideo(toVideo: Boolean) {
+            switchVideo(toVideo)
+        }
+
+        override fun onVideoQuality(height: Int) {
+            player.selectVideoQuality(height)
+        }
+
+        override fun onVideoSurface(surface: android.view.Surface?) {
+            player.videoSurface(surface)
+        }
+
         override fun onPlayUri(uri: String) {
             val enhanced = enhancedQueue(chainContext)
             val at = enhanced.indexOfFirst { it.uri == uri }
@@ -471,6 +490,7 @@ class PlaybackBridge(private val context: Context) {
                     isExplicit = track.explicit,
                     albumUri = track.albumUri,
                     artistUri = track.artistUri,
+                    hasVideo = track.video,
                 )
             }
         }
@@ -710,6 +730,119 @@ class PlaybackBridge(private val context: Context) {
         cluster = null
         state = ComposePlaybackState()
     }
+
+    /**
+     * Swaps the current track for its music video variant (or back), all
+     * local: the audio media manifest already names the video entity
+     * (video_version_uri), so no server round trip or cluster wait applies.
+     * The track identity stays the audio track the whole time.
+     */
+    fun switchVideo(toVideo: Boolean) {
+        scope.launch {
+            state = state.copy(videoSwitching = true)
+            if (toVideo) {
+                if (videoActive()) {
+                    state = state.copy(videoSwitching = false)
+                    return@launch
+                }
+                val audioUri = state.trackUri
+                if (!audioUri.startsWith("spotify:track:") || decorated[audioUri]?.hasVideo != true) {
+                    log.i("video switch ignored, '${audioUri.takeLast(12)}' has no music video")
+                    return@launch
+                }
+                val at = player.positionMs
+                val videoUri = runCatching {
+                    VideoManifests.videoVersionUri(context, connect.spclientHost, audioUri)
+                }.getOrNull()
+                if (videoUri == null) {
+                    log.w("video switch dropped, no video_version_uri for '${audioUri.takeLast(12)}'")
+                    state = state.copy(videoSwitching = false)
+                    return@launch
+                }
+                val source = runCatching {
+                    VideoManifests.resolve(context, connect.spclientHost, videoUri)
+                }.getOrNull()
+                if (source == null) {
+                    log.w("video switch dropped, '${videoUri.takeLast(12)}' did not resolve")
+                    state = state.copy(videoSwitching = false)
+                    return@launch
+                }
+                log.i("video switch -> video at ${at}ms")
+                state = state.copy(
+                    videoActive = true,
+                    musicVideoAvailable = true,
+                    videoQualities = source.manifest.videoProfiles.map { it.height }.distinct().sortedDescending(),
+                    videoSwitching = false,
+                )
+                player.playVideo(videoUri, audioUri, source.manifest.durationMs, at)
+            } else {
+                if (!videoActive()) {
+                    state = state.copy(videoSwitching = false)
+                    return@launch
+                }
+                val audioUri = state.trackUri
+                val at = player.positionMs
+                val wasPlaying = player.isPlaying
+                log.i("video switch -> audio at ${at}ms")
+                state = state.copy(videoActive = false, videoQualities = emptyList())
+                player.stopVideo()
+                val cluster = connect.cluster.value
+                val row = cluster?.window()?.firstOrNull { it.uri == audioUri }
+                    ?: cluster?.track?.takeIf { it.uri == audioUri }
+                    ?: clusterRowFor(audioUri)
+                if (row == null) {
+                    log.w("video switch back dropped, no row for '${audioUri.takeLast(12)}'")
+                    state = state.copy(videoSwitching = false)
+                    return@launch
+                }
+                val index = cluster?.window()?.indexOfFirst { it.uri == audioUri }?.takeIf { it >= 0 } ?: -1
+                startLocal(row, state.contextUri, index, at, playing = wasPlaying)
+                state = state.copy(videoSwitching = false)
+            }
+        }
+    }
+
+    /** The video engine gave up: back to the audio track at the last known position. */
+    private fun fallbackFromVideo() {
+        log.w("the video engine failed, falling back to audio")
+        state = state.copy(videoActive = false, videoQualities = emptyList(), videoSwitching = false)
+        player.stopVideo()
+        scope.launch {
+            val audioUri = state.trackUri
+            val cluster = connect.cluster.value
+            val row = cluster?.window()?.firstOrNull { it.uri == audioUri }
+                ?: cluster?.track?.takeIf { it.uri == audioUri }
+                ?: clusterRowFor(audioUri)
+            if (row == null) {
+                log.w("video fallback dropped, no row for '${audioUri.takeLast(12)}'")
+                return@launch
+            }
+            val index = cluster?.window()?.indexOfFirst { it.uri == audioUri }?.takeIf { it >= 0 } ?: -1
+            startLocal(row, state.contextUri, index, state.positionMs, playing = state.isPlaying)
+        }
+    }
+
+    private fun refreshVideoFlags() {
+        val uri = state.trackUri
+        val active = videoActive()
+        val available = active || decorated[uri]?.hasVideo == true
+        if (uri == videoFlagsUri && state.musicVideoAvailable == available && state.videoActive == active) return
+        videoFlagsUri = uri
+        state = state.copy(
+            musicVideoAvailable = available,
+            videoActive = active,
+            videoQualities = if (active) state.videoQualities else emptyList(),
+        )
+        if (available && !active && uri != videoPrefetchUri) {
+            videoPrefetchUri = uri
+            scope.launch {
+                runCatching { VideoManifests.resolve(context, connect.spclientHost, uri) }
+                    .onFailure { log.w("video prefetch failed ${it.message}") }
+            }
+        }
+    }
+
+    private fun videoActive(): Boolean = player.state.value.isVideo
 
     private fun markPending(uri: String, index: Int, context: String = "") {
         pendingTrack = uri
@@ -1406,6 +1539,7 @@ class PlaybackBridge(private val context: Context) {
                     isExplicit = found.explicit,
                     albumUri = found.albumUri,
                     artistUri = found.artistUri,
+                    hasVideo = found.video,
                 )
             }
         }
@@ -1524,6 +1658,7 @@ class PlaybackBridge(private val context: Context) {
             queueRevision = at?.queueRevision.orEmpty(),
             nextRows = queueTailRows(contextUri),
         )
+        refreshVideoFlags()
     }
 
     private fun queueTailRows(contextUri: String): List<ClusterTrack> {
@@ -2186,6 +2321,7 @@ class PlaybackBridge(private val context: Context) {
                 isExplicit = row.explicit,
                 albumUri = row.albumUri,
                 artistUri = row.artistUri,
+                hasVideo = row.video,
             )
             state = state.copy(
                 title = row.title,
@@ -2355,6 +2491,7 @@ class PlaybackBridge(private val context: Context) {
             contextLabel = contextLabelOf(cluster),
         )
         watchForVanishedActive(cluster)
+        refreshVideoFlags()
     }
 
     private fun contextLabelOf(cluster: ClusterState): String {
@@ -2648,6 +2785,7 @@ class PlaybackBridge(private val context: Context) {
                     isExplicit = track.explicit,
                     albumUri = track.albumUri,
                     artistUri = track.artistUri,
+                    hasVideo = track.video,
                 )
             }
             log.i("decorated ${rows.size} of ${uris.size} upcoming row(s)")
@@ -2929,7 +3067,13 @@ class PlaybackBridge(private val context: Context) {
                     log.i("player ended '$ended' with no command, advancing on this phone")
                     scope.launch { advance(ended) }
                 }
-                is PlayerEvent.Failed -> flushHeld()
+                is PlayerEvent.Failed -> {
+                    if (videoActive()) {
+                        fallbackFromVideo()
+                        return
+                    }
+                    flushHeld()
+                }
                 is PlayerEvent.Progress -> Unit
             }
             return
@@ -3026,6 +3170,10 @@ class PlaybackBridge(private val context: Context) {
 
             is PlayerEvent.Failed -> {
                 log.w("player failed: ${event.message}")
+                if (videoActive()) {
+                    fallbackFromVideo()
+                    return
+                }
                 if (event.message.startsWith("license") || event.message.startsWith("licence")) {
                     scope.launch { blameTheStream(event.message) }
                     if (event.message.contains("429")) {
