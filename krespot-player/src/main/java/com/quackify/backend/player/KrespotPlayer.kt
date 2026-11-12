@@ -2,6 +2,7 @@ package com.quackify.backend.player
 
 import android.content.Context
 import android.os.SystemClock
+import android.view.Surface
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -67,6 +68,7 @@ data class PlayerState(
     val bitrate: Int = 0,
     val quality: String = "",
     val trackUri: String = "",
+    val isVideo: Boolean = false,
 )
 
 class KrespotPlayer(private val context: Context) {
@@ -112,6 +114,21 @@ class KrespotPlayer(private val context: Context) {
     private val widevine = Widevine(context) { spclient }
 
     private val focus = AudioFocus(context)
+
+    private val video = VideoEngine(context, { spclient }, scope) { event ->
+        if (videoActive && event !is PlayerEvent.Progress) {
+            _events.tryEmit(event)
+        }
+        if (videoActive) {
+            mirror(event, _state.value.durationMs)
+        }
+    }
+
+    @Volatile
+    private var videoActive = false
+
+    @Volatile
+    private var pendingVideoSurface: Surface? = null
 
     var onFocusPause: (() -> Unit)? = null
 
@@ -326,6 +343,7 @@ class KrespotPlayer(private val context: Context) {
             log.i("audio sink warmed in ${sink}ms, decoder in ${decoder}ms")
         }
         scope.launch { widevine.warm() }
+        video.prewarmDrm()
     }
 
     private fun warmDecoder(): Long {
@@ -392,11 +410,12 @@ class KrespotPlayer(private val context: Context) {
     }
 
     val positionMs: Long
-        get() = engine?.currentPositionMs ?: mp3?.currentPositionMs ?: _state.value.positionMs
+        get() = if (videoActive) video.positionMs else engine?.currentPositionMs
+            ?: mp3?.currentPositionMs ?: _state.value.positionMs
 
     val durationMs: Long get() = _state.value.durationMs
 
-    val isPlaying: Boolean get() = _state.value.playing
+    val isPlaying: Boolean get() = if (videoActive) video.isPlaying else _state.value.playing
 
     val format: Int get() = _state.value.format
 
@@ -404,7 +423,7 @@ class KrespotPlayer(private val context: Context) {
 
     val quality: String get() = _state.value.quality
 
-    val hasSource: Boolean get() = engine != null || mp3 != null || job?.isActive == true
+    val hasSource: Boolean get() = videoActive || engine != null || mp3 != null || job?.isActive == true
 
     fun play(
         track: CommandTrack,
@@ -575,6 +594,7 @@ class KrespotPlayer(private val context: Context) {
 
     private fun pauseInternal() {
         pendingPause = true
+        if (videoActive) video.pause()
         engine?.pause()
         mp3?.pause()
         _state.update { it.copy(playing = false, paused = true, buffering = false) }
@@ -591,23 +611,32 @@ class KrespotPlayer(private val context: Context) {
             return
         }
         pendingPause = false
+        if (videoActive) video.play()
         engine?.resume()
         mp3?.resume()
         _state.update { it.copy(playing = true, paused = false, buffering = false) }
     }
 
     fun duck(level: Float) {
+        if (videoActive) video.duck(level)
         engine?.duck(level)
         mp3?.duck(level)
     }
 
     /** User volume on the local sink, kept separate from audio-focus ducking. */
     fun setVolume(level: Float) {
+        if (videoActive) video.duck(level)
         engine?.volume(level)
         mp3?.volume(level)
     }
 
     fun seekTo(ms: Long) {
+        if (videoActive) {
+            log.i("video seek -> ${ms}ms")
+            video.seekTo(ms)
+            _state.update { it.copy(positionMs = ms) }
+            return
+        }
         val engine = engine
         if (engine == null) {
             if (job?.isActive == true) {
@@ -629,6 +658,7 @@ class KrespotPlayer(private val context: Context) {
         pendingPause = false
         pendingSeekMs = -1L
         refused = null
+        stopVideo()
         deepJob?.cancel()
         deepTarget = ""
         engine?.stop()
@@ -645,6 +675,97 @@ class KrespotPlayer(private val context: Context) {
         stop()
         scope.launch { widevine.close() }
         LicenseEndpoint.reset()
+    }
+
+    /** Hands the surface the video renders into; kept until the engine starts. */
+    fun videoSurface(surface: Surface?) {
+        pendingVideoSurface = surface
+        video.setSurface(surface)
+    }
+
+    /** Constrains the video rendition by height; 0 or below restores auto. */
+    fun selectVideoQuality(height: Int) {
+        video.selectQuality(height)
+    }
+
+    /**
+     * Plays a music video entity: resolves its source manifest, builds the DASH
+     * session and takes over playback from the audio pipeline at fromMs.
+     */
+    fun playVideo(videoUri: String, audioTrackUri: String, durationMs: Long, fromMs: Long) {
+        if (!videoUri.startsWith("spotify:track:")) return
+        stopAudio()
+        if (!focus.acquire()) {
+            log.w("video play refused, another app holds the audio focus")
+            _events.tryEmit(PlayerEvent.Failed("focus"))
+            return
+        }
+        val id = ++generation
+        pendingPause = false
+        videoActive = true
+        _state.value = PlayerState(
+            playing = true,
+            buffering = true,
+            durationMs = durationMs,
+            trackUri = audioTrackUri,
+            isVideo = true,
+        )
+        log.i("play video '$videoUri' of '$audioTrackUri' from ${fromMs}ms")
+        job = scope.launch {
+            try {
+                val source = VideoManifests.resolve(context, spclient, videoUri)
+                if (source == null) {
+                    log.w("video '$videoUri' did not resolve, falling back to audio")
+                    videoActive = false
+                    _events.emit(PlayerEvent.Failed("no video source"))
+                    return@launch
+                }
+                if (id != generation) return@launch
+                val ready = video.prepare(source.manifest, fromMs, autoplay = !pendingPause)
+                if (!ready) {
+                    videoActive = false
+                    _events.emit(PlayerEvent.Failed("video engine failed"))
+                    return@launch
+                }
+                if (id != generation) return@launch
+                video.setSurface(pendingVideoSurface)
+                _state.value = PlayerState(
+                    playing = !pendingPause,
+                    paused = pendingPause,
+                    buffering = !pendingPause,
+                    durationMs = source.manifest.durationMs,
+                    trackUri = audioTrackUri,
+                    isVideo = true,
+                )
+                if (pendingPause) video.pause()
+                if (!pendingPause) video.play()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Throwable) {
+                log.e("video play failed ${failure.javaClass.simpleName}: ${failure.message}")
+                videoActive = false
+                _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
+            }
+        }
+    }
+
+    /** Leaves video mode; the caller resumes audio playback at fromMs. */
+    fun stopVideo() {
+        if (!videoActive) return
+        videoActive = false
+        video.stop()
+        _state.update { it.copy(isVideo = false, playing = false, buffering = false) }
+        log.i("video mode stopped")
+    }
+
+    private fun stopAudio() {
+        generation++
+        engine?.stop()
+        engine = null
+        mp3?.stop()
+        mp3 = null
+        job?.cancel()
+        job = null
     }
 
     fun reset() {

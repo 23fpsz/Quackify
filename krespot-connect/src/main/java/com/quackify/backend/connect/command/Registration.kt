@@ -227,6 +227,7 @@ object Registration {
 
     private fun supportedTypes(): JSONArray = JSONArray()
         .put("audio/track")
+        .put("video/track")
         .put("audio/episode")
         .put("audio/ad")
         .put("audio/chapter")
