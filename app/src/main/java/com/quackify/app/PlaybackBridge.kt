@@ -17,6 +17,7 @@ import com.quackify.app.bridge.targetFrom
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.shell.ChapterMarker
 import com.quackify.compose.shell.ComposePlaybackState
 import com.quackify.compose.shell.ComposePlayerListener
 import com.quackify.backend.connect.KrespotConnect
@@ -35,6 +36,7 @@ import com.quackify.backend.player.KrespotPlayer
 import com.quackify.backend.player.PlayerEvent
 import com.quackify.backend.player.PlayerState
 import com.quackify.backend.player.VideoManifests
+import com.quackify.backend.api.Podcasts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -107,6 +109,7 @@ class PlaybackBridge(private val context: Context) {
 
     /** The track whose video source is already being prefetched. */
     private var videoPrefetchUri = ""
+    private val videoAutoSwitched = HashSet<String>()
 
     private var mirrors: Job? = null
 
@@ -141,6 +144,7 @@ class PlaybackBridge(private val context: Context) {
     private var blankSeen = ""
 
     private val hydrateTried = HashSet<String>()
+    private var machineLearned = ""
 
     @Volatile
     private var pendingTrack = ""
@@ -308,6 +312,27 @@ class PlaybackBridge(private val context: Context) {
 
         override fun onSwitchVideo(toVideo: Boolean) {
             switchVideo(toVideo)
+        }
+
+        override fun onPlaybackSpeed(speed: Float) {
+            val clamped = speed.coerceIn(0.5f, 3.5f)
+            player.playbackRate(clamped)
+            state = state.copy(playbackSpeed = clamped)
+        }
+
+        override fun onSkipSeek(deltaMs: Long) {
+            val duration = player.durationMs.takeIf { it > 0L } ?: state.durationMs
+            val target = (state.positionMs + deltaMs).coerceIn(0L, duration)
+            onSeek(target)
+        }
+
+        override fun onPlayEpisode(uri: String, contextUri: String, hasVideo: Boolean) {
+            if (hasVideo) {
+                decorated[uri] = (decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri))
+                    .copy(hasVideo = true)
+            }
+            captureChain(contextUri)
+            scope.launch { playTrack(uri, contextUri, -1) }
         }
 
         override fun onVideoQuality(height: Int) {
@@ -698,6 +723,7 @@ class PlaybackBridge(private val context: Context) {
         state = ComposePlaybackState()
         scope.cancel()
         hydrateTried.clear()
+        machineLearned = ""
         log.i("bridge stopped, every collector and the socket are gone")
     }
 
@@ -727,6 +753,7 @@ class PlaybackBridge(private val context: Context) {
         activeSeen = ""
         engineSeen = ""
         hydrateTried.clear()
+        machineLearned = ""
         cluster = null
         state = ComposePlaybackState()
     }
@@ -746,12 +773,19 @@ class PlaybackBridge(private val context: Context) {
                     return@launch
                 }
                 val audioUri = state.trackUri
-                if (!audioUri.startsWith("spotify:track:") || decorated[audioUri]?.hasVideo != true) {
+                val episode = audioUri.startsWith("spotify:episode:")
+                val hasVideo = if (episode) {
+                    VideoManifests.episodeVideoKnown(audioUri) &&
+                            VideoManifests.knownEpisodeVideoId(audioUri) != null
+                } else {
+                    decorated[audioUri]?.hasVideo == true
+                }
+                if ((!episode && !audioUri.startsWith("spotify:track:")) || !hasVideo) {
                     log.i("video switch ignored, '${audioUri.takeLast(12)}' has no music video")
                     return@launch
                 }
                 val at = player.positionMs
-                val videoUri = runCatching {
+                val videoUri = if (episode) audioUri else runCatching {
                     VideoManifests.videoVersionUri(context, connect.spclientHost, audioUri)
                 }.getOrNull()
                 if (videoUri == null) {
@@ -825,7 +859,12 @@ class PlaybackBridge(private val context: Context) {
     private fun refreshVideoFlags() {
         val uri = state.trackUri
         val active = videoActive()
-        val available = active || decorated[uri]?.hasVideo == true
+        val episode = uri.startsWith("spotify:episode:")
+        val available = active || when {
+            episode -> VideoManifests.episodeVideoKnown(uri) &&
+                    VideoManifests.knownEpisodeVideoId(uri) != null
+            else -> decorated[uri]?.hasVideo == true
+        }
         if (uri == videoFlagsUri && state.musicVideoAvailable == available && state.videoActive == active) return
         videoFlagsUri = uri
         state = state.copy(
@@ -833,6 +872,25 @@ class PlaybackBridge(private val context: Context) {
             videoActive = active,
             videoQualities = if (active) state.videoQualities else emptyList(),
         )
+        // The web player starts video episodes in video mode; mirror that here
+        // once we own the stream and the episode's video file is confirmed.
+        if (episode && available && !active &&
+            uri !in videoAutoSwitched && player.state.value.trackUri == uri
+        ) {
+            videoAutoSwitched += uri
+            log.i("episode '$uri' has video, switching to video automatically")
+            switchVideo(true)
+            return
+        }
+        if (episode && !VideoManifests.episodeVideoKnown(uri) && uri != videoPrefetchUri) {
+            videoPrefetchUri = uri
+            scope.launch {
+                runCatching { VideoManifests.episodeVideoId(context, connect.spclientHost, uri) }
+                    .onFailure { log.w("episode video probe failed ${it.message}") }
+                refreshVideoFlags()
+            }
+            return
+        }
         if (available && !active && uri != videoPrefetchUri) {
             videoPrefetchUri = uri
             scope.launch {
@@ -1520,7 +1578,9 @@ class PlaybackBridge(private val context: Context) {
         playing: Boolean,
     ) {
         var row = track
-        if (row.title.isBlank() && row.uri.startsWith("spotify:track:")) {
+        if (row.title.isBlank() &&
+            (row.uri.startsWith("spotify:track:") || row.uri.startsWith("spotify:episode:"))
+        ) {
             runCatching { TrackSource.decorate(context, listOf(row.uri))[row.uri] }.getOrNull()?.let { found ->
                 row = row.copy(
                     title = found.title,
@@ -1568,8 +1628,25 @@ class PlaybackBridge(private val context: Context) {
         connect.holdsStream = true
         publishLocalFromEngine(positionMs, playing)
         publishQueue(connect.cluster.value)
+        loadChapters(row.uri)
         if (row.uri.startsWith("spotify:track:") || row.uri.startsWith("spotify:episode:")) {
             if (contextUri.isBlank() || contextUri == row.uri) primeStation(row.uri)
+        }
+    }
+
+    private fun loadChapters(uri: String) {
+        if (!uri.startsWith("spotify:episode:")) {
+            if (state.chapters.isNotEmpty()) state = state.copy(chapters = emptyList())
+            return
+        }
+        if (state.chapters.isNotEmpty() && state.trackUri == uri) return
+        state = state.copy(chapters = emptyList())
+        scope.launch {
+            val spans = runCatching { Podcasts.chapters(context, uri) }.getOrDefault(emptyList())
+            if (spans.isEmpty() || player.state.value.trackUri != uri) return@launch
+            state = state.copy(chapters = spans.map {
+                ChapterMarker(title = it.title, startMs = it.startMs, endMs = it.endMs)
+            })
         }
     }
 
@@ -2915,6 +2992,10 @@ class PlaybackBridge(private val context: Context) {
             val detail = Krespot.collections.collection(context, contextUri) ?: return emptyList()
             detail.tracks.map { it.uri }
         }
+        contextUri.startsWith("spotify:show:") -> {
+            val detail = Podcasts.show(context, contextUri) ?: return emptyList()
+            detail.episodes.map { it.uri }
+        }
         else -> emptyList()
     }
 
@@ -2943,6 +3024,16 @@ class PlaybackBridge(private val context: Context) {
                     "the old chain does not follow"
                 )
             }
+            if (chainRows.isEmpty()) {
+                scope.launch {
+                    val fetched = runCatching { rowsOf(contextUri) }.getOrNull().orEmpty()
+                    if (fetched.size < 2 || chainContext != contextUri || chainRows.isNotEmpty()) return@launch
+                    chainRows = fetched
+                    rememberChain(contextUri)
+                    log.i("chain: ${fetched.size} rows fetched for '${contextUri.takeLast(16)}'")
+                    publishQueue(connect.cluster.value)
+                }
+            }
             return
         }
         chainRows = rows
@@ -2956,6 +3047,7 @@ class PlaybackBridge(private val context: Context) {
     private fun mirrorState(command: PlaybackCommand?) {
         if (command == null) return
         if (command.isControl) return
+        learnMachineQueue(command)
         val track = command.currentTrack ?: return
         val loaded = player.state.value.trackUri
         val bothAds = loaded.startsWith(AD_PREFIX) && track.uri.startsWith(AD_PREFIX)
@@ -2994,6 +3086,43 @@ class PlaybackBridge(private val context: Context) {
             contextUri = track.contextUri.ifBlank { state.contextUri },
             contextLabel = command.contextDescription.trim(),
         )
+    }
+
+    /**
+     * The state machine response carries the full context queue. Shows have
+     * no local row source (rowsOf does not know spotify:show:), so the
+     * machine's episode list becomes the chain and decorates the queue.
+     */
+    private fun learnMachineQueue(command: PlaybackCommand) {
+        if (command.tracks.size < 2) return
+        if (machineLearned == command.stateMachineId) return
+        val track = command.currentTrack ?: return
+        val ctx = track.contextUri
+        if (!ctx.startsWith("spotify:show:")) return
+        machineLearned = command.stateMachineId
+        val at = command.currentState?.trackIndex ?: -1
+        command.tracks.forEach { row ->
+            if (row.uri.isBlank()) return@forEach
+            if (decorated[row.uri]?.title.isNullOrBlank()) {
+                decorated[row.uri] = TrackItem(
+                    title = row.name,
+                    artist = row.artists,
+                    uri = row.uri,
+                    imageUrl = row.imageUrl.takeIf { it.isNotBlank() },
+                    durationMs = row.durationMs,
+                    isExplicit = row.explicit,
+                    albumUri = row.albumUri,
+                    artistUri = if (row.uri.startsWith("spotify:episode:")) row.albumUri else "",
+                )
+            }
+        }
+        if (chainContext != ctx || chainRows.size < command.tracks.size) {
+            chainContext = ctx
+            chainRows = command.tracks.map { it.uri }
+            if (at in chainRows.indices) resumeRow = at
+            log.i("machine queue: ${chainRows.size} rows in '$ctx' at row $at")
+            publishQueue(connect.cluster.value)
+        }
     }
 
     private fun smokeReport(command: PlaybackCommand) {

@@ -17,7 +17,11 @@ fun ClusterTrack.asCommandTrack(): CommandTrack = CommandTrack(
     durationMs = durationMs,
     imageUrl = imageUrl,
     explicit = explicit,
-    contentType = ContentType.TRACK,
+    contentType = when {
+        uri.startsWith("spotify:episode:") -> ContentType.EPISODE
+        uri.startsWith("spotify:ad:") -> ContentType.AD
+        else -> ContentType.TRACK
+    },
     files = emptyList(),
     dualFiles = emptyList(),
     directFiles = emptyList(),

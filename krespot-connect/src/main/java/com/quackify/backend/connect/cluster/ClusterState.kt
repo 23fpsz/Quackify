@@ -206,9 +206,13 @@ private fun parseTrack(node: JSONObject?): ClusterTrack? {
     return ClusterTrack(
         uri = uri,
         uid = node.text("uid"),
-        title = metadata.text("title"),
-        artistName = metadata.text("artist_name"),
-        artistUri = metadata.text("artist_uri"),
+        title = metadata.text("title").ifBlank { metadata.text("name") },
+        artistName = metadata.text("artist_name").ifBlank {
+            metadata.text("group_name").ifBlank {
+                metadata.optJSONArray("authors")?.optJSONObject(0)?.optString("name").orEmpty()
+            }
+        },
+        artistUri = metadata.text("artist_uri").ifBlank { metadata.text("group_uri") },
         imageUrl = metadata.text("image_url").ifBlank { metadata.text("image_large_url") },
         albumTitle = metadata.text("album_title"),
         albumUri = metadata.text("album_uri"),
