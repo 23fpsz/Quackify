@@ -32,3 +32,4 @@ log.log
 .pi/
 # Local signing material, never publish
 keystore/
+keystore.properties
