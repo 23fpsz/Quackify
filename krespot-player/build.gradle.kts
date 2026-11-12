@@ -21,4 +21,6 @@ android {
 dependencies {
     api(project(":krespot-connect"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.dash)
 }
