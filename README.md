@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="art/quackifyart.png" alt="Quackify" width="480" />
   <h1>Quackify</h1>
+  <img src="art/quackifyart.png" alt="Quackify" width="480" />
   <p>Quackify is the continuation of SpotiDuck, a native Android music client built with Jetpack Compose and Material 3. It offers a familiar streaming experience, inspired by modern player apps, without needing a WebView.</p>
 </div>
 
