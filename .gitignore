@@ -30,3 +30,6 @@ AGENTS.md
 log.log
 .perch/
 .pi/
+# Local signing material and licensed fonts, never publish
+keystore/
+ui/src/main/res/font/mix_ui_*.otf
