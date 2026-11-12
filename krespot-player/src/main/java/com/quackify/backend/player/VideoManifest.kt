@@ -113,6 +113,7 @@ object VideoManifests {
     }
 
     suspend fun resolve(context: Context, spclient: String, trackUri: String): VideoSource? {
+        if (trackUri.startsWith("spotify:episode:")) return resolveEpisode(context, spclient, trackUri)
         if (!trackUri.startsWith("spotify:track:")) return null
         synchronized(resolvedCache) { resolvedCache[trackUri] }?.let { cached ->
             log.i("video: '${trackUri.takeLast(12)}' served from the prefetch cache")
@@ -147,6 +148,54 @@ object VideoManifests {
             "${manifest.durationMs}ms")
         val source = VideoSource(trackUri, original, manifest)
         synchronized(resolvedCache) { resolvedCache[trackUri] = source }
+        return source
+    }
+
+    private val episodeVideoIds = object : LinkedHashMap<String, String?>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String?>): Boolean = size > 16
+    }
+
+    fun knownEpisodeVideoId(episodeUri: String): String? = synchronized(episodeVideoIds) {
+        episodeVideoIds[episodeUri]
+    }
+
+    fun episodeVideoKnown(episodeUri: String): Boolean = synchronized(episodeVideoIds) {
+        episodeVideoIds.containsKey(episodeUri)
+    }
+
+    suspend fun episodeVideoId(context: Context, spclient: String, episodeUri: String): String? {
+        synchronized(episodeVideoIds) {
+            if (episodeVideoIds.containsKey(episodeUri)) return episodeVideoIds[episodeUri]
+        }
+        val host = spclientHost(spclient)
+        val url = "https://$host/track-playback/v1/media/$episodeUri?manifestFileFormat=file_ids_mp4&manifest"
+        val response = Net.get(url, PlayerHeaders.of(context), tag = "media")
+        val json = response?.takeIf { it.ok }?.json()
+        if (json == null) {
+            log.w("episode video: media failed ${response?.code ?: "no response"}")
+            return null
+        }
+        val manifest = json.optJSONObject("media")?.optJSONObject(episodeUri)
+            ?.optJSONObject("item")
+        val videoId = manifest?.text("video_id")?.takeIf { it.isNotBlank() }
+            ?: manifest?.optJSONObject("manifest")?.optJSONArray("manifest_ids_video")
+                ?.optJSONObject(0)?.text("file_id").orEmpty()
+        synchronized(episodeVideoIds) { episodeVideoIds[episodeUri] = videoId.takeIf { it.isNotBlank() } }
+        if (videoId.isBlank()) log.i("episode video: '$episodeUri' has no video file")
+        return videoId.takeIf { it.isNotBlank() }
+    }
+
+    private suspend fun resolveEpisode(context: Context, spclient: String, episodeUri: String): VideoSource? {
+        synchronized(resolvedCache) { resolvedCache[episodeUri] }?.let { cached ->
+            log.i("video: '${episodeUri.takeLast(12)}' served from the prefetch cache")
+            return cached
+        }
+        val videoId = episodeVideoId(context, spclient, episodeUri) ?: return null
+        val manifest = manifest(context, spclient, videoId) ?: return null
+        log.i("video: episode '${episodeUri.takeLast(12)}' -> source $videoId " +
+                "${manifest.videoProfiles.size} video profiles ${manifest.durationMs}ms")
+        val source = VideoSource(episodeUri, videoId, manifest)
+        synchronized(resolvedCache) { resolvedCache[episodeUri] = source }
         return source
     }
 

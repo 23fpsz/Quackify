@@ -180,8 +180,8 @@ internal object SourceResolver {
         val sizes = usable.map { it.optInt("size") }
         val durations = usable.map { it.optLong("duration", 0L) }
         val pssh = json.optJSONObject("pssh")?.optString("widevine").orEmpty()
-        if (sizes.isEmpty() || pssh.isBlank()) {
-            log.w("seektable incomplete segs=${sizes.size} pssh=${pssh.length}B")
+        if (sizes.isEmpty()) {
+            log.w("seektable incomplete segs=${sizes.size}")
             return null
         }
         return Seektable(

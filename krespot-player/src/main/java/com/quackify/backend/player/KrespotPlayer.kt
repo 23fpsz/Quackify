@@ -473,6 +473,10 @@ class KrespotPlayer(private val context: Context) {
                 rememberFile(track.uri, source.fileId)
                 val warmed = async(Dispatchers.IO) { SegmentStore.warm(source, fromMs) }
                 val drm = async(Dispatchers.IO) {
+                    if (source.seektable.pssh.isBlank()) {
+                        log.i("clear content, no drm session asked")
+                        return@async null
+                    }
                     val left = KEY_SETTLE_MS - (SystemClock.elapsedRealtime() - startedAt)
                     if (left > 0L) delay(left)
                     if (id != generation) {
@@ -688,12 +692,22 @@ class KrespotPlayer(private val context: Context) {
         video.selectQuality(height)
     }
 
+    fun playbackRate(speed: Float) {
+        val clamped = speed.coerceIn(0.5f, 3.5f)
+        if (state.value.isVideo) {
+            video.rate(clamped)
+        } else {
+            engine?.rate(clamped)
+        }
+        log.i("playback rate -> ${clamped}x")
+    }
+
     /**
      * Plays a music video entity: resolves its source manifest, builds the DASH
      * session and takes over playback from the audio pipeline at fromMs.
      */
     fun playVideo(videoUri: String, audioTrackUri: String, durationMs: Long, fromMs: Long) {
-        if (!videoUri.startsWith("spotify:track:")) return
+        if (!videoUri.startsWith("spotify:track:") && !videoUri.startsWith("spotify:episode:")) return
         stopAudio()
         if (!focus.acquire()) {
             log.w("video play refused, another app holds the audio focus")

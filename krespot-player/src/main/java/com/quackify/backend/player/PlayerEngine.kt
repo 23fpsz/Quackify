@@ -69,6 +69,9 @@ internal class PlayerEngine(
     @Volatile
     private var userVolumeLevel = 1f
 
+    @Volatile
+    private var rate = 1f
+
     private var codec: MediaCodec? = null
     private var format: MediaFormat? = null
 
@@ -115,6 +118,11 @@ internal class PlayerEngine(
         sink?.volume(userVolumeLevel)
     }
 
+    fun rate(mult: Float) {
+        rate = mult.coerceIn(0.5f, 3.5f)
+        sink?.rate(rate)
+    }
+
     fun resume() {
         paused = false
         sink?.resume()
@@ -154,7 +162,7 @@ internal class PlayerEngine(
             scope.launch { runCatching { opening.await().release() } }
             throw cancellation
         }
-        if (crypto == null) {
+        if (crypto == null && source.seektable.pssh.isNotBlank()) {
             runCatching { opening.await().release() }
             emit(PlayerEvent.Failed(widevine.reason.ifBlank { "no drm session" }))
             return
@@ -184,6 +192,7 @@ internal class PlayerEngine(
         sink = audio
         audio.duck(duckLevel)
         audio.volume(userVolumeLevel)
+        if (rate != 1f) audio.rate(rate)
         audio.start()
         emit(PlayerEvent.Started)
 

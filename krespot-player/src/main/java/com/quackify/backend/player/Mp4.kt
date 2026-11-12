@@ -133,12 +133,11 @@ internal object Mp4 {
 
         require(sampleRate > 0) { "no audio sample entry" }
         require(asc != null) { "no esds" }
-        require(kidBytes != null) { "no tenc" }
         return Init(
             sampleRate = sampleRate,
             channels = channels,
             asc = asc!!,
-            kid = kidBytes!!,
+            kid = kidBytes ?: ByteArray(0),
             ivSize = ivSize,
             timescale = timescale,
             defaultDuration = defaultDuration,

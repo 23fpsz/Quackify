@@ -8,6 +8,7 @@ import android.view.Surface
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -306,28 +307,32 @@ internal class VideoEngine(
         withContext(Dispatchers.Main) {
             release()
             val file = VideoDash.write(context, manifest, qualityHeight) ?: return@withContext false
-            val license = VideoManifests.licenseUrl(spclient(), manifest.encryption?.licenseEndpoint.orEmpty())
-            val drmCallback = SpotifyVideoDrmCallback(context, license)
-            var cachedManager: DrmSessionManager? = null
-            val provider = DrmSessionManagerProvider { _: MediaItem ->
-                val existing = cachedManager
-                if (existing != null) return@DrmSessionManagerProvider existing
-                DefaultDrmSessionManager.Builder()
-                    .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, l3Provider())
-                    .build(drmCallback)
-                    .also { cachedManager = it }
+            val encryption = manifest.encryption
+            val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
+            val mediaItem: MediaItem
+            if (encryption == null) {
+                mediaItem = MediaItem.Builder().setUri(Uri.fromFile(file)).build()
+            } else {
+                val license = VideoManifests.licenseUrl(spclient(), encryption.licenseEndpoint)
+                val drmCallback = SpotifyVideoDrmCallback(context, license)
+                var cachedManager: DrmSessionManager? = null
+                factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { _: MediaItem ->
+                    val existing = cachedManager
+                    if (existing != null) return@DrmSessionManagerProvider existing
+                    DefaultDrmSessionManager.Builder()
+                        .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, l3Provider())
+                        .build(drmCallback)
+                        .also { cachedManager = it }
+                })
+                mediaItem = MediaItem.Builder()
+                    .setUri(Uri.fromFile(file))
+                    .setDrmConfiguration(
+                        MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
+                            .setForceSessionsForAudioAndVideoTracks(true)
+                            .build(),
+                    )
+                    .build()
             }
-            val dataSourceFactory = DefaultDataSource.Factory(context)
-            val factory = DefaultMediaSourceFactory(dataSourceFactory)
-                .setDrmSessionManagerProvider(provider)
-            val mediaItem = MediaItem.Builder()
-                .setUri(Uri.fromFile(file))
-                .setDrmConfiguration(
-                    MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
-                        .setForceSessionsForAudioAndVideoTracks(true)
-                        .build(),
-                )
-                .build()
             val created = ExoPlayer.Builder(context)
                 .setMediaSourceFactory(factory)
                 .build()
@@ -368,6 +373,10 @@ internal class VideoEngine(
 
     fun duck(level: Float) {
         runOnMain { player?.volume = level }
+    }
+
+    fun rate(mult: Float) {
+        runOnMain { player?.playbackParameters = PlaybackParameters(mult.coerceIn(0.5f, 3.5f)) }
     }
 
     fun stop() {
