@@ -4,6 +4,9 @@
   <p>Quackify is the continuation of SpotiDuck, a native Android music client built with Jetpack Compose and Material 3. It offers a familiar streaming experience, inspired by modern player apps, without needing a WebView.</p>
 </div>
 
+> [!WARNING]
+> **BETA Notice** — This project is still under continuous development. Not everything may work exactly as expected yet. Any help is welcome, as long as you know what you are doing.
+
 ## Features
 
 - Browse the home screen with filter chips
