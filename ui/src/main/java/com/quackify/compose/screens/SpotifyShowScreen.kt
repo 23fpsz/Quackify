@@ -25,7 +25,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -84,6 +86,7 @@ fun SpotifyShowScreen(
     onEpisodeClick: (EpisodeRow) -> Unit = {},
     onEpisodeMoreClick: ((EpisodeRow) -> Unit)? = null,
     onRelatedClick: (ShowCard) -> Unit = {},
+    onPlayEpisode: (EpisodeRow) -> Unit = {},
     onBackClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
     onMoreClick: (() -> Unit)? = null,
@@ -258,7 +261,13 @@ fun SpotifyShowScreen(
 
                         EncorePlayButton(
                             isPlaying = isPlaying,
-                            onClick = onPlayPauseClick,
+                            onClick = {
+                                val current = episodes.firstOrNull {
+                                    matchesCurrent(it.uri, currentTrackUri, it.title, currentTrackTitle)
+                                }
+                                if (current != null) onPlayPauseClick()
+                                else episodes.firstOrNull()?.let(onPlayEpisode) ?: onPlayPauseClick()
+                            },
                             size = 52.dp,
                             iconSize = 26.dp,
                         )
@@ -296,6 +305,7 @@ fun SpotifyShowScreen(
                     isCurrent = matchesCurrent(episode.uri, currentTrackUri, episode.title, currentTrackTitle),
                     isPlaying = isPlaying,
                     onClick = { onEpisodeClick(episode) },
+                    onPlayClick = { onPlayEpisode(episode) },
                     onMoreClick = onEpisodeMoreClick?.let { handler -> { handler(episode) } },
                 )
             }
@@ -383,6 +393,7 @@ private fun EpisodeListRow(
     isCurrent: Boolean,
     isPlaying: Boolean,
     onClick: () -> Unit,
+    onPlayClick: (() -> Unit)? = null,
     onMoreClick: (() -> Unit)?,
 ) {
     Row(
@@ -405,6 +416,27 @@ private fun EpisodeListRow(
                     modifier = Modifier.fillMaxSize(),
                     cornerRadius = 6.dp,
                 )
+            }
+            if (onPlayClick != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(onClick = onPlayClick),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            if (isCurrent && isPlaying) R.drawable.encore_icon_pause_24
+                            else R.drawable.encore_icon_play_24
+                        ),
+                        contentDescription = if (isCurrent && isPlaying) "Pause episode" else "Play episode",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                            .padding(3.dp),
+                    )
+                }
             }
         }
 

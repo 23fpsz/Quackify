@@ -61,8 +61,10 @@ fun SpotifyEpisodeScreen(
     positionMs: Long = 0L,
     isVideo: Boolean = false,
     isPlaying: Boolean = false,
+    isCurrent: Boolean = false,
     onBackClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
+    onPlayClick: () -> Unit = {},
     onShowClick: () -> Unit = {},
     onMoreClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -191,7 +193,7 @@ fun SpotifyEpisodeScreen(
                         }
                         EncorePlayButton(
                             isPlaying = isPlaying,
-                            onClick = onPlayPauseClick,
+                            onClick = { if (isCurrent) onPlayPauseClick() else onPlayClick() },
                             size = 52.dp,
                             iconSize = 26.dp,
                         )

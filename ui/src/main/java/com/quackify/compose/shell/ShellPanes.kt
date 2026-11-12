@@ -49,6 +49,7 @@ import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.EpisodeDetail
+import com.quackify.backend.model.EpisodeRow
 import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.SearchKind
@@ -773,6 +774,7 @@ internal fun ShellShowPane(
     onBack: () -> Unit,
     onRetry: (String) -> Unit,
     onEpisodeClick: (String) -> Unit,
+    onPlayEpisode: (EpisodeRow) -> Unit = {},
     onPlayPause: () -> Unit,
     onLoadMore: () -> Unit
 ) {
@@ -796,6 +798,7 @@ internal fun ShellShowPane(
             isPlaying = isPlaying,
             currentTrackTitle = currentTrackTitle,
             onEpisodeClick = { episode -> onEpisodeClick(episode.uri) },
+            onPlayEpisode = onPlayEpisode,
             onBackClick = onBack,
             onPlayPauseClick = onPlayPause,
             onLoadMore = onLoadMore
@@ -809,9 +812,11 @@ internal fun ShellEpisodePane(
     loading: Boolean,
     retryUri: String,
     isPlaying: Boolean,
+    isCurrent: Boolean,
     onBack: () -> Unit,
     onRetry: (String) -> Unit,
     onPlayPause: () -> Unit,
+    onPlay: () -> Unit = {},
     onShowClick: (String) -> Unit
 ) {
     if (episode == null) {
@@ -829,9 +834,13 @@ internal fun ShellEpisodePane(
             headerColor = parseHexColor(episode.colorHex) ?: EncoreColors.Card,
             metaLabel = episode.releaseDate,
             durationMs = episode.durationMs,
+            positionMs = episode.positionMs,
+            isVideo = episode.video,
             isPlaying = isPlaying,
+            isCurrent = isCurrent,
             onBackClick = onBack,
             onPlayPauseClick = onPlayPause,
+            onPlayClick = onPlay,
             onShowClick = { onShowClick(episode.showUri) }
         )
     }

@@ -110,6 +110,14 @@ data class ComposePlaybackState(
     val videoActive: Boolean = false,
     val videoQualities: List<Int> = emptyList(),
     val videoSwitching: Boolean = false,
+    val playbackSpeed: Float = 1f,
+    val chapters: List<ChapterMarker> = emptyList(),
+)
+
+data class ChapterMarker(
+    val title: String,
+    val startMs: Long,
+    val endMs: Long,
 )
 
 interface ComposePlayerListener {
@@ -138,6 +146,9 @@ interface ComposePlayerListener {
     fun onSwitchVideo(toVideo: Boolean) {}
     fun onVideoQuality(height: Int) {}
     fun onVideoSurface(surface: android.view.Surface?) {}
+    fun onPlaybackSpeed(speed: Float) {}
+    fun onSkipSeek(deltaMs: Long) {}
+    fun onPlayEpisode(uri: String, contextUri: String, hasVideo: Boolean) {}
 }
 
 internal enum class FolderMode { CREATE, RENAME, PICKER }

@@ -805,6 +805,9 @@ fun SpotifyAppShell(
                 onBack = handleBack,
                 onRetry = { uri -> onOpenShow?.invoke(uri) },
                 onEpisodeClick = openEpisode,
+                onPlayEpisode = { episode ->
+                    playerListener?.onPlayEpisode(episode.uri, active.showUri, episode.video)
+                },
                 onPlayPause = handlePlayPause,
                 onLoadMore = { onLoadMoreEpisodes?.invoke() }
             )
@@ -814,9 +817,16 @@ fun SpotifyAppShell(
                 loading = episodeLoading,
                 retryUri = active.episodeUri,
                 isPlaying = isPlaying,
+                isCurrent = playbackState?.trackUri == active.episodeUri,
                 onBack = handleBack,
                 onRetry = { uri -> onOpenEpisode?.invoke(uri) },
                 onPlayPause = handlePlayPause,
+                onPlay = {
+                    val episode = episodeDetail
+                    if (episode != null) {
+                        playerListener?.onPlayEpisode(episode.uri, episode.showUri, episode.video)
+                    }
+                },
                 onShowClick = { uri -> openShow(uri) }
             )
 
@@ -980,6 +990,11 @@ fun SpotifyAppShell(
             onSwitchVideo = { to -> playerListener?.onSwitchVideo(to) },
             onVideoQuality = { height -> playerListener?.onVideoQuality(height) },
             onVideoSurface = { surface -> playerListener?.onVideoSurface(surface) },
+            isEpisode = playbackState?.trackUri.orEmpty().startsWith("spotify:episode:"),
+            playbackSpeed = playbackState?.playbackSpeed ?: 1f,
+            chapters = playbackState?.chapters.orEmpty(),
+            onPlaybackSpeed = { speed -> playerListener?.onPlaybackSpeed(speed) },
+            onSkipSeek = { delta -> playerListener?.onSkipSeek(delta) },
             isEnhancedTrack = playbackState?.isEnhanced ?: false,
             shuffleMode = currentShuffleMode,
             repeatMode = currentRepeatMode,

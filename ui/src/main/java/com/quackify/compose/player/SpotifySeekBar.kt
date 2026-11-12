@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -71,7 +72,8 @@ fun SpotifySeekBar(
     inactiveColor: Color = Color.White.copy(alpha = 0.30f),
     bufferProgress: Float = 0f,
     isLoading: Boolean = false,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    markers: List<Float> = emptyList()
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(progress) }
@@ -212,6 +214,19 @@ fun SpotifySeekBar(
                     .clip(RoundedCornerShape(2.dp))
                     .background(if (isDragging) EncoreColors.Green else activeColor)
             )
+
+            markers.forEach { marker ->
+                val fraction = marker.coerceIn(0f, 1f)
+                if (fraction <= 0f) return@forEach
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset(x = (fraction * widthPx).roundToInt(), y = 0) }
+                        .width(2.dp)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                )
+            }
 
             val thumbOffsetPx = (displayProgress * widthPx).coerceIn(0f, widthPx)
             Box(

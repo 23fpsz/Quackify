@@ -94,11 +94,14 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
+import com.quackify.compose.shell.ChapterMarker
 import com.quackify.compose.components.CanvasVideoPlayer
 import com.quackify.compose.components.MusicVideoSurface
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreIconButton
+import com.quackify.compose.components.EncoreMenu
+import com.quackify.compose.components.EncoreMenuItem
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreRepeatButton
 import com.quackify.compose.components.EncoreSmartShuffleButton
@@ -248,6 +251,11 @@ fun SpotifyNowPlayingScreen(
     onSwitchVideo: (Boolean) -> Unit = {},
     onVideoQuality: (Int) -> Unit = {},
     onVideoSurface: (android.view.Surface?) -> Unit = {},
+    isEpisode: Boolean = false,
+    playbackSpeed: Float = 1f,
+    chapters: List<ChapterMarker> = emptyList(),
+    onPlaybackSpeed: (Float) -> Unit = {},
+    onSkipSeek: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
     onBanClick: (() -> Unit)? = null,
     contextHeaderTitle: String? = null,
@@ -513,11 +521,24 @@ fun SpotifyNowPlayingScreen(
                             currentPositionMs = currentPositionMs,
                             onSeek = onSeek,
                             isLoading = effectiveIsLoading,
-                            canSeek = canSeek
+                            canSeek = canSeek,
+                            markers = chapterFractions(chapters, durationMs)
                         )
 
                         Spacer(modifier = Modifier.height(20.dp))
 
+                        if (isEpisode) {
+                            EpisodeControlsRow(
+                                playbackSpeed = playbackSpeed,
+                                isPlaying = isPlaying,
+                                isLoading = effectiveIsLoading,
+                                onPlaybackSpeed = onPlaybackSpeed,
+                                onSkipSeek = onSkipSeek,
+                                onSkipPreviousClick = onSkipPreviousClick,
+                                onPlayPauseClick = onPlayPauseClick,
+                                onSkipNextClick = onSkipNextClick
+                            )
+                        } else {
                         NowPlayingControlsRow(
                             shuffleMode = shuffleMode,
                             repeatMode = repeatMode,
@@ -533,6 +554,7 @@ fun SpotifyNowPlayingScreen(
                             onSkipNextClick = onSkipNextClick,
                             onRepeatClick = onRepeatClick
                         )
+                        }
 
                         Spacer(modifier = Modifier.height(16.dp))
 
@@ -735,11 +757,24 @@ fun SpotifyNowPlayingScreen(
                                 currentPositionMs = currentPositionMs,
                                 onSeek = onSeek,
                                 isLoading = effectiveIsLoading,
-                                canSeek = canSeek
+                                canSeek = canSeek,
+                                markers = chapterFractions(chapters, durationMs)
                             )
 
                             Spacer(modifier = Modifier.height(20.dp))
 
+                            if (isEpisode) {
+                                EpisodeControlsRow(
+                                    playbackSpeed = playbackSpeed,
+                                    isPlaying = isPlaying,
+                                    isLoading = effectiveIsLoading,
+                                    onPlaybackSpeed = onPlaybackSpeed,
+                                    onSkipSeek = onSkipSeek,
+                                    onSkipPreviousClick = onSkipPreviousClick,
+                                    onPlayPauseClick = onPlayPauseClick,
+                                    onSkipNextClick = onSkipNextClick
+                                )
+                            } else {
                             NowPlayingControlsRow(
                                 shuffleMode = shuffleMode,
                                 repeatMode = repeatMode,
@@ -755,6 +790,7 @@ fun SpotifyNowPlayingScreen(
                                 onSkipNextClick = onSkipNextClick,
                                 onRepeatClick = onRepeatClick
                             )
+                            }
 
                             Spacer(modifier = Modifier.height(16.dp))
 
@@ -1151,22 +1187,20 @@ private fun NowPlayingArtworkCard(
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
-                                DropdownMenu(
+                                EncoreMenu(
                                     expanded = menuOpen,
-                                    onDismissRequest = { menuOpen = false },
-                                    shape = RoundedCornerShape(16.dp),
-                                    containerColor = Color(0xE6191919)
+                                    onDismiss = { menuOpen = false },
                                 ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Auto", color = Color.White) },
+                                    EncoreMenuItem(
+                                        label = "Auto",
                                         onClick = {
                                             onVideoQuality(0)
                                             menuOpen = false
                                         }
                                     )
                                     videoQualities.forEach { height ->
-                                        DropdownMenuItem(
-                                            text = { Text("${height}p", color = Color.White) },
+                                        EncoreMenuItem(
+                                            label = "${height}p",
                                             onClick = {
                                                 onVideoQuality(height)
                                                 menuOpen = false
@@ -1413,6 +1447,7 @@ private fun NowPlayingSeekBarSection(
     onSeek: (Float) -> Unit,
     isLoading: Boolean,
     canSeek: Boolean = true,
+    markers: List<Float> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -1422,6 +1457,7 @@ private fun NowPlayingSeekBarSection(
             onSeek = onSeek,
             isLoading = isLoading,
             enabled = canSeek,
+            markers = markers,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
@@ -1449,6 +1485,138 @@ private fun NowPlayingSeekBarSection(
                     fontFeatureSettings = "tnum"
                 )
             )
+        }
+    }
+}
+
+/**
+ * Podcast controls: speed pill, skip 15s, previous, play/pause, next.
+ * Reference: web player control-button-seek-back-15 / control-button-playback-speed.
+ */
+private val EPISODE_SPEED_OPTIONS = listOf(0.5f, 0.8f, 1f, 1.2f, 1.5f, 2f, 2.5f, 3f, 3.5f)
+
+private fun chapterFractions(chapters: List<ChapterMarker>, durationMs: Long): List<Float> {
+    if (durationMs <= 0L) return emptyList()
+    return chapters.map { it.startMs / durationMs.toFloat() }
+}
+
+@Composable
+private fun EpisodeControlsRow(
+    playbackSpeed: Float,
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    onPlaybackSpeed: (Float) -> Unit,
+    onSkipSeek: (Long) -> Unit,
+    onSkipPreviousClick: () -> Unit,
+    onPlayPauseClick: () -> Unit,
+    onSkipNextClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SpeedPill(
+            speed = playbackSpeed,
+            onSelect = onPlaybackSpeed
+        )
+
+        EncoreIconButton(
+            iconRes = R.drawable.encore_icon_seek_back_15,
+            contentDescription = "Back 15 seconds",
+            onClick = { onSkipSeek(-15_000L) },
+            tint = EncoreColors.TextPrimary,
+            size = 48.dp,
+            iconSize = 26.dp
+        )
+
+        EncoreIconButton(
+            iconRes = R.drawable.encore_icon_skip_back_24,
+            contentDescription = "Previous",
+            onClick = onSkipPreviousClick,
+            tint = EncoreColors.TextPrimary,
+            size = 44.dp,
+            iconSize = 26.dp
+        )
+
+        EncorePlayButton(
+            isPlaying = isPlaying,
+            onClick = onPlayPauseClick,
+            size = 64.dp,
+            iconSize = 32.dp,
+            backgroundColor = Color.White,
+            iconColor = EncoreColors.PureBlack,
+            isLoading = isLoading
+        )
+
+        EncoreIconButton(
+            iconRes = R.drawable.encore_icon_skip_forward_24,
+            contentDescription = "Next",
+            onClick = onSkipNextClick,
+            tint = EncoreColors.TextPrimary,
+            size = 48.dp,
+            iconSize = 30.dp
+        )
+
+        EncoreIconButton(
+            iconRes = R.drawable.encore_icon_seek_forward_15,
+            contentDescription = "Forward 15 seconds",
+            onClick = { onSkipSeek(15_000L) },
+            tint = EncoreColors.TextPrimary,
+            size = 48.dp,
+            iconSize = 26.dp
+        )
+    }
+}
+
+@Composable
+private fun SpeedPill(
+    speed: Float,
+    onSelect: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.14f))
+                .clickable { expanded = true }
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = if (speed == 1f) "1" else String.format(java.util.Locale.US, "%.1f", speed),
+                style = SpotifyTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                color = Color.White
+            )
+            Text(
+                text = "×",
+                style = SpotifyTheme.typography.marginal.copy(
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color.White,
+                modifier = Modifier.padding(start = 1.dp)
+            )
+        }
+        EncoreMenu(
+            expanded = expanded,
+            onDismiss = { expanded = false }
+        ) {
+            EPISODE_SPEED_OPTIONS.forEach { option ->
+                EncoreMenuItem(
+                    label = if (option == 1f) "1x" else String.format(java.util.Locale.US, "%.1fx", option),
+                    selected = kotlin.math.abs(option - speed) < 0.01f,
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    }
+                )
+            }
         }
     }
 }
