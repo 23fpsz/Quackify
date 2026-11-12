@@ -33,6 +33,12 @@ cd Quackify
 
 Or open Android Studio, select the **app** configuration, and hit **Run** (`Shift + F10`).
 
+## Releases
+
+Official builds published by the devs are on the [Releases page](https://github.com/23fpsz/Quackify/releases/latest) — grab the latest one for a tested, stable experience.
+
+Automatic builds are produced on every commit/push by the devs: the [Build Quackify](https://github.com/23fpsz/Quackify/actions/workflows/build.yml) workflow compiles the app and attaches the APKs to the run artifacts. These are bleeding-edge builds straight from the source — they may contain unfinished work, so use them at your own risk.
+
 ## Contributing
 
 1. Fork the repo
