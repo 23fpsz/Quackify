@@ -4,7 +4,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
 /**
- * Spotify Encore Color Tokens extracted from Spotify Mobile decompiled resources.
  */
 object EncoreColors {
     val Green = Color(0xFF1DB954)
@@ -12,7 +11,7 @@ object EncoreColors {
     val GreenDark = Color(0xFF169C46)
 
     val PureBlack = Color(0xFF000000)
-    val Background = Color(0xFF121212)      // gray_7: Default Spotify dark background
+    val Background = Color(0xFF121212)
     val Surface = Color(0xFF181818)         // gray_10: Cards, quick access rows
     val Card = Color(0xFF282828)            // gray_15: Floating mini-player, elevated cards
     val CardElevated = Color(0xFF333333)    // gray_20: Dialogs, sheets, bottom navigation

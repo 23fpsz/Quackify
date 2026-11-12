@@ -49,8 +49,6 @@ import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * Spotify Queue Screen & Bottom Sheet matching `layout_queue_sheet_content.xml`
- * and `layout_queue_controls.xml` from decompiled Spotify Mobile resources:
  * - "Now playing" item with animated Encore equalizer indicator
  * - "Next in queue" with dismiss action and reordering handles
  * - "Next from: [Context]" with upcoming queue items

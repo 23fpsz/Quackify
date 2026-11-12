@@ -75,7 +75,6 @@ data class CategorySubgenre(
 )
 
 /**
- * Helper to return signature Spotify genre colors for browse cards and category hub headers.
  */
 fun getCategoryColor(title: String): Color = when (title.trim()) {
     "Podcasts" -> Color(0xFFE13300)
@@ -104,14 +103,11 @@ fun getCategoryColor(title: String): Color = when (title.trim()) {
 }
 
 /**
- * 1:1 Pixel-Perfect Spotify Category & Genre Recommendation Screen.
  *
- * Implements Spotify's Hub / Assisted Curation Recommendation architecture:
  * - Collapsible sticky top bar with back navigation and smooth title crossfade on scroll
  * - Dynamic category gradient starting at Y=0 tinted with the signature genre color
  * - Large Category Title header matching Encore typography
  * - Multi-shelf recommendation carousels (Featured Playlists, New Releases, Radios, Curated Mixes)
- * - Subcategory grid cards matching Spotify's 2-column browse style
  * - Safe mini player bottom padding via [rememberBottomPadding]
  */
 @Composable
@@ -415,7 +411,6 @@ fun EncoreCategoryScreen(
 }
 
 /**
- * Returns curated Spotify recommendations and subcategories for the selected category.
  */
 private fun getCategoryContent(
     title: String,

@@ -193,7 +193,6 @@ object EncoreAuth {
 
     /**
      * Prepares the cookie jar for logging into an additional account: the
-     * active session's cookies are dropped from the webview so Spotify asks
      * for credentials. The secure session itself is untouched.
      */
     fun beginAddAccount(context: Context) {

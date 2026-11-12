@@ -37,8 +37,6 @@ import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * Spotify Profile Side Sheet / Navigation Menu opened when tapping the user avatar.
- * Matches Spotify's user profile navigation drawer.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -15,7 +15,6 @@ import kotlinx.coroutines.withContext
 private val log = Logs.of(Logs.Module.TRACKS)
 
 /**
- * Client-side Spotify Canvas loader.
  *
  * The canvas for a track is resolved from the Pathfinder GraphQL api (the
  * same `canvas` persisted query the web player uses). The answer carries a

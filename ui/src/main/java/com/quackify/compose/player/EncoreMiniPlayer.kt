@@ -76,7 +76,6 @@ private fun miniPlayerTint(cover: Color): Color {
 }
 
 /**
- * Floating Mini Player Bar matching Spotify Mobile's `now_playing_bar.xml` specifications.
  * Supports swiping the track title/artist (CarouselView) to skip tracks with real-time translation and spring physics.
  */
 private fun resolveDeviceIcon(kind: DeviceKind?): Int = when (kind) {

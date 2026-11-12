@@ -19,9 +19,7 @@ data class DealerFrame(
 
     /**
      * The connection id exactly as the dealer handed it out: the
-     * `Spotify-Connection-Id` header of the first frame, still base64.
      *
-     * Both the connect-state header (`X-Spotify-Connection-Id`) and the
      * track-playback register body want this form. Decoding it and sending
      * the plain uuid is what makes every player command answer
      * `410 COMMAND_FAILED`: the server binds the routed connection by the

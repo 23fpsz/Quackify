@@ -84,7 +84,6 @@ private fun dominantColorOf(bitmap: Bitmap): Color {
 }
 
 /**
- * Normalizes an artwork color into the vivid, screen-friendly band Spotify's
  * player uses: hue is preserved, saturation and lightness are pulled into a
  * range that reads as color on an OLED panel instead of near-black.
  */

@@ -155,7 +155,6 @@ data class SearchHistoryItem(
 )
 
 /**
- * Spotify Search & Browse Screen matching Spotify APK:
  * - Profile avatar shortcut
  * - Interactive Search pill with Voice Mic and Clear button
  * - In-search category filter pills (Top, Songs, Artists, Playlists, Albums, Podcasts)
@@ -1274,7 +1273,6 @@ fun EncoreSearchScreen(
 }
 
 /**
- * Search Track Row matching decompiled `track_row_search_layout.xml`:
  * - 48dp cover art thumbnail (`@dimen/track_row_cover_art_size`)
  * - Title: `TextAppearance.Encore.BodyMedium`, colored green when playing
  * - Subtitle: `TextAppearance.Encore.BodySmall` with explicit badge + "Song • <artist>"

@@ -196,7 +196,7 @@ object LibraryPageSource {
                 title = name,
                 subtitle = "Playlist • " + (
                     data.optJSONObject("ownerV2")?.optJSONObject("data")?.optString("name").orEmpty()
-                        .plainText().ifBlank { "Spotify" }
+                        .plainText().ifBlank { "Unknown" }
                     ),
                 kind = ShelfKind.PLAYLIST,
                 imageUrl = GraphQl.entityImage(data),

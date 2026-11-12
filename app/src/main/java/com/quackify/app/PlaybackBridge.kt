@@ -3090,7 +3090,6 @@ class PlaybackBridge(private val context: Context) {
 
     /**
      * The state machine response carries the full context queue. Shows have
-     * no local row source (rowsOf does not know spotify:show:), so the
      * machine's episode list becomes the chain and decorates the queue.
      */
     private fun learnMachineQueue(command: PlaybackCommand) {

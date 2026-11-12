@@ -64,7 +64,6 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * 1:1 Pixel-Perfect Spotify Mobile Playlist Edit Mode Content matching:
  * - Image 1: Discard changes dialog
  * - Image 2: Initial Edit mode (←, "Edit playlist", Green "Save", circular minus ⊖, artwork with play triangle, sort handle ≡, bottom "Select" pill)
  * - Image 3: Edit mode with changes (Top capsule with Undo/Redo arrows)

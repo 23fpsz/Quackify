@@ -35,8 +35,6 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * Spotify Album 3-Dot Options Bottom Sheet.
- * Matches decompiled Spotify Mobile specs for album actions.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -198,8 +196,6 @@ fun AlbumOptionsSheet(
 }
 
 /**
- * Spotify Artist 3-Dot Options Bottom Sheet.
- * Matches decompiled Spotify Mobile specs for artist options.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

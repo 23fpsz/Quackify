@@ -10,7 +10,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Exact Spotify Encore Dimensions & Tokens extracted from decompiled `res/values/dimens.xml`.
  */
 object EncoreSpacers {
     val Tighter5: Dp = 2.dp   // encore_spacer_tighter_5
@@ -59,7 +58,6 @@ object EncoreControlSizes {
 }
 
 /**
- * Exact Spotify Motion Tokens & Interpolators extracted from decompiled `res/anim` and `res/values/integers.xml`.
  */
 object EncoreAnimation {
     const val ButtonDuration: Int = 200            // encore_button_animation_time

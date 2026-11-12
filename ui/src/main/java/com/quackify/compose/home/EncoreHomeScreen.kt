@@ -87,7 +87,6 @@ data class ArtistCardItem(
 )
 
 /**
- * 1:1 Pixel-Perfect Spotify Home Screen matching Spotify Android v9.1.92.3058 decompiled architecture:
  * - funkis_home.xml & funkis_filter_chips_header.xml (collapsing sticky filter bar, avatar shortcut, 12dp fade gradient)
  * - shortcut_card.xml (56dp height, 4dp radius, opacity_white_10 background, equalizer bar, 8dp blue freshness dot)
  * - artist_pick_main_card.xml (220dp hero height, artist comment bubble, EncoreListRow)
@@ -421,7 +420,6 @@ private fun QuickAccessCard(
 }
 
 /**
- * Section Heading matching decompiled `HeadingWithDescription.smali` and `EnrichedHeading.smali`:
  * - Title: 20sp TitleLarge / TitleMedium
  * - Optional Subtitle: 12sp Marginal, text subdued
  * - Optional "See all" chevron action

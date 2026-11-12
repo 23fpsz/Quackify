@@ -31,12 +31,10 @@ import androidx.compose.ui.window.DialogProperties
 import com.quackify.compose.theme.EncoreColors
 
 /**
- * Spotify "Discard changes?" Confirmation Dialog matching Image 1:
  * - Center card dialog
  * - Pure white background card with rounded corners (~16dp)
  * - Black text: Title "Discard changes?" (bold)
  * - Subtitle: "If you go back now, you'll lose your changes."
- * - Spotify green pill button: "Keep editing" (black text, bold)
  * - Subdued text button below: "Discard" (black text, bold)
  */
 @Composable

@@ -78,7 +78,6 @@ object Registration {
      * The hidden hobs_ observer never shows up in the account's device list
      * and the track-playback register is what the web player uses, so this
      * PUT is what actually makes the phone selectable in "Listening on" and
-     * reachable for transfers: the X-Spotify-Connection-Id header binds the
      * dealer connection the server routes commands over. The answer is the
      * cluster, like the observer PUT.
      *

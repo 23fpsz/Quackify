@@ -23,11 +23,8 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /**
- * Spotify Jellyfish Ambient Wave Engine.
  *
- * Reverse-engineered from `JellyfishView.smali` (`com.spotify.encoreconsumermobile.elements.jellyfish`).
  * Renders 3 dynamic, undulating Bézier spline wave layers (Top, Mid, Bottom) that smoothly oscillate
- * across the canvas to provide the authentic organic liquid backdrop of Spotify Now Playing & Lyrics screens.
  */
 @Composable
 fun JellyfishCanvas(

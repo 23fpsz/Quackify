@@ -152,7 +152,6 @@ private val PEEK_HEIGHT = 44.dp
 
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
-/** Spotify's dark ink, for content that sits on light artwork. */
 private val InkDark = Color(0xFF191414)
 
 /**
@@ -195,7 +194,6 @@ private fun rememberRevealProgress(): Float {
 }
 
 /**
- * Full-screen Now Playing Player Screen matching Spotify APK (NPV):
  * - Context header ("PLAYING FROM PLAYLIST" with chevron collapse)
  * - 1:1 Album Artwork with swipe-to-skip gesture
  * - Scrubber slider with elapsed and remaining timestamps
@@ -292,7 +290,7 @@ fun EncoreNowPlayingScreen(
 
     val effectiveMonthlyListeners = monthlyListeners
     val effectiveArtistBio = artistBio.ifBlank {
-        if (artist.isNotBlank()) "Listen to $artist on Spotify. Discover top songs and upcoming releases." else ""
+        if (artist.isNotBlank()) "Listen to $artist. Discover top songs and upcoming releases." else ""
     }
 
     val effectiveIsLoading = isLoading
@@ -1435,7 +1433,6 @@ private fun NowPlayingTrackInfoRow(
 }
 
 /**
- * 1:1 Spotify Native NPV Scrubber SeekBar with elapsed & remaining timestamps.
  * Horizontal padding 24dp aligns perfectly with timestamps, track title, and album artwork.
  * Live dump bounds: position [63, 1809], duration [948, 1809] (24dp screen margins)
  */
@@ -2012,8 +2009,6 @@ private fun NowPlayingAboutArtistCard(
 }
 
 /**
- * Fullscreen Time-Synced Lyrics Screen matching Spotify mobile lyrics view
- * and decompiled `com.spotify.timesyncedtext.v1.TimeSyncedText` protobuf model:
  * - Dynamic active line calculation from current playback timestamp
  * - Tap any line to seek directly to that lyric position
  * - Smooth auto-scrolling to current line

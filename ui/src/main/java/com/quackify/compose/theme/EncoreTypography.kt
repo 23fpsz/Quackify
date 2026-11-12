@@ -9,7 +9,6 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 
 /**
- * Spotify Mix Typefaces extracted from Spotify Mobile decompiled resources.
  */
 val EncoreMixFontFamily = FontFamily(
     Font(R.font.mix_ui_regular, FontWeight.Normal),
@@ -22,7 +21,6 @@ val EncoreMixTitleFontFamily = FontFamily(
 )
 
 /**
- * Spotify Encore Typography specifications matching TextAppearance.Encore in decompiled styles.xml:
  * - HeadlineLarge: 48sp Extrabold (encore_text_size_larger_5)
  * - HeadlineMedium: 40sp Bold (encore_text_size_larger_4)
  * - TitleLarge: 32sp Bold (encore_text_size_larger_3)

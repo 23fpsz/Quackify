@@ -56,7 +56,6 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * Signature Spotify Encore Green Play/Pause button with press-scale animation.
  * Supports the optional shuffle badge (11dp) at the bottom-right corner used in playlist headers.
  */
 @Composable
@@ -143,7 +142,6 @@ fun EncorePlayButton(
 }
 
 /**
- * Spotify Encore standard Icon Button.
  */
 @Composable
 fun EncoreIconButton(
@@ -213,7 +211,6 @@ fun EncoreIconButton(
 }
 
 /**
- * Filter Chip pill used on Spotify Home and Library screens ("All", "Music", "Podcasts").
  */
 @Composable
 fun EncoreChip(
@@ -246,8 +243,6 @@ fun EncoreChip(
 }
 
 /**
- * Spotify Encore Animated Play Indicator (Equalizer bars).
- * Mathematical recreation of Spotify's `play_indicator_playing.json` Lottie animation:
  * - 12dp x 12dp bounding box (matches @dimen/encore_play_indicator_default_size)
  * - 3 vertical bars (width 2dp, spacing 2dp, corner radius 1dp)
  * - 1250ms cycle length at 60fps with authentic keyframed heights:
@@ -350,7 +345,6 @@ fun EncorePlayIndicator(
 }
 
 /**
- * Compact explicit-content tag matching Spotify's ContentRestrictionBadgeView:
  * a small rounded gray square with a tiny bold "E". Kept deliberately smaller
  * than the surrounding text so it never visually outweighs the track title.
  */
@@ -383,7 +377,6 @@ fun EncoreExplicitTag(
 }
 
 /**
- * Reusable Track Item Row matching Spotify's album_track_row_layout.xml.
  */
 @Composable
 fun EncoreTrackRow(
@@ -528,7 +521,6 @@ enum class RepeatMode {
 }
 
 /**
- * Spotify Encore Smart Shuffle Button.
  * Replicates `SmartShuffleButtonView.smali` with 3-way toggle (Off -> Shuffle -> Smart Shuffle)
  * and the active green indicator dot beneath the icon.
  */
@@ -602,7 +594,6 @@ fun EncoreSmartShuffleButton(
 }
 
 /**
- * Spotify Encore Repeat Button.
  * Supports 3-way repeat toggle (Off -> Repeat All -> Repeat One)
  * with the authentic '1' badge icon and active green dot indicator.
  */
@@ -676,7 +667,6 @@ fun EncoreRepeatButton(
 }
 
 /**
- * Spotify Encore Heart Button with authentic Spotify bouncy spring physics:
  * - On like: snaps to 0.80f -> animates to 1.30f (120ms tween) -> springs back to 1.0f (bouncy spring).
  * - Button press scale: uses EncoreAnimation.PressedScale and EncoreAnimation.ButtonInterpolator.
  * - Icon: smooth 150ms crossfade between outline and filled active heart.
@@ -760,7 +750,6 @@ fun EncoreHeartButton(
 }
 
 /**
- * Standard Spotify Profile Avatar (faceheader_image) with 36dp default size.
  * Displays user avatar image when [avatarUrl] is provided, or a colored circle with the user's initial.
  */
 @Composable

@@ -66,12 +66,10 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * 1:1 Spotify Lyrics Share Card Generator matching:
  * - `lyrics_share_button_action_label`
  * - `enhanced_share_card_text_alignment_state_center` / left / right
  * - Story card preview with multi-line selection (up to 5 lines)
  * - Color swatch background palette selection
- * - Track badge with Spotify logo
  */
 @Composable
 fun LyricsShareDialog(
@@ -93,8 +91,8 @@ fun LyricsShareDialog(
     val palette = remember {
         listOf(
             initialDominantColor,
-            Color(0xFF1DB954), // Spotify Green
-            Color(0xFFE91429), // Spotify Red
+            Color(0xFF1DB954),
+            Color(0xFFE91429),
             Color(0xFF8D67AB), // Purple
             Color(0xFF2E77D0), // Blue
             Color(0xFFE1306C), // Magenta
@@ -391,7 +389,7 @@ private fun ShareCardPreview(
                     }
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Spotify",
+                        text = "Quackify",
                         style = EncoreTheme.typography.bodySmallBold.copy(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp,

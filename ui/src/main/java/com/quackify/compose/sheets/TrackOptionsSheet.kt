@@ -51,8 +51,6 @@ import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * Spotify Track Context Options Sheet (3-dot menu).
- * Fully matches decompiled Spotify Mobile specs:
  * - 112dp artwork thumbnail with 8dp rounded corners
  * - Centered title & artist metadata
  * - Quick action row: Like (with spring heart-pop animation), Add to playlist, Add to queue

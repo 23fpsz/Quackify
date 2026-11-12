@@ -118,7 +118,7 @@ fun AccountsSheet(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = account.name.ifBlank { "Spotify user" },
+                            text = account.name.ifBlank { "Listener" },
                             style = EncoreTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold
                             )

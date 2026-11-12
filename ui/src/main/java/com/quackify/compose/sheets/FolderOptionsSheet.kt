@@ -33,7 +33,6 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * 1:1 Spotify Mobile Folder Options Sheet (Three-dots menu / Long press).
  * Matches Screenshot 3:
  * - Header: Folder Icon in square + Folder Title + "X playlists"
  * - Thin divider

@@ -91,7 +91,6 @@ val DefaultPodcastEpisodes = emptyList<PodcastEpisode>()
 private val RelatedPodcastShows = emptyList<Pair<String, String>>()
 
 /**
- * 1:1 Pixel-Perfect Spotify Podcast / Creator Webpage (CWP) Screen:
  * - Collapsible Show Header: Two-column layout (112dp cover art on left, Bold title & publisher on right)
  * - Pinned Navigation Tabs: Episodes, About, More like this (stays directly below the Top Bar when scrolling)
  * - Gradient ends strictly before the Tabs Bar, keeping Tabs & Content over pure #121212 black background
@@ -766,7 +765,6 @@ fun EncorePodcastScreen(
 }
 
 /**
- * Spotify Podcast Episode Row matching official mobile APK hierarchy:
  * - Top: 16:9 widescreen artwork (114x64dp, 6dp radius) + Title (15sp bold, maxLines = 3)
  * - Description: 2-line snippet (13sp textSecondary)
  * - Metadata line: Day • Duration • Status (e.g. "Tue • 1h 15m" or "Sat • 1h 50m left • Finished")

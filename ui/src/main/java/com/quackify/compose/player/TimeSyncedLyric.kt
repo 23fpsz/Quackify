@@ -1,7 +1,6 @@
 package com.quackify.compose.player
 
 /**
- * Time-synced lyric line matching `com.spotify.timesyncedtext.v1.TimeSyncedText` protobuf model.
  */
 data class TimeSyncedLyric(
     val startTimeMs: Long,

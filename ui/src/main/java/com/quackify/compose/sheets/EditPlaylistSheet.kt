@@ -65,8 +65,6 @@ private const val DESCRIPTION_LIMIT = 300
 private const val COVER_SIDE = 640
 
 /**
- * Spotify Mobile "Name & details" Bottom Sheet Modal.
- * Matches decompiled specs (rj11.smali) 1:1.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

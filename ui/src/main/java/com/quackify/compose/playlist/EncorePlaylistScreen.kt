@@ -137,7 +137,6 @@ enum class PlaylistSort(
 }
 
 /**
- * 1:1 Pixel-Perfect Spotify Mobile Playlist Screen:
  * - Top Bar: Back button, Centered Title (when scrolled), Green Play FAB (when scrolled) / 3-dots (when at top)
  * - Sticky Header: Filter chips row ([+ Add], [≡ Edit], [✏ Name & details], [⇅ Sort]) pins directly below Top Bar
  * - Dynamic Artwork Shrink: smoothly scales down from 230dp to 100dp with alpha fade as user scrolls
@@ -1351,7 +1350,6 @@ private fun PlaylistChipsRow(
 }
 
 /**
- * Filter Chip Button matching Spotify Mobile specs:
  * Pill shape, #2A2A2A background, white icon + bold white text.
  */
 @Composable
@@ -1394,7 +1392,6 @@ private fun PlaylistChip(
 
 
 /**
- * 1:1 Spotify Empty Playlist Curation Header:
  * - Square Cover placeholder (120dp x 120dp) with centered edit pencil icon
  * - Playlist Title with right-side "Change" pill button
  * - Collaborator row with (+) circle button, Avatar circle, and User name

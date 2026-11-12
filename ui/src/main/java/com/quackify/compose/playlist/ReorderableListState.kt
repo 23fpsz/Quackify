@@ -27,7 +27,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 /**
- * Reorderable drag-and-drop state for LazyColumn matching Spotify's playlist track reordering physics:
  * - Long-press activation on drag handle ≡
  * - Real-time vertical translation with smooth target swapping
  * - Elevation z-index lift during drag

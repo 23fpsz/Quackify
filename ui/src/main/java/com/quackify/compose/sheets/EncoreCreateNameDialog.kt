@@ -49,7 +49,6 @@ import com.quackify.compose.theme.EncoreTheme
 import kotlinx.coroutines.delay
 
 /**
- * 1:1 Pixel-Perfect Spotify Mobile Entity Creation Dialog
  * ("Give your playlist a name" / "Give your folder a name")
  */
 @Composable

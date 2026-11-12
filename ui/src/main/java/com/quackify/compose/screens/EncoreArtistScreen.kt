@@ -87,7 +87,6 @@ data class PopularTrack(
 )
 
 /**
- * 1:1 Pixel-Perfect Spotify Artist Screen matching decompiled collection_artist_header_layout.xml:
  * - Edge-to-edge Hero image banner with dynamic gradient
  * - Verified Artist badge with monthly listeners count
  * - Follow / Following pill button with animated state

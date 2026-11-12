@@ -44,7 +44,6 @@ enum class SleepTimerOption(val label: String, val minutes: Int) {
 }
 
 /**
- * 1:1 Spotify Sleep Timer Bottom Sheet matching `sleep_timer_menu_item.xml`.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -77,7 +77,6 @@ internal fun ShellOverlaySlot(content: @Composable () -> Unit) {
 
 
 /**
- * Spotify App Shell containing:
  * - 3-tab Bottom Navigation (Home, Search, Your Library)
  * - Persistent floating Mini-Player
  * - Animated Full Now Playing Player expansion

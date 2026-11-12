@@ -62,7 +62,6 @@ private sealed interface Resolve {
 }
 
 /**
- * Full-screen Spotify login webview. Polls for a signed-in session, resolves
  * the account behind it and hands it to [onLoggedIn].
  *
  * When signing into an *additional* account, pass [isDuplicateAccount]: the

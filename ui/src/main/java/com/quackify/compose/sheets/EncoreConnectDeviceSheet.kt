@@ -63,15 +63,13 @@ data class EncoreDevice(
     val name: String,
     val type: DeviceType,
     val isCurrent: Boolean = false,
-    val protocol: String = "Spotify Connect",
+    val protocol: String = "Connect",
     val volumeFraction: Float = -1f,
     val local: Boolean = false
 )
 
 /**
- * Spotify "Connect to a device" bottom sheet matching Spotify Mobile decompiled resources:
  * - Current listening device card with animated green equalizer soundwaves and volume slider
- * - Available remote devices (Google Cast, Spotify Connect, Bluetooth)
  * - Volume control with volume icon indicators
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -286,8 +284,8 @@ private fun DeviceRow(
 private fun defaultDeviceList(): List<EncoreDevice> = listOf(
     EncoreDevice("1", "This Phone", DeviceType.PHONE, isCurrent = true),
     EncoreDevice("2", "Living Room Speaker", DeviceType.SPEAKER, protocol = "Google Cast"),
-    EncoreDevice("3", "MacBook Pro", DeviceType.COMPUTER, protocol = "Spotify Connect"),
-    EncoreDevice("4", "Kitchen Echo", DeviceType.SPEAKER, protocol = "Spotify Connect"),
+    EncoreDevice("3", "MacBook Pro", DeviceType.COMPUTER, protocol = "Connect"),
+    EncoreDevice("4", "Kitchen Echo", DeviceType.SPEAKER, protocol = "Connect"),
     EncoreDevice("5", "Tesla Model 3", DeviceType.CAR, protocol = "Bluetooth")
 )
 
@@ -304,7 +302,7 @@ fun ConnectDevice.toEncoreDevice(): EncoreDevice = EncoreDevice(
         DeviceKind.UNKNOWN -> DeviceType.COMPUTER
     },
     isCurrent = active,
-    protocol = if (brand.isBlank()) "Spotify Connect" else brand,
+    protocol = if (brand.isBlank()) "Connect" else brand,
     volumeFraction = if (volumeSteps > 0) (volume.toFloat() / volumeSteps.toFloat()).coerceIn(0f, 1f) else -1f,
     local = local
 )

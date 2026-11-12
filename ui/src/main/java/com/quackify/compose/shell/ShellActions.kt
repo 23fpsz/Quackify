@@ -112,7 +112,7 @@ internal class ShellActions(
 
     fun copyEntityLink(uri: String) {
         val url = entityUrl(uri) ?: return
-        clipboard.setPrimaryClip(ClipData.newPlainText("Spotify link", url))
+        clipboard.setPrimaryClip(ClipData.newPlainText("Track link", url))
     }
 
     fun shareEntity(context: Context, uri: String) {

@@ -30,8 +30,6 @@ import coil.request.ImageRequest
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * Resolves any Spotify image format (full URL, spotify:image:<id>, or raw hex image hash)
- * into a valid HTTPS URL pointing to Spotify's image CDN.
  */
 fun resolveRemoteImageUrl(rawUrl: String?): String? {
     if (rawUrl.isNullOrBlank()) return null
@@ -51,7 +49,6 @@ fun resolveRemoteImageUrl(rawUrl: String?): String? {
 }
 
 /**
- * Universal Spotify Album & Playlist Artwork Component.
  * Renders high-resolution remote artwork with crossfade transitions and
  * elegant fallback placeholders.
  */

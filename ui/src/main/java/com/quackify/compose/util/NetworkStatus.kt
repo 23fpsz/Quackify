@@ -14,7 +14,6 @@ import androidx.compose.ui.platform.LocalContext
 
 /**
  * Live network reachability for the shell's offline banner. Mirrors what the
- * Spotify app does: the device is "offline" when the system's default network
  * is missing or has not validated its internet capability. The callback keeps
  * the state current while the composable is shown, and unregisters on leave.
  */

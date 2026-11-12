@@ -35,10 +35,8 @@ import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * Spotify Library Create Bottom Sheet (+ button).
  * When opened from root library: shows "Create" header + Playlist, Folder.
  * When opened from within a folder: shows Playlist only (no header).
- * Spotify does not support nested folders, so Folder is a root-only option.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -82,7 +82,6 @@ data class LibraryItem(
 )
 
 /**
- * Spotify Your Library Screen matching Spotify APK:
  * - Profile avatar shortcut
  * - In-library search filter
  * - Plus (+) create menu

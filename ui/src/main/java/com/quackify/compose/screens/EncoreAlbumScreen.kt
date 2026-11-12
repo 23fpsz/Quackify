@@ -80,10 +80,8 @@ data class AlbumDisc(
 )
 
 /**
- * 1:1 Pixel-Perfect Spotify Album Screen matching Spotify Mobile specs:
  * - Collapsible overlay top bar (transparent at rest, solid coverColor when scrolled)
  * - Album artwork starting directly under status bar at statusBarTop + 8.dp with smooth scaling
- * - Single continuous gliding play button implementing Spotify's ComposePlayButtonBehavior
  * - Continuous header gradient extending from Y=0 and smoothly fading to pure #121212
  * - Official Encore download, heart, and 3-dot option buttons
  * - Track rows with disc headers, numbers, and copyrights section
@@ -713,7 +711,6 @@ fun EncoreAlbumScreen(
 }
 
 /**
- * Album Track Row matching Spotify's album_track_row_layout:
  * - Numbered left index or 3-bar Encore equalizer
  * - Title and secondary artist subtitle
  * - Explicit [E] badge

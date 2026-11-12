@@ -32,7 +32,6 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
 
 /**
- * Spotify Playlist Sort Bottom Sheet matching decompiled specs:
  * - sort_filter_bottom_sheet_layout.xml
  * - Options: Custom order, Title, Artist, Album, Recently added
  * - Active option highlighted in Encore Green with direction arrow (for reversible) or checkmark (for non-reversible)

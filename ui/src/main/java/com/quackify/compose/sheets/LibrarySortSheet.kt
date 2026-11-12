@@ -50,7 +50,6 @@ enum class LibrarySortOption(
 }
 
 /**
- * Spotify Library Sort & Filter Bottom Sheet matching decompiled:
  * - `sort_filter_bottom_sheet_layout.xml`
  * - `sort_and_filter_bottom_sheet_handle.xml` (36dp x 4dp grapple, #4DFFFFFF)
  * - `@style/CwpSortAndFilterTitleStyle` (48dp minHeight, 16dp horizontal padding)

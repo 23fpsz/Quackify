@@ -62,7 +62,6 @@ data class EncoreNotification(
 )
 
 /**
- * Spotify "What's New" Notifications screen matching native Spotify APK.
  */
 @Composable
 fun NotificationsScreen(

@@ -21,9 +21,6 @@ import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /**
- * Curated authentic Spotify header and card gradient tones used across
- * Spotify Mobile when dynamic extraction is pending or as fallbacks.
- * Reference: D:\Programs\Spotify Mobile\decompiled_base\res\values\colors.xml
  */
 val SPOTIFY_PALETTE_FALLBACKS = listOf(
     Color(0xFF144D3F), // Forest Green
@@ -31,7 +28,7 @@ val SPOTIFY_PALETTE_FALLBACKS = listOf(
     Color(0xFF1E3264), // Midnight Blue
     Color(0xFF8D1624), // Velvet Crimson
     Color(0xFF503750), // Deep Plum
-    Color(0xFFAF2896), // Spotify Magenta
+    Color(0xFFAF2896),
     Color(0xFF006450), // Dark Teal
     Color(0xFFBA5D07), // Amber Ochre
     Color(0xFF7D4B32), // Warm Umber
@@ -41,17 +38,15 @@ val SPOTIFY_PALETTE_FALLBACKS = listOf(
 )
 
 /**
- * Deterministically derives an authentic Spotify gradient background color
  * from a title, uri, or identifier string.
  */
-fun spotifyColorForSeed(seed: String?): Color {
+fun paletteColorForSeed(seed: String?): Color {
     if (seed.isNullOrBlank()) return SPOTIFY_PALETTE_FALLBACKS[0]
     val index = abs(seed.hashCode()) % SPOTIFY_PALETTE_FALLBACKS.size
     return SPOTIFY_PALETTE_FALLBACKS[index]
 }
 
 /**
- * Extracts the most vibrant/dominant color suitable for Spotify's header gradient
  * from an Android [Bitmap].
  */
 fun extractDominantColor(bitmap: Bitmap): Color {
@@ -73,7 +68,6 @@ fun extractDominantColor(bitmap: Bitmap): Color {
  * and remembers the extracted [Color].
  *
  * If the image cannot be loaded or [imageUrl] is blank, [fallbackSeed] is used
- * to pick a deterministic authentic Spotify hue so different entities always have
  * distinct, visually rich gradients.
  */
 @Composable
@@ -83,7 +77,7 @@ fun rememberDominantColor(
     defaultColor: Color? = null
 ): State<Color> {
     val context = LocalContext.current
-    val fallback = defaultColor ?: spotifyColorForSeed(fallbackSeed ?: imageUrl)
+    val fallback = defaultColor ?: paletteColorForSeed(fallbackSeed ?: imageUrl)
     val colorState = remember(imageUrl) { mutableStateOf(fallback) }
 
     LaunchedEffect(imageUrl) {

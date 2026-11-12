@@ -276,7 +276,6 @@ object CommandClient {
     /**
      * Tells the server to (re)read the playback context through a lens: the
      * smart shuffle flow points the context url at
-     * 'context://{uri}?spotify-apply-lenses=enhance' so the queue picks up the
      * enhanced rows the lens adds.
      */
     suspend fun updateContext(

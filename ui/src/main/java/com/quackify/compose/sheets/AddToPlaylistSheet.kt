@@ -66,8 +66,6 @@ private val playlistSearchEngine = GenericSearchEngine<PlaylistChoice>(maxResult
 private val PLAYLIST_CHOICE_FIELDS = SearchableFieldExtractor<PlaylistChoice> { arrayOf(it.name) }
 
 /**
- * 1:1 Spotify "Saved in" (Add to Playlist) bottom sheet.
- * Reverse-engineered from Spotify Mobile decompiled smali: `smali_classes4/p/xzl1.smali`, `zzl1.smali`.
  *
  * Structure:
  * - Top drag handle (36dp x 4dp)
@@ -502,7 +500,6 @@ private fun AddToPlaylistSearchBox(
 }
 
 /**
- * 1:1 Spotify playlist row with trailing checkmark (when in playlist) or plus (when not in playlist).
  * When [choice.kind] is [PlaylistChoice.Kind.LIKED_SONGS], displays the official purple-blue gradient with heart.
  */
 @Composable

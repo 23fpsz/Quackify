@@ -48,9 +48,7 @@ import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 
 /**
- * Spotify Listening History screen matching Spotify APK: plays from the same
  * artist that follow each other collapse into one expandable artist group,
- * the way Spotify's own history groups a run of consecutive plays.
  */
 @Composable
 fun HistoryScreen(

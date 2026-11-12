@@ -57,7 +57,6 @@ import kotlinx.coroutines.delay
 private const val SEEK_HOLD_MS = 2000L
 
 /**
- * 1:1 Spotify Native NPV Scrubber SeekBar matching decompiled:
  * - `seekbar_progress_default.xml` (3dp track thickness, 1.5dp corner radius, 30% white background)
  * - `seekbar_thumb_default.xml` (32dp touch target, 4dp idle thumb dot, 12dp active thumb dot)
  * - Scrubbing time preview tooltip floating directly above the thumb during user drag

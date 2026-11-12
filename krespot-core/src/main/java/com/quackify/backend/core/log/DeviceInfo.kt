@@ -27,7 +27,6 @@ import java.util.UUID
  * Builds a plain-text report of everything worth knowing when debugging this
  * install: app build, Android build, hardware, display, memory, storage,
  * network, battery, WebView, the Widevine/DRM stack and the (secret-free)
- * Spotify session state. Tokens and cookies are never included, only their
  * length or remaining lifetime.
  */
 object DeviceInfo {
