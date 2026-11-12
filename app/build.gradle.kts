@@ -13,8 +13,9 @@ android {
     }
 
     val keystoreProperties = Properties()
-    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    val keystorePropertiesFile = rootProject.file("keystore/keystore.properties")
         .takeIf { it.exists() }
+        ?: rootProject.file("keystore.properties").takeIf { it.exists() }
         ?: rootProject.file("local.properties")
     if (keystorePropertiesFile.exists()) {
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
