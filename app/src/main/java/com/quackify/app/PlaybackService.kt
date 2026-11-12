@@ -69,7 +69,14 @@ class PlaybackService : Service() {
         val bridge = PlaybackHost.ensure(this)
         PlaybackHost.markForeground()
         setUpSession(bridge)
-        startForeground(NOTIFICATION_ID, buildNotification(bridge.state))
+        val foreground = runCatching {
+            startForeground(NOTIFICATION_ID, buildNotification(bridge.state))
+        }
+        if (foreground.isFailure) {
+            log.w("startForeground refused from the background, stopping until the app is visible")
+            stopSelf()
+            return
+        }
         watch(bridge)
         log.i("service created with a media session, the app owns nothing once it leaves recents")
     }
