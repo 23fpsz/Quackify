@@ -22,6 +22,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -50,6 +52,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -90,6 +95,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.CanvasVideoPlayer
+import com.quackify.compose.components.MusicVideoSurface
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreIconButton
@@ -108,6 +114,7 @@ import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
 import com.quackify.compose.theme.SpotifyEncoreTheme
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import com.quackify.compose.theme.SpotifyTheme
@@ -234,6 +241,13 @@ fun SpotifyNowPlayingScreen(
     isCanvasEnabled: Boolean = false,
     fullArtwork: Boolean = true,
     onCanvasToggle: (Boolean) -> Unit = {},
+    musicVideoAvailable: Boolean = false,
+    videoActive: Boolean = false,
+    videoQualities: List<Int> = emptyList(),
+    videoSwitching: Boolean = false,
+    onSwitchVideo: (Boolean) -> Unit = {},
+    onVideoQuality: (Int) -> Unit = {},
+    onVideoSurface: (android.view.Surface?) -> Unit = {},
     modifier: Modifier = Modifier,
     onBanClick: (() -> Unit)? = null,
     contextHeaderTitle: String? = null,
@@ -260,7 +274,6 @@ fun SpotifyNowPlayingScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val playerOffsetY = remember { Animatable(0f) }
-    val artworkOffsetX = remember { Animatable(0f) }
     val scrollState = rememberScrollState()
     val reveal = rememberRevealProgress()
 
@@ -309,6 +322,7 @@ fun SpotifyNowPlayingScreen(
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = screenHeightPx * 0.5f
     val fullArtworkHeight = (configuration.screenWidthDp + 76).dp
+    val videoAreaHeight = (configuration.screenWidthDp * 0.8f * 9f / 16f).dp + 24.dp
 
     LaunchedEffect(Unit) {
         playerOffsetY.snapTo(0f)
@@ -350,7 +364,6 @@ fun SpotifyNowPlayingScreen(
     val artworkGestureModifier = Modifier.npvArtworkGesture(
         coroutineScope = coroutineScope,
         playerOffsetY = playerOffsetY,
-        artworkOffsetX = artworkOffsetX,
         scrollState = scrollState,
         scrollEnabled = !effectiveIsLoading,
         dismissThresholdPx = dismissThresholdPx,
@@ -425,6 +438,7 @@ fun SpotifyNowPlayingScreen(
                         modifier = Modifier
                             .weight(LANDSCAPE_ARTWORK_PANE_WEIGHT)
                             .fillMaxHeight()
+                            .then(artworkGestureModifier)
                             .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -435,10 +449,12 @@ fun SpotifyNowPlayingScreen(
                             backgroundColor = animatedDominantColor,
                             canvasFilePath = canvasFilePath,
                             isCanvasEnabled = canvasActive,
-                            gestureModifier = artworkGestureModifier,
+                            videoActive = videoActive,
+                            videoQualities = videoQualities,
+                            onVideoQuality = onVideoQuality,
+                            onVideoSurface = onVideoSurface,
                             modifier = Modifier
-                                .aspectRatio(1.0f)
-                                .graphicsLayer { translationX = artworkOffsetX.value }
+                                .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
                         )
                     }
 
@@ -464,6 +480,13 @@ fun SpotifyNowPlayingScreen(
                             visible = effectiveLyricsVisible,
                             height = if (effectiveLyricsVisible) 36.dp else 0.dp,
                             onOpenLyrics = { isLyricsFullscreen = true }
+                        )
+
+                        MusicVideoSwitchRow(
+                            available = musicVideoAvailable,
+                            active = videoActive,
+                            switching = videoSwitching,
+                            onSwitch = onSwitchVideo
                         )
 
                         if (effectiveLyricsVisible) {
@@ -561,11 +584,12 @@ fun SpotifyNowPlayingScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(viewportHeight - PEEK_HEIGHT),
+                            .then(artworkGestureModifier)
+                            .heightIn(min = viewportHeight - PEEK_HEIGHT),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         if (fullArtwork) {
-                            Box(modifier = Modifier.fillMaxWidth()) {
+                            val card: @Composable () -> Unit = {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -578,17 +602,23 @@ fun SpotifyNowPlayingScreen(
                                         backgroundColor = animatedDominantColor,
                                         canvasFilePath = canvasFilePath,
                                         isCanvasEnabled = canvasActive,
-                                        gestureModifier = artworkGestureModifier,
                                         fullBleed = true,
                                         fadeFraction = if (canvasActive) CANVAS_FADE_FRACTION else ARTWORK_FADE_FRACTION,
                                         canvasZoom = CANVAS_ZOOM,
+                                        videoActive = videoActive,
+                                        videoQualities = videoQualities,
+                                        onVideoQuality = onVideoQuality,
+                                        onVideoSurface = onVideoSurface,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(fullArtworkHeight)
-                                            .graphicsLayer { translationX = artworkOffsetX.value }
+                                            .then(
+                                                if (videoActive) Modifier.height(videoAreaHeight)
+                                                else Modifier.height(fullArtworkHeight)
+                                            )
                                     )
                                 }
-
+                            }
+                            val header: @Composable () -> Unit = {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -604,8 +634,18 @@ fun SpotifyNowPlayingScreen(
                                     )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.weight(1f))
+                            if (videoActive) {
+                                header()
+                                Spacer(modifier = Modifier.weight(1f))
+                                card()
+                                Spacer(modifier = Modifier.weight(1f))
+                            } else {
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    card()
+                                    header()
+                                }
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         } else {
                             Box(
                                 modifier = Modifier
@@ -637,14 +677,19 @@ fun SpotifyNowPlayingScreen(
                                     backgroundColor = animatedDominantColor,
                                     canvasFilePath = canvasFilePath,
                                     isCanvasEnabled = canvasActive,
-                                    gestureModifier = artworkGestureModifier,
                                     fullBleed = false,
                                     fadeFraction = 0f,
+                                    videoActive = videoActive,
+                                    videoQualities = videoQualities,
+                                    onVideoQuality = onVideoQuality,
+                                    onVideoSurface = onVideoSurface,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .aspectRatio(1.0f)
-                                        .graphicsLayer { translationX = artworkOffsetX.value }
-                                )
+                                        .then(
+                                            if (videoActive) Modifier.height(videoAreaHeight)
+                                            else Modifier.aspectRatio(1.0f)
+                                        )
+                                        )
                             }
                         }
 
@@ -659,6 +704,13 @@ fun SpotifyNowPlayingScreen(
                                 visible = effectiveLyricsVisible,
                                 height = lyricLineHeight,
                                 onOpenLyrics = { isLyricsFullscreen = true }
+                            )
+
+                            MusicVideoSwitchRow(
+                                available = musicVideoAvailable,
+                                active = videoActive,
+                                switching = videoSwitching,
+                                onSwitch = onSwitchVideo
                             )
 
                             Spacer(modifier = Modifier.height(lyricBottomSpacerHeight))
@@ -850,7 +902,6 @@ private fun Modifier.npvDismissDragGesture(
 private fun Modifier.npvArtworkGesture(
     coroutineScope: CoroutineScope,
     playerOffsetY: Animatable<Float, AnimationVector1D>,
-    artworkOffsetX: Animatable<Float, AnimationVector1D>,
     scrollState: ScrollState,
     scrollEnabled: Boolean,
     dismissThresholdPx: Float,
@@ -896,9 +947,6 @@ private fun Modifier.npvArtworkGesture(
                 AXIS_HORIZONTAL -> {
                     change.consume()
                     velocityTracker.addPosition(change.uptimeMillis, change.position)
-                    coroutineScope.launch {
-                        artworkOffsetX.snapTo(artworkOffsetX.value + delta.x)
-                    }
                 }
                 AXIS_VERTICAL -> {
                     change.consume()
@@ -914,36 +962,10 @@ private fun Modifier.npvArtworkGesture(
         val velocity = velocityTracker.calculateVelocity()
         coroutineScope.launch {
             when (axis) {
-                AXIS_HORIZONTAL -> {
-                    val offset = artworkOffsetX.value
-                    if (offset < -SKIP_THRESHOLD_PX) {
-                        artworkOffsetX.animateTo(
-                            -SKIP_TRAVEL_PX,
-                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                        onSkipNext()
-                        artworkOffsetX.snapTo(SKIP_TRAVEL_PX)
-                        artworkOffsetX.animateTo(
-                            0f,
-                            tween(200, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                    } else if (offset > SKIP_THRESHOLD_PX) {
-                        artworkOffsetX.animateTo(
-                            SKIP_TRAVEL_PX,
-                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                        onSkipPrevious()
-                        artworkOffsetX.snapTo(-SKIP_TRAVEL_PX)
-                        artworkOffsetX.animateTo(
-                            0f,
-                            tween(200, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                    } else {
-                        artworkOffsetX.animateTo(
-                            0f,
-                            tween(150, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                    }
+                AXIS_HORIZONTAL -> when {
+                    totalDragX < -SKIP_THRESHOLD_PX -> onSkipNext()
+                    totalDragX > SKIP_THRESHOLD_PX -> onSkipPrevious()
+                    else -> Unit
                 }
                 AXIS_VERTICAL -> {
                     when {
@@ -1048,18 +1070,22 @@ private fun NowPlayingArtworkCard(
     fullBleed: Boolean = false,
     fadeFraction: Float = 0f,
     canvasZoom: Float = 1f,
+    videoActive: Boolean = false,
+    videoQualities: List<Int> = emptyList(),
+    onVideoQuality: (Int) -> Unit = {},
+    onVideoSurface: (android.view.Surface?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val corner = if (fullBleed) 0.dp else EncoreCornerRadii.Larger2
     val canvasActive = isCanvasEnabled && canvasFilePath != null
-    val layerModifier = if (!canvasActive && fadeFraction > 0f) {
+    val layerModifier = if (!canvasActive && !videoActive && fadeFraction > 0f) {
         Modifier
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .dissolveInto(fadeFraction)
     } else {
         Modifier
     }
-    val surfaceModifier = if (canvasActive) {
+    val surfaceModifier = if (canvasActive || videoActive) {
         Modifier
     } else {
         Modifier.background(backgroundColor)
@@ -1073,21 +1099,163 @@ private fun NowPlayingArtworkCard(
             .then(surfaceModifier),
         contentAlignment = Alignment.Center
     ) {
-        if (canvasActive) {
-            CanvasVideoPlayer(
-                filePath = canvasFilePath,
-                fadeFraction = fadeFraction,
-                zoom = canvasZoom,
-                modifier = Modifier.fillMaxSize()
+        when {
+            videoActive -> {
+                var overlayVisible by remember { mutableStateOf(false) }
+                LaunchedEffect(overlayVisible) {
+                    if (overlayVisible) {
+                        delay(3000)
+                        overlayVisible = false
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .pointerInput(Unit) {
+                            detectTapGestures { overlayVisible = !overlayVisible }
+                        }
+                ) {
+                    MusicVideoSurface(
+                        onSurface = onVideoSurface,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    AnimatedVisibility(
+                        visible = overlayVisible,
+                        enter = fadeIn(tween(durationMillis = 180)),
+                        exit = fadeOut(tween(durationMillis = 180))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.25f))
+                        ) {
+                            var menuOpen by remember { mutableStateOf(false) }
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(Color.Black.copy(alpha = 0.45f))
+                                        .clickable { menuOpen = true }
+                                        .padding(7.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.encore_icon_settings_24),
+                                        contentDescription = "Video quality",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = menuOpen,
+                                    onDismissRequest = { menuOpen = false },
+                                    shape = RoundedCornerShape(16.dp),
+                                    containerColor = Color(0xE6191919)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Auto", color = Color.White) },
+                                        onClick = {
+                                            onVideoQuality(0)
+                                            menuOpen = false
+                                        }
+                                    )
+                                    videoQualities.forEach { height ->
+                                        DropdownMenuItem(
+                                            text = { Text("${height}p", color = Color.White) },
+                                            onClick = {
+                                                onVideoQuality(height)
+                                                menuOpen = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            canvasActive -> {
+                CanvasVideoPlayer(
+                    filePath = canvasFilePath,
+                    fadeFraction = fadeFraction,
+                    zoom = canvasZoom,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            else -> {
+                SpotifyArtworkImage(
+                    imageUrl = coverUrl,
+                    contentDescription = title,
+                    fallbackColor = dominantColor,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MusicVideoSwitchRow(
+    available: Boolean,
+    active: Boolean,
+    switching: Boolean,
+    onSwitch: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!available && !active) return
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+    ) {
+        MusicVideoSwitchPill(
+            label = if (active) "Audio" else "Music video",
+            iconRes = if (active) R.drawable.encore_icon_audio_24 else R.drawable.encore_icon_video_24,
+            switching = switching,
+            onClick = { onSwitch(!active) }
+        )
+    }
+}
+
+@Composable
+private fun MusicVideoSwitchPill(
+    label: String,
+    iconRes: Int,
+    switching: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = 0.2f))
+            .clickable(onClick = onClick)
+            .padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (switching) {
+            CircularProgressIndicator(
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(14.dp)
             )
         } else {
-            SpotifyArtworkImage(
-                imageUrl = coverUrl,
-                contentDescription = title,
-                fallbackColor = dominantColor,
-                modifier = Modifier.fillMaxSize()
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(14.dp)
             )
         }
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(
+            text = label,
+            style = SpotifyTheme.typography.bodySmall,
+            color = Color.White
+        )
     }
 }
 

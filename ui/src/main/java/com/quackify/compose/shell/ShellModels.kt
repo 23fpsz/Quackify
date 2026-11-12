@@ -106,6 +106,10 @@ data class ComposePlaybackState(
     val contextUri: String = "",
     val contextLabel: String = "",
     val explicit: Boolean = false,
+    val musicVideoAvailable: Boolean = false,
+    val videoActive: Boolean = false,
+    val videoQualities: List<Int> = emptyList(),
+    val videoSwitching: Boolean = false,
 )
 
 interface ComposePlayerListener {
@@ -131,6 +135,9 @@ interface ComposePlayerListener {
     fun onLoadArtist(uri: String, artistName: String = "") {}
     fun onRefreshLibrary() {}
     fun onRefreshHome() {}
+    fun onSwitchVideo(toVideo: Boolean) {}
+    fun onVideoQuality(height: Int) {}
+    fun onVideoSurface(surface: android.view.Surface?) {}
 }
 
 internal enum class FolderMode { CREATE, RENAME, PICKER }

@@ -489,6 +489,7 @@ fun SpotifyPlaylistScreen(
                             artist = track.artist,
                             isPlaying = isCurrentTrack && isPlaying,
                             isExplicit = track.isExplicit,
+                            hasVideo = track.hasVideo,
                             imageUrl = track.imageUrl,
                             onClick = { onTrackSelect(track) },
                             onMoreClick = { onTrackOptionsClick(track) }
@@ -1027,6 +1028,7 @@ fun SpotifyPlaylistScreen(
                         artist = track.artist,
                         isPlaying = isCurrentTrack && isPlaying,
                         isExplicit = track.isExplicit,
+                        hasVideo = track.hasVideo,
                         imageUrl = track.imageUrl,
                         onClick = { onTrackSelect(track) },
                         onMoreClick = { onTrackOptionsClick(track) }

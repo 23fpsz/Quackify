@@ -395,6 +395,7 @@ fun EncoreTrackRow(
     onMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
     isExplicit: Boolean = false,
+    hasVideo: Boolean = false,
     imageUrl: String? = null
 ) {
     Row(
@@ -472,6 +473,16 @@ fun EncoreTrackRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isExplicit) {
                     EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
+                }
+                if (hasVideo) {
+                    Icon(
+                        painter = painterResource(R.drawable.encore_icon_video_24),
+                        contentDescription = "Music video",
+                        tint = EncoreColors.TextSecondary,
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .size(14.dp)
+                    )
                 }
                 Text(
                     text = artist,
