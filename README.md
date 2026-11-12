@@ -19,11 +19,7 @@ git clone https://github.com/23fpsz/Quackify.git
 cd Quackify
 ```
 
-### 2. Configure authentication
-
-The session is obtained from the login WebView. No asset file is needed.
-
-### 3. Build & run
+### 2. Build & run
 
 ```bash
 ./gradlew assembleDebug
