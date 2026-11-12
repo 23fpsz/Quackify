@@ -205,18 +205,9 @@ internal class Widevine(
     }
 
     private suspend fun provision(instance: MediaDrm): ByteArray? {
-        val request = runCatching { instance.getProvisionRequest() }.getOrNull()
-        if (request == null) {
-            fail("provision: no request")
-            return null
-        }
-        val signed = String(request.data, Charsets.UTF_8)
-        val separator = if (request.defaultUrl.contains("?")) "&" else "?"
-        val url = request.defaultUrl + separator + "signedRequest=" + URLEncoder.encode(signed, "UTF-8")
-        val response = Net.postBlob(url, ByteArray(0), "application/octet-stream", tag = "provision")
-        val bytes = response?.takeIf { it.ok }?.bytes
+        val bytes = provisionDevice(instance)
         if (bytes == null) {
-            fail("provision failed ${response?.code ?: "no response"}")
+            fail("provision failed")
             return null
         }
         return runCatching {
@@ -468,4 +459,13 @@ internal class Widevine(
     }
 
     private fun throttled(code: Int?): Boolean = code == 429 || code == 503
+}
+
+internal suspend fun provisionDevice(instance: MediaDrm): ByteArray? {
+    val request = runCatching { instance.getProvisionRequest() }.getOrNull() ?: return null
+    val signed = String(request.data, Charsets.UTF_8)
+    val separator = if (request.defaultUrl.contains("?")) "&" else "?"
+    val url = request.defaultUrl + separator + "signedRequest=" + URLEncoder.encode(signed, "UTF-8")
+    val response = Net.postBlob(url, ByteArray(0), "application/octet-stream", tag = "provision")
+    return response?.takeIf { it.ok }?.bytes
 }
