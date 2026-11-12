@@ -54,12 +54,12 @@ android {
             val envStoreFile = System.getenv("RELEASE_STORE_FILE")
             val propsStoreFile = keystoreProperties["signing.storeFile"] as String?
             val storePath = when {
-                envStoreFile != null && file(envStoreFile).exists() -> envStoreFile
-                propsStoreFile != null && file(propsStoreFile).exists() -> propsStoreFile
+                envStoreFile != null && rootProject.file(envStoreFile).exists() -> envStoreFile
+                propsStoreFile != null && rootProject.file(propsStoreFile).exists() -> propsStoreFile
                 else -> null
             }
             if (storePath != null) {
-                storeFile = file(storePath)
+                storeFile = rootProject.file(storePath)
                 storePassword = System.getenv("RELEASE_STORE_PASSWORD")
                     ?: keystoreProperties["signing.storePassword"] as String?
                 keyAlias = System.getenv("RELEASE_KEY_ALIAS")
