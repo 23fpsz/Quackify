@@ -1,2 +1,3 @@
 -keepattributes SourceFile,LineNumberTable
--dontobfuscate
+-repackageclasses
+-allowaccessmodification
