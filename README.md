@@ -1,6 +1,6 @@
 # Quackify
 
-Quackify is the continuation of SpotiDuck, built as a native Android client with ~90% Spotify parity. It delivers a 1:1 pixel perfect experience inspired by Spotify mobile UI, without needing a WebView. Built with Jetpack Compose and Material 3.
+Quackify is the continuation of SpotiDuck, a native Android music client built with Jetpack Compose and Material 3. It offers a familiar streaming experience — inspired by modern player apps — without needing a WebView.
 
 ## Features
 
@@ -9,6 +9,7 @@ Quackify is the continuation of SpotiDuck, built as a native Android client with
 - View your library's playlists and albums
 - Play playlist and album tracks with the mini player
 - Expand to the full Now Playing screen with seek controls and lyrics
+- Podcasts with chapters, playback speed, and episode video
 
 ## Getting Started
 
@@ -46,3 +47,7 @@ Quackify is a community driven project built with passion by:
 ## License
 
 This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - see the [LICENSE](LICENSE) file for details.
+
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or sponsored by Spotify AB or any other streaming service. All product names, trademarks, and registered trademarks mentioned or referenced are the property of their respective owners. Quackify is an independent, community-driven client intended for educational and personal use. Users are responsible for complying with the terms of service of any service they connect to. No proprietary assets or credentials are distributed with this project.

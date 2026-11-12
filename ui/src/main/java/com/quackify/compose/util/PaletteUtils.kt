@@ -22,7 +22,7 @@ import kotlin.math.abs
 
 /**
  */
-val SPOTIFY_PALETTE_FALLBACKS = listOf(
+val PALETTE_FALLBACKS = listOf(
     Color(0xFF144D3F), // Forest Green
     Color(0xFF432371), // Royal Violet
     Color(0xFF1E3264), // Midnight Blue
@@ -41,9 +41,9 @@ val SPOTIFY_PALETTE_FALLBACKS = listOf(
  * from a title, uri, or identifier string.
  */
 fun paletteColorForSeed(seed: String?): Color {
-    if (seed.isNullOrBlank()) return SPOTIFY_PALETTE_FALLBACKS[0]
-    val index = abs(seed.hashCode()) % SPOTIFY_PALETTE_FALLBACKS.size
-    return SPOTIFY_PALETTE_FALLBACKS[index]
+    if (seed.isNullOrBlank()) return PALETTE_FALLBACKS[0]
+    val index = abs(seed.hashCode()) % PALETTE_FALLBACKS.size
+    return PALETTE_FALLBACKS[index]
 }
 
 /**

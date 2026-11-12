@@ -3,7 +3,7 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Spotify Mobile Sort / SortBy Icon (Encore.Vector.SortBy24) -->
+    <!-- Sort / SortBy icon (Encore.Vector.SortBy24) -->
     <!-- Top upward chevron -->
     <path
         android:fillColor="#FFFFFFFF"
