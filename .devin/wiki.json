@@ -1,0 +1,63 @@
+{
+  "repo_notes": [
+    {
+      "content": "Quackify is a native Android Spotify-protocol client (Kotlin, Jetpack Compose + Material 3). Priority for documentation: the backend modules (krespot-core, krespot-connect, krespot-player, krespot-library, krespot-api, krespot-model) are the strong, critical layer — document them thoroughly, including protocol details (auth/token flow, connect cluster state machine, dealer websocket, playback engines, pathfinder GraphQL). The krespot-api module is the complete API contract; document every endpoint wrapper it exposes. The ui/ module is partial and mirrors a reference design; document it more briefly (structure and theming, not every screen).",
+      "author": "23fpsz"
+    },
+    {
+      "content": "Build/verification command: ./gradlew :app:compileSpotifyDebugKotlin -q (flavors exist: standard, spotify, apple — do NOT use compileDebugKotlin). No test suite; compilation is the gate. Legal note: the project avoids the 'Spotify' name in identifiers/strings/comments except required protocol constants (spotify: URIs, X-Spotify-Connection-Id, spotify-app-version, spotify-apply-lenses). See DISCLAIMER.md.",
+      "author": "23fpsz"
+    },
+    {
+      "content": "Key glue code: app/src/main/java/com/quackify/app/PlaybackBridge.kt connects the connect cluster state machine to the player engines (audio/video), handles queue/chain building (rowsOf, captureChain, learnMachineQueue), episode playback (video ids, chapters, speed) and hydration. Episodes need no DRM; episode video file id is media.<uri>.item.video_id; chapter titles come from the transcript endpoint matched to chapter spans by time window.",
+      "author": "23fpsz"
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview",
+      "purpose": "What Quackify is, high-level architecture diagram (app + ui + krespot-* modules), how data flows from the Spotify protocol to the UI.",
+      "parent": null
+    },
+    {
+      "title": "Build & Flavors",
+      "purpose": "Gradle setup, flavor dimensions (standard/spotify/apple applicationIds), the compileSpotifyDebugKotlin verification command, signing setup (keystore is local-only), and the no-APK rule for agents.",
+      "parent": null
+    },
+    {
+      "title": "Backend: Core & Auth",
+      "purpose": "krespot-core: networking (Net), sp_dc login flow, token refresh (WebToken, ClientToken), pathfinder GraphQL transport, device info, logging. Document the token lifecycle end to end.",
+      "parent": "Overview"
+    },
+    {
+      "title": "Backend: Connect State Machine",
+      "purpose": "krespot-connect: cluster state (ClusterState, parseTrack), dealer websocket, command parsing (PlaybackCommand, CommandClient), state reporting (StateReporter, Registration), and how local playback mirrors to other devices.",
+      "parent": "Overview"
+    },
+    {
+      "title": "Backend: Playback Engines",
+      "purpose": "krespot-player: audio engine (Mp4, AudioSource, AudioSink), video engine (VideoEngine, VideoManifest), DRM-optional manifests, playback rate, prefetch. Include the episode specifics (video_id at item level, no encryption_infos).",
+      "parent": "Overview"
+    },
+    {
+      "title": "Backend: Library & API Layer",
+      "purpose": "krespot-library data sources (TrackSource, AlbumSource, ArtistSource, PlaylistSource, CollectionSource, LyricsSource, Podcasts) and the complete krespot-api contract: every endpoint wrapper, its inputs/outputs, and which spclient/partner endpoints it hits.",
+      "parent": "Overview"
+    },
+    {
+      "title": "PlaybackBridge: The Glue",
+      "purpose": "How PlaybackBridge wires cluster commands to engines: playTrack/startLocal, queue building (rowsOf, captureChain, learnMachineQueue, publishQueue), hydration, episode handling (chapters, speed, video auto-switch), remote control and canvas.",
+      "parent": "Overview"
+    },
+    {
+      "title": "UI Layer",
+      "purpose": "ui/ module structure: EncoreAppShell navigation, Encore*Screen screens, theme system (EncoreColors/EncoreTokens/EncoreTheme), shared components, and the episode Now Playing controls. Note the UI is a partial mirror of a reference design and naming must stay neutral (no Spotify terms).",
+      "parent": "Overview"
+    },
+    {
+      "title": "Legal & Branding",
+      "purpose": "Naming rules (Encore* instead of Spotify*), allowed protocol constants, DISCLAIMER.md summary, GPL-3 license, and what must never be committed (keystore, tokens, proprietary assets).",
+      "parent": null
+    }
+  ]
+}

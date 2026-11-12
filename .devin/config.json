@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Exec(./gradlew *)",
+      "Exec(git status*)",
+      "Exec(git diff*)",
+      "Exec(git log*)",
+      "Exec(git add*)",
+      "Exec(git commit*)",
+      "Exec(git show*)",
+      "Exec(grep *)",
+      "Exec(find *)",
+      "Exec(ls*)",
+      "Exec(sed -i *)",
+      "Exec(python3 *)"
+    ],
+    "deny": [
+      "Exec(sudo*)",
+      "Exec(rm -rf /*)",
+      "Write(keystore/**)",
+      "Edit(keystore/**)",
+      "Write(**/*.jks)",
+      "Edit(**/*.jks)",
+      "Write(local.properties)",
+      "Edit(local.properties)"
+    ]
+  }
+}
