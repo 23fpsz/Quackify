@@ -2875,9 +2875,17 @@ class PlaybackBridge(private val context: Context) {
         row.title.isBlank() && decorated[row.uri] == null
 
     private fun screenContext(uri: String): String {
+        val cluster = connect.cluster.value
         val known = connect.playback?.currentTrack?.contextUri.orEmpty()
-        if (known.isNotBlank() && !known.startsWith("spotify:track:")) return known
-        if (screen.size >= 2 && screen.any { it == uri }) {
+        if (known.isNotBlank() && !known.startsWith("spotify:track:") && !known.startsWith("spotify:episode:")) {
+            val inWindow = cluster?.takeIf { it.contextUri == known }?.window()?.any { it.uri == uri } ?: false
+            val inChain = chainContext == known && chainRows.any { it == uri }
+            if (inWindow || inChain) return known
+            log.i("screen: '${uri.takeLast(12)}' is not part of the live context " +
+                "'${known.takeLast(16)}', playing it on its own"
+            )
+        }
+        if (screen.size >= 2 && screen.any { it == uri } && uri in chainRows) {
             return chainContext.takeIf { it.isNotBlank() && it != uri }.orEmpty()
         }
         return ""
