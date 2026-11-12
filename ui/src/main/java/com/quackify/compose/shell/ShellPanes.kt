@@ -128,11 +128,15 @@ internal fun nowPlayingContext(
     albumTitle: String,
     artistName: String,
     searchQuery: String,
+    queueLabel: String = "",
 ): Pair<String, String> {
     fun searchSub(query: String): String {
         val q = query.trim()
         return if (q.isBlank()) "Search" else "$q in Search"
     }
+    fun playlistContext(label: String): Pair<String, String> =
+        if (label.isBlank()) "Playing from Queue" to queueLabel.ifBlank { "Next up" }
+        else "Playing from playlist" to label
     return when {
         !trackLoaded -> "Nothing playing" to "Pick a song to get started"
         origin != null -> when (origin.screen) {
@@ -140,13 +144,13 @@ internal fun nowPlayingContext(
             ShellScreen.ALBUM -> "Playing from album" to origin.label
             ShellScreen.ARTIST -> "Playing from artist" to origin.label
             ShellScreen.HOME -> "Playing from home" to origin.label
-            else -> "Playing from playlist" to origin.label
+            else -> playlistContext(origin.label)
         }
         screen == ShellScreen.SEARCH -> "Playing from search" to searchSub(searchQuery)
-        screen == ShellScreen.PLAYLIST -> "Playing from playlist" to playlistTitle
+        screen == ShellScreen.PLAYLIST -> playlistContext(playlistTitle)
         screen == ShellScreen.ALBUM -> "Playing from album" to albumTitle
         screen == ShellScreen.ARTIST -> "Playing from artist" to artistName
-        else -> "Playing from playlist" to playlistTitle
+        else -> playlistContext(playlistTitle)
     }
 }
 

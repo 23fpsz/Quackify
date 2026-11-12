@@ -946,6 +946,9 @@ fun EncoreAppShell(
             albumTitle = active.albumTitle,
             artistName = active.artistName,
             searchQuery = searchQuery,
+            queueLabel = playbackState?.queueContextLabel?.takeIf { it.isNotBlank() }
+                ?: playbackState?.contextLabel?.takeIf { it.isNotBlank() }
+                ?: "",
         )
         val remoteCtl = playbackState?.controllingRemote == true
         val effectiveCanShuffle = if (remoteCtl) playbackState?.remoteCanShuffle ?: true else playbackState?.canShuffle ?: true
