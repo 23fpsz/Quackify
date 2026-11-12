@@ -5,7 +5,9 @@ import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.model.*
 import org.json.JSONObject
+import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.GraphQl
+import com.quackify.backend.core.net.Net
 import com.quackify.backend.core.net.Pathfinder
 import com.quackify.backend.core.net.plainText
 
@@ -256,4 +258,76 @@ object Podcasts {
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December",
     )
+
+    private const val CHAPTERS_HOST = "https://spclient.wg.spotify.com"
+
+    private suspend fun spHeaders(context: Context): Map<String, String> = buildMap {
+        put("Authorization", "Bearer ${SpotifyAuth.token(context)}")
+        put("Accept", "application/json")
+        put("app-platform", "WebPlayer")
+        put("User-Agent", Net.DESKTOP_UA)
+        ClientToken.get(context).takeIf { it.isNotBlank() }?.let { put("client-token", it) }
+    }
+
+    /**
+     * Chapter spans come from the episode's chapter playlist; the ml_generated
+     * lists carry positions only, so titles are matched from the transcript's
+     * titled sections, the first one landing inside the chapter's opening
+     * seconds. Speaker labels are not chapter titles.
+     */
+    suspend fun chapters(context: Context, episodeUri: String): List<ChapterSpan> {
+        if (!episodeUri.startsWith("spotify:episode:")) return emptyList()
+        val encoded = java.net.URLEncoder.encode(episodeUri, "UTF-8")
+        val list = Net.get(
+            "$CHAPTERS_HOST/playlist/v2/list/podcast-chapters/$encoded" +
+                "?decorate=revision,length,attributes,timestamp,owner,capabilities",
+            spHeaders(context),
+            tag = "chapters",
+        )?.takeIf { it.ok }?.json() ?: return emptyList()
+        val items = list.optJSONObject("contents")?.optJSONArray("items")
+        if (items == null || items.length() == 0) return emptyList()
+        val spans = ArrayList<ChapterSpan>(items.length())
+        for (i in 0 until items.length()) {
+            val node = items.optJSONObject(i) ?: continue
+            val attrs = node.optJSONObject("attributes")?.optJSONArray("formatAttributes") ?: continue
+            var startMs = -1L
+            var endMs = -1L
+            for (j in 0 until attrs.length()) {
+                val attr = attrs.optJSONObject(j) ?: continue
+                when (attr.optString("key")) {
+                    "chapter.start_position_in_milliseconds" -> startMs = attr.optString("value").toLongOrNull() ?: -1L
+                    "chapter.end_position_in_milliseconds" -> endMs = attr.optString("value").toLongOrNull() ?: -1L
+                }
+            }
+            if (startMs < 0L || endMs <= startMs) continue
+            spans += ChapterSpan(title = "", startMs = startMs, endMs = endMs)
+        }
+        if (spans.isEmpty()) return emptyList()
+        val episodeId = episodeUri.removePrefix("spotify:episode:")
+        val transcript = Net.get(
+            "$CHAPTERS_HOST/transcript-read-along/v2/episode/$episodeId?format=json&maxSentenceLength=100&excludeCC=false",
+            spHeaders(context),
+            tag = "transcript",
+        )?.takeIf { it.ok }?.json()
+        val titled = ArrayList<Pair<Long, String>>()
+        transcript?.optJSONArray("section")?.let { sections ->
+            for (i in 0 until sections.length()) {
+                val section = sections.optJSONObject(i) ?: continue
+                val title = section.optJSONObject("title")?.optString("title").orEmpty().plainText()
+                if (title.isBlank() || title.matches(Regex("Speaker \\d+"))) continue
+                titled += section.optLong("startMs", 0L) to title
+            }
+        }
+        titled.sortBy { it.first }
+        val out = ArrayList<ChapterSpan>(spans.size)
+        spans.forEachIndexed { index, span ->
+            val title = titled.firstOrNull { (at, _) -> at >= span.startMs - 2000L && at <= span.startMs + 30_000L }
+                ?.second
+                .orEmpty()
+                .ifBlank { "Chapter ${index + 1}" }
+            out += span.copy(title = title)
+        }
+        log.i("chapters $episodeUri spans=${spans.size} titled=${titled.size}")
+        return out
+    }
 }

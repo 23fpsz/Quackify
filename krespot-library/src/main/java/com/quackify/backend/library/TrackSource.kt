@@ -4,6 +4,7 @@ import android.content.Context
 import com.quackify.backend.core.auth.SpotifyAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Pathfinder
+import com.quackify.backend.api.Podcasts
 import com.quackify.backend.model.TrackRow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -21,7 +22,8 @@ object TrackSource {
 
     suspend fun decorate(context: Context, uris: List<String>): Map<String, TrackRow> {
         val unique = uris.filter { it.startsWith("spotify:track:") }.distinct()
-        if (unique.isEmpty()) return emptyMap()
+        val episodes = uris.filter { it.startsWith("spotify:episode:") }.distinct()
+        if (unique.isEmpty() && episodes.isEmpty()) return emptyMap()
         val token = SpotifyAuth.token(context)
         if (token.isBlank()) {
             log.w("decorate: no token")
@@ -46,7 +48,26 @@ object TrackSource {
                 out[row.uri] = row
             }
         }
-        log.i("decorate ${out.size} of ${unique.size} track(s) in ${chunks.size} batch(es)")
+        if (episodes.isNotEmpty()) {
+            coroutineScope {
+                episodes.map { uri -> async(Dispatchers.IO) { Podcasts.episode(context, uri) } }.awaitAll()
+            }.filterNotNull().forEach { detail ->
+                out[detail.uri] = TrackRow(
+                    uri = detail.uri,
+                    title = detail.title,
+                    artists = detail.showName,
+                    album = "",
+                    imageUrl = detail.imageUrl,
+                    colorHex = detail.colorHex,
+                    durationMs = detail.durationMs,
+                    explicit = detail.explicit,
+                    playable = detail.playable,
+                    artistUri = detail.showUri,
+                    video = detail.video,
+                )
+            }
+        }
+        log.i("decorate ${out.size} of ${unique.size + episodes.size} row(s) in ${chunks.size + episodes.size} batch(es)")
         return out
     }
 }

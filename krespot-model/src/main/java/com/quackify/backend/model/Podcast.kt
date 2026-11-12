@@ -17,6 +17,12 @@ data class EpisodeRow(
     val showUri: String = "",
 )
 
+data class ChapterSpan(
+    val title: String,
+    val startMs: Long,
+    val endMs: Long,
+)
+
 data class ShowCard(
     val uri: String,
     val name: String,
