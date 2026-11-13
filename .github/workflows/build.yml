@@ -19,6 +19,9 @@ on:
       - 'gradlew'
       - 'gradlew.bat'
 
+  pull_request:
+    branches: [ "main", "master" ]
+
   workflow_dispatch:
     inputs:
       flavor:
@@ -34,19 +37,24 @@ on:
       build_type:
         description: 'Build Type'
         required: true
-        default: 'all'
+        default: 'release'
         type: choice
         options:
           - 'all'
-          - 'debug'
           - 'release'
+          - 'debug'
+      create_draft:
+        description: 'Create a Draft Release on GitHub'
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -87,8 +95,23 @@ jobs:
           INPUT_FLAVOR: ${{ github.event.inputs.flavor }}
           INPUT_TYPE: ${{ github.event.inputs.build_type }}
         run: |
+          # Fast-path verification for Pull Requests
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "tasks=assembleStandardDebug" >> "$GITHUB_OUTPUT"
+            echo "Selected tasks: assembleStandardDebug (PR check)"
+            exit 0
+          fi
+
+          # Automated pushes build only release variants
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "tasks=assembleRelease" >> "$GITHUB_OUTPUT"
+            echo "Selected tasks: assembleRelease (automated push)"
+            exit 0
+          fi
+
+          # Manual runs (workflow_dispatch) follow user selection
           FLAVOR="${INPUT_FLAVOR:-all}"
-          TYPE="${INPUT_TYPE:-all}"
+          TYPE="${INPUT_TYPE:-release}"
 
           capitalise() {
             printf '%s%s' "$(printf '%s' "$1" | cut -c1 | tr '[:lower:]' '[:upper:]')" "$(printf '%s' "$1" | cut -c2-)"
@@ -114,33 +137,84 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew ${{ steps.gradle_tasks.outputs.tasks }} --stacktrace
 
-      - name: Collect Generated APKs
+      - name: Collect Generated APKs & Checksums
         run: |
           set -euo pipefail
           mkdir -p apk_output
-          if [ ! -d app/build/outputs/apk ]; then
-            echo "::error::Gradle did not create app/build/outputs/apk"
-            exit 1
-          fi
           find app/build/outputs/apk -type f -name '*.apk' ! -name '*-unsigned.apk' -exec cp {} apk_output/ \;
           COUNT=$(find apk_output -maxdepth 1 -type f -name '*.apk' | wc -l)
           echo "Collected APKs: $COUNT"
-          ls -la apk_output/
           if [ "$COUNT" -eq 0 ]; then
             echo "::error::Gradle produced no signed APK"
             exit 1
           fi
 
-      - name: Upload APKs as Workflow Artifact
+          # Generate SHA-256 Checksums for artifacts
+          cd apk_output
+          sha256sum *.apk > sha256_checksums.txt
+          cat sha256_checksums.txt
+          cd ..
+
+      # Individual Artifact Uploads (Download only the ~3.9MB APK you need)
+      - name: Upload Standard Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: Quackify-Compose-APKs
-          path: apk_output/*.apk
-          if-no-files-found: error
+          name: Quackify-Standard-Release
+          path: apk_output/*standard*release*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Spotify Island Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quackify-Spotify-Release
+          path: apk_output/*spotify*release*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Apple Island Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quackify-Apple-Release
+          path: apk_output/*apple*release*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Standard Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quackify-Standard-Debug
+          path: apk_output/*standard*debug*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Spotify Island Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quackify-Spotify-Debug
+          path: apk_output/*spotify*debug*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Apple Island Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quackify-Apple-Debug
+          path: apk_output/*apple*debug*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quackify-Checksums
+          path: apk_output/sha256_checksums.txt
+          if-no-files-found: ignore
           retention-days: 14
 
       - name: Prepare Release Info
         id: release_info
+        if: ${{ github.event_name != 'pull_request' && (github.event_name == 'push' || github.event.inputs.create_draft == 'true') }}
         run: |
           VERSION_NAME=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
           if [ -z "$VERSION_NAME" ]; then
@@ -148,30 +222,36 @@ jobs:
           fi
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           TAG="v${VERSION_NAME}-b${{ github.run_number }}-${SHORT_SHA}"
-          TITLE="Quackify v${VERSION_NAME} (Build #${{ github.run_number }} - ${SHORT_SHA})"
+          TITLE="Quackify v${VERSION_NAME} (Draft #${{ github.run_number }})"
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "title=$TITLE" >> "$GITHUB_OUTPUT"
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Publish GitHub Release
+      - name: Create GitHub Draft Release
+        if: ${{ steps.release_info.outputs.tag != '' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: ${{ steps.release_info.outputs.title }}
+          draft: true
+          prerelease: false
           body: |
-            ### 📱 Quackify Build
-            - **Commit:** [${{ steps.release_info.outputs.short_sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
-            - **Branch:** `${{ github.ref_name }}`
-            - **Build Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            ### 📝 What's Changed
+            <!-- Add release notes or changelog here before publishing -->
+            - 
 
-            ### 📦 Available Editions:
-            - **Standard**: `Quackify-v*-standard-*.apk` (`com.quackify.app`)
-            - **Spotify Island**: `Quackify-v*-spotify-*.apk` (`com.spotify.music`)
-            - **Apple Island**: `Quackify-v*-apple-*.apk` (`com.apple.android.music`)
+            ---
+            > [!NOTE]
+            > All app variants are functionally identical in features and code. The only difference is the package name (Application ID) to allow side-by-side installations on your device:
+            > - **Standard**: `com.quackify.app`
+            > - **Spotify Island**: `com.spotify.music`
+            > - **Apple Island**: `com.apple.android.music`
+
+            ### 🔍 Build Info:
+            - **Commit:** [${{ steps.release_info.outputs.short_sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            - **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           files: apk_output/*.apk
-          prerelease: true
-          draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

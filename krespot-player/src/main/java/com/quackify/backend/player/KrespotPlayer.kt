@@ -66,8 +66,8 @@ private const val KEY_RESUME_AT = "resumeAt"
 private const val RESUME_WRITE_MS = 5_000L
 
 sealed interface PlayerEvent {
-    data object Started : PlayerEvent
-    data object Ended : PlayerEvent
+    data class Started(val uri: String = "") : PlayerEvent
+    data class Ended(val uri: String = "") : PlayerEvent
     data class Progress(val positionMs: Long, val durationMs: Long) : PlayerEvent
     data class Seeked(val positionMs: Long) : PlayerEvent
     data class Failed(val message: String) : PlayerEvent
@@ -193,6 +193,64 @@ class KrespotPlayer(private val context: Context) {
         }
     }
 
+    @Volatile
+    var queuedNextUri: String = ""
+        private set
+
+    @Volatile
+    private var queuedGainDb = 0.0
+
+    /**
+     * Hands the engine the next track of the queue so ExoPlayer prebuffers it
+     * while the current one plays and the transition carries no silence. A
+     * warm source queues right away; a cold one resolves here and only queues
+     * if the engine is still on the track that asked for it. The bridge checks
+     * hasQueuedNext at the end of the track, so a late resolve can never leave
+     * the transition hanging - the normal advance simply takes over.
+     */
+    fun queueNext(track: CommandTrack, spclient: String) {
+        if (track.isDirect) return
+        this.spclient = spclient
+        val live = engine ?: return
+        val askedFor = _state.value.trackUri
+        if (askedFor.isBlank() || live.currentUri != askedFor) return
+        if (queuedNextUri == track.uri) return
+        val file = track.best() ?: track.files.firstOrNull()
+        val cached = sourceFor(track.uri)
+        if (cached != null) {
+            live.queueNext(track.uri, cached)
+            queuedNextUri = track.uri
+            queuedGainDb = file?.gainDb ?: 0.0
+            log.i("queued next '${track.name}' from the warm source")
+            return
+        }
+        scope.launch {
+            val source = SourceResolver.resolve(
+                context,
+                spclient,
+                track.uri,
+                file?.fileId.orEmpty(),
+                file?.format ?: 0,
+                prefetched = if (file == null) manifestFor(track.uri) else null,
+            ) ?: return@launch
+            rememberSource(track.uri, source)
+            rememberFile(track.uri, source.fileId)
+            val still = engine
+            if (still !== live || still.currentUri != askedFor || _state.value.trackUri != askedFor) {
+                return@launch
+            }
+            still.queueNext(track.uri, source)
+            queuedNextUri = track.uri
+            queuedGainDb = file?.gainDb ?: 0.0
+            log.i("queued next '${track.name}' after resolving")
+        }
+    }
+
+    fun clearQueuedNext() {
+        queuedNextUri = ""
+    }
+
+    fun hasSourceFor(trackUri: String): Boolean = sourceFor(trackUri) != null
     fun prefetch(trackUri: String, spclient: String) {
         if (trackUri.isBlank() || spclient.isBlank()) return
         if (manifests.containsKey(trackUri)) return
@@ -406,6 +464,11 @@ class KrespotPlayer(private val context: Context) {
 
     val hasSource: Boolean get() = videoActive || engine != null || mp3 != null || job?.isActive == true
 
+    val hasQueuedNext: Boolean get() = !videoActive && mp3 == null && (engine?.hasQueuedNext ?: false)
+
+    val currentUri: String
+        get() = engine?.currentUri ?: _state.value.trackUri
+
     fun play(
         track: CommandTrack,
         spclient: String,
@@ -425,6 +488,7 @@ class KrespotPlayer(private val context: Context) {
         }
         val id = ++generation
         pendingPause = false
+        queuedNextUri = ""
         _state.value = PlayerState(
             playing = true,
             buffering = true,
@@ -458,12 +522,12 @@ class KrespotPlayer(private val context: Context) {
                 val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
                 player = AudioEngine(context, { spclient }, scope) { event ->
                     if (id == generation) {
-                        mirror(event, totalMs)
+                        mirror(event, player?.durationMs ?: totalMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                     }
                 }
                 val startAt = if (pendingSeekMs >= 0L) pendingSeekMs.also { pendingSeekMs = -1L } else fromMs
-                val ready = player.prepare(source, startAt, autoplay = !pendingPause, file?.gainDb ?: 0.0)
+                val ready = player.prepare(source, track.uri, startAt, autoplay = !pendingPause, file?.gainDb ?: 0.0)
                 if (!ready || id != generation) {
                     player.stop()
                     return@launch
@@ -621,6 +685,7 @@ class KrespotPlayer(private val context: Context) {
         generation++
         pendingPause = false
         pendingSeekMs = -1L
+        queuedNextUri = ""
         refused = null
         stopVideo()
         deepJob?.cancel()
@@ -753,12 +818,19 @@ class KrespotPlayer(private val context: Context) {
             when (event) {
                 is PlayerEvent.Progress -> current.copy(positionMs = event.positionMs, durationMs = event.durationMs)
                 is PlayerEvent.Seeked -> current.copy(positionMs = event.positionMs)
-                PlayerEvent.Started -> if (current.paused) {
-                    current.copy(buffering = false, durationMs = durationMs)
-                } else {
-                    current.copy(playing = true, paused = false, buffering = false, durationMs = durationMs)
+                is PlayerEvent.Started -> {
+                    val moved = event.uri.isNotBlank() && event.uri != current.trackUri
+                    val base = if (moved) current.copy(trackUri = event.uri, positionMs = 0L) else current
+                    if (event.uri == queuedNextUri) {
+                        engine?.retune(queuedGainDb)
+                    }
+                    if (current.paused) {
+                        base.copy(buffering = false, durationMs = durationMs)
+                    } else {
+                        base.copy(playing = true, paused = false, buffering = false, durationMs = durationMs)
+                    }
                 }
-                PlayerEvent.Ended -> current.copy(playing = false, buffering = false, positionMs = durationMs)
+                is PlayerEvent.Ended -> current.copy(playing = false, buffering = false, positionMs = durationMs)
                 is PlayerEvent.Failed -> current.copy(playing = false, buffering = false, trackUri = "")
             }
         }

@@ -27,6 +27,7 @@ import com.quackify.backend.model.ConnectDevice
 import com.quackify.backend.model.DeviceKind
 import com.quackify.backend.connect.command.CommandClient
 import com.quackify.backend.connect.command.CommandTrack
+import com.quackify.backend.connect.command.ContentType
 import com.quackify.backend.connect.command.PlaybackCommand
 import com.quackify.backend.connect.command.RemoteCommand
 import com.quackify.backend.connect.command.TrackUid
@@ -70,6 +71,9 @@ const val AUTOPLAY_ON_STARTUP_PREF = "autoplayOnStartup"
 /** Settings toggle: keep playing from a station when the context runs out. */
 const val AUTOPLAY_ON_END_PREF = "autoplayOnEnd"
 
+/** Settings toggle: prebuffer the next track so transitions carry no silence. */
+const val GAPLESS_PREF = "gaplessPlayback"
+
 /** Last context this phone played, so a cold start can rebuild its row list. */
 const val CHAIN_CONTEXT_PREF = "chainContext"
 
@@ -97,6 +101,108 @@ class PlaybackBridge(private val context: Context) {
 
     /** Settings "Autoplay on startup": read from the local prefs at start(). */
     private var autoplayOnStartup: Boolean = false
+
+    /** Settings "Gapless playback": read on demand, so the toggle applies live. */
+    private fun gaplessEnabled(): Boolean =
+        com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
+            .getBoolean(GAPLESS_PREF, false)
+
+    /** The track the engine is prebuffering to take over without a restart. */
+    @Volatile
+    private var gaplessQueuedUri: String = ""
+
+    /**
+     * The next track when the local queue decides it deterministically: repeat
+     * one, the smart-shuffle picks, the user queue, the play order and the
+     * context chain. Server-driven or randomised picks return null and the
+     * normal advance handles them, because guessing wrong here would skip a
+     * track the listener expected.
+     */
+    private fun peekNextTrack(ended: String): CommandTrack? {
+        if (!gaplessEnabled()) return null
+        if (ended.isBlank() || ended.startsWith(AD_PREFIX)) return null
+        val server = connect.cluster.value
+        val context = chainContext.ifBlank { server?.contextUri.orEmpty() }
+        val rows = chainFor()
+        if (repeatTrackOn(server)) return commandFor(ended, context)
+        val upcoming = enhancedUpcoming(context, ended)
+        if (upcoming.isNotEmpty()) {
+            val pick = upcoming.firstOrNull()?.uri.orEmpty()
+            if (pick.isNotBlank() && pick != ended) return commandFor(pick, context)
+        }
+        queuedTail.firstOrNull()?.let { queued ->
+            if (queued.uri != ended) return CommandTrack(
+                uri = queued.uri,
+                name = queued.title,
+                artists = queued.artist,
+                album = "",
+                albumUri = queued.albumUri.orEmpty(),
+                durationMs = queued.durationMs,
+                imageUrl = queued.imageUrl.orEmpty(),
+                explicit = queued.isExplicit,
+                contentType = if (queued.uri.startsWith("spotify:episode:")) ContentType.EPISODE else ContentType.TRACK,
+                files = emptyList(),
+                dualFiles = emptyList(),
+                directFiles = emptyList(),
+                contextUri = context,
+            )
+        }
+        if (sessionQueueContext == context && sessionQueue.isNotEmpty()) {
+            val rest = if (sessionQueue.firstOrNull() == ended) sessionQueue.drop(1) else sessionQueue
+            rest.firstOrNull()?.takeIf { it != ended }?.let { return commandFor(it, context) }
+        }
+        if (shuffleOn(server) && !smartOn(server)) return null
+        val at = rowOf(rows, ended)
+        if (at >= 0 && at + 1 in rows.indices) return commandFor(rows[at + 1], context)
+        return null
+    }
+
+    private fun commandFor(uri: String, context: String): CommandTrack {
+        connect.cluster.value?.window()?.firstOrNull { it.uri == uri }?.let { return it.asCommandTrack() }
+        decorated[uri]?.let { item ->
+            return CommandTrack(
+                uri = uri,
+                name = item.title,
+                artists = item.artist,
+                album = "",
+                albumUri = item.albumUri.orEmpty(),
+                durationMs = item.durationMs,
+                imageUrl = item.imageUrl.orEmpty(),
+                explicit = item.isExplicit,
+                contentType = if (uri.startsWith("spotify:episode:")) ContentType.EPISODE else ContentType.TRACK,
+                files = emptyList(),
+                dualFiles = emptyList(),
+                directFiles = emptyList(),
+                contextUri = context,
+            )
+        }
+        return CommandTrack(
+            uri = uri,
+            name = "",
+            artists = "",
+            album = "",
+            albumUri = "",
+            durationMs = 0L,
+            imageUrl = "",
+            explicit = false,
+            contentType = if (uri.startsWith("spotify:episode:")) ContentType.EPISODE else ContentType.TRACK,
+            files = emptyList(),
+            dualFiles = emptyList(),
+            directFiles = emptyList(),
+            contextUri = context,
+        )
+    }
+
+    /** Queues the next track into the live engine so the handoff is seamless. */
+    private fun queueGaplessNext(currentUri: String) {
+        if (!gaplessEnabled()) return
+        val next = peekNextTrack(currentUri) ?: return
+        if (!next.uri.startsWith("spotify:track:")) return
+        if (!player.hasSourceFor(next.uri)) player.prefetch(next.uri, connect.spclientHost)
+        player.queueNext(next, connect.spclientHost)
+        gaplessQueuedUri = next.uri
+        log.i("gapless: '${next.uri.takeLast(12)}' handed to the engine behind the current track")
+    }
     private var autoplayPending: Boolean = false
     private var autoplayArmedAt: Long = 0L
 
@@ -1680,6 +1786,7 @@ class PlaybackBridge(private val context: Context) {
         contextIndex: Int,
         positionMs: Long,
         playing: Boolean,
+        startEngine: Boolean = true,
     ) {
         var row = track
         if (row.title.isBlank() &&
@@ -1727,8 +1834,10 @@ class PlaybackBridge(private val context: Context) {
             connectedDevice = "Quackify",
             devices = state.devices.map { it.copy(active = it.id == deviceId) },
         )
-        player.play(row.asCommandTrack(), connect.spclientHost, positionMs)
-        if (!playing) player.pause()
+        if (startEngine) {
+            player.play(row.asCommandTrack(), connect.spclientHost, positionMs)
+            if (!playing) player.pause()
+        }
         connect.holdsStream = true
         publishLocalFromEngine(positionMs, playing)
         publishQueue(connect.cluster.value)
@@ -1736,6 +1845,78 @@ class PlaybackBridge(private val context: Context) {
         if (row.uri.startsWith("spotify:track:") || row.uri.startsWith("spotify:episode:")) {
             if (contextUri.isBlank() || contextUri == row.uri) primeStation(row.uri)
         }
+    }
+
+    /**
+     * The engine moved to the queued track on its own: adopt it instead of
+     * restarting. The bridge state moves first, the member PUT tells the
+     * cluster, and the started report goes out once the pushed command names
+     * the same track.
+     */
+    private suspend fun adoptEngineAdvance(uri: String) {
+        gaplessQueuedUri = ""
+        player.clearQueuedNext()
+        val rows = chainFor()
+        val at = rowOf(rows, uri)
+        if (at >= 0) resumeRow = at + 1
+        val server = connect.cluster.value
+        val contextUri = chainContext.ifBlank { server?.contextUri.orEmpty() }
+        val window = server?.window().orEmpty()
+        val windowAt = window.indexOfFirst { it.uri == uri }
+        var row = windowAt.takeIf { it >= 0 }?.let { window[it] }
+        if (row == null) {
+            val found = runCatching { TrackSource.decorate(this.context, listOf(uri))[uri] }.getOrNull()
+            row = ClusterTrack(
+                uri = uri,
+                uid = TrackUid.get(uri),
+                title = found?.title.orEmpty(),
+                artistName = found?.artists.orEmpty(),
+                artistUri = found?.artistUri.orEmpty(),
+                imageUrl = found?.imageUrl.orEmpty(),
+                albumTitle = "",
+                albumUri = found?.albumUri.orEmpty(),
+                durationMs = found?.durationMs ?: 0L,
+                explicit = found?.explicit ?: false,
+                creativeId = "",
+            )
+        }
+        val index = when {
+            windowAt >= 0 -> server?.indexOf(windowAt) ?: -1
+            at >= 0 -> at
+            else -> -1
+        }
+        log.i("gapless: adopting '${row.title.ifBlank { uri.takeLast(12) }}' ctxIdx=$index")
+        startLocal(row, contextUri, index, 0L, playing = true, startEngine = false)
+        val deadline = SystemClock.elapsedRealtime() + 3000L
+        while (connect.playback?.currentTrack?.uri != uri && SystemClock.elapsedRealtime() < deadline) {
+            delay(100)
+        }
+        val command = connect.playback
+        if (command?.currentTrack?.uri != uri) {
+            log.w("gapless: the command never caught up with '${uri.takeLast(12)}', started report skipped")
+            return
+        }
+        val duration = player.durationMs.takeIf { it > 0L } ?: row.durationMs
+        val snapshot = Snapshot.of(
+            command,
+            DebugSource.STARTED_PLAYING,
+            positionMs = 0L,
+            previousPositionMs = 0L,
+            speed = 1.0,
+            durationMs = duration,
+            format = player.format.takeIf { it > 0 }?.toString().orEmpty(),
+            bitrate = player.bitrate,
+            quality = player.quality,
+            videoOn = canvasOn,
+        )
+        if (snapshot == null) {
+            log.w("gapless: no snapshot for the adopted track")
+            return
+        }
+        val accepted = connect.report(snapshot)
+        command.currentTrack?.let { connect.melody.audioParams(it, 0L) }
+        log.i("report started_playing accepted=$accepted pos=0 (gapless) fmt=${snapshot.format}")
+        queueGaplessNext(uri)
     }
 
     private fun loadChapters(uri: String) {
@@ -3359,14 +3540,29 @@ class PlaybackBridge(private val context: Context) {
         val command = connect.playback
         if (command == null) {
             when (event) {
-                PlayerEvent.Started -> scope.launch { publishLocalFromEngine() }
+                is PlayerEvent.Started -> {
+                    if (event.uri.isNotBlank() && event.uri == player.queuedNextUri) {
+                        log.i("gapless: the engine moved to '${event.uri.takeLast(12)}' on its own")
+                        scope.launch { adoptEngineAdvance(event.uri) }
+                        return
+                    }
+                    scope.launch {
+                        publishLocalFromEngine()
+                        queueGaplessNext(event.uri.ifBlank { state.trackUri })
+                    }
+                }
                 is PlayerEvent.Seeked -> scope.launch { publishLocalFromEngine(event.positionMs) }
-                PlayerEvent.Ended -> {
-                    val ended = player.state.value.trackUri
+                is PlayerEvent.Ended -> {
+                    val ended = event.uri.ifBlank { player.state.value.trackUri }
+                    if (gaplessEnabled() && player.currentUri != ended) {
+                        log.i("player ended '$ended', the queued track takes over without a restart")
+                        return
+                    }
                     log.i("player ended '$ended' with no command, advancing on this phone")
                     scope.launch { advance(ended) }
                 }
                 is PlayerEvent.Failed -> {
+                    gaplessQueuedUri = ""
                     if (videoActive()) {
                         fallbackFromVideo()
                         return
@@ -3383,7 +3579,12 @@ class PlaybackBridge(private val context: Context) {
         val duration = if (ad) AD_THRESHOLD_MS else player.durationMs
         val position = if (duration > 0L) raw.coerceAtMost(duration) else raw
         when (event) {
-            PlayerEvent.Started -> {
+            is PlayerEvent.Started -> {
+                if (event.uri.isNotBlank() && event.uri == player.queuedNextUri) {
+                    log.i("gapless: the engine moved to '${event.uri.takeLast(12)}' on its own")
+                    scope.launch { adoptEngineAdvance(event.uri) }
+                    return
+                }
                 log.i("player started pos=$position dur=${player.durationMs}ms ad=$ad")
                 scope.launch {
                     val snapshot = Snapshot.of(
@@ -3409,6 +3610,7 @@ class PlaybackBridge(private val context: Context) {
                             "fmt=${snapshot.format} ${snapshot.bitrate}b ${snapshot.quality}"
                     )
                 }
+                if (!ad) queueGaplessNext(event.uri.ifBlank { state.trackUri })
             }
 
             is PlayerEvent.Seeked -> {
@@ -3426,7 +3628,7 @@ class PlaybackBridge(private val context: Context) {
                 }
             }
 
-            PlayerEvent.Ended -> {
+            is PlayerEvent.Ended -> {
                 log.i("player ended at $raw clamped=$position dur=$duration ad=$ad")
                 scope.launch {
                     if (ad) {
@@ -3461,7 +3663,14 @@ class PlaybackBridge(private val context: Context) {
                         val accepted = connect.report(finalized)
                         log.i("report track_data_finalized accepted=$accepted ad=$ad pos=$position")
                     }
-                    advance(command.currentTrack?.uri.orEmpty().ifBlank { player.state.value.trackUri })
+                    val ended = event.uri.ifBlank {
+                        command.currentTrack?.uri.orEmpty().ifBlank { player.state.value.trackUri }
+                    }
+                    if (gaplessEnabled() && player.currentUri != ended) {
+                        log.i("player ended '$ended', the queued track takes over without a restart")
+                        return@launch
+                    }
+                    advance(ended)
                 }
             }
 
@@ -3469,6 +3678,13 @@ class PlaybackBridge(private val context: Context) {
 
             is PlayerEvent.Failed -> {
                 log.w("player failed: ${event.message}")
+                if (gaplessQueuedUri.isNotBlank()) {
+                    log.w("gapless: the queued '${gaplessQueuedUri.takeLast(12)}' failed to take over, advancing the hard way")
+                    gaplessQueuedUri = ""
+                    player.clearQueuedNext()
+                    scope.launch { advance(state.trackUri) }
+                    return
+                }
                 if (videoActive()) {
                     fallbackFromVideo()
                     return

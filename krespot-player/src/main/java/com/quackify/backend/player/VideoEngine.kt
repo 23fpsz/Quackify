@@ -429,12 +429,12 @@ internal class VideoEngine(
             when (state) {
                 Player.STATE_READY -> if (!announced) {
                     announced = true
-                    onEvent(PlayerEvent.Started)
+                    onEvent(PlayerEvent.Started())
                     if (started) startProgress()
                 }
                 Player.STATE_ENDED -> {
                     lastPositionMs = durationMs
-                    onEvent(PlayerEvent.Ended)
+                    onEvent(PlayerEvent.Ended())
                 }
                 else -> Unit
             }
