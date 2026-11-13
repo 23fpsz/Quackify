@@ -62,6 +62,7 @@ import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.SearchHit
+import com.quackify.backend.model.SearchKind
 import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.compose.home.toFavoriteArtistsShelf
@@ -245,7 +246,7 @@ class MainActivity : ComponentActivity() {
                         var searchFetch by remember { mutableStateOf(0) }
                         var searchDataFor by remember { mutableStateOf("") }
                         val searchSavedOverrides = remember { mutableStateMapOf<String, Boolean>() }
-                        var recentQueries by remember { mutableStateOf(RecentQueries.all(context)) }
+                        var recentSearches by remember { mutableStateOf(RecentSearches.all(context)) }
                         val scope = rememberCoroutineScope()
 
                         var showUri by remember { mutableStateOf("") }
@@ -865,8 +866,6 @@ class MainActivity : ComponentActivity() {
                             searchLoading = true
                             searchFailed = false
                             delay(280)
-                            RecentQueries.record(context, term)
-                            recentQueries = RecentQueries.all(context)
                             searchHits = Search.suggest(context, term)
                             val results = Search.query(context, term)
                             searchData = results?.let { decorateSearchTracks(context, it) }
@@ -875,7 +874,7 @@ class MainActivity : ComponentActivity() {
                             searchFailed = results == null
                             searchLoading = false
                             if (results != null) {
-                                log.i("searched '$term', recents now ${recentQueries.size}")
+                                log.i("searched '$term'")
                             }
                         }
                         EncoreAppShell(
@@ -1254,12 +1253,16 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             },
-                            searchRecent = remember(recentQueries) {
-                                recentQueries.map { term ->
+                            searchRecent = remember(recentSearches) {
+                                recentSearches.map { entry ->
                                     SearchHistoryItem(
-                                        title = term,
-                                        subtitle = "",
-                                        isQuery = true,
+                                        title = entry.title,
+                                        subtitle = entry.subtitle,
+                                        kind = runCatching { SearchKind.valueOf(entry.kind) }
+                                            .getOrDefault(SearchKind.QUERY),
+                                        colorHex = entry.colorHex,
+                                        uri = entry.uri,
+                                        imageUrl = entry.imageUrl,
                                     )
                                 }
                             },
@@ -1269,14 +1272,18 @@ class MainActivity : ComponentActivity() {
                             searchQuery = searchTerm,
                             searchData = searchData,
                             onClearRecentSearches = {
-                                RecentQueries.clear(context)
-                                recentQueries = emptyList()
+                                RecentSearches.clear(context)
+                                recentSearches = emptyList()
                                 log.i("cleared the recent searches on this device")
                             },
-                            onRemoveRecentSearch = { term ->
-                                RecentQueries.remove(context, term)
-                                recentQueries = RecentQueries.all(context)
-                                log.i("removed '$term' from the recent searches")
+                            onRemoveRecentSearch = { item ->
+                                RecentSearches.remove(context, item.uri.ifBlank { item.title })
+                                recentSearches = RecentSearches.all(context)
+                                log.i("removed '${item.title}' from the recent searches")
+                            },
+                            onRecordRecentSearch = { hit ->
+                                RecentSearches.record(context, hit)
+                                recentSearches = RecentSearches.all(context)
                             },
                             onLoadSearchSection = { kind, offset ->
                                 Search.section(context, kind, searchTerm, offset)
