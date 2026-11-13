@@ -247,6 +247,8 @@ fun EncoreNowPlayingScreen(
     videoQualities: List<Int> = emptyList(),
     videoSwitching: Boolean = false,
     onSwitchVideo: (Boolean) -> Unit = {},
+    videoFullscreen: Boolean = false,
+    onToggleVideoFullscreen: (Boolean) -> Unit = {},
     onVideoQuality: (Int) -> Unit = {},
     onVideoSurface: (android.view.Surface?) -> Unit = {},
     isEpisode: Boolean = false,
@@ -275,6 +277,24 @@ fun EncoreNowPlayingScreen(
     var isLyricsShareOpen by remember { mutableStateOf(false) }
 
     BackHandler(enabled = isLyricsFullscreen) { isLyricsFullscreen = false }
+
+    if (videoFullscreen && videoActive) {
+        BackHandler { onToggleVideoFullscreen(false) }
+        VideoFullscreenLayout(
+            videoQualities = videoQualities,
+            onVideoQuality = onVideoQuality,
+            onVideoSurface = onVideoSurface,
+            progress = progress,
+            durationMs = durationMs,
+            currentPositionMs = currentPositionMs,
+            onSeek = onSeek,
+            isLoading = isLoading,
+            canSeek = canSeek,
+            chapters = chapters,
+            onExit = { onToggleVideoFullscreen(false) }
+        )
+        return
+    }
 
     val canvasActive = isCanvasAllowed && isCanvasEnabled && canvasFilePath != null
 
@@ -492,7 +512,8 @@ fun EncoreNowPlayingScreen(
                             available = musicVideoAvailable,
                             active = videoActive,
                             switching = videoSwitching,
-                            onSwitch = onSwitchVideo
+                            onSwitch = onSwitchVideo,
+                            onFull = { onToggleVideoFullscreen(true) }
                         )
 
                         if (effectiveLyricsVisible) {
@@ -733,7 +754,8 @@ fun EncoreNowPlayingScreen(
                                 available = musicVideoAvailable,
                                 active = videoActive,
                                 switching = videoSwitching,
-                                onSwitch = onSwitchVideo
+                                onSwitch = onSwitchVideo,
+                                onFull = { onToggleVideoFullscreen(true) }
                             )
 
                             Spacer(modifier = Modifier.height(lyricBottomSpacerHeight))
@@ -1236,18 +1258,82 @@ private fun NowPlayingArtworkCard(
 }
 
 @Composable
+private fun VideoFullscreenLayout(
+    videoQualities: List<Int>,
+    onVideoQuality: (Int) -> Unit,
+    onVideoSurface: (android.view.Surface?) -> Unit,
+    progress: Float,
+    durationMs: Long,
+    currentPositionMs: Long,
+    onSeek: (Float) -> Unit,
+    isLoading: Boolean,
+    canSeek: Boolean,
+    chapters: List<ChapterMarker>,
+    onExit: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        NowPlayingArtworkCard(
+            title = "",
+            coverUrl = null,
+            dominantColor = Color.Black,
+            backgroundColor = Color.Black,
+            canvasFilePath = null,
+            isCanvasEnabled = false,
+            fullBleed = true,
+            videoActive = true,
+            videoQualities = videoQualities,
+            onVideoQuality = onVideoQuality,
+            onVideoSurface = onVideoSurface,
+            modifier = Modifier.fillMaxSize()
+        )
+        Icon(
+            painter = painterResource(R.drawable.encore_icon_arrow_down_24),
+            contentDescription = "Exit fullscreen",
+            tint = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(16.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.35f))
+                .clickable { onExit() }
+                .padding(8.dp)
+                .size(20.dp)
+        )
+        NowPlayingSeekBarSection(
+            progress = progress,
+            durationMs = durationMs,
+            currentPositionMs = currentPositionMs,
+            onSeek = onSeek,
+            isLoading = isLoading,
+            canSeek = canSeek,
+            markers = chapterFractions(chapters, durationMs),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp)
+        )
+    }
+}
+
+@Composable
 private fun MusicVideoSwitchRow(
     available: Boolean,
     active: Boolean,
     switching: Boolean,
     onSwitch: (Boolean) -> Unit,
+    onFull: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (!available && !active) return
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         MusicVideoSwitchPill(
             label = if (active) "Audio" else "Music video",
@@ -1255,6 +1341,14 @@ private fun MusicVideoSwitchRow(
             switching = switching,
             onClick = { onSwitch(!active) }
         )
+        if (active) {
+            MusicVideoSwitchPill(
+                label = "Full",
+                iconRes = R.drawable.encore_icon_fullscreen_24,
+                switching = false,
+                onClick = onFull
+            )
+        }
     }
 }
 

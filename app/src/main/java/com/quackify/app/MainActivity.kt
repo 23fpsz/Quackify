@@ -128,6 +128,7 @@ class MainActivity : ComponentActivity() {
     private var updateTotalMb by mutableStateOf(0f)
     private var updateSpeedMbps by mutableStateOf(0f)
     private var installTick by mutableStateOf(0)
+    private var videoFullscreen by mutableStateOf(false)
 
     /** Bumped every time the playback notification's body is tapped; the
      * shell watches it and slides the Now Playing view over whatever is
@@ -844,6 +845,13 @@ class MainActivity : ComponentActivity() {
 
                         val bridge = remember { PlaybackHost.ensure(context) }
                         val playback = bridge.state
+
+                        LaunchedEffect(playback.videoActive) {
+                            if (!playback.videoActive && videoFullscreen) {
+                                videoFullscreen = false
+                                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                            }
+                        }
                         LaunchedEffect(settingsSwitches.musicVideos, settingsSwitches.otherVideos) {
                             bridge.setVideoPolicy(settingsSwitches.musicVideos, settingsSwitches.otherVideos)
                         }
@@ -1530,6 +1538,15 @@ class MainActivity : ComponentActivity() {
                             browsePage = browsePage,
                             categoryShelves = categoryShelves,
                             fullArtworkPlayer = fullArtworkPlayer,
+                            videoFullscreen = videoFullscreen,
+                            onToggleVideoFullscreen = { on ->
+                                videoFullscreen = on
+                                requestedOrientation = if (on) {
+                                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                } else {
+                                    ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                }
+                            },
                             onToggleFullArtwork = { on ->
                                 fullArtworkPlayer = on
                                 clientPrefs.edit().putBoolean("fullArtworkPlayer", on).apply()
