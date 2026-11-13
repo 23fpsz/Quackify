@@ -737,6 +737,18 @@ class PlaybackBridge(private val context: Context) {
         remoteTick = null
         mirrors?.cancel()
         mirrors = null
+        scope.cancel()
+        if (player.isPlaying) player.pause()
+        runCatching {
+            runBlocking {
+                withTimeoutOrNull(2_000L) {
+                    if (connect.holdsStream && player.hasSource) {
+                        publishLocalFromEngine(playing = false)
+                    }
+                    connect.unregister()
+                }
+            }
+        }.onFailure { log.w("reset cleanup failed ${it.javaClass.simpleName}") }
         player.reset()
         connect.reset()
         thresholdTrack = ""
