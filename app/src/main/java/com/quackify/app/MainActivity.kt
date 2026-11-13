@@ -40,6 +40,7 @@ import com.quackify.compose.library.LibraryItemType
 import com.quackify.compose.shell.PlaylistEditDraft
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.PopularTrack
+import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.ArtistRelease
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.home.toTrackItem
@@ -110,6 +111,10 @@ class MainActivity : ComponentActivity() {
     }
     private var resumeSignal by mutableStateOf(0)
     private var pendingLink by mutableStateOf<SpotLink?>(null)
+    private var appUpdate by mutableStateOf<AppUpdate?>(null)
+    private var updateChecking by mutableStateOf(false)
+    private var updateChecked by mutableStateOf(false)
+    private var updateFetch by mutableStateOf(0)
 
     /** Bumped every time the playback notification's body is tapped; the
      * shell watches it and slides the Now Playing view over whatever is
@@ -725,6 +730,15 @@ class MainActivity : ComponentActivity() {
                             browsePage = Browse.page(context, browseUri)
                         }
 
+                        LaunchedEffect(updateFetch) {
+                            updateChecking = true
+                            appUpdate = withContext(Dispatchers.IO) {
+                                runCatching { UpdateChecker.check(context) }.getOrNull()
+                            }
+                            updateChecking = false
+                            updateChecked = true
+                        }
+
                         LaunchedEffect(loggedIn, pendingLink) {
                             val link = pendingLink ?: return@LaunchedEffect
                             if (link.kind != "track" && link.kind != "station") return@LaunchedEffect
@@ -925,6 +939,10 @@ class MainActivity : ComponentActivity() {
                                 deeplink = pendingLink?.let { ShellDeepLink(it.kind, it.uri, it.query) },
                                 onDeeplinkConsumed = { pendingLink = null },
                                 onDeeplinkSearch = { q -> if (searchTerm == q) searchFetch++ else searchTerm = q },
+                                appUpdate = appUpdate,
+                                updateChecking = updateChecking,
+                                updateChecked = updateChecked,
+                                onCheckUpdates = { updateFetch++ },
                                 userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
                                 userAvatarUrl = account?.imageUrl.orEmpty(),
                             playbackState = bridge.state,

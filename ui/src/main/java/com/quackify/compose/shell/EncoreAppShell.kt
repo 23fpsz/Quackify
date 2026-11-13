@@ -31,6 +31,7 @@ import com.quackify.compose.library.EncoreLibraryScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.SettingsSwitches
@@ -136,6 +137,10 @@ fun EncoreAppShell(
     onToggleSetting: ((String, Boolean) -> Unit)? = null,
     onToggleFullArtwork: (Boolean) -> Unit = {},
     onAppIconChange: ((String) -> Unit)? = null,
+    appUpdate: AppUpdate? = null,
+    updateChecking: Boolean = false,
+    updateChecked: Boolean = false,
+    onCheckUpdates: (() -> Unit)? = null,
     browsePage: BrowsePage? = null,
     categoryShelves: List<CategoryShelf>? = null,
     onOpenCategory: ((String) -> Unit)? = null,
@@ -798,7 +803,11 @@ fun EncoreAppShell(
                 loading = settingsLoading,
                 onToggleSetting = onToggleSetting,
                 onToggleFullArtwork = onToggleFullArtwork,
-                onAppIconChange = { onAppIconChange?.invoke(it) }
+                onAppIconChange = { onAppIconChange?.invoke(it) },
+                update = appUpdate,
+                updateChecking = updateChecking,
+                updateChecked = updateChecked,
+                onCheckUpdates = { onCheckUpdates?.invoke() }
             )
             ShellScreen.NOTIFICATIONS -> ShellNotificationsPane(
                 onBackClick = handleBack,
