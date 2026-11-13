@@ -18,6 +18,7 @@ internal class ShellNavController(
     private val onLoadArtist: ((String, String) -> Unit)?,
     private val onOpenShow: ((String) -> Unit)?,
     private val onOpenEpisode: ((String) -> Unit)?,
+    private val onOpenUserProfile: ((String, String) -> Unit)?,
     private val libraryItems: List<LibraryItem>?,
     private val searchData: SearchResults?,
     private val nowPlayingArtistImageUrl: String?,
@@ -233,6 +234,16 @@ internal class ShellNavController(
     fun openProfile() {
         pushCurrentState()
         currentScreen = ShellScreen.PROFILE
+    }
+
+    fun openUserProfile(context: Context, uri: String, name: String) {
+        if (!uri.startsWith("spotify:user:")) {
+            Toast.makeText(context, "Couldn't open $name", Toast.LENGTH_SHORT).show()
+            return
+        }
+        pushCurrentState()
+        currentScreen = ShellScreen.PROFILE
+        onOpenUserProfile?.invoke(uri, name)
     }
 
     fun openHistory(onOpenHistory: (() -> Unit)?) {

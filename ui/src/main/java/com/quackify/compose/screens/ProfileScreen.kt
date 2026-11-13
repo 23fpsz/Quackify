@@ -92,6 +92,7 @@ fun EncoreProfileScreen(
     onTrackSelect: (ProfileTopTrack) -> Unit,
     onTrackOptionsClick: (ProfileTopTrack) -> Unit,
     onContextClick: (ProfileContextCard) -> Unit,
+    contextsTitle: String = "Recently played",
     fallbackName: String = "",
     avatarUrl: String = "",
     modifier: Modifier = Modifier
@@ -133,7 +134,7 @@ fun EncoreProfileScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Couldn't load your profile",
+                        text = "Couldn't load this profile",
                         style = EncoreTheme.typography.titleLarge
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -203,7 +204,7 @@ fun EncoreProfileScreen(
                 }
                 if (contexts.isNotEmpty()) {
                     item {
-                        ProfileSectionTitle(title = "Recently played")
+                        ProfileSectionTitle(title = contextsTitle)
                     }
                     val rows = contexts.chunked(3)
                     items(rows) { rowCards ->

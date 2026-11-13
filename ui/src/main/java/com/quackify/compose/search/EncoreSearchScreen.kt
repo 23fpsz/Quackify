@@ -172,6 +172,7 @@ fun EncoreSearchScreen(
     onPodcastClick: (String, String) -> Unit = { _, _ -> },
     onEpisodeClick: (String, String) -> Unit = { _, _ -> },
     onShowClick: (String, String) -> Unit = { _, _ -> },
+    onUserClick: (String, String) -> Unit = { _, _ -> },
     searchData: SearchResults? = null,
     onPlaylistClick: (String, String) -> Unit = { _, _ -> },
     searchResults: List<TrackItem>? = null,
@@ -203,7 +204,7 @@ fun EncoreSearchScreen(
     var selectedSearchTab by remember { mutableIntStateOf(0) }
     var isSearchBarFocused by remember { mutableStateOf(false) }
     var suggestionsPinned by remember { mutableStateOf(false) }
-    val searchTabs = listOf("Top", "Songs", "Artists", "Playlists", "Albums", "Podcasts")
+    val searchTabs = listOf("Top", "Songs", "Artists", "Playlists", "Albums", "Podcasts", "Profiles")
     val focusManager = LocalFocusManager.current
     val bottomPadding = rememberBottomPadding()
 
@@ -412,6 +413,7 @@ fun EncoreSearchScreen(
             SearchKind.PLAYLIST -> onPlaylistClick(hit.title, hit.uri)
             SearchKind.EPISODE -> onEpisodeClick(hit.title, hit.uri)
             SearchKind.SHOW -> onShowClick(hit.title, hit.uri)
+            SearchKind.USER -> onUserClick(hit.uri, hit.title)
             SearchKind.TRACK -> playFromSearch(hit.toTrackItem())
             else -> Unit
         }
@@ -629,6 +631,7 @@ fun EncoreSearchScreen(
                                     SearchKind.PLAYLIST -> onPlaylistClick(searchItem.title, searchItem.uri)
                                     SearchKind.EPISODE -> onEpisodeClick(searchItem.title, searchItem.uri)
                                     SearchKind.SHOW -> onShowClick(searchItem.title, searchItem.uri)
+                                    SearchKind.USER -> onUserClick(searchItem.uri, searchItem.title)
                                     else -> {
                                         searchQuery = searchItem.title
                                         onSearchQueryChange(searchItem.title)
@@ -877,6 +880,7 @@ fun EncoreSearchScreen(
                             item {
                                 val top = topHit?.toTrackItem() ?: topTrack!!
                                 val topLabel = topHit?.kind?.sectionLabel() ?: "Song"
+                                val topRound = topHit?.kind == SearchKind.ARTIST || topHit?.kind == SearchKind.USER
                                 val openTopResult = {
                                     val hit = topHit
                                     if (hit == null) {
@@ -914,7 +918,7 @@ fun EncoreSearchScreen(
                                         Box(
                                             modifier = Modifier
                                                 .size(64.dp)
-                                                .clip(RoundedCornerShape(4.dp))
+                                                .clip(if (topRound) CircleShape else RoundedCornerShape(4.dp))
                                                 .background(
                                                     Brush.linearGradient(
                                                         listOf(Color(0xFF8D67AB), Color(0xFF1E3264))
@@ -927,10 +931,10 @@ fun EncoreSearchScreen(
                                                     imageUrl = top.imageUrl,
                                                     contentDescription = top.title,
                                                     modifier = Modifier.fillMaxSize(),
-                                                    cornerRadius = 4.dp
+                                                    cornerRadius = if (topRound) 32.dp else 4.dp
                                                 )
                                             } else {
-                                                Text(text = "♫", fontSize = 32.sp, color = Color.White)
+                                                Text(text = if (topRound) "★" else "♫", fontSize = 32.sp, color = Color.White)
                                             }
                                         }
 
@@ -950,22 +954,26 @@ fun EncoreSearchScreen(
                                                 text = topLabel,
                                                 style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary)
                                             )
-                                            Text(
-                                                text = " • ${top.artist}",
-                                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
+                                            if (top.artist.isNotBlank() && !top.artist.equals(topLabel, ignoreCase = true)) {
+                                                Text(
+                                                    text = " • ${top.artist}",
+                                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
                                     }
 
-                                    EncorePlayButton(
-                                        isPlaying = isThisPlaying,
-                                        onClick = { openTopResult() },
-                                        size = 48.dp,
-                                        iconSize = 22.dp,
-                                        modifier = Modifier.align(Alignment.BottomEnd)
-                                    )
+                                    if (topHit?.kind != SearchKind.USER) {
+                                        EncorePlayButton(
+                                            isPlaying = isThisPlaying,
+                                            onClick = { openTopResult() },
+                                            size = 48.dp,
+                                            iconSize = 22.dp,
+                                            modifier = Modifier.align(Alignment.BottomEnd)
+                                        )
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.height(20.dp))
@@ -1099,6 +1107,38 @@ fun EncoreSearchScreen(
                                         )
                                         onPlaylistClick(playlist.title, playlist.uri)
                                     }
+                                )
+                            }
+
+                            item {
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+                        }
+
+                        val profileHits = displaySearchData?.others.orEmpty().filter { it.kind == SearchKind.USER }
+                        if (profileHits.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Profiles",
+                                    style = EncoreTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
+
+                            items(profileHits.take(4), key = { "user_${it.uri}" }) { hit ->
+                                SearchHitRow(
+                                    hit = hit,
+                                    isPlaying = isPlaying,
+                                    currentTrackTitle = currentTrackTitle,
+                                    currentTrackUri = currentTrackUri,
+                                    onTrackSelect = playFromSearch,
+                                    onTrackOptionsClick = onTrackOptionsClick,
+                                    onAlbumClick = onAlbumClick,
+                                    onArtistClick = onArtistClick,
+                                    onPlaylistClick = onPlaylistClick,
+                                    onToggleSaved = onToggleSaved,
+                                    onOpen = { openHit(hit) },
+                                    onRecordRecent = onRecordRecent
                                 )
                             }
 
@@ -1634,6 +1674,7 @@ private fun SearchKind.sectionLabel(): String = when (this) {
     SearchKind.ALBUM -> "Album"
     SearchKind.PLAYLIST -> "Playlist"
     SearchKind.SHOW, SearchKind.EPISODE -> "Podcast"
+    SearchKind.USER -> "Profile"
     else -> "Result"
 }
 
@@ -1643,6 +1684,7 @@ private fun kindOfTab(index: Int): SearchKind? = when (index) {
     3 -> SearchKind.PLAYLIST
     4 -> SearchKind.ALBUM
     5 -> SearchKind.SHOW
+    6 -> SearchKind.USER
     else -> null
 }
 
@@ -1653,6 +1695,7 @@ private fun kindLabel(kind: SearchKind): String = when (kind) {
     SearchKind.ALBUM -> "albums"
     SearchKind.PLAYLIST -> "playlists"
     SearchKind.SHOW, SearchKind.EPISODE -> "podcasts"
+    SearchKind.USER -> "profiles"
     else -> "results"
 }
 
@@ -1690,6 +1733,7 @@ private fun SearchKind.recentIconRes(): Int = when (this) {
     SearchKind.ALBUM -> R.drawable.encore_icon_album_24
     SearchKind.PLAYLIST -> R.drawable.encore_icon_playlist_24
     SearchKind.EPISODE, SearchKind.SHOW -> R.drawable.encore_icon_podcasts_24
+    SearchKind.USER -> R.drawable.encore_icon_user_24
     else -> R.drawable.encore_icon_search_24
 }
 

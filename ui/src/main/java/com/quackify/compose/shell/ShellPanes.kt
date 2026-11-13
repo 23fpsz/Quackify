@@ -263,6 +263,7 @@ internal fun ShellProfilePane(
     onTrackSelect: (ProfileTopTrack) -> Unit,
     onTrackOptionsClick: (ProfileTopTrack) -> Unit,
     onContextClick: (ProfileContextCard) -> Unit,
+    contextsTitle: String,
     fallbackName: String,
     avatarUrl: String,
 ) {
@@ -281,6 +282,7 @@ internal fun ShellProfilePane(
         onTrackSelect = onTrackSelect,
         onTrackOptionsClick = onTrackOptionsClick,
         onContextClick = onContextClick,
+        contextsTitle = contextsTitle,
         fallbackName = fallbackName,
         avatarUrl = avatarUrl
     )
@@ -408,6 +410,7 @@ internal fun ShellSearchPane(
     onOpenEpisode: (String) -> Unit,
     onOpenShow: (String) -> Unit,
     onOpenPlaylist: (String, String) -> Unit,
+    onUserClick: (String, String) -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit,
     onProfileClick: () -> Unit,
@@ -419,6 +422,7 @@ internal fun ShellSearchPane(
         onPodcastClick = onPodcastClick,
         onEpisodeClick = { _, uri -> if (uri.isNotEmpty()) onOpenEpisode(uri) },
         onShowClick = { _, uri -> if (uri.isNotEmpty()) onOpenShow(uri) },
+        onUserClick = onUserClick,
         onPlaylistClick = onOpenPlaylist,
         onTrackSelect = onTrackSelect,
         onTrackOptionsClick = onTrackOptionsClick,
