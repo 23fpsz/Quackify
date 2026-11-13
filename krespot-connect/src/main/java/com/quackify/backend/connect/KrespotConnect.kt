@@ -338,6 +338,7 @@ class KrespotConnect(private val context: Context) {
         repeatTrack: Boolean = false,
         enhancement: String = "",
         queueRevision: String = "",
+        contextDescription: String = "",
         nextRows: List<ClusterTrack> = emptyList(),
     ): Boolean {
         val connection = _connectionId.value
@@ -350,7 +351,8 @@ class KrespotConnect(private val context: Context) {
         val state = withContext(Dispatchers.Default) {
             localPlayerState(
                 track, contextUri, contextIndex, positionMs, playing, durationMs,
-                shuffle, repeatContext, repeatTrack, enhancement, queueRevision, nextRows,
+                shuffle, repeatContext, repeatTrack, enhancement, queueRevision,
+                contextDescription, nextRows,
             )
         }
         val response = Registration.connectState(
@@ -403,6 +405,7 @@ class KrespotConnect(private val context: Context) {
         repeatTrack: Boolean,
         enhancement: String,
         queueRevision: String,
+        contextDescription: String,
         nextRows: List<ClusterTrack>,
     ): JSONObject {
         val now = System.currentTimeMillis()
@@ -450,6 +453,7 @@ class KrespotConnect(private val context: Context) {
             .put("context_uri", contextUri)
             .put("context_url", "context://$contextUri")
             .put("context_restrictions", JSONObject())
+            .put("context_metadata", JSONObject().put("context_description", contextDescription))
             .put(
                 "play_origin",
                 JSONObject()
