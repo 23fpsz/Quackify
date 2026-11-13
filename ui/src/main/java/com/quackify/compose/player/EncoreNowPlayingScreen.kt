@@ -344,7 +344,7 @@ fun EncoreNowPlayingScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-    val dismissThresholdPx = screenHeightPx * 0.5f
+    val dismissThresholdPx = screenHeightPx * 0.35f
     val fullArtworkHeight = (configuration.screenWidthDp + 76).dp
     val videoAreaHeight = (configuration.screenWidthDp * 0.8f * 9f / 16f).dp + 24.dp
 
@@ -965,12 +965,14 @@ private fun Modifier.npvArtworkGesture(
     onSnapBack: () -> Unit
 ): Modifier = pointerInput(dismissThresholdPx, scrollEnabled) {
     var axis = AXIS_UNDECIDED
+    var totalDragX = 0f
     var totalDragY = 0f
     val velocityTracker = VelocityTracker()
 
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         axis = AXIS_UNDECIDED
+        totalDragX = 0f
         totalDragY = 0f
         velocityTracker.resetTracking()
         velocityTracker.addPosition(down.uptimeMillis, down.position)
@@ -981,13 +983,16 @@ private fun Modifier.npvArtworkGesture(
             if (!change.pressed) break
 
             val delta = change.positionChange()
+            totalDragX += delta.x
             totalDragY += delta.y
 
             if (axis == AXIS_UNDECIDED) {
-                if (delta.y.absoluteValue > DRAG_AXIS_SLOP_PX) {
+                val absX = totalDragX.absoluteValue
+                val absY = totalDragY.absoluteValue
+                if (absY > DRAG_AXIS_SLOP_PX && absY >= absX) {
                     val pageAtTop = !scrollEnabled || scrollState.value <= 0
-                    axis = if (delta.y > 0f && pageAtTop) AXIS_VERTICAL else AXIS_YIELD
-                } else if (delta.x.absoluteValue > DRAG_AXIS_SLOP_PX) {
+                    axis = if (totalDragY > 0f && pageAtTop) AXIS_VERTICAL else AXIS_YIELD
+                } else if (absX > DRAG_AXIS_SLOP_PX) {
                     axis = AXIS_YIELD
                 }
             }
