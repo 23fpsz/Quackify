@@ -209,6 +209,7 @@ fun EncoreAlbumScreen(
                 )
         )
 
+        EncoreFastScroll(listState) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -613,7 +614,7 @@ fun EncoreAlbumScreen(
             }
         }
 
-        EncoreFastScroll(listState = listState)
+        }
 
         Box(
             modifier = Modifier
