@@ -73,11 +73,11 @@ internal class AudioDrmCallback(
         }
         val body = response?.takeIf { it.ok }
         if (body == null) {
-            LicenseGate.hold(0L)
+            LicenseGate.hold(response?.retryAfterSeconds ?: 0L)
             throw IOException("audio licence ${response?.code ?: "failed"}")
         }
         LicenseGate.clear()
-        log.i("audio licence ${body.bytes.size}B")
+        log.i("audio licence ${body.bytes.size}B ${licencePolicy(body.bytes)}")
         return MediaDrmCallback.Response(body.bytes)
     }
 
@@ -91,6 +91,51 @@ internal class AudioDrmCallback(
         val body = response?.takeIf { it.ok } ?: throw IOException("provision ${response?.code ?: "failed"}")
         return MediaDrmCallback.Response(body.bytes)
     }
+
+    private fun licencePolicy(bytes: ByteArray): String = runCatching {
+        var type = 0
+        var canPersist = -1
+        var canRenew = -1
+        var licenseDuration = -1L
+        var playbackDuration = -1L
+        var license: ByteArray? = null
+        var reader = Reader(bytes)
+        while (!reader.done()) {
+            val (field, wire) = reader.tag()
+            when {
+                field == 2 && wire == 0 -> type = reader.varint().toInt()
+                field == 3 && wire == 2 -> license = reader.bytes()
+                else -> reader.skip(wire)
+            }
+        }
+        license?.let {
+            reader = Reader(it)
+            var policy: ByteArray? = null
+            while (!reader.done()) {
+                val (field, wire) = reader.tag()
+                when {
+                    field == 3 && wire == 2 -> policy = reader.bytes()
+                    else -> reader.skip(wire)
+                }
+            }
+            policy?.let { p ->
+                reader = Reader(p)
+                while (!reader.done()) {
+                    val (field, wire) = reader.tag()
+                    when {
+                        field == 2 && wire == 0 -> canPersist = reader.varint().toInt()
+                        field == 3 && wire == 0 -> canRenew = reader.varint().toInt()
+                        field == 5 && wire == 0 -> playbackDuration = reader.varint()
+                        field == 6 && wire == 0 -> licenseDuration = reader.varint()
+                        else -> reader.skip(wire)
+                    }
+                }
+            }
+        }
+        "type=${if (type == 1) "offline" else "streaming"} " +
+            "persist=$canPersist renew=$canRenew " +
+            "licenseDur=${licenseDuration}s playbackDur=${playbackDuration}s"
+    }.getOrElse { "policy unreadable" }
 }
 
 internal class AudioEngine(
@@ -401,5 +446,45 @@ internal class AudioEngine(
             log.w("the main thread did not answer in 2500ms, giving up on the read")
         }
         return result
+    }
+}
+
+private class Reader(private val data: ByteArray) {
+    private var pos = 0
+
+    fun done(): Boolean = pos >= data.size
+
+    fun tag(): Pair<Int, Int> {
+        val value = varint()
+        return (value ushr 3).toInt() to (value and 7L).toInt()
+    }
+
+    fun varint(): Long {
+        var result = 0L
+        var shift = 0
+        while (shift <= 63) {
+            if (pos >= data.size) throw IllegalStateException("truncated varint")
+            val byte = data[pos++].toInt() and 255
+            result = result or ((byte and 127).toLong() shl shift)
+            if (byte and 128 == 0) return result
+            shift += 7
+        }
+        throw IllegalStateException("varint overflow")
+    }
+
+    fun bytes(): ByteArray {
+        val length = varint().toInt()
+        if (length < 0 || pos + length > data.size) throw IllegalStateException("truncated field")
+        return data.copyOfRange(pos, pos + length).also { pos += length }
+    }
+
+    fun skip(wire: Int) {
+        when (wire) {
+            0 -> varint()
+            1 -> pos += 8
+            2 -> bytes()
+            5 -> pos += 4
+            else -> throw IllegalStateException("wire $wire")
+        }
     }
 }
