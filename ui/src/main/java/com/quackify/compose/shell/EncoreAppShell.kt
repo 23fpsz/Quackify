@@ -933,6 +933,7 @@ fun EncoreAppShell(
                 onSkipNext = handleSkipNext,
                 onSkipPrevious = handleSkipPrevious,
                 hasTrack = playerIdentity.trackLoaded,
+                showMiniPlayer = playbackState?.trackUri.isNullOrBlank() || currentTrackTitle.isNotBlank(),
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
