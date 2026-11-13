@@ -231,6 +231,11 @@ internal class ShellNavController(
         currentScreen = ShellScreen.NOTIFICATIONS
     }
 
+    fun openActivity() {
+        pushCurrentState()
+        currentScreen = ShellScreen.ACTIVITY
+    }
+
     fun openProfile() {
         pushCurrentState()
         currentScreen = ShellScreen.PROFILE

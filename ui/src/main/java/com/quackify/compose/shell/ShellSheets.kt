@@ -105,6 +105,8 @@ internal fun ShellSheets(
     onCopyLink: (String) -> Unit,
     onShare: (String) -> Unit,
     onWhatsNew: () -> Unit,
+    onNotifications: (() -> Unit)? = null,
+    notificationsUnread: Boolean = false,
     onProfile: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
@@ -139,6 +141,8 @@ internal fun ShellSheets(
         onWhatsNewClick = onWhatsNew,
         onListeningHistoryClick = onHistory,
         onSettingsClick = onSettings,
+        onNotificationsClick = onNotifications,
+        notificationsUnread = notificationsUnread,
         onLogoutClick = onLogout,
         userDisplayName = userDisplayName,
         userAvatarUrl = userAvatarUrl
