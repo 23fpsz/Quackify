@@ -82,6 +82,8 @@ data class AlbumDisc(
     val tracks: List<TrackItem>
 )
 
+private const val PRELOAD_REMAINING_TRACKS = 25
+
 /**
  * - Collapsible overlay top bar (transparent at rest, solid coverColor when scrolled)
  * - Album artwork starting directly under status bar at statusBarTop + 8.dp with smooth scaling
@@ -129,6 +131,18 @@ fun EncoreAlbumScreen(
     var isShuffle by remember { mutableStateOf(false) }
     val bottomPadding = rememberBottomPadding()
     val listState = rememberLazyListState()
+
+    val shouldLoadMore by remember(hasMore, loadingMore, tracks.size, onLoadMore) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            hasMore && !loadingMore && tracks.isNotEmpty() &&
+                lastVisible - 1 >= tracks.size - PRELOAD_REMAINING_TRACKS
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) onLoadMore()
+    }
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val toolbarHeight = 54.dp
@@ -497,9 +511,6 @@ fun EncoreAlbumScreen(
                 }
             } else {
                 itemsIndexed(tracks) { index, track ->
-                    if (index == tracks.lastIndex - 8) {
-                        AlbumLoadMoreSentinel(hasMore = hasMore, loadingMore = loadingMore, onLoadMore = onLoadMore)
-                    }
                     val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                     AlbumTrackRow(
                         trackNumber = index + 1,
@@ -732,16 +743,6 @@ fun EncoreAlbumScreen(
  * - Explicit [E] badge
  * - 3-dot context action
  */
-@Composable
-private fun AlbumLoadMoreSentinel(
-    hasMore: Boolean,
-    loadingMore: Boolean,
-    onLoadMore: () -> Unit,
-) {
-    if (!hasMore || loadingMore) return
-    LaunchedEffect(Unit) { onLoadMore() }
-}
-
 @Composable
 private fun AlbumTrackRow(
     trackNumber: Int,

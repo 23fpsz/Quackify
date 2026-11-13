@@ -127,6 +127,8 @@ private val TRACK_SEARCH_FIELDS = SearchableFieldExtractor<TrackItem> {
     arrayOf(it.title, it.artist, it.albumName)
 }
 
+private const val PRELOAD_REMAINING_TRACKS = 25
+
 enum class PlaylistSort(
     val label: String,
     val reversible: Boolean = true,
@@ -261,12 +263,13 @@ fun EncorePlaylistScreen(
     val listState = rememberLazyListState()
     val density = LocalDensity.current
 
-    val shouldLoadMore by remember(hasMore, loadingMore, displayedTracks.size, onLoadMore) {
+    val shouldLoadMore by remember(hasMore, loadingMore, displayedTracks.size, isEditable, onLoadMore) {
         derivedStateOf {
             val info = listState.layoutInfo
             val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val leading = 1 + if (isEditable && displayedTracks.isNotEmpty()) 1 else 0
             hasMore && !loadingMore && displayedTracks.isNotEmpty() &&
-                lastVisible >= info.totalItemsCount - 8
+                lastVisible - leading >= displayedTracks.size - PRELOAD_REMAINING_TRACKS
         }
     }
     LaunchedEffect(shouldLoadMore) {
