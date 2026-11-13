@@ -5,6 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import com.quackify.compose.theme.EncoreColors
+import com.quackify.compose.theme.EncoreTheme
 
 @Composable
 internal fun DeleteConfirmDialog(
@@ -16,18 +17,18 @@ internal fun DeleteConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = EncoreColors.CardElevated,
-        title = { Text(title, color = EncoreColors.TextPrimary) },
-        text = { Text(message, color = EncoreColors.TextSecondary) },
+        containerColor = EncoreTheme.colors.cardElevated,
+        title = { Text(title, color = EncoreTheme.colors.textPrimary) },
+        text = { Text(message, color = EncoreTheme.colors.textSecondary) },
         confirmButton = {
             TextButton(onClick = {
                 onDismiss()
                 onConfirm()
-            }) { Text(confirmLabel, color = EncoreColors.Error) }
+            }) { Text(confirmLabel, color = EncoreTheme.colors.error) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = EncoreColors.TextPrimary)
+                Text("Cancel", color = EncoreTheme.colors.textPrimary)
             }
         }
     )

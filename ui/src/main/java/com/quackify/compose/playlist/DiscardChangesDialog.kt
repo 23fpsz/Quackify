@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.quackify.compose.theme.EncoreColors
+import com.quackify.compose.theme.EncoreTheme
 
 /**
  * - Center card dialog
@@ -63,7 +64,7 @@ fun DiscardChangesDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White)
+                    .background(EncoreTheme.colors.canvas)
                     .padding(horizontal = 24.dp, vertical = 28.dp),
                 contentAlignment = Alignment.Center
             ) {

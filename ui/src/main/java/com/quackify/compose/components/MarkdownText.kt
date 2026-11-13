@@ -202,12 +202,12 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
                         1 -> EncoreTheme.typography.titleLarge
                         2 -> EncoreTheme.typography.titleMedium
                         else -> EncoreTheme.typography.titleSmall
-                    }.copy(fontWeight = FontWeight.Bold, color = EncoreColors.TextPrimary)
+                    }.copy(fontWeight = FontWeight.Bold, color = EncoreTheme.colors.textPrimary)
                 )
                 is Block.Paragraph -> if (block.hasLinks) {
                     ClickableText(
                         text = block.text,
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textPrimary),
                         onClick = { offset ->
                             block.text.getStringAnnotations(TAG_URL, offset, offset).firstOrNull()?.let { url ->
                                 runCatching {
@@ -221,18 +221,18 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
                 } else {
                     Text(
                         text = block.text,
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary)
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textPrimary)
                     )
                 }
                 is Block.ListItem -> Row {
                     Text(
                         text = block.marker,
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
                         modifier = Modifier.width(24.dp)
                     )
                     Text(
                         text = block.text,
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary)
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textPrimary)
                     )
                 }
                 is Block.Quote -> Row {
@@ -246,7 +246,7 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
                     Text(
                         text = block.text,
                         style = EncoreTheme.typography.bodyMedium.copy(
-                            color = EncoreColors.TextSecondary,
+                            color = EncoreTheme.colors.textSecondary,
                             fontStyle = FontStyle.Italic
                         )
                     )
@@ -265,7 +265,7 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 12.sp,
-                                color = EncoreColors.TextPrimary
+                                color = EncoreTheme.colors.textPrimary
                             )
                         )
                     }

@@ -68,13 +68,15 @@ fun EncoreBrowseScreen(
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val accent by rememberSmoothColor(target = parseHexColor(colorHex) ?: EncoreColors.Card)
-    val headerTint = remember(accent) { lerp(EncoreColors.Background, accent, HEADER_TINT_WEIGHT) }
+    val schemeCard = EncoreTheme.colors.card
+    val schemeBackground = EncoreTheme.colors.background
+    val accent by rememberSmoothColor(target = parseHexColor(colorHex) ?: schemeCard)
+    val headerTint = remember(accent, schemeBackground) { lerp(schemeBackground, accent, HEADER_TINT_WEIGHT) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreColors.Background)
+            .background(EncoreTheme.colors.background)
     ) {
         Row(
             modifier = Modifier
@@ -147,7 +149,7 @@ fun EncoreBrowseScreen(
                         .fillMaxWidth()
                         .background(
                             Brush.verticalGradient(
-                                listOf(accent.copy(alpha = 0.55f), EncoreColors.Background)
+                                listOf(accent.copy(alpha = 0.55f), EncoreTheme.colors.background)
                             )
                         )
                         .padding(horizontal = 16.dp, vertical = 20.dp)
@@ -158,14 +160,14 @@ fun EncoreBrowseScreen(
                             fontSize = 30.sp,
                             fontWeight = FontWeight.Bold
                         ),
-                        color = EncoreColors.TextPrimary
+                        color = EncoreTheme.colors.textPrimary
                     )
                     if (subtitle.isNotBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = subtitle,
                             style = EncoreTheme.typography.bodyMedium.copy(
-                                color = EncoreColors.TextSecondary
+                                color = EncoreTheme.colors.textSecondary
                             )
                         )
                     }
@@ -181,7 +183,7 @@ fun EncoreBrowseScreen(
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = EncoreColors.TextPrimary,
+                            color = EncoreTheme.colors.textPrimary,
                             modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 10.dp)
                         )
                     }
@@ -207,7 +209,7 @@ fun EncoreBrowseScreen(
                             .height(56.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        InlineLoadingDots(color = EncoreColors.TextSecondary)
+                        InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
                     }
                 }
             }
@@ -222,7 +224,7 @@ fun EncoreBrowseScreen(
                     ) {
                         Text(
                             text = "Nothing here yet",
-                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
                             textAlign = TextAlign.Center
                         )
                     }
@@ -253,14 +255,14 @@ private fun BrowseCardTile(card: BrowseCard, onClick: () -> Unit) {
         Text(
             text = card.title,
             style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = EncoreColors.TextPrimary,
+            color = EncoreTheme.colors.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         if (card.subtitle.isNotBlank()) {
             Text(
                 text = card.subtitle,
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

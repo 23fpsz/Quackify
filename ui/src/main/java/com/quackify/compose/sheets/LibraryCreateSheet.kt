@@ -136,7 +136,7 @@ private fun CreateOptionItem(
             Icon(
                 painter = painterResource(id = iconRes),
                 contentDescription = title,
-                tint = Color.White,
+                tint = EncoreTheme.colors.textPrimary,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -146,7 +146,7 @@ private fun CreateOptionItem(
                 text = title,
                 style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = EncoreTheme.colors.textPrimary,
                     fontSize = 15.sp
                 )
             )
@@ -154,7 +154,7 @@ private fun CreateOptionItem(
             Text(
                 text = subtitle,
                 style = EncoreTheme.typography.bodySmall.copy(
-                    color = EncoreColors.TextSecondary,
+                    color = EncoreTheme.colors.textSecondary,
                     fontSize = 13.sp
                 )
             )

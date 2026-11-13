@@ -136,7 +136,7 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreColors.Background)
+            .background(EncoreTheme.colors.background)
             .statusBarsPadding()
     ) {
         Row(
@@ -149,7 +149,7 @@ fun SettingsScreen(
                 iconRes = R.drawable.encore_icon_arrow_left_24,
                 contentDescription = "Back",
                 onClick = onBackClick,
-                tint = EncoreColors.TextPrimary
+                tint = EncoreTheme.colors.textPrimary
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -165,7 +165,7 @@ fun SettingsScreen(
             item {
                 ProfileSummary(account)
                 HorizontalDivider(
-                    color = EncoreColors.Card,
+                    color = EncoreTheme.colors.card,
                     thickness = 1.dp,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
@@ -175,7 +175,7 @@ fun SettingsScreen(
                 SettingsSectionHeader(title = "Videos and Canvas")
                 Text(
                     text = "It may take some time for your experience to update.",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 SettingsToggleRow(
@@ -270,7 +270,7 @@ fun SettingsScreen(
                 SettingsSectionHeader(title = "App icon")
                 Text(
                     text = "Pick the launcher icon. It can take a moment for your home screen to update, and the app may restart once.",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                     modifier = Modifier.padding(bottom = 10.dp)
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -308,7 +308,7 @@ fun SettingsScreen(
                 }
                 Text(
                     text = "Log out",
-                    style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Error),
+                    style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreTheme.colors.error),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
@@ -321,7 +321,7 @@ fun SettingsScreen(
                 SettingsSectionHeader(title = "About")
                 Text(
                     text = "Quackify is a native Android music client built with Jetpack Compose, continuing the SpotiDuck project.",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 SettingsInfoRow(
@@ -335,7 +335,7 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .padding(vertical = 6.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(EncoreColors.Card)
+                            .background(EncoreTheme.colors.card)
                             .clickable {
                                 runCatching {
                                     context.startActivity(
@@ -353,7 +353,7 @@ fun SettingsScreen(
                             )
                             Text(
                                 text = update.version,
-                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
                             )
                         }
                         Text(
@@ -378,7 +378,7 @@ fun SettingsScreen(
                                 updateChecked -> "Up to date"
                                 else -> "\u2014"
                             },
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
                         )
                     }
                     Text(
@@ -386,7 +386,7 @@ fun SettingsScreen(
                         style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green),
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(EncoreColors.Card)
+                            .background(EncoreTheme.colors.card)
                             .clickable { onCheckUpdates() }
                             .padding(horizontal = 14.dp, vertical = 8.dp)
                     )
@@ -397,7 +397,7 @@ fun SettingsScreen(
                 }
                 Text(
                     text = "\u00A9 2026 Quackify Team",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 12.dp),
@@ -418,7 +418,7 @@ private fun AboutLinkButton(label: String, iconRes: Int, url: String) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(EncoreColors.Card)
+            .background(EncoreTheme.colors.card)
             .clickable {
                 runCatching {
                     context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
@@ -432,7 +432,7 @@ private fun AboutLinkButton(label: String, iconRes: Int, url: String) {
             painter = painterResource(iconRes),
             contentDescription = label,
             modifier = Modifier.size(18.dp),
-            tint = EncoreColors.TextPrimary
+            tint = EncoreTheme.colors.textPrimary
         )
         Text(
             text = label,
@@ -454,14 +454,14 @@ private fun ProfileSummary(account: EncoreAuth.Account?) {
             modifier = Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(EncoreColors.Card),
+                .background(EncoreTheme.colors.card),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = account?.name?.trim()?.firstOrNull()?.uppercase() ?: "?",
                 style = EncoreTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    color = EncoreColors.TextPrimary
+                    color = EncoreTheme.colors.textPrimary
                 )
             )
             val avatar = account?.imageUrl.orEmpty()
@@ -488,7 +488,7 @@ private fun ProfileSummary(account: EncoreAuth.Account?) {
             if (detail.isNotBlank()) {
                 Text(
                     text = detail,
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
                 )
             }
         }
@@ -530,7 +530,7 @@ private fun SettingsToggleRow(
                     text = title,
                     style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Medium,
-                        color = if (enabled) EncoreColors.TextPrimary else EncoreColors.TextSecondary
+                        color = if (enabled) EncoreTheme.colors.textPrimary else EncoreTheme.colors.textSecondary
                     )
                 )
                 if (badge.isNotBlank() && badgeInfo.isNotBlank()) {
@@ -542,7 +542,7 @@ private fun SettingsToggleRow(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
                 )
             }
         }
@@ -553,8 +553,8 @@ private fun SettingsToggleRow(
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = EncoreColors.Green,
-                uncheckedThumbColor = EncoreColors.TextSecondary,
-                uncheckedTrackColor = EncoreColors.Card
+                uncheckedThumbColor = EncoreTheme.colors.textSecondary,
+                uncheckedTrackColor = EncoreTheme.colors.card
             )
         )
     }
@@ -593,7 +593,7 @@ private fun SettingsBadge(text: String, info: String) {
             ) {
                 val arrowHeight = with(density) { 7.dp.toPx() }
                 val arrowWidth = with(density) { 14.dp.toPx() }
-                val arrowColor = EncoreColors.CardElevated.copy(alpha = 0.94f)
+                val arrowColor = EncoreTheme.colors.cardElevated.copy(alpha = 0.94f)
                 Column {
                     Canvas(
                         modifier = Modifier
@@ -610,12 +610,12 @@ private fun SettingsBadge(text: String, info: String) {
                     }
                     Text(
                         text = info,
-                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextPrimary),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textPrimary),
                         modifier = Modifier
                             .widthIn(max = 240.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(arrowColor)
-                            .border(1.dp, EncoreColors.Divider, RoundedCornerShape(8.dp))
+                            .border(1.dp, EncoreTheme.colors.divider, RoundedCornerShape(8.dp))
                             .clickable { open = false }
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                     )
@@ -639,7 +639,7 @@ private fun SettingsIconOption(
                 .clip(RoundedCornerShape(14.dp))
                 .border(
                     width = if (selected) 2.dp else 1.dp,
-                    color = if (selected) EncoreColors.Green else EncoreColors.Divider,
+                    color = if (selected) EncoreColors.Green else EncoreTheme.colors.divider,
                     shape = RoundedCornerShape(14.dp)
                 )
                 .clickable(onClick = onClick)
@@ -655,7 +655,7 @@ private fun SettingsIconOption(
         Text(
             text = label,
             style = EncoreTheme.typography.marginal.copy(
-                color = if (selected) EncoreColors.Green else EncoreColors.TextSecondary
+                color = if (selected) EncoreColors.Green else EncoreTheme.colors.textSecondary
             )
         )
     }
@@ -680,7 +680,7 @@ private fun SettingsInfoRow(
         )
         Text(
             text = value,
-            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
         )
     }
 }

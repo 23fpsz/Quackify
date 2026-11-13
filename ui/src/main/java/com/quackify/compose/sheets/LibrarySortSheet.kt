@@ -73,7 +73,7 @@ fun LibrarySortSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = EncoreTheme.colors.card,
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         dragHandle = {
             Box(
@@ -95,7 +95,7 @@ fun LibrarySortSheet(
                 text = "Sort by",
                 style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    color = EncoreColors.TextPrimary
+                    color = EncoreTheme.colors.textPrimary
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -133,7 +133,7 @@ fun LibrarySortSheet(
                         text = option.displayName,
                         style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) EncoreColors.Green else EncoreColors.TextPrimary,
+                            color = if (isSelected) EncoreColors.Green else EncoreTheme.colors.textPrimary,
                             fontSize = 15.sp
                         ),
                         modifier = Modifier.weight(1f)

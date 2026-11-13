@@ -116,14 +116,14 @@ fun PlaylistContributorsSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = EncoreTheme.colors.card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
+                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -168,12 +168,12 @@ fun PlaylistContributorsSheet(
                                         .padding(vertical = 28.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    InlineLoadingDots(color = EncoreColors.TextSecondary)
+                                    InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
                                 }
                                 searchResults.isEmpty() -> Text(
                                     text = if (query.trim().length < 2) "Type at least 2 characters"
                                     else "No profiles found",
-                                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 24.dp)
@@ -211,7 +211,7 @@ fun PlaylistContributorsSheet(
                                                 Text(
                                                     text = hit.subtitle.ifBlank { "Profile" },
                                                     style = EncoreTheme.typography.marginal.copy(
-                                                        color = EncoreColors.TextSecondary
+                                                        color = EncoreTheme.colors.textSecondary
                                                     )
                                                 )
                                             }
@@ -219,13 +219,13 @@ fun PlaylistContributorsSheet(
                                                 modifier = Modifier
                                                     .size(30.dp)
                                                     .clip(CircleShape)
-                                                    .border(1.dp, EncoreColors.Outline, CircleShape),
+                                                    .border(1.dp, EncoreTheme.colors.outline, CircleShape),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
                                                     painter = painterResource(id = R.drawable.encore_icon_plus_24),
                                                     contentDescription = "Add contributor",
-                                                    tint = EncoreColors.TextPrimary,
+                                                    tint = EncoreTheme.colors.textPrimary,
                                                     modifier = Modifier.size(14.dp)
                                                 )
                                             }
@@ -266,7 +266,7 @@ fun PlaylistContributorsSheet(
                     ) {
                         Text(
                             text = "Couldn't load contributors",
-                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary)
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textPrimary)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -280,7 +280,7 @@ fun PlaylistContributorsSheet(
                     }
                     members.isEmpty() -> Text(
                         text = "No contributors yet",
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 24.dp)
@@ -299,13 +299,13 @@ fun PlaylistContributorsSheet(
                                         modifier = Modifier
                                             .size(48.dp)
                                             .clip(CircleShape)
-                                            .background(EncoreColors.CardElevated),
+                                            .background(EncoreTheme.colors.cardElevated),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             painter = painterResource(id = R.drawable.encore_icon_plus_24),
                                             contentDescription = null,
-                                            tint = EncoreColors.TextPrimary,
+                                            tint = EncoreTheme.colors.textPrimary,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -314,7 +314,7 @@ fun PlaylistContributorsSheet(
                                         text = "Add contributor",
                                         style = EncoreTheme.typography.bodyMedium.copy(
                                             fontWeight = FontWeight.Bold,
-                                            color = EncoreColors.TextPrimary
+                                            color = EncoreTheme.colors.textPrimary
                                         )
                                     )
                                 }
@@ -384,12 +384,12 @@ private fun ContributorRow(
             )
             Text(
                 text = statusOf(member),
-                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
             )
             if (isAdmin && !member.isOwner && member.permissionLevel != PlaylistMember.PERMISSION_BLOCKED) {
                 Spacer(modifier = Modifier.height(8.dp))
                 if (busy) {
-                    InlineLoadingDots(color = EncoreColors.TextSecondary)
+                    InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
                 } else {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(18.dp)
@@ -412,14 +412,14 @@ private fun ContributorRow(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, EncoreColors.Outline, RoundedCornerShape(16.dp))
+                .border(1.dp, EncoreTheme.colors.outline, RoundedCornerShape(16.dp))
                 .clickable { onOpenProfile(member.uri, member.name) }
                 .padding(horizontal = 12.dp, vertical = 7.dp)
         ) {
             Text(
                 text = "View profile",
                 style = EncoreTheme.typography.bodySmall.copy(
-                    color = EncoreColors.TextPrimary,
+                    color = EncoreTheme.colors.textPrimary,
                     fontWeight = FontWeight.Medium
                 )
             )
@@ -435,7 +435,7 @@ private fun ContributorActionLabel(
     Text(
         text = text,
         style = EncoreTheme.typography.bodySmall.copy(
-            color = EncoreColors.Error,
+            color = EncoreTheme.colors.error,
             fontWeight = FontWeight.SemiBold
         ),
         modifier = Modifier
@@ -457,7 +457,7 @@ private fun ContributorSearchBox(
             .fillMaxWidth()
             .height(44.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(EncoreColors.Background)
+            .background(EncoreTheme.colors.background)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -465,7 +465,7 @@ private fun ContributorSearchBox(
         Icon(
             painter = painterResource(id = R.drawable.encore_icon_search_24),
             contentDescription = null,
-            tint = EncoreColors.TextSecondary,
+            tint = EncoreTheme.colors.textSecondary,
             modifier = Modifier.size(20.dp)
         )
         BasicTextField(
@@ -473,10 +473,10 @@ private fun ContributorSearchBox(
             onValueChange = onQueryChange,
             singleLine = true,
             textStyle = EncoreTheme.typography.bodyMedium.copy(
-                color = EncoreColors.TextPrimary,
+                color = EncoreTheme.colors.textPrimary,
                 fontSize = 15.sp
             ),
-            cursorBrush = SolidColor(EncoreColors.TextPrimary),
+            cursorBrush = SolidColor(EncoreTheme.colors.textPrimary),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             modifier = Modifier.weight(1f),
             decorationBox = { field ->
@@ -488,7 +488,7 @@ private fun ContributorSearchBox(
                         Text(
                             text = "Search usernames",
                             style = EncoreTheme.typography.bodyMedium.copy(
-                                color = EncoreColors.TextSecondary,
+                                color = EncoreTheme.colors.textSecondary,
                                 fontSize = 15.sp
                             )
                         )
@@ -502,7 +502,7 @@ private fun ContributorSearchBox(
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_x_24),
                 contentDescription = "Clear search",
-                tint = EncoreColors.TextSecondary,
+                tint = EncoreTheme.colors.textSecondary,
                 modifier = Modifier
                     .size(18.dp)
                     .clickable { onQueryChange("") }
@@ -511,7 +511,7 @@ private fun ContributorSearchBox(
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_x_24),
                 contentDescription = "Close search",
-                tint = EncoreColors.TextSecondary,
+                tint = EncoreTheme.colors.textSecondary,
                 modifier = Modifier
                     .size(18.dp)
                     .clickable(onClick = onClose)

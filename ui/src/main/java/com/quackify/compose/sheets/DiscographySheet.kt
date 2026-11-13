@@ -129,14 +129,14 @@ fun DiscographySheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = EncoreTheme.colors.card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
+                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -160,7 +160,7 @@ fun DiscographySheet(
                     )
                     Text(
                         text = artistName,
-                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -259,7 +259,7 @@ private fun DiscographyChip(
     onClick: () -> Unit
 ) {
     val background = if (selected) EncoreColors.Green else Color(0xFF2A2A2A)
-    val foreground = if (selected) Color.Black else EncoreColors.TextPrimary
+    val foreground = if (selected) Color.Black else EncoreTheme.colors.textPrimary
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
@@ -280,7 +280,7 @@ private fun DiscographyChip(
             Text(
                 text = count.toString(),
                 style = EncoreTheme.typography.marginal.copy(
-                    color = if (selected) Color.Black.copy(alpha = 0.6f) else EncoreColors.TextSecondary
+                    color = if (selected) Color.Black.copy(alpha = 0.6f) else EncoreTheme.colors.textSecondary
                 )
             )
         }
@@ -324,7 +324,7 @@ private fun ReleaseTile(row: ShelfItem, onClick: () -> Unit) {
         if (row.subtitle.isNotBlank()) {
             Text(
                 text = row.subtitle,
-                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -343,10 +343,10 @@ private fun StatusTile(failed: Boolean) {
         if (failed) {
             Text(
                 text = "Could not load this section",
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
             )
         } else {
-            InlineLoadingDots(color = EncoreColors.TextSecondary)
+            InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
         }
     }
 }
@@ -361,7 +361,7 @@ private fun EmptyTile() {
     ) {
         Text(
             text = "Nothing here yet",
-            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
         )
     }
 }
@@ -392,7 +392,7 @@ private fun ReleaseRow(row: ShelfItem, onClick: () -> Unit) {
             if (row.subtitle.isNotBlank()) {
                 Text(
                     text = row.subtitle,
-                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

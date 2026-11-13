@@ -58,7 +58,7 @@ fun SleepTimerSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = EncoreTheme.colors.card,
         dragHandle = {
             Box(
                 modifier = Modifier
@@ -116,7 +116,7 @@ fun SleepTimerSheet(
                         text = option.label,
                         style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) EncoreColors.Green else EncoreColors.TextPrimary
+                            color = if (isSelected) EncoreColors.Green else EncoreTheme.colors.textPrimary
                         )
                     )
 

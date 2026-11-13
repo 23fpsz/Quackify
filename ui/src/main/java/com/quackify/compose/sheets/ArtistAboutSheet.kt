@@ -66,14 +66,14 @@ fun ArtistAboutSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = EncoreTheme.colors.card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
+                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -97,7 +97,7 @@ fun ArtistAboutSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "About",
-                        style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                        style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
                     )
                     Text(
                         text = artistName,
@@ -128,7 +128,7 @@ fun ArtistAboutSheet(
                 Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                 Text(
                     text = biography,
-                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary)
                 )
             }
 
@@ -154,7 +154,7 @@ fun ArtistAboutSheet(
                         Text(
                             text = compact(stat.listeners) + " listeners",
                             style = EncoreTheme.typography.bodySmall.copy(
-                                color = EncoreColors.TextSecondary
+                                color = EncoreTheme.colors.textSecondary
                             )
                         )
                     }
@@ -175,7 +175,7 @@ fun ArtistAboutSheet(
                     externalLinks.forEach { link ->
                         Text(
                             text = link.name.lowercase().replaceFirstChar { it.uppercase() },
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextPrimary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textPrimary),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color(0xFF3A3A3A))
@@ -224,7 +224,7 @@ private fun AboutStat(value: String, label: String) {
         )
         Text(
             text = label,
-            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+            style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
         )
     }
 }

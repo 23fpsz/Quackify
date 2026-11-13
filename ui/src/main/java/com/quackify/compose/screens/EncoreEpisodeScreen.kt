@@ -82,7 +82,7 @@ fun EncoreEpisodeScreen(
                     colors = listOf(
                         smoothHeaderColor,
                         smoothHeaderColor.copy(alpha = 0.5f),
-                        EncoreColors.Background,
+                        EncoreTheme.colors.background,
                     ),
                 ),
             ),
@@ -99,14 +99,14 @@ fun EncoreEpisodeScreen(
                 iconRes = R.drawable.encore_icon_arrow_left_24,
                 contentDescription = "Back",
                 onClick = onBackClick,
-                tint = EncoreColors.TextPrimary,
+                tint = EncoreTheme.colors.textPrimary,
             )
             if (onMoreClick != null) {
                 EncoreIconButton(
                     iconRes = R.drawable.encore_icon_more_android_24,
                     contentDescription = "More options",
                     onClick = onMoreClick,
-                    tint = EncoreColors.TextPrimary,
+                    tint = EncoreTheme.colors.textPrimary,
                 )
             } else {
                 Spacer(modifier = Modifier.size(48.dp))
@@ -153,7 +153,7 @@ fun EncoreEpisodeScreen(
                     if (showName.isNotBlank()) {
                         Text(
                             text = showName,
-                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textPrimary),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.clickable(onClick = onShowClick),
@@ -164,7 +164,7 @@ fun EncoreEpisodeScreen(
                     Text(
                         text = title,
                         style = EncoreTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                        color = EncoreColors.TextPrimary,
+                        color = EncoreTheme.colors.textPrimary,
                         maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -173,7 +173,7 @@ fun EncoreEpisodeScreen(
 
                     Text(
                         text = metaLabel,
-                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -187,7 +187,7 @@ fun EncoreEpisodeScreen(
                             if (positionMs > 0L && durationMs > 0L) {
                                 Text(
                                     text = "${formatDuration(positionMs)} / ${formatDuration(durationMs)}",
-                                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                                    style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary),
                                 )
                             }
                         }
@@ -203,7 +203,7 @@ fun EncoreEpisodeScreen(
                         Spacer(modifier = Modifier.height(18.dp))
                         Text(
                             text = description,
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                             maxLines = if (descriptionExpanded) Int.MAX_VALUE else 4,
                             overflow = TextOverflow.Ellipsis,
                             onTextLayout = { if (!descriptionExpanded) descriptionOverflows = it.hasVisualOverflow },
@@ -211,7 +211,7 @@ fun EncoreEpisodeScreen(
                         if (descriptionOverflows || descriptionExpanded) {
                             Text(
                                 text = if (descriptionExpanded) "Show less" else "Show more",
-                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
+                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textPrimary),
                                 modifier = Modifier
                                     .padding(top = 6.dp)
                                     .clickable { descriptionExpanded = !descriptionExpanded },
@@ -225,7 +225,7 @@ fun EncoreEpisodeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(EncoreColors.Card)
+                                .background(EncoreTheme.colors.card)
                                 .clickable(onClick = onShowClick)
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -236,12 +236,12 @@ fun EncoreEpisodeScreen(
                                     text = "Go to show",
                                     style = EncoreTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.SemiBold,
-                                        color = EncoreColors.TextPrimary,
+                                        color = EncoreTheme.colors.textPrimary,
                                     ),
                                 )
                                 Text(
                                     text = showName,
-                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -249,7 +249,7 @@ fun EncoreEpisodeScreen(
                             androidx.compose.material3.Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
                                 contentDescription = null,
-                                tint = EncoreColors.TextSecondary,
+                                tint = EncoreTheme.colors.textSecondary,
                                 modifier = Modifier
                                     .size(20.dp)
                                     .rotate(180f),

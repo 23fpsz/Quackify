@@ -336,7 +336,7 @@ fun EncoreAlbumScreen(
                             Text(
                                 text = artistName,
                                 style = EncoreTheme.typography.bodySmallBold.copy(
-                                    color = EncoreColors.TextPrimary,
+                                    color = EncoreTheme.colors.textPrimary,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
@@ -346,7 +346,7 @@ fun EncoreAlbumScreen(
 
                         Text(
                             text = "Album • $releaseYear",
-                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                            style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary),
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
 
@@ -375,7 +375,7 @@ fun EncoreAlbumScreen(
                                             id = if (isDownloaded) R.drawable.encore_icon_downloaded_24 else R.drawable.encore_icon_download_24
                                         ),
                                         contentDescription = if (isDownloaded) "Downloaded" else "Download",
-                                        tint = if (isDownloaded) EncoreColors.Green else EncoreColors.TextSecondary,
+                                        tint = if (isDownloaded) EncoreColors.Green else EncoreTheme.colors.textSecondary,
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
@@ -392,7 +392,7 @@ fun EncoreAlbumScreen(
                                             id = if (isLiked) R.drawable.encore_icon_heart_active_24 else R.drawable.encore_icon_heart_24
                                         ),
                                         contentDescription = "Save album",
-                                        tint = if (isLiked) EncoreColors.Green else EncoreColors.TextSecondary,
+                                        tint = if (isLiked) EncoreColors.Green else EncoreTheme.colors.textSecondary,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -407,7 +407,7 @@ fun EncoreAlbumScreen(
                                     Icon(
                                         painter = painterResource(id = R.drawable.encore_icon_more_android_24),
                                         contentDescription = "Album options",
-                                        tint = EncoreColors.TextSecondary,
+                                        tint = EncoreTheme.colors.textSecondary,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -427,7 +427,7 @@ fun EncoreAlbumScreen(
                                     Icon(
                                         painter = painterResource(id = R.drawable.encore_icon_shuffle_24),
                                         contentDescription = "Shuffle",
-                                        tint = if (isShuffle) EncoreColors.Green else EncoreColors.TextSecondary,
+                                        tint = if (isShuffle) EncoreColors.Green else EncoreTheme.colors.textSecondary,
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
@@ -466,7 +466,7 @@ fun EncoreAlbumScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_album_24),
                                 contentDescription = null,
-                                tint = EncoreColors.TextSecondary,
+                                tint = EncoreTheme.colors.textSecondary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -475,7 +475,7 @@ fun EncoreAlbumScreen(
                                 style = EncoreTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
-                                    color = EncoreColors.TextSecondary
+                                    color = EncoreTheme.colors.textSecondary
                                 )
                             )
                         }
@@ -532,7 +532,7 @@ fun EncoreAlbumScreen(
                     if (releaseDate.isNotBlank()) {
                         Text(
                             text = releaseDate,
-                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textPrimary)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                     }
@@ -545,7 +545,7 @@ fun EncoreAlbumScreen(
                             text = listOf("${tracks.size} songs", totalDuration)
                                 .filter { it.isNotBlank() }
                                 .joinToString(" • "),
-                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                            style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
                         )
                     }
 
@@ -556,7 +556,7 @@ fun EncoreAlbumScreen(
                             style = EncoreTheme.typography.marginal.copy(
                                 fontSize = 10.sp,
                                 lineHeight = 14.sp,
-                                color = EncoreColors.TextSecondary
+                                color = EncoreTheme.colors.textSecondary
                             )
                         )
                     }
@@ -568,7 +568,7 @@ fun EncoreAlbumScreen(
                             style = EncoreTheme.typography.marginal.copy(
                                 fontSize = 10.sp,
                                 lineHeight = 14.sp,
-                                color = EncoreColors.TextSecondary
+                                color = EncoreTheme.colors.textSecondary
                             )
                         )
                     }
@@ -608,7 +608,7 @@ fun EncoreAlbumScreen(
                                             cornerRadius = 4.dp
                                         )
                                     } else {
-                                        Text(text = "♫", color = Color.White, fontSize = 36.sp)
+                                        Text(text = "♫", color = EncoreTheme.colors.textPrimary, fontSize = 36.sp)
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -621,7 +621,7 @@ fun EncoreAlbumScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "${release.type} • ${release.year}",
-                                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                                    style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
                                 )
                             }
                         }
@@ -666,7 +666,7 @@ fun EncoreAlbumScreen(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
                     contentDescription = "Back",
-                    tint = Color.White,
+                    tint = EncoreTheme.colors.textPrimary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -681,7 +681,7 @@ fun EncoreAlbumScreen(
                     text = albumTitle,
                     style = EncoreTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = EncoreTheme.colors.textPrimary,
                         fontSize = 17.sp
                     ),
                     maxLines = 1,
@@ -707,7 +707,7 @@ fun EncoreAlbumScreen(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_more_android_24),
                         contentDescription = "Album options",
-                        tint = Color.White,
+                        tint = EncoreTheme.colors.textPrimary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -775,7 +775,7 @@ private fun AlbumTrackRow(
                 Text(
                     text = trackNumber.toString(),
                     style = EncoreTheme.typography.bodyMedium.copy(
-                        color = EncoreColors.TextSecondary,
+                        color = EncoreTheme.colors.textSecondary,
                         fontWeight = FontWeight.Medium
                     )
                 )
@@ -791,7 +791,7 @@ private fun AlbumTrackRow(
                 text = track.title,
                 style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    color = if (isPlaying) EncoreColors.Green else EncoreColors.TextPrimary
+                    color = if (isPlaying) EncoreColors.Green else EncoreTheme.colors.textPrimary
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -801,13 +801,13 @@ private fun AlbumTrackRow(
                 if (track.isExplicit) {
                     EncoreExplicitTag(
                         modifier = Modifier.padding(end = 6.dp),
-                        background = EncoreColors.TextSecondary.copy(alpha = 0.6f)
+                        background = EncoreTheme.colors.textSecondary.copy(alpha = 0.6f)
                     )
                 }
 
                 Text(
                     text = track.artist,
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -825,7 +825,7 @@ private fun AlbumTrackRow(
             iconRes = R.drawable.encore_icon_more_android_24,
             contentDescription = "Track options",
             onClick = onMoreClick,
-            tint = EncoreColors.TextSecondary,
+            tint = EncoreTheme.colors.textSecondary,
             size = 36.dp,
             iconSize = 20.dp
         )
@@ -892,7 +892,7 @@ private fun AlbumLoadError(title: String, onRetry: (() -> Unit)?) {
             text = title,
             style = EncoreTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
-                color = EncoreColors.TextPrimary
+                color = EncoreTheme.colors.textPrimary
             ),
             textAlign = TextAlign.Center
         )

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.theme.DmMono
 import com.quackify.compose.theme.EncoreColors
+import com.quackify.compose.theme.EncoreTheme
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -56,7 +57,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreColors.Background)
+            .background(EncoreTheme.colors.background)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -67,7 +68,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .align(Alignment.Center)
                 .size(72.dp),
-            color = Color.White,
+            color = EncoreTheme.colors.textPrimary,
         )
 
         Column(
@@ -84,7 +85,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
         ) {
             Text(
                 text = "Quackify",
-                color = Color.White,
+                color = EncoreTheme.colors.textPrimary,
                 fontFamily = DmMono,
                 fontWeight = FontWeight.Medium,
                 fontSize = 21.sp,
@@ -92,7 +93,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
             )
             Text(
                 text = version,
-                color = EncoreColors.TextSecondary,
+                color = EncoreTheme.colors.textSecondary,
                 fontFamily = DmMono,
                 fontWeight = FontWeight.Normal,
                 fontSize = 10.sp,
