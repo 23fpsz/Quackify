@@ -438,6 +438,7 @@ internal fun ShellArtistPane(
     onPlayPauseClick: () -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit,
+    onTrackLikeToggle: (TrackItem) -> Unit,
     onFollowToggle: (String, Boolean) -> Unit,
     onReleaseClick: (ArtistRelease) -> Unit,
     onAboutClick: () -> Unit,
@@ -472,6 +473,7 @@ internal fun ShellArtistPane(
             onPlayPauseClick = onPlayPauseClick,
             onTrackSelect = onTrackSelect,
             onTrackOptionsClick = onTrackOptionsClick,
+            onTrackLikeToggle = onTrackLikeToggle,
             onArtistOptionsClick = onOptionsClick,
             isFollowing = artistFollowed == true,
             onFollowToggle = { follow ->

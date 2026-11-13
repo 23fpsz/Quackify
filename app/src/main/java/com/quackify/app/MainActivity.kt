@@ -650,6 +650,18 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
+                        LaunchedEffect(artistUri, artistTracks?.size, libraryRevision) {
+                            val rows = artistTracks ?: return@LaunchedEffect
+                            if (artistUri.isBlank()) return@LaunchedEffect
+                            val uris = rows.map { it.track.uri }.filter { it.isNotBlank() }
+                            if (uris.isEmpty()) return@LaunchedEffect
+                            val liked = Library.saved(context, uris)
+                            if (artistUri.isBlank()) return@LaunchedEffect
+                            artistTracks = rows.map { popTrack ->
+                                popTrack.copy(track = popTrack.track.copy(saved = popTrack.track.uri in liked))
+                            }
+                        }
+
                         LaunchedEffect(folderUri, folderFetch) {
                             if (folderUri.isBlank()) return@LaunchedEffect
                             val page = Krespot.library.folder(context, folderUri)
@@ -1235,6 +1247,24 @@ class MainActivity : ComponentActivity() {
                                     if (!ok) return@launch
                                     if (uri == artistUri) artistFollowed = follow
                                     if (uri == nowPlayingArtistUri) nowPlayingArtistFollowed = follow
+                                }
+                            },
+                            onArtistTrackLikeToggle = { track ->
+                                val next = track.saved != true
+                                val swap = { liked: Boolean ->
+                                    artistTracks = artistTracks?.map { popTrack ->
+                                        if (popTrack.track.uri == track.uri) {
+                                            popTrack.copy(track = popTrack.track.copy(saved = liked))
+                                        } else {
+                                            popTrack
+                                        }
+                                    }
+                                }
+                                swap(next)
+                                scope.launch {
+                                    val ok = Library.setSaved(context, listOf(track.uri), next)
+                                    log.i("artist heart '${track.title}' -> $next ok=$ok")
+                                    if (!ok) swap(!next)
                                 }
                             },
                             onArtistRadio = { uri ->
