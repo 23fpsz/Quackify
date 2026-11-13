@@ -79,6 +79,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quackify.backend.model.PlaylistMember
 import com.quackify.compose.R
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.matchesCurrent
@@ -172,6 +173,8 @@ fun EncorePlaylistScreen(
     onEditDetails: (suspend (name: String, description: String, cover: ByteArray?, clearCover: Boolean) -> Unit)? = null,
     onDeletePlaylist: (() -> Unit)? = null,
     isEditable: Boolean = false,
+    contributors: List<PlaylistMember> = emptyList(),
+    onContributorsClick: () -> Unit = {},
     onShareClick: () -> Unit = {},
     isSaved: Boolean? = null,
     onSaveToggle: () -> Unit = {},
@@ -743,40 +746,79 @@ fun EncorePlaylistScreen(
                                 }
 
                                 if (creator.isNotBlank()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFF333333)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (creatorAvatarUrl.isNotBlank()) {
-                                            EncoreArtworkImage(
-                                                imageUrl = creatorAvatarUrl,
-                                                contentDescription = creator,
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .clip(CircleShape),
-                                                cornerRadius = 12.dp
-                                            )
-                                        } else {
-                                            Icon(
-                                                painter = painterResource(id = R.drawable.encore_icon_user_24),
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                        }
+                                    val ownerMember = contributors.firstOrNull { it.isOwner }
+                                    val ownerName = ownerMember?.name?.takeIf { it.isNotBlank() } ?: creator
+                                    val extraContributors = contributors.count { !it.isOwner }
+                                    val stack = remember(creatorAvatarUrl, contributors) {
+                                        val ownerAvatar = ownerMember?.avatarUrl?.takeIf { it.isNotBlank() }
+                                            ?: creatorAvatarUrl.takeIf { it.isNotBlank() }
+                                            ?: ""
+                                        val others = contributors.filterNot { it.isOwner }
+                                            .mapNotNull { it.avatarUrl.takeIf { url -> url.isNotBlank() } }
+                                            .take(2)
+                                        (listOf(ownerAvatar) + others).take(3)
                                     }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier
+                                            .then(
+                                                if (contributors.isNotEmpty()) {
+                                                    Modifier
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .clickable { onContributorsClick() }
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy((-8).dp)
+                                        ) {
+                                            stack.forEachIndexed { index, url ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(if (index == 0) 24.dp else 20.dp)
+                                                        .zIndex(if (index == 0) 2f else 1f)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFF333333)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    if (url.isNotBlank()) {
+                                                        EncoreArtworkImage(
+                                                            imageUrl = url,
+                                                            contentDescription = ownerName,
+                                                            modifier = Modifier
+                                                                .fillMaxSize()
+                                                                .clip(CircleShape),
+                                                            cornerRadius = 12.dp
+                                                        )
+                                                    } else {
+                                                        Icon(
+                                                            painter = painterResource(id = R.drawable.encore_icon_user_24),
+                                                            contentDescription = null,
+                                                            tint = Color.White,
+                                                            modifier = Modifier.size(if (index == 0) 14.dp else 12.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
 
-                                    Text(
-                                        text = creator,
-                                        style = EncoreTheme.typography.bodyMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            fontSize = 13.sp
+                                        Text(
+                                            text = if (extraContributors > 0) {
+                                                "$ownerName + $extraContributors more"
+                                            } else {
+                                                ownerName
+                                            },
+                                            style = EncoreTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                fontSize = 13.sp
+                                            )
                                         )
-                                    )
+                                    }
                                 } else if (loading) {
                                     ShimmerHost {
                                         Row(

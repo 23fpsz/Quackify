@@ -45,6 +45,7 @@ import com.quackify.compose.share.Share
 import com.quackify.compose.sheets.CreditsSheet
 import com.quackify.compose.sheets.AddToPlaylistSheet
 import com.quackify.compose.sheets.ProfileFollowSheet
+import com.quackify.compose.sheets.PlaylistContributorsSheet
 import com.quackify.compose.sheets.EntityOptions
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.backend.api.Collection2
@@ -61,6 +62,7 @@ import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.ProfileTopContent
 import com.quackify.backend.model.ProfileUser
+import com.quackify.backend.model.PlaylistPermissions
 import com.quackify.backend.model.UserProfile
 import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.ShowDetail
@@ -223,6 +225,14 @@ fun EncoreAppShell(
     onPlaylistDefaultName: (suspend () -> String)? = null,
     onCreatePlaylist: (suspend (name: String, description: String, cover: ByteArray?) -> String?)? = null,
     playlistSaved: Boolean? = null,
+    playlistPermissions: PlaylistPermissions? = null,
+    contributorsLoading: Boolean = false,
+    contributorBusyIds: Set<String> = emptySet(),
+    onLoadPlaylistContributors: (() -> Unit)? = null,
+    onSearchUsers: (suspend (String) -> List<SearchHit>)? = null,
+    onAddPlaylistContributor: ((String) -> Unit)? = null,
+    onRemovePlaylistContributor: ((String) -> Unit)? = null,
+    onRemovePlaylistMember: ((String) -> Unit)? = null,
     playlistEditDraft: PlaylistEditDraft? = null,
     editablePlaylistUris: Set<String> = emptySet(),
     onEditPlaylist: ((uri: String) -> Unit)? = null,
@@ -652,6 +662,11 @@ fun EncoreAppShell(
                     }
                 },
                 onTogglePlaylistSaved = onTogglePlaylistSaved,
+                playlistMembers = playlistPermissions?.members ?: playlistDetail?.members.orEmpty(),
+                onOpenContributors = {
+                    flags.isContributorsOpen = true
+                    onLoadPlaylistContributors?.invoke()
+                },
                 onTrackLikeToggle = { onPlaylistTrackLikeToggle?.invoke(it) },
                 handleBack = handleBack,
                 handleTrackOptions = handleTrackOptions,
@@ -1418,6 +1433,25 @@ fun EncoreAppShell(
                 onArtistClick = { artist, uri ->
                     flags.isProfileFollowOpen = false
                     openArtist(artist, uri)
+                }
+            )
+        }
+
+        if (flags.isContributorsOpen) {
+            PlaylistContributorsSheet(
+                isOpen = true,
+                onDismiss = { flags.isContributorsOpen = false },
+                permissions = playlistPermissions,
+                loading = contributorsLoading,
+                onRetry = { onLoadPlaylistContributors?.invoke() },
+                busyUserIds = contributorBusyIds,
+                onSearchUsers = onSearchUsers,
+                onAddContributor = { userId -> onAddPlaylistContributor?.invoke(userId) },
+                onRemoveAsContributor = { userId -> onRemovePlaylistContributor?.invoke(userId) },
+                onRemoveFromPlaylist = { userId -> onRemovePlaylistMember?.invoke(userId) },
+                onOpenProfile = { uri, name ->
+                    flags.isContributorsOpen = false
+                    openUserProfile(uri, name)
                 }
             )
         }
