@@ -108,6 +108,10 @@ internal class AudioEngine(
     private var started = false
 
     @Volatile
+    var playplay = false
+        private set
+
+    @Volatile
     private var announced = false
 
     @Volatile
@@ -161,8 +165,15 @@ internal class AudioEngine(
         withContext(Dispatchers.Main) {
             release()
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
-            val encrypted = source.seektable.pssh.isNotBlank()
-            val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
+            val ppKey = source.playplayKey
+            val encrypted = !source.isPlayplay && source.seektable.pssh.isNotBlank()
+            val factory = if (ppKey != null) {
+                DefaultMediaSourceFactory(
+                    PlayPlayDataSource.Factory(source.url, ppKey, source.playplayFlac)
+                )
+            } else {
+                DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
+            }
             if (encrypted) {
                 val callback = AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) }
                 var cachedManager: DrmSessionManager? = null
@@ -179,6 +190,7 @@ internal class AudioEngine(
             } else {
                 log.i("clear content, no drm session asked")
             }
+            playplay = source.isPlayplay
             gainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
             durationMs = totalMs
             announced = false
@@ -198,6 +210,8 @@ internal class AudioEngine(
             true
         }
 
+    fun canQueue(source: AudioSource): Boolean = playplay == source.isPlayplay
+
     fun queueNext(uri: String, source: AudioSource) {
         runOnMain {
             val p = player ?: return@runOnMain
@@ -205,7 +219,13 @@ internal class AudioEngine(
             if (p.mediaItemCount > current + 1) p.removeMediaItems(current + 1, p.mediaItemCount)
             p.addMediaItem(itemFor(uri, source))
         }
-        log.i("audio queued next '$uri' '${source.fileId.take(12)}' ${if (source.seektable.pssh.isNotBlank()) "drm" else "clear"}")
+        log.i("audio queued next '$uri' '${source.fileId.take(12)}' " +
+                when {
+                    source.isPlayplay -> "playplay"
+                    source.seektable.pssh.isNotBlank() -> "drm"
+                    else -> "clear"
+                }
+        )
     }
 
     fun skipTo(uri: String): Boolean {
@@ -224,7 +244,7 @@ internal class AudioEngine(
     }
 
     private fun itemFor(uri: String, source: AudioSource): MediaItem {
-        val encrypted = source.seektable.pssh.isNotBlank()
+        val encrypted = !source.isPlayplay && source.seektable.pssh.isNotBlank()
         return MediaItem.Builder()
             .setMediaId(uri)
             .setUri(Uri.parse(source.url))
