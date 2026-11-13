@@ -171,6 +171,15 @@ class PlaybackBridge(private val context: Context) {
     private var pendingShuffle: Boolean? = null
 
     @Volatile
+    private var shuffledContext: String = ""
+
+    @Volatile
+    private var sessionQueue: List<String> = emptyList()
+
+    @Volatile
+    private var sessionQueueContext: String = ""
+
+    @Volatile
     private var pendingRepeatContext: Boolean? = null
 
     @Volatile
@@ -363,7 +372,14 @@ class PlaybackBridge(private val context: Context) {
 
         override fun onPlayTrack(uri: String, contextUri: String, index: Int) {
             captureChain(contextUri)
-            scope.launch { playTrack(uri, contextUri, index) }
+            sessionQueue = emptyList()
+            sessionQueueContext = ""
+            scope.launch {
+                playTrack(uri, contextUri, index)
+                if (shuffleOn(connect.cluster.value) && !smartOn(connect.cluster.value)) {
+                    applyShuffleOrder(true, contextUri, uri)
+                }
+            }
         }
 
         override fun onListRendered(uris: List<String>) {
@@ -1110,12 +1126,53 @@ class PlaybackBridge(private val context: Context) {
                     log.i("shuffle: dropped the enhance lens from '${contextUri.takeLast(16)}' ok=$dropped")
                 }
             }
+            applyShuffleOrder(next)
         }
         publishModes()
         if (nextSmart) enhanceReset(cluster)
         delay(MODE_SETTLE_MS)
         runCatching { connect.refreshCluster() }
         publishModes()
+    }
+
+    /**
+     * Rebuilds the local play order the way the web player does: no server
+     * call carries the order - the array below is the source of truth for the
+     * skip, the advance and the queue panel. The current track keeps playing
+     * and only the rows after it change - a fresh shuffle of the context when
+     * shuffle turns on, the original context order when it turns off.
+     */
+    private suspend fun applyShuffleOrder(
+        turnOn: Boolean,
+        contextUri: String = "",
+        anchorUri: String = "",
+    ) {
+        val cluster = connect.cluster.value
+        val context = contextUri.ifBlank { cluster?.contextUri.orEmpty() }
+        if (!usableContext(context)) return
+        if (context.contains(":station") || context.contains(":radio")) return
+        if (remoteTarget().isNotBlank()) return
+        val rows = chainFor().ifEmpty { cluster?.window()?.filter { it.isVisible }?.map { it.uri }.orEmpty() }
+        if (rows.size < 2) {
+            log.i("shuffle order: '${context.takeLast(16)}' has ${rows.size} row(s), nothing to reorder")
+            return
+        }
+        val anchor = anchorUri.ifBlank {
+            pendingTrack.takeIf { pendingActive() } ?: (cluster?.let { playingUri(it) } ?: "")
+        }
+        if (anchor.isBlank() || anchor !in rows) {
+            log.i("shuffle order: the playing row is outside the context list, skipping")
+            return
+        }
+        sessionQueue = if (turnOn) {
+            rows.filterNot { it == anchor }.shuffled()
+        } else {
+            rows.drop(rows.indexOf(anchor) + 1)
+        }
+        sessionQueueContext = context
+        shuffledContext = context
+        log.i("shuffle order '${context.takeLast(16)}' on=$turnOn -> ${sessionQueue.size} row(s) ahead of '${anchor.takeLast(12)}'")
+        publishQueue(cluster)
     }
 
     /**
@@ -1414,6 +1471,7 @@ class PlaybackBridge(private val context: Context) {
                 val uri = command.trackUri
                 if (uri.isNotBlank()) queueAdd(uri)
             }
+            "set_queue" -> scope.launch { runCatching { connect.refreshCluster() } }
             else -> log.i("remote command '${command.endpoint}' is not handled here yet")
         }
     }
@@ -1733,6 +1791,9 @@ class PlaybackBridge(private val context: Context) {
             repeatTrack = state.repeatMode == RepeatMode.REPEAT_ONE,
             enhancement = if (state.shuffleMode == ShuffleMode.SMART_SHUFFLE) ENHANCEMENT_SMART else "NONE",
             queueRevision = at?.queueRevision.orEmpty(),
+            contextDescription = state.queueContextLabel
+                .takeIf { it.isNotBlank() && state.queueContext == contextUri }
+                .orEmpty(),
             nextRows = queueTailRows(contextUri),
         )
         refreshVideoFlags()
@@ -1753,7 +1814,9 @@ class PlaybackBridge(private val context: Context) {
             known ?: asQueued(clusterTrackFor(row.uri))
         }
         val follows = at?.contextUri.orEmpty().isNotBlank() && at?.contextUri == contextUri
-        val context = if (follows) {
+        val context = if (sessionQueueContext == contextUri && sessionQueue.isNotEmpty()) {
+            sessionQueue.map { uri -> clusterTrackFor(uri) }
+        } else if (follows) {
             at!!.fromContext.filterNot { row -> queued.any { it.uri == row.uri } }
         } else {
             emptyList()
@@ -1904,6 +1967,15 @@ class PlaybackBridge(private val context: Context) {
                 log.i("skip next from the enhanced queue: '${pick.takeLast(12)}' " +
                     "of ${upcoming.size} upcoming"
                 )
+                playTrack(pick, chainContext.ifBlank { cluster.contextUri }, -1)
+                return
+            }
+        }
+        if (sessionQueueContext == chainContext.ifBlank { cluster.contextUri } && sessionQueue.isNotEmpty()) {
+            if (sessionQueue.firstOrNull() == here) sessionQueue = sessionQueue.drop(1)
+            val pick = sessionQueue.firstOrNull()
+            if (!pick.isNullOrBlank()) {
+                log.i("skip next from the play order: '${pick.takeLast(12)}' of ${sessionQueue.size} ahead")
                 playTrack(pick, chainContext.ifBlank { cluster.contextUri }, -1)
                 return
             }
@@ -2522,6 +2594,12 @@ class PlaybackBridge(private val context: Context) {
         }
         publishQueue(cluster)
         publishModes()
+        if (moved) {
+            if (sessionQueue.firstOrNull() == cluster.track.uri) sessionQueue = sessionQueue.drop(1)
+            if (cluster.contextUri != shuffledContext && shuffleOn(cluster) && !smartOn(cluster)) {
+                scope.launch { applyShuffleOrder(true, cluster.contextUri) }
+            }
+        }
         val clusterArtist = cluster.track.artistUri
         if (cluster.track.uri == state.trackUri && clusterArtist.isNotBlank() && state.artistUri != clusterArtist) {
             state = state.copy(artistUri = clusterArtist)
@@ -2763,9 +2841,18 @@ class PlaybackBridge(private val context: Context) {
         val follows = clusterContext.isNotBlank() &&
                 (clusterContext == context || (single && context.isBlank()))
         val serverRows = if (server && follows) cluster!!.fromContext.map { it.asTrackItem() } else emptyList()
+        val localRows = sessionQueue
+            .takeIf { sessionQueueContext == context && it.isNotEmpty() }
+            ?.map { uri -> decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri) }
+            .orEmpty()
+        val contextRows = localRows.ifEmpty { serverRows }
         val radio = server && follows &&
                 cluster!!.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
-        val label = if (server && follows && !radio && !single) cluster!!.contextDescription else ""
+        val label = if (server && follows && !radio && !single) {
+            cluster!!.contextDescription.ifBlank {
+                state.queueContextLabel.takeIf { state.queueContext == context }.orEmpty()
+            }
+        } else ""
         val queued = if (server) {
             val onServer = cluster!!.queued.map { it.asTrackItem() }
             val known = onServer.mapTo(HashSet()) { it.uri }
@@ -2794,7 +2881,7 @@ class PlaybackBridge(private val context: Context) {
         } else {
             emptyList()
         }
-        val knownUpcoming = serverRows.mapTo(HashSet()) { it.uri }
+        val knownUpcoming = contextRows.mapTo(HashSet()) { it.uri }
         val enhanced = if (chainFits) enhancedQueue(context) else emptyList()
         val enhancedTail = if (enhanced.isNotEmpty()) {
             enhancedUpcoming(context, anchor)
@@ -2807,8 +2894,8 @@ class PlaybackBridge(private val context: Context) {
         } else {
             emptyList()
         }
-        val tailUris = if (enhancedTail.isNotEmpty()) enhancedTail else chainTail
-        val sparse = ((if (enhancedTail.isNotEmpty()) emptyList() else serverRows) + queued)
+        val tailUris = if (enhancedTail.isNotEmpty()) enhancedTail else if (contextRows.isEmpty()) chainTail else emptyList()
+        val sparse = ((if (enhancedTail.isNotEmpty()) emptyList() else contextRows) + queued)
             .filter { it.title.isBlank() }.map { it.uri }
         val missing = (sparse + tailUris.filterNot { it in knownUpcoming })
             .filterNot { decorated.containsKey(it) || it in undecoratable }
@@ -2821,7 +2908,7 @@ class PlaybackBridge(private val context: Context) {
         val upcoming = if (enhancedTail.isNotEmpty()) {
             tailRowsFilled
         } else {
-            (serverRows.map { if (it.title.isBlank()) decorated[it.uri] ?: it else it } +
+            (contextRows.map { if (it.title.isBlank()) decorated[it.uri] ?: it else it } +
                 tailRowsFilled)
                 .filterNot { it.uri == anchor }
         }
@@ -3020,6 +3107,11 @@ class PlaybackBridge(private val context: Context) {
         if (contextUri.startsWith("spotify:track:") || contextUri.startsWith("spotify:episode:")) {
             log.d("chain: a single track carries no chain, keeping '${chainContext.takeLast(16)}'")
             return
+        }
+        if (contextUri != chainContext) {
+            sessionQueue = emptyList()
+            sessionQueueContext = ""
+            shuffledContext = ""
         }
         val rows = screen
         if (rows.size < 2) {
@@ -3466,6 +3558,16 @@ class PlaybackBridge(private val context: Context) {
                     "the list resumes at row $resumeRow of ${rows.size}")
             playTrack(queued.uri, chainContext.ifBlank { server?.contextUri.orEmpty() }, -1)
             return
+        }
+        if (sessionQueueContext == chainContext.ifBlank { server?.contextUri.orEmpty() } && sessionQueue.isNotEmpty()) {
+            if (sessionQueue.firstOrNull() == ended) sessionQueue = sessionQueue.drop(1)
+            val pick = sessionQueue.firstOrNull()
+            if (!pick.isNullOrBlank()) {
+                sessionQueue = sessionQueue.drop(1)
+                log.i("advance -> '${pick.takeLast(12)}' from the play order, ${sessionQueue.size} left")
+                playTrack(pick, chainContext.ifBlank { server?.contextUri.orEmpty() }, -1)
+                return
+            }
         }
         if (shuffleOn(server) && !smartOn(server) && !ended.startsWith(AD_PREFIX)) {
             val pool = rows.ifEmpty {
