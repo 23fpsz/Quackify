@@ -111,6 +111,15 @@ class PlaybackBridge(private val context: Context) {
     private var videoPrefetchUri = ""
     private val videoAutoSwitched = HashSet<String>()
 
+    /** Account switches: music videos for tracks, other videos for episode video. */
+    @Volatile
+    var musicVideosAllowed: Boolean = true
+        private set
+
+    @Volatile
+    var otherVideosAllowed: Boolean = true
+        private set
+
     private var mirrors: Job? = null
 
     private var thresholdTrack = ""
@@ -790,6 +799,12 @@ class PlaybackBridge(private val context: Context) {
                 }
                 val audioUri = state.trackUri
                 val episode = audioUri.startsWith("spotify:episode:")
+                val allowed = if (episode) otherVideosAllowed else musicVideosAllowed
+                if (!allowed) {
+                    log.i("video switch blocked, the ${if (episode) "other videos" else "music videos"} switch is off")
+                    state = state.copy(videoSwitching = false)
+                    return@launch
+                }
                 val hasVideo = if (episode) {
                     VideoManifests.episodeVideoKnown(audioUri) &&
                             VideoManifests.knownEpisodeVideoId(audioUri) != null
@@ -877,9 +892,9 @@ class PlaybackBridge(private val context: Context) {
         val active = videoActive()
         val episode = uri.startsWith("spotify:episode:")
         val available = active || when {
-            episode -> VideoManifests.episodeVideoKnown(uri) &&
+            episode -> otherVideosAllowed && VideoManifests.episodeVideoKnown(uri) &&
                     VideoManifests.knownEpisodeVideoId(uri) != null
-            else -> decorated[uri]?.hasVideo == true
+            else -> musicVideosAllowed && decorated[uri]?.hasVideo == true
         }
         if (uri == videoFlagsUri && state.musicVideoAvailable == available && state.videoActive == active) return
         videoFlagsUri = uri
@@ -898,7 +913,7 @@ class PlaybackBridge(private val context: Context) {
             switchVideo(true)
             return
         }
-        if (episode && !VideoManifests.episodeVideoKnown(uri) && uri != videoPrefetchUri) {
+        if (episode && otherVideosAllowed && !VideoManifests.episodeVideoKnown(uri) && uri != videoPrefetchUri) {
             videoPrefetchUri = uri
             scope.launch {
                 runCatching { VideoManifests.episodeVideoId(context, connect.spclientHost, uri) }
@@ -1485,6 +1500,23 @@ class PlaybackBridge(private val context: Context) {
         delay(MODE_SETTLE_MS)
         runCatching { connect.refreshCluster() }
         publishModes()
+    }
+
+    /** Apply the account video switches; an active video of a switched-off kind drops back to audio. */
+    fun setVideoPolicy(musicVideos: Boolean, otherVideos: Boolean) {
+        if (musicVideosAllowed == musicVideos && otherVideosAllowed == otherVideos) return
+        musicVideosAllowed = musicVideos
+        otherVideosAllowed = otherVideos
+        log.i("video policy music=$musicVideos other=$otherVideos")
+        val episode = state.trackUri.startsWith("spotify:episode:")
+        if (videoActive() && (if (episode) !otherVideosAllowed else !musicVideosAllowed)) {
+            scope.launch {
+                log.i("video policy drops the active video to audio")
+                switchVideo(false)
+            }
+        } else {
+            refreshVideoFlags()
+        }
     }
 
     /** Toggle the canvas loop and push it into the next playback state report. */

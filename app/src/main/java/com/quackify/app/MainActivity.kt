@@ -689,6 +689,9 @@ class MainActivity : ComponentActivity() {
 
                         val bridge = remember { PlaybackHost.ensure(context) }
                         val playback = bridge.state
+                        LaunchedEffect(settingsSwitches.musicVideos, settingsSwitches.otherVideos) {
+                            bridge.setVideoPolicy(settingsSwitches.musicVideos, settingsSwitches.otherVideos)
+                        }
                         val nowPlayingArtistUri = remember(playback.trackUri, playback.artistUri, playback.queue, playback.queueFromContext) {
                             playback.artistUri.ifBlank {
                                 (playback.queue + playback.queueFromContext)
