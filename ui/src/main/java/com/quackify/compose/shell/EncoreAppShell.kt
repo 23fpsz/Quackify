@@ -251,6 +251,7 @@ fun EncoreAppShell(
     profileFailed: Boolean = false,
     onLoadProfile: (() -> Unit)? = null,
     onRetryProfile: (() -> Unit)? = null,
+    onOpenUserProfile: ((String, String) -> Unit)? = null,
     profileFollowers: List<ProfileUser> = emptyList(),
     profileFollowing: List<ProfileUser> = emptyList(),
     profileFollowLoading: Boolean = false,
@@ -275,6 +276,7 @@ fun EncoreAppShell(
         onLoadArtist = onLoadArtist,
         onOpenShow = onOpenShow,
         onOpenEpisode = onOpenEpisode,
+        onOpenUserProfile = onOpenUserProfile,
         onAddTracksClosed = { onRetryPlaylist?.invoke() },
         libraryItems = libraryItems,
         searchData = searchData,
@@ -411,6 +413,10 @@ fun EncoreAppShell(
     }
 
     val openProfileDrawer: () -> Unit = { navController.openProfileDrawer() }
+
+    val openUserProfile: (String, String) -> Unit = { uri, name ->
+        navController.openUserProfile(context, uri, name)
+    }
 
     val openArtist: (String, String) -> Unit = { artist, uri ->
         navController.openArtist(context, artist, uri)
@@ -584,6 +590,7 @@ fun EncoreAppShell(
                 onOpenEpisode = openEpisode,
                 onOpenShow = openShow,
                 onOpenPlaylist = openPlaylist,
+                onUserClick = openUserProfile,
                 onTrackSelect = handleTrackPlay,
                 onTrackOptionsClick = handleTrackOptions,
                 onProfileClick = openProfileDrawer,
@@ -924,8 +931,13 @@ fun EncoreAppShell(
                         card.uri.startsWith("spotify:playlist:") -> openPlaylist(card.title, card.uri)
                     }
                 },
-                fallbackName = userDisplayName,
-                avatarUrl = userAvatarUrl
+                contextsTitle = if (profile?.isCurrentUser == false) "Public playlists" else "Recently played",
+                fallbackName = if (profile?.isCurrentUser == false) profile.name else userDisplayName,
+                avatarUrl = when {
+                    profile == null -> userAvatarUrl
+                    profile.isCurrentUser -> profile.avatarUrl.ifBlank { userAvatarUrl }
+                    else -> profile.avatarUrl
+                }
             )
         }
         }

@@ -47,7 +47,7 @@ object Search {
         val trimmed = term.trim()
         if (trimmed.isEmpty()) return null
         val json = call(context, OP_RESULTS, variables(trimmed, limit, prefix = false)) ?: return null
-        val results = withSaved(context, parseResults(json, trimmed))
+        val results = withSaved(context, withResolvedUsers(context, parseResults(json, trimmed), trimmed))
         log.i("search '$trimmed' tracks=${results.tracks.size} artists=${results.artists.size} " +
                 "albums=${results.albums.size} playlists=${results.playlists.size} " +
                 "sections=${results.sections.map { "${it.title}(${it.items.size})" }} " +
@@ -79,7 +79,7 @@ object Search {
         val trimmed = term.trim()
         if (trimmed.isEmpty()) return emptyList()
         val json = call(context, OP_SUGGESTIONS, suggestionVariables(trimmed, limit)) ?: return emptyList()
-        val hits = topHits(json).take(limit)
+        val hits = withResolvedUserHits(context, trimmed, topHits(json).take(limit))
         val entities = hits.filter { it.kind != SearchKind.QUERY && it.uri.isNotBlank() }
         val saved = if (entities.isEmpty()) emptySet() else Library.saved(context, entities.map { it.uri })
         val marked = if (saved.isEmpty()) hits else hits.map { if (it.uri in saved) it.copy(saved = true) else it }
@@ -175,6 +175,83 @@ object Search {
         .put("includeAlbumPreReleases", true)
         .put("includeEpisodeContentRatingsV2", true)
         .toString()
+
+    /**
+     * The ranked answer and the suggestion drop name users with the bare account
+     * id as the title. The dedicated users search returns the display name and
+     * avatar, so one extra call patches every user row before it reaches the UI.
+     */
+    private suspend fun withResolvedUsers(context: Context, results: SearchResults, term: String): SearchResults {
+        fun unresolved(hit: SearchHit) =
+            hit.kind == SearchKind.USER && (looksLikeRawId(hit) || hit.imageUrl.isBlank())
+        val all = listOfNotNull(results.top) + results.tracks + results.artists + results.albums +
+            results.playlists + results.others + results.sections.flatMap { it.items }
+        if (all.none(::unresolved)) return results
+        val rich = userHitsByUri(context, term)
+        if (rich.isEmpty()) return results
+        fun fill(hit: SearchHit): SearchHit {
+            if (hit.kind != SearchKind.USER) return hit
+            val resolved = rich[hit.uri] ?: return hit
+            return hit.copy(
+                title = if (looksLikeRawId(hit)) resolved.title else hit.title,
+                subtitle = hit.subtitle.ifBlank { resolved.subtitle },
+                imageUrl = hit.imageUrl.ifBlank { resolved.imageUrl },
+            )
+        }
+        return results.copy(
+            top = results.top?.let(::fill),
+            tracks = results.tracks.map(::fill),
+            artists = results.artists.map(::fill),
+            albums = results.albums.map(::fill),
+            playlists = results.playlists.map(::fill),
+            others = results.others.map(::fill),
+            sections = results.sections.map { section ->
+                section.copy(items = section.items.map(::fill))
+            },
+        )
+    }
+
+    private suspend fun withResolvedUserHits(
+        context: Context,
+        term: String,
+        hits: List<SearchHit>,
+    ): List<SearchHit> {
+        if (hits.none { it.kind == SearchKind.USER && (looksLikeRawId(it) || it.imageUrl.isBlank()) }) return hits
+        val rich = userHitsByUri(context, term)
+        if (rich.isEmpty()) return hits
+        return hits.map { hit ->
+            if (hit.kind != SearchKind.USER) return@map hit
+            val resolved = rich[hit.uri] ?: return@map hit
+            hit.copy(
+                title = if (looksLikeRawId(hit)) resolved.title else hit.title,
+                subtitle = hit.subtitle.ifBlank { resolved.subtitle },
+                imageUrl = hit.imageUrl.ifBlank { resolved.imageUrl },
+            )
+        }
+    }
+
+    private var usersCacheTerm = ""
+    private var usersCacheAt = 0L
+    private var usersCache: Map<String, SearchHit> = emptyMap()
+
+    private suspend fun userHitsByUri(context: Context, term: String): Map<String, SearchHit> {
+        val key = term.trim().lowercase()
+        val now = System.currentTimeMillis()
+        if (key == usersCacheTerm && now - usersCacheAt < 60_000L) return usersCache
+        val hits = runCatching { section(context, SearchKind.USER, term) }.getOrDefault(emptyList())
+            .filter { it.kind == SearchKind.USER && it.uri.isNotBlank() }
+            .associateBy { it.uri }
+        usersCacheTerm = key
+        usersCacheAt = now
+        usersCache = hits
+        log.i("resolved ${hits.size} user hit(s) for '$key'")
+        return hits
+    }
+
+    private fun looksLikeRawId(hit: SearchHit): Boolean {
+        val id = hit.uri.substringAfterLast(':')
+        return hit.title.isBlank() || hit.title.equals(id, ignoreCase = true)
+    }
 
     private fun searchV2(json: JSONObject): JSONObject? =
         json.optJSONObject("data")?.optJSONObject("searchV2")
@@ -443,15 +520,19 @@ object Search {
     }
 
     private fun user(data: JSONObject): SearchHit? {
-        val title = data.optString("name").ifBlank { data.optString("username") }
+        val uri = data.optString("uri")
+        if (uri.isBlank()) return null
+        val title = data.optString("displayName")
+            .ifBlank { data.optString("name") }
+            .ifBlank { data.optString("username") }
         if (title.isBlank()) return null
-        val handle = data.optString("username")
         return SearchHit(
             kind = SearchKind.USER,
-            uri = data.optString("uri"),
+            uri = uri,
             title = title,
-            subtitle = if (handle.isBlank()) "Profile" else "Profile • @$handle",
-            imageUrl = GraphQl.largestSource(data.optJSONObject("avatar")),
+            subtitle = "Profile",
+            imageUrl = GraphQl.largestSource(data.optJSONObject("avatar"))
+                .ifBlank { GraphQl.largestSource(data.optJSONObject("image")) },
         )
     }
 }
