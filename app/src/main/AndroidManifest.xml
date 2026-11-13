@@ -62,7 +62,7 @@
             android:name=".LauncherBuffed"
             android:enabled="false"
             android:exported="true"
-            android:icon="@drawable/ic_launcher_buffed"
+            android:icon="@mipmap/ic_launcher_buffed"
             android:label="${appName}"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -75,7 +75,7 @@
             android:name=".LauncherCustom"
             android:enabled="false"
             android:exported="true"
-            android:icon="@drawable/ic_launcher_custom"
+            android:icon="@mipmap/ic_launcher_custom"
             android:label="${appName}"
             android:targetActivity=".MainActivity">
             <intent-filter>
