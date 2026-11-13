@@ -28,6 +28,14 @@ data class UserProfile(
     val recentlyPlayedArtists: List<ProfileArtist>,
     val colorHex: String,
     val isCurrentUser: Boolean,
+    val avatarUrl: String = "",
+    val publicPlaylists: List<ProfilePlaylist> = emptyList(),
+)
+
+data class ProfilePlaylist(
+    val uri: String,
+    val name: String,
+    val imageUrl: String = "",
 )
 
 data class ProfileArtist(

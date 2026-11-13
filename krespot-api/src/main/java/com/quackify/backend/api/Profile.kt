@@ -29,6 +29,7 @@ import com.quackify.backend.core.net.Net
 import com.quackify.backend.core.net.Pathfinder
 import com.quackify.backend.model.ProfileArtist
 import com.quackify.backend.model.ProfileContext
+import com.quackify.backend.model.ProfilePlaylist
 import com.quackify.backend.model.ProfileTopContent
 import com.quackify.backend.model.ProfileTopTrack
 import com.quackify.backend.model.ProfileUser
@@ -47,14 +48,14 @@ object Profile {
     private const val TOP_TRACK_LIMIT = 5
     private const val RECENT_LIMIT = 12
 
-    suspend fun profile(context: Context): UserProfile? {
-        val userId = EncoreAuth.userId(context)
-        if (userId.isBlank()) {
+    suspend fun profile(context: Context, userId: String = ""): UserProfile? {
+        val id = normalizeUserId(userId).ifBlank { EncoreAuth.userId(context) }
+        if (id.isBlank()) {
             log.w("profile: no user id")
             return null
         }
         val response = Net.get(
-            "$BASE/$userId?playlist_limit=10&artist_limit=10&episode_limit=10&market=from_token",
+            "$BASE/$id?playlist_limit=10&artist_limit=10&episode_limit=10&market=from_token",
             headers(context),
             "profile/view",
         )
@@ -65,6 +66,8 @@ object Profile {
         val root = response.json() ?: return null
         val artists = root.optJSONArray("recently_played_artists") ?: JSONArray()
         val parsed = (0 until artists.length()).mapNotNull { parseArtist(artists.optJSONObject(it)) }
+        val playlists = root.optJSONArray("public_playlists") ?: JSONArray()
+        val parsedPlaylists = (0 until playlists.length()).mapNotNull { parsePlaylist(playlists.optJSONObject(it)) }
         val profile = UserProfile(
             uri = root.optString("uri"),
             name = root.optString("name"),
@@ -73,16 +76,21 @@ object Profile {
             recentlyPlayedArtists = parsed,
             colorHex = colorHexOf(root.optInt("color", 0)),
             isCurrentUser = root.optBoolean("is_current_user", true),
+            avatarUrl = root.optString("image_url"),
+            publicPlaylists = parsedPlaylists,
         )
         log.i("profile '${profile.name}' followers=${profile.followersCount} " +
-                "following=${profile.followingCount} artists=${parsed.size}"
+                "following=${profile.followingCount} artists=${parsed.size} " +
+                "playlists=${parsedPlaylists.size} self=${profile.isCurrentUser}"
         )
         return profile
     }
 
-    suspend fun following(context: Context): List<ProfileUser>? = people(context, "following")
+    suspend fun following(context: Context, userId: String = ""): List<ProfileUser>? =
+        people(context, "following", userId)
 
-    suspend fun followers(context: Context): List<ProfileUser>? = people(context, "followers")
+    suspend fun followers(context: Context, userId: String = ""): List<ProfileUser>? =
+        people(context, "followers", userId)
 
     suspend fun topContent(context: Context): ProfileTopContent? {
         val token = EncoreAuth.token(context)
@@ -157,14 +165,14 @@ object Profile {
         return parsed
     }
 
-    private suspend fun people(context: Context, kind: String): List<ProfileUser>? {
-        val userId = EncoreAuth.userId(context)
-        if (userId.isBlank()) {
+    private suspend fun people(context: Context, kind: String, userId: String): List<ProfileUser>? {
+        val id = normalizeUserId(userId).ifBlank { EncoreAuth.userId(context) }
+        if (id.isBlank()) {
             log.w("$kind: no user id")
             return null
         }
         val response = Net.get(
-            "$BASE/$userId/$kind?market=from_token",
+            "$BASE/$id/$kind?market=from_token",
             headers(context),
             "profile/$kind",
         )
@@ -224,6 +232,17 @@ object Profile {
         )
     }
 
+    private fun parsePlaylist(node: JSONObject?): ProfilePlaylist? {
+        if (node == null) return null
+        val uri = node.optString("uri")
+        val name = node.optString("name")
+        if (uri.isBlank() || name.isBlank()) return null
+        val image = node.optString("image_url").ifBlank {
+            node.optJSONArray("images")?.optJSONObject(0)?.optString("url").orEmpty()
+        }
+        return ProfilePlaylist(uri = uri, name = name, imageUrl = image)
+    }
+
     private fun parsePerson(node: JSONObject?): ProfileUser? {
         if (node == null) return null
         val uri = node.optString("uri")
@@ -236,6 +255,11 @@ object Profile {
             followersCount = node.optLong("followers_count", 0L),
             colorHex = colorHexOf(node.optInt("color", 0)),
         )
+    }
+
+    private fun normalizeUserId(value: String): String {
+        val id = value.trim().removePrefix("spotify:user:").substringBefore(':')
+        return id.takeUnless { it.isBlank() || it == "me" }.orEmpty()
     }
 
     private fun colorHexOf(color: Int): String =
