@@ -1224,6 +1224,7 @@ private fun NowPlayingArtworkCard(
                     imageUrl = coverUrl,
                     contentDescription = title,
                     fallbackColor = dominantColor,
+                    requestSize = 640,
                     modifier = Modifier.fillMaxSize()
                 )
             }

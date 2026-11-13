@@ -64,7 +64,8 @@ fun EncoreArtworkImage(
     shape: Shape? = null,
     cornerRadius: Dp? = null,
     fallbackColor: Color = Color(0xFF282828),
-    contentScale: ContentScale = ContentScale.Crop
+    contentScale: ContentScale = ContentScale.Crop,
+    requestSize: Int = 256
 ) {
     val effectiveShape = shape ?: (if (cornerRadius != null && cornerRadius > 0.dp) RoundedCornerShape(cornerRadius) else null)
     val clipModifier = if (effectiveShape != null) modifier.clip(effectiveShape) else modifier
@@ -87,7 +88,7 @@ fun EncoreArtworkImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(resolvedUrl)
                     .crossfade(true)
-                    .size(256)
+                    .size(requestSize)
                     .setParameter("retry", attempt)
                     .build(),
                 contentDescription = contentDescription,
