@@ -124,6 +124,8 @@ object Pathfinder {
             "b907ad6b088d5bf7680fa81198996d58398c2d55dfcdf59fcc959e0be98a418a",
         "profileAttributes" to
             "08ffb4730af3746e04a8301396f20875dbbce10c75243803091a9274eacc8ac0",
+        "userTopContent" to
+            "61b7353d3625780022dbc63d459eb64cd609e7e5e2a820f9160d65030efe2e15",
         "queryShowMetadataV2" to
             "b475447846f37cc426add800b995a7859c169c53c72b62de6338c0c40a5dacea",
         "queryPodcastEpisodes" to
