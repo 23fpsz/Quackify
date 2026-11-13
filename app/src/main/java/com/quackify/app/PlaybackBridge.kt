@@ -111,6 +111,8 @@ class PlaybackBridge(private val context: Context) {
     @Volatile
     private var gaplessQueuedUri: String = ""
 
+    private var adoptDuration: Long = 0L
+
     /**
      * The next track when the local queue decides it deterministically: repeat
      * one, the smart-shuffle picks, the user queue, the play order and the
@@ -1808,7 +1810,9 @@ class PlaybackBridge(private val context: Context) {
                 )
             }
         }
-        val duration = row.durationMs.takeIf { it > 0L } ?: state.durationMs
+        val duration = adoptDuration.takeIf { it > 0L }
+            ?: row.durationMs.takeIf { it > 0L }
+            ?: state.durationMs
         state = state.copy(
             title = row.title,
             artist = row.artistName,
@@ -1880,7 +1884,9 @@ class PlaybackBridge(private val context: Context) {
             else -> -1
         }
         log.i("gapless: adopting '${row.title.ifBlank { uri.takeLast(12) }}' ctxIdx=$index")
+        adoptDuration = player.durationForItem(uri).takeIf { it > 0L } ?: 0L
         startLocal(row, contextUri, index, 0L, playing = true, startEngine = false)
+        adoptDuration = 0L
         val deadline = SystemClock.elapsedRealtime() + 3000L
         while (connect.playback?.currentTrack?.uri != uri && SystemClock.elapsedRealtime() < deadline) {
             delay(100)
@@ -1890,7 +1896,11 @@ class PlaybackBridge(private val context: Context) {
             log.w("gapless: the command never caught up with '${uri.takeLast(12)}', started report skipped")
             return
         }
-        val duration = player.durationMs.takeIf { it > 0L } ?: row.durationMs
+        val duration = player.durationForItem(uri).takeIf { it > 0L }
+            ?: player.durationMs.takeIf { it > 0L }
+            ?: row.durationMs
+        state = state.copy(positionMs = 0L, durationMs = duration, progress = progressOf(0L, duration))
+        publishLocalFromEngine(0L, true)
         val snapshot = Snapshot.of(
             command,
             DebugSource.STARTED_PLAYING,

@@ -1,6 +1,8 @@
 package com.quackify.compose.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +26,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,15 +36,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
 import androidx.core.content.pm.PackageInfoCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import kotlinx.coroutines.delay
 import com.quackify.compose.R
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.compose.components.EncoreIconButton
@@ -220,6 +229,8 @@ fun SettingsScreen(
                     subtitle = "Prepares the next track while the current one plays, so albums and playlists flow without silence between songs.",
                     isChecked = gapless,
                     enabled = true,
+                    badge = "BETA",
+                    badgeInfo = "Gapless is not optimised yet and may use a lot of license key quota.",
                     onCheckedChange = { on ->
                         gapless = on
                         clientPrefs.edit().putBoolean("gaplessPlayback", on).apply()
@@ -342,6 +353,8 @@ private fun SettingsToggleRow(
     subtitle: String,
     isChecked: Boolean,
     enabled: Boolean = true,
+    badge: String = "",
+    badgeInfo: String = "",
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
@@ -352,13 +365,19 @@ private fun SettingsToggleRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(
-                text = title,
-                style = EncoreTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.Medium,
-                    color = if (enabled) EncoreColors.TextPrimary else EncoreColors.TextSecondary
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium,
+                        color = if (enabled) EncoreColors.TextPrimary else EncoreColors.TextSecondary
+                    )
                 )
-            )
+                if (badge.isNotBlank() && badgeInfo.isNotBlank()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    SettingsBadge(text = badge, info = badgeInfo)
+                }
+            }
             if (subtitle.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -378,6 +397,71 @@ private fun SettingsToggleRow(
                 uncheckedTrackColor = EncoreColors.Card
             )
         )
+    }
+}
+
+@Composable
+private fun SettingsBadge(text: String, info: String) {
+    var open by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    LaunchedEffect(open) {
+        if (!open) return@LaunchedEffect
+        delay(4500)
+        open = false
+    }
+    Box {
+        Text(
+            text = text,
+            style = EncoreTheme.typography.marginal.copy(
+                fontSize = 9.sp,
+                lineHeight = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.6.sp,
+                color = EncoreColors.PureBlack
+            ),
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(EncoreColors.Beta)
+                .clickable { open = !open }
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+        if (open) {
+            Popup(
+                alignment = Alignment.TopStart,
+                offset = IntOffset(-10, 24),
+                onDismissRequest = { open = false }
+            ) {
+                val arrowHeight = with(density) { 7.dp.toPx() }
+                val arrowWidth = with(density) { 14.dp.toPx() }
+                val arrowColor = EncoreColors.CardElevated.copy(alpha = 0.94f)
+                Column {
+                    Canvas(
+                        modifier = Modifier
+                            .padding(start = with(density) { 14.dp })
+                            .size(width = 14.dp, height = 7.dp)
+                    ) {
+                        val path = Path().apply {
+                            moveTo(0f, arrowHeight)
+                            lineTo(arrowWidth / 2f, 0f)
+                            lineTo(arrowWidth, arrowHeight)
+                            close()
+                        }
+                        drawPath(path, arrowColor)
+                    }
+                    Text(
+                        text = info,
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextPrimary),
+                        modifier = Modifier
+                            .widthIn(max = 240.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(arrowColor)
+                            .border(1.dp, EncoreColors.Divider, RoundedCornerShape(8.dp))
+                            .clickable { open = false }
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

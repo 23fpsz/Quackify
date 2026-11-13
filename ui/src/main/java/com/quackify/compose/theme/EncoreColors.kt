@@ -23,6 +23,7 @@ object EncoreColors {
     val TextDisabled = Color(0xFF7F7F7F)    // gray_50: Disabled/placeholder text
 
     val Error = Color(0xFFE91429)
+    val Beta = Color(0xFFFFD54F)
     val HeartActive = Color(0xFF1DB954)
     val ProgressBarBackground = Color(0x33FFFFFF)
     val ScrubberThumb = Color(0xFFFFFFFF)
