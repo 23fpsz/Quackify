@@ -246,11 +246,11 @@ internal object SourceResolver {
         }
         var source: AudioSource? = null
         for (candidate in ordered) {
-            val format = formatName(candidate.format) ?: continue
+            if (formatName(candidate.format) == null) continue
             val key = PlayPlayKeys.key(context, candidate.fileId) ?: continue
             val (table, url) = coroutineScope {
                 val table = async { seektable(candidate.fileId) }
-                val url = async { cdnUrlNamed(context, candidate.fileId, format) }
+                val url = async { cdnUrlNamed(context, candidate.fileId, candidate.format.toString()) }
                 table.await() to url.await()
             }
             if (url == null) continue
