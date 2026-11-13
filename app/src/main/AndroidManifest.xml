@@ -28,6 +28,22 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="spotify" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" android:host="open.spotify.com" />
+                <data android:scheme="https" android:host="open.spotify.com" />
+                <data android:scheme="https" android:host="play.spotify.com" />
+                <data android:scheme="https" android:host="spotify.com" />
+                <data android:scheme="https" android:host="www.spotify.com" />
+            </intent-filter>
         </activity>
 
         <activity-alias

@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
         com.quackify.backend.core.store.AppPrefs.prefs(applicationContext, CLIENT_PREFS)
     }
     private var resumeSignal by mutableStateOf(0)
+    private var pendingLink by mutableStateOf<SpotLink?>(null)
 
     /** Bumped every time the playback notification's body is tapped; the
      * shell watches it and slides the Now Playing view over whatever is
@@ -182,6 +183,7 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra(PlaybackService.EXTRA_OPEN_PLAYER, false) == true) {
             openPlayerSignal++
         }
+        pendingLink = SpotLinks.parse(intent?.data)
         enableEdgeToEdge()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
@@ -720,6 +722,36 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(browseUri, browseFetch) {
                             if (browseUri.isBlank()) return@LaunchedEffect
                             browsePage = Browse.page(context, browseUri)
+                        }
+
+                        LaunchedEffect(loggedIn, pendingLink) {
+                            val link = pendingLink ?: return@LaunchedEffect
+                            pendingLink = null
+                            when (link.kind) {
+                                "track" -> PlaybackHost.bridge?.listener?.onPlayUri(link.uri)
+                                "album" -> albumUri = link.uri
+                                "artist" -> artistUri = link.uri
+                                "playlist" -> if (link.uri != playlistUri) {
+                                    playlistUri = link.uri
+                                    playlistDetail = null
+                                    playlistTracks = null
+                                    playlistHasMore = false
+                                    playlistLoading = true
+                                    playlistRecommendations = emptyList()
+                                    playlistSaved = null
+                                }
+                                "show" -> {
+                                    showUri = link.uri
+                                    showFetch++
+                                    showDetail = null
+                                }
+                                "episode" -> {
+                                    episodeUri = link.uri
+                                    episodeFetch++
+                                    episodeDetail = null
+                                }
+                                "search" -> if (searchTerm == link.query) searchFetch++ else searchTerm = link.query
+                            }
                         }
 
                         val bridge = remember { PlaybackHost.ensure(context) }
@@ -1651,6 +1683,7 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra(PlaybackService.EXTRA_OPEN_PLAYER, false)) {
             openPlayerSignal++
         }
+        SpotLinks.parse(intent.data)?.let { pendingLink = it }
     }
 
     private companion object {
