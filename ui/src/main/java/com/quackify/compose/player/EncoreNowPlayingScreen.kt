@@ -128,7 +128,8 @@ private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
 private const val DRAG_AXIS_SLOP_PX = 8f
 private const val SNAP_BACK_FLING_VELOCITY = -100f
-private const val DISMISS_FLING_VELOCITY = 1000f
+private const val DISMISS_FLING_VELOCITY = 700f
+private const val DISMISS_THRESHOLD_DP = 140f
 private const val AXIS_UNDECIDED = 0
 private const val AXIS_VERTICAL = 2
 private const val AXIS_YIELD = 3
@@ -344,7 +345,7 @@ fun EncoreNowPlayingScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-    val dismissThresholdPx = screenHeightPx * 0.35f
+    val dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() }
     val fullArtworkHeight = (configuration.screenWidthDp + 76).dp
     val videoAreaHeight = (configuration.screenWidthDp * 0.8f * 9f / 16f).dp + 24.dp
 
@@ -925,7 +926,7 @@ private fun Modifier.npvDismissDragGesture(
         onDragEnd = {
             val velocity = velocityTracker.calculateVelocity()
             coroutineScope.launch {
-                if (velocity.y > 1000f || playerOffsetY.value > dismissThresholdPx) {
+                if (velocity.y > DISMISS_FLING_VELOCITY || playerOffsetY.value > dismissThresholdPx) {
                     onDismiss()
                 } else {
                     onSnapBack()
