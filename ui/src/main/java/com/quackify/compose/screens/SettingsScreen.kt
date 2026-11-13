@@ -323,7 +323,7 @@ fun SettingsScreen(
                     AboutLinkButton(label = "Discord", iconRes = R.drawable.ic_discord_24, url = DISCORD_URL)
                 }
                 Text(
-                    text = "\u00A9 2026 Quackify Team \u00B7 xzyyysh & AldySan",
+                    text = "\u00A9 2026 Quackify Team",
                     style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     modifier = Modifier
                         .fillMaxWidth()
