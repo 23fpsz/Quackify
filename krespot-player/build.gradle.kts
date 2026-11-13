@@ -23,4 +23,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.dash)
+    implementation(libs.okhttp)
 }

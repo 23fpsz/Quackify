@@ -25,11 +25,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -272,8 +274,15 @@ internal fun ShellActivityPane(
     self: SelfProfile?,
     fallbackName: String,
     fallbackAvatarUrl: String,
-    onOpenNotification: (ActivityNotification) -> Unit
+    onOpenNotification: (ActivityNotification) -> Unit,
+    onLeave: () -> Unit = {}
 ) {
+    /** Leaving the screen — back, row tap, anything — resets the server-side
+     * read cursor the way the web player does when the panel closes. */
+    val leave by rememberUpdatedState(onLeave)
+    DisposableEffect(Unit) {
+        onDispose { leave() }
+    }
     ActivityScreen(
         onBackClick = onBackClick,
         notifications = notifications,

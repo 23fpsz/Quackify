@@ -111,7 +111,11 @@ data class AudioSource(
     val quality: String,
     val url: String,
     val seektable: Seektable,
-)
+    val playplayKey: ByteArray? = null,
+    val playplayFlac: Boolean = false,
+) {
+    val isPlayplay: Boolean get() = playplayKey != null
+}
 
 internal object SourceResolver {
 
@@ -224,6 +228,71 @@ internal object SourceResolver {
             return null
         }
         return first
+    }
+
+    suspend fun resolvePlayplay(
+        context: Context,
+        uri: String,
+        durationMs: Long,
+    ): AudioSource? {
+        val files = AudioMeta.audioFiles(context, uri)
+        val best = AudioMeta.best(files) ?: return null
+        val format = formatName(best.format) ?: return null
+        val key = PlayPlayKeys.key(context, best.fileId) ?: return null
+        val (table, url) = coroutineScope {
+            val table = async { seektable(best.fileId) }
+            val url = async { cdnUrlNamed(context, best.fileId, format) }
+            table.await() to url.await()
+        }
+        if (url == null) return null
+        val finalTable = table ?: syntheticTable(durationMs)
+        log.i("playplay source ${best.fileId.take(12)} fmt=${best.format} " +
+                (table?.let { "segs=${it.count}" } ?: "synthetic table"))
+        return AudioSource(
+            fileId = best.fileId,
+            format = best.format,
+            bitrate = best.bitrate,
+            quality = qualityName(best.format),
+            url = url,
+            seektable = finalTable,
+            playplayKey = key,
+            playplayFlac = best.format == AudioMeta.FLAC_FLAC ||
+                best.format == AudioMeta.FLAC_FLAC_24BIT,
+        )
+    }
+
+    private suspend fun cdnUrlNamed(context: Context, fileId: String, format: String): String? {
+        val url = "https://$RESOLVE_HOST${RESOLVE_PREFIX.replace("{format}", format)}$fileId$RESOLVE_QUERY"
+        val response = Net.get(url, PlayerHeaders.of(context), tag = "resolve")
+        val urls = response?.takeIf { it.ok }?.json()?.optJSONArray("cdnurl")
+        val first = urls?.optString(0).orEmpty()
+        if (first.isBlank()) {
+            log.w("playplay resolve failed ${response?.code ?: "no response"} ${response?.body?.take(200).orEmpty()}")
+            return null
+        }
+        return first
+    }
+
+    private fun formatName(format: Int): String? = when (format) {
+        AudioMeta.OGG_VORBIS_96 -> "OGG_VORBIS_96"
+        AudioMeta.OGG_VORBIS_160 -> "OGG_VORBIS_160"
+        AudioMeta.OGG_VORBIS_320 -> "OGG_VORBIS_320"
+        AudioMeta.FLAC_FLAC -> "FLAC_FLAC"
+        AudioMeta.FLAC_FLAC_24BIT -> "FLAC_FLAC_24BIT"
+        else -> null
+    }
+
+    private fun qualityName(format: Int): String = when (format) {
+        AudioMeta.OGG_VORBIS_320 -> "VERY_HIGH"
+        AudioMeta.OGG_VORBIS_160 -> "HIGH"
+        AudioMeta.OGG_VORBIS_96 -> "NORMAL"
+        else -> "LOSSLESS"
+    }
+
+    private fun syntheticTable(durationMs: Long): Seektable {
+        val timescale = 44_100
+        val duration = durationMs.coerceAtLeast(0L) * timescale / 1000L
+        return Seektable(0, listOf(1), listOf(duration), timescale, "")
     }
 }
 

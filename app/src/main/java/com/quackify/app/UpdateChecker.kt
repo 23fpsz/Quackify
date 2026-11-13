@@ -12,7 +12,7 @@ object UpdateChecker {
 
     fun check(context: Context): AppUpdate? {
         val current = currentVersion(context) ?: return null
-        val release = latestRelease() ?: return null
+        val release = latestRelease(UpdateInstaller.flavorOf(context.packageName)) ?: return null
         val mine = parse(current) ?: return null
         val theirs = parse(release.tag) ?: return null
         if (compare(theirs, mine) <= 0) return null
@@ -38,7 +38,7 @@ object UpdateChecker {
 
     private class Release(val tag: String, val url: String, val notes: String)
 
-    private fun latestRelease(): Release? = runCatching {
+    private fun latestRelease(flavor: String): Release? = runCatching {
         val conn = URL(RELEASES_API).openConnection() as HttpURLConnection
         conn.connectTimeout = 8000
         conn.readTimeout = 8000
@@ -53,7 +53,7 @@ object UpdateChecker {
             if (tag.isBlank()) return@runCatching null
             Release(
                 tag = tag,
-                url = pickApk(json) ?: json.optString("html_url").orEmpty(),
+                url = pickApk(json, flavor) ?: json.optString("html_url").orEmpty(),
                 notes = json.optString("body").orEmpty(),
             )
         } finally {
@@ -61,7 +61,7 @@ object UpdateChecker {
         }
     }.getOrNull()
 
-    private fun pickApk(json: JSONObject): String? {
+    private fun pickApk(json: JSONObject, flavor: String): String? {
         val assets = json.optJSONArray("assets") ?: return null
         var fallback: String? = null
         for (i in 0 until assets.length()) {
@@ -69,7 +69,7 @@ object UpdateChecker {
             val name = asset.optString("name").orEmpty()
             val download = asset.optString("browser_download_url").orEmpty()
             if (download.isBlank() || !name.endsWith(".apk", true)) continue
-            if (name.contains("standard", true)) return download
+            if (name.contains(flavor, true)) return download
             if (fallback == null) fallback = download
         }
         return fallback
