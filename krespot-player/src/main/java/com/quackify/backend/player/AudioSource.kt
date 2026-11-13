@@ -236,33 +236,41 @@ internal object SourceResolver {
         durationMs: Long,
     ): AudioSource? {
         val files = AudioMeta.audioFiles(context, uri)
-        val best = AudioMeta.best(files) ?: run {
+        if (files.isEmpty()) {
             log.i("no direct file ids for '${uri.takeLast(12)}' " +
                     "(free accounts only get drm manifests), falling back")
             return null
         }
-        val format = formatName(best.format) ?: return null
-        val key = PlayPlayKeys.key(context, best.fileId) ?: return null
-        val (table, url) = coroutineScope {
-            val table = async { seektable(best.fileId) }
-            val url = async { cdnUrlNamed(context, best.fileId, format) }
-            table.await() to url.await()
+        val ordered = AudioMeta.PLAYABLE_FORMATS.flatMap { format ->
+            files.filter { it.format == format }.sortedByDescending { it.bitrate }
         }
-        if (url == null) return null
-        val finalTable = table ?: syntheticTable(durationMs)
-        log.i("playplay source ${best.fileId.take(12)} fmt=${best.format} " +
-                (table?.let { "segs=${it.count}" } ?: "synthetic table"))
-        return AudioSource(
-            fileId = best.fileId,
-            format = best.format,
-            bitrate = best.bitrate,
-            quality = qualityName(best.format),
-            url = url,
-            seektable = finalTable,
-            playplayKey = key,
-            playplayFlac = best.format == AudioMeta.FLAC_FLAC ||
-                best.format == AudioMeta.FLAC_FLAC_24BIT,
-        )
+        var source: AudioSource? = null
+        for (candidate in ordered) {
+            val format = formatName(candidate.format) ?: continue
+            val key = PlayPlayKeys.key(context, candidate.fileId) ?: continue
+            val (table, url) = coroutineScope {
+                val table = async { seektable(candidate.fileId) }
+                val url = async { cdnUrlNamed(context, candidate.fileId, format) }
+                table.await() to url.await()
+            }
+            if (url == null) continue
+            val finalTable = table ?: syntheticTable(durationMs)
+            log.i("playplay source ${candidate.fileId.take(12)} fmt=${candidate.format} " +
+                    (table?.let { "segs=${it.count}" } ?: "synthetic table"))
+            source = AudioSource(
+                fileId = candidate.fileId,
+                format = candidate.format,
+                bitrate = candidate.bitrate,
+                quality = qualityName(candidate.format),
+                url = url,
+                seektable = finalTable,
+                playplayKey = key,
+                playplayFlac = candidate.format == AudioMeta.FLAC_FLAC ||
+                    candidate.format == AudioMeta.FLAC_FLAC_24BIT,
+            )
+            break
+        }
+        return source
     }
 
     private suspend fun cdnUrlNamed(context: Context, fileId: String, format: String): String? {

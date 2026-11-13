@@ -23,6 +23,7 @@ internal object AudioMeta {
     private const val URL = "https://guc3-spclient.spotify.com/extended-metadata/v0/extended-metadata"
 
     private const val KIND_AUDIO_FILES = 5
+    private const val KIND_TRACK_V4 = 10
 
     const val OGG_VORBIS_96 = 0
     const val OGG_VORBIS_160 = 1
@@ -90,6 +91,8 @@ internal object AudioMeta {
             val query = ByteArrayOutputStream().apply {
                 write(0x08)
                 writeVarint(this, KIND_AUDIO_FILES.toLong())
+                write(0x08)
+                writeVarint(this, KIND_TRACK_V4.toLong())
             }.toByteArray()
             val entity = ByteArrayOutputStream().apply {
                 field(1, uri.toByteArray())
@@ -116,7 +119,11 @@ internal object AudioMeta {
 
     private fun parse(data: ByteArray, wantedUri: String): List<AudioEntry> {
         val reader = Reader(data)
-        val files = mutableListOf<AudioEntry>()
+        var audioFiles = listOf<AudioEntry>()
+        var trackFiles = listOf<AudioEntry>()
+        var alternativeFiles = listOf<AudioEntry>()
+        var restrictionCount = 0
+        var sawTrack = false
         while (!reader.done()) {
             val (field, wire) = reader.tag()
             if (field != 2 || wire != 2) { reader.skip(wire); continue }
@@ -131,7 +138,7 @@ internal object AudioMeta {
                     else -> array.skip(w)
                 }
             }
-            if (kind != KIND_AUDIO_FILES) continue
+            if (kind != KIND_AUDIO_FILES && kind != KIND_TRACK_V4) continue
             for (entry in entries) {
                 val data0 = Reader(entry)
                 var uri = ""
@@ -152,44 +159,99 @@ internal object AudioMeta {
                     if (f == 2 && w == 2) payload = any.bytes() else any.skip(w)
                 }
                 if (payload.isEmpty()) continue
-                val response = Reader(payload)
-                while (!response.done()) {
-                    val (f, w) = response.tag()
-                    if (f != 1 || w != 2) { response.skip(w); continue }
-                    val extended = Reader(response.bytes())
-                    var file = ByteArray(0)
-                    var bitrate = 0
-                    while (!extended.done()) {
-                        val (ef, ew) = extended.tag()
-                        when {
-                            ef == 1 && ew == 2 -> file = extended.bytes()
-                            ef == 4 && ew == 0 -> bitrate = extended.varint().toInt()
-                            else -> extended.skip(ew)
-                        }
-                    }
-                    if (file.isEmpty()) continue
-                    val audio = Reader(file)
-                    var fileId = ByteArray(0)
-                    var format = -1
-                    while (!audio.done()) {
-                        val (af, aw) = audio.tag()
-                        when {
-                            af == 1 && aw == 2 -> fileId = audio.bytes()
-                            af == 2 && aw == 0 -> format = audio.varint().toInt()
-                            else -> audio.skip(aw)
-                        }
-                    }
-                    if (fileId.size == 20 && format in PLAYABLE_FORMATS) {
-                        files += AudioEntry(
-                            fileId = fileId.joinToString("") { "%02x".format(it) },
-                            format = format,
-                            bitrate = bitrate,
-                        )
+                when (kind) {
+                    KIND_AUDIO_FILES -> audioFiles = audioFiles + parseAudioFiles(payload)
+                    KIND_TRACK_V4 -> {
+                        sawTrack = true
+                        val track = parseTrack(payload)
+                        restrictionCount += track.restrictions
+                        trackFiles = trackFiles + track.files
+                        alternativeFiles = alternativeFiles + track.alternatives
                     }
                 }
             }
         }
-        return files.distinctBy { it.fileId }
+        val needsRelink = sawTrack && (restrictionCount > 0 || trackFiles.isEmpty())
+        val merged = when {
+            needsRelink && alternativeFiles.isNotEmpty() -> alternativeFiles
+            audioFiles.isNotEmpty() -> audioFiles
+            trackFiles.isNotEmpty() -> trackFiles
+            else -> alternativeFiles
+        }
+        return merged.distinctBy { it.fileId }
+    }
+
+    private fun parseAudioFiles(payload: ByteArray): List<AudioEntry> {
+        val files = mutableListOf<AudioEntry>()
+        val response = Reader(payload)
+        while (!response.done()) {
+            val (f, w) = response.tag()
+            if (f != 1 || w != 2) { response.skip(w); continue }
+            val extended = Reader(response.bytes())
+            var file = ByteArray(0)
+            var bitrate = 0
+            while (!extended.done()) {
+                val (ef, ew) = extended.tag()
+                when {
+                    ef == 1 && ew == 2 -> file = extended.bytes()
+                    ef == 4 && ew == 0 -> bitrate = extended.varint().toInt()
+                    else -> extended.skip(ew)
+                }
+            }
+            parseFile(file, bitrate)?.let { files += it }
+        }
+        return files
+    }
+
+    private class TrackFiles(
+        val files: List<AudioEntry>,
+        val alternatives: List<AudioEntry>,
+        val restrictions: Int,
+    )
+
+    private fun parseTrack(payload: ByteArray): TrackFiles {
+        val files = mutableListOf<AudioEntry>()
+        val alternatives = mutableListOf<AudioEntry>()
+        var restrictions = 0
+        val track = Reader(payload)
+        while (!track.done()) {
+            val (f, w) = track.tag()
+            when {
+                f == 11 -> { restrictions++; track.skip(w) }
+                f == 12 && w == 2 -> parseFile(track.bytes(), 0)?.let { files += it }
+                f == 13 && w == 2 -> {
+                    val alt = Reader(track.bytes())
+                    while (!alt.done()) {
+                        val (af, aw) = alt.tag()
+                        if (af == 12 && aw == 2) parseFile(alt.bytes(), 0)?.let { alternatives += it }
+                        else alt.skip(aw)
+                    }
+                }
+                else -> track.skip(w)
+            }
+        }
+        return TrackFiles(files, alternatives, restrictions)
+    }
+
+    private fun parseFile(file: ByteArray, bitrate: Int): AudioEntry? {
+        if (file.isEmpty()) return null
+        val audio = Reader(file)
+        var fileId = ByteArray(0)
+        var format = -1
+        while (!audio.done()) {
+            val (af, aw) = audio.tag()
+            when {
+                af == 1 && aw == 2 -> fileId = audio.bytes()
+                af == 2 && aw == 0 -> format = audio.varint().toInt()
+                else -> audio.skip(aw)
+            }
+        }
+        if (fileId.size != 20 || format !in PLAYABLE_FORMATS) return null
+        return AudioEntry(
+            fileId = fileId.joinToString("") { "%02x".format(it) },
+            format = format,
+            bitrate = bitrate,
+        )
     }
 
     private class Reader(private val data: ByteArray) {
