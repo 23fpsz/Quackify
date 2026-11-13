@@ -312,6 +312,7 @@ internal fun ShellAlbumPane(
     handleBack: () -> Unit,
     handlePlayPause: () -> Unit,
     handleTrackOptions: (TrackItem) -> Unit,
+    onTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     openArtist: (String, String) -> Unit,
     openAlbum: (String, String, String) -> Unit,
     onAlbumOptions: () -> Unit,
@@ -369,6 +370,7 @@ internal fun ShellAlbumPane(
                 }
             },
             onTrackOptionsClick = handleTrackOptions,
+            onTrackLikeToggle = { onTrackLikeToggle?.invoke(it) },
             onAlbumOptionsClick = onAlbumOptions,
             onArtistClick = { artist -> openArtist(artist, albumDetail?.artistUri.orEmpty()) },
             onAlbumClick = { release -> openAlbum(release.title, activeAlbumArtist, release.uri) }
@@ -486,6 +488,7 @@ internal fun ShellArtistPane(
     onPlayPauseClick: () -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit,
+    onTrackLikeToggle: (TrackItem) -> Unit,
     onFollowToggle: (String, Boolean) -> Unit,
     onReleaseClick: (ArtistRelease) -> Unit,
     onAboutClick: () -> Unit,
@@ -520,6 +523,7 @@ internal fun ShellArtistPane(
             onPlayPauseClick = onPlayPauseClick,
             onTrackSelect = onTrackSelect,
             onTrackOptionsClick = onTrackOptionsClick,
+            onTrackLikeToggle = onTrackLikeToggle,
             onArtistOptionsClick = onOptionsClick,
             isFollowing = artistFollowed == true,
             onFollowToggle = { follow ->
@@ -626,6 +630,7 @@ internal fun ShellPlaylistPane(
     onEditPlaylistDetails: (suspend (String, String, String, ByteArray?, Boolean) -> Boolean)?,
     onDeletePlaylist: ((String) -> Unit)?,
     onTogglePlaylistSaved: ((String, Boolean) -> Unit)?,
+    onTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     handleBack: () -> Unit,
     handleTrackOptions: (TrackItem) -> Unit,
     shareEntity: (String) -> Unit,
@@ -720,6 +725,7 @@ internal fun ShellPlaylistPane(
                 }
             },
             onTrackOptionsClick = handleTrackOptions,
+            onTrackLikeToggle = { onTrackLikeToggle?.invoke(it) },
             onPlaylistOptionsClick = onPlaylistOptions,
             onShareClick = {
                 if (activePlaylistUri.isNotEmpty()) shareEntity(activePlaylistUri)

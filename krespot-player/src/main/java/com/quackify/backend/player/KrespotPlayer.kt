@@ -454,6 +454,8 @@ class KrespotPlayer(private val context: Context) {
 
     val durationMs: Long get() = _state.value.durationMs
 
+    fun durationForItem(uri: String): Long = engine?.durationFor(uri) ?: 0L
+
     val isPlaying: Boolean get() = if (videoActive) video.isPlaying else _state.value.playing
 
     val format: Int get() = _state.value.format
@@ -819,15 +821,21 @@ class KrespotPlayer(private val context: Context) {
                 is PlayerEvent.Progress -> current.copy(positionMs = event.positionMs, durationMs = event.durationMs)
                 is PlayerEvent.Seeked -> current.copy(positionMs = event.positionMs)
                 is PlayerEvent.Started -> {
+                    val itemMs = engine?.durationFor(event.uri) ?: 0L
+                    val settled = itemMs.takeIf { it > 0L } ?: durationMs
                     val moved = event.uri.isNotBlank() && event.uri != current.trackUri
-                    val base = if (moved) current.copy(trackUri = event.uri, positionMs = 0L) else current
+                    val base = if (moved) {
+                        current.copy(trackUri = event.uri, positionMs = 0L, durationMs = settled)
+                    } else {
+                        current.copy(durationMs = settled)
+                    }
                     if (event.uri == queuedNextUri) {
                         engine?.retune(queuedGainDb)
                     }
                     if (current.paused) {
-                        base.copy(buffering = false, durationMs = durationMs)
+                        base.copy(buffering = false)
                     } else {
-                        base.copy(playing = true, paused = false, buffering = false, durationMs = durationMs)
+                        base.copy(playing = true, paused = false, buffering = false)
                     }
                 }
                 is PlayerEvent.Ended -> current.copy(playing = false, buffering = false, positionMs = durationMs)

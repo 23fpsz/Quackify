@@ -84,6 +84,7 @@ import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.matchesCurrent
 import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreFastScroll
+import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreTrackRow
 import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.TrackListSkeleton
@@ -162,6 +163,7 @@ fun EncorePlaylistScreen(
     onPlayPauseClick: () -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
+    onTrackLikeToggle: (TrackItem) -> Unit = {},
     onPlaylistOptionsClick: () -> Unit = {},
     onEditModeChange: (Boolean) -> Unit = {},
     onSaveOrder: (List<TrackItem>) -> Unit = {},
@@ -494,7 +496,9 @@ fun EncorePlaylistScreen(
                             hasVideo = track.hasVideo,
                             imageUrl = track.imageUrl,
                             onClick = { onTrackSelect(track) },
-                            onMoreClick = { onTrackOptionsClick(track) }
+                            onMoreClick = { onTrackOptionsClick(track) },
+                            saved = track.saved,
+                            onLikeToggle = { onTrackLikeToggle(track) }
                         )
                     }
                 }
@@ -1034,7 +1038,9 @@ fun EncorePlaylistScreen(
                         hasVideo = track.hasVideo,
                         imageUrl = track.imageUrl,
                         onClick = { onTrackSelect(track) },
-                        onMoreClick = { onTrackOptionsClick(track) }
+                        onMoreClick = { onTrackOptionsClick(track) },
+                        saved = track.saved,
+                        onLikeToggle = { onTrackLikeToggle(track) }
                     )
                 }
 
@@ -1126,6 +1132,14 @@ fun EncorePlaylistScreen(
                                     )
                                 }
                             }
+
+                            EncoreHeartButton(
+                                isLiked = recTrack.saved == true,
+                                onLikeToggle = { onTrackLikeToggle(recTrack) },
+                                size = 34.dp,
+                                iconSize = 18.dp,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
 
                             Box(
                                 modifier = Modifier

@@ -242,6 +242,9 @@ fun EncoreAppShell(
     /** null while the library contains-check for the open artist is loading. */
     artistFollowed: Boolean? = null,
     onArtistFollowToggle: ((artistUri: String, follow: Boolean) -> Unit)? = null,
+    onArtistTrackLikeToggle: ((TrackItem) -> Unit)? = null,
+    onAlbumTrackLikeToggle: ((TrackItem) -> Unit)? = null,
+    onPlaylistTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     /** Resolves the artist's radio playlist uri (null when it cannot be built). */
     onArtistRadio: (suspend (artistUri: String) -> String?)? = null,
     profile: UserProfile? = null,
@@ -649,6 +652,7 @@ fun EncoreAppShell(
                     }
                 },
                 onTogglePlaylistSaved = onTogglePlaylistSaved,
+                onTrackLikeToggle = { onPlaylistTrackLikeToggle?.invoke(it) },
                 handleBack = handleBack,
                 handleTrackOptions = handleTrackOptions,
                 shareEntity = shareEntity,
@@ -694,6 +698,7 @@ fun EncoreAppShell(
                 handleBack = handleBack,
                 handlePlayPause = handlePlayPause,
                 handleTrackOptions = handleTrackOptions,
+                onTrackLikeToggle = { onAlbumTrackLikeToggle?.invoke(it) },
                 openArtist = openArtist,
                 openAlbum = openAlbum,
                 onAlbumOptions = { flags.isAlbumOptionsOpen = true },
@@ -718,6 +723,7 @@ fun EncoreAppShell(
                 onPlayPauseClick = handlePlayPause,
                 onTrackSelect = handleTrackPlay,
                 onTrackOptionsClick = handleTrackOptions,
+                onTrackLikeToggle = { onArtistTrackLikeToggle?.invoke(it) },
                 onFollowToggle = { uri, follow ->
                     onArtistFollowToggle?.invoke(uri, follow)
                 },

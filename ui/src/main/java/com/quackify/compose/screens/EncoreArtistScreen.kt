@@ -115,6 +115,7 @@ fun EncoreArtistScreen(
     onPlayPauseClick: () -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
+    onTrackLikeToggle: (TrackItem) -> Unit = {},
     onArtistOptionsClick: () -> Unit = {},
     onReleaseClick: (ArtistRelease) -> Unit = {},
     onAboutClick: () -> Unit = {},
@@ -444,23 +445,24 @@ fun EncoreArtistScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onTrackSelect(track) }
-                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter),
+                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter3),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
-                        modifier = Modifier.width(28.dp),
+                        modifier = Modifier.width(24.dp),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         if (isCurrentTrack && isPlaying) {
                             EncorePlayIndicator(
                                 isPlaying = true,
                                 color = EncoreColors.Green,
-                                size = 14.dp
+                                size = 12.dp
                             )
                         } else {
                             Text(
                                 text = "${index + 1}",
-                                style = EncoreTheme.typography.bodyMediumBold.copy(
+                                style = EncoreTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Normal,
                                     color = if (isCurrentTrack) EncoreColors.Green else EncoreColors.TextSecondary
                                 )
                             )
@@ -469,7 +471,7 @@ fun EncoreArtistScreen(
 
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(40.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .background(Color(0xFF242424)),
                         contentAlignment = Alignment.Center
@@ -482,46 +484,49 @@ fun EncoreArtistScreen(
                                 cornerRadius = 4.dp
                             )
                         } else {
-                            Text("♫", color = Color.White, fontSize = 20.sp)
+                            Text("♫", color = Color.White, fontSize = 16.sp)
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(EncoreSpacers.Tighter))
+                    Spacer(modifier = Modifier.width(EncoreSpacers.Tighter2))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = track.title,
-                            style = EncoreTheme.typography.bodyMedium.copy(
+                            style = EncoreTheme.typography.bodySmall.copy(
+                                fontSize = 14.sp,
+                                lineHeight = 18.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (isCurrentTrack) EncoreColors.Green else Color.White
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            text = popTrack.streamCount,
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                            maxLines = 1
-                        )
+                        if (popTrack.streamCount.isNotBlank()) {
+                            Text(
+                                text = popTrack.streamCount,
+                                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                                maxLines = 1
+                            )
+                        }
                     }
 
-                    if (track.saved == true) {
-                        Icon(
-                            painter = painterResource(R.drawable.encore_icon_heart_active_24),
-                            contentDescription = "In Liked Songs",
-                            tint = EncoreColors.Green,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
+                    EncoreIconButton(
+                        iconRes = if (track.saved == true) R.drawable.encore_icon_heart_active_24 else R.drawable.encore_icon_heart_24,
+                        contentDescription = if (track.saved == true) "Remove from Liked Songs" else "Add to Liked Songs",
+                        onClick = { onTrackLikeToggle(track) },
+                        tint = if (track.saved == true) EncoreColors.Green else EncoreColors.TextSecondary,
+                        size = 32.dp,
+                        iconSize = 18.dp
+                    )
 
                     EncoreIconButton(
                         iconRes = R.drawable.encore_icon_more_android_24,
                         contentDescription = "Track options",
                         onClick = { onTrackOptionsClick(track) },
                         tint = EncoreColors.TextSecondary,
-                        size = 36.dp,
-                        iconSize = 20.dp
+                        size = 32.dp,
+                        iconSize = 18.dp
                     )
                 }
             }

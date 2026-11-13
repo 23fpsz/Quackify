@@ -389,7 +389,9 @@ fun EncoreTrackRow(
     modifier: Modifier = Modifier,
     isExplicit: Boolean = false,
     hasVideo: Boolean = false,
-    imageUrl: String? = null
+    imageUrl: String? = null,
+    saved: Boolean? = null,
+    onLikeToggle: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier
@@ -484,6 +486,15 @@ fun EncoreTrackRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        }
+
+        if (onLikeToggle != null) {
+            EncoreHeartButton(
+                isLiked = saved == true,
+                onLikeToggle = onLikeToggle,
+                size = 36.dp,
+                iconSize = 20.dp
+            )
         }
 
         EncoreIconButton(
