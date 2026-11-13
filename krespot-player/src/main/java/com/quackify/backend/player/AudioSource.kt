@@ -21,6 +21,7 @@
 package com.quackify.backend.player
 
 import android.content.Context
+import com.quackify.backend.core.store.AppPrefs
 import com.quackify.backend.core.store.SecureStore
 import com.quackify.backend.connect.command.AudioFile
 import com.quackify.backend.core.auth.EncoreAuth
@@ -34,6 +35,24 @@ import org.json.JSONObject
 private val log = Logs.of(Logs.Module.SOURCE)
 
 private val deniedFormats = mutableSetOf<Int>()
+
+private var deniedLoaded = false
+
+private const val PP_STORE = "quackify.playplay"
+
+private const val PP_DENIED_KEY = "denied_formats"
+
+private fun loadDenied(context: Context) {
+    if (deniedLoaded) return
+    deniedLoaded = true
+    AppPrefs.getString(context, PP_STORE, PP_DENIED_KEY, null)
+        ?.split(',')
+        ?.forEach { it.toIntOrNull()?.let { f -> deniedFormats += f } }
+}
+
+private fun saveDenied(context: Context) {
+    AppPrefs.putString(context, PP_STORE, PP_DENIED_KEY, deniedFormats.joinToString(","))
+}
 
 private const val RESOLVE_HOST = "guc3-spclient.spotify.com"
 private const val RESOLVE_PREFIX = "/storage-resolve/v2/files/audio/interactive/{format}/"
@@ -238,6 +257,7 @@ internal object SourceResolver {
         durationMs: Long,
     ): AudioSource? {
         val files = AudioMeta.audioFiles(context, uri)
+        loadDenied(context)
         if (files.isEmpty()) {
             log.i("no direct file ids for '${uri.takeLast(12)}' " +
                     "(free accounts only get drm manifests), falling back")
@@ -255,6 +275,7 @@ internal object SourceResolver {
             if (key == null) {
                 if (PlayPlayKeys.isRateLimited) break
                 deniedFormats += candidate.format
+                saveDenied(context)
                 log.i("playplay format ${candidate.format} denied, skipping it from now on")
                 continue
             }
