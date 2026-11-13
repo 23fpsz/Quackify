@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -113,6 +114,9 @@ fun EncoreAlbumScreen(
     artistImageUrl: String? = null,
     isLoading: Boolean = false,
     loadFailed: Boolean = false,
+    hasMore: Boolean = false,
+    loadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
     onRetry: () -> Unit = {}
 ) {
     val density = LocalDensity.current
@@ -487,6 +491,9 @@ fun EncoreAlbumScreen(
                 }
             } else {
                 itemsIndexed(tracks) { index, track ->
+                    if (index == tracks.lastIndex - 8) {
+                        AlbumLoadMoreSentinel(hasMore = hasMore, loadingMore = loadingMore, onLoadMore = onLoadMore)
+                    }
                     val isCurrentTrack = track.title == currentTrackTitle
                     AlbumTrackRow(
                         trackNumber = index + 1,
@@ -716,6 +723,16 @@ fun EncoreAlbumScreen(
  * - Explicit [E] badge
  * - 3-dot context action
  */
+@Composable
+private fun AlbumLoadMoreSentinel(
+    hasMore: Boolean,
+    loadingMore: Boolean,
+    onLoadMore: () -> Unit,
+) {
+    if (!hasMore || loadingMore) return
+    LaunchedEffect(Unit) { onLoadMore() }
+}
+
 @Composable
 private fun AlbumTrackRow(
     trackNumber: Int,

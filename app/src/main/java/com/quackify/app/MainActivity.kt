@@ -367,6 +367,8 @@ class MainActivity : ComponentActivity() {
                         var albumLoading by remember { mutableStateOf(false) }
                         var albumFailed by remember { mutableStateOf(false) }
                         var albumRetry by remember { mutableStateOf(0) }
+                        var albumHasMore by remember { mutableStateOf(false) }
+                        var albumLoadingMore by remember { mutableStateOf(false) }
                         var artistUri by remember { mutableStateOf("") }
                         var artistDetail by remember { mutableStateOf<ArtistDetail?>(null) }
                         var artistLoading by remember { mutableStateOf(false) }
@@ -578,12 +580,15 @@ class MainActivity : ComponentActivity() {
                             albumDetail = null
                             albumTracks = null
                             albumFailed = false
+                            albumHasMore = false
                             albumLoading = true
                             try {
                                 val detail = Krespot.albums.album(context, uri)
                                 if (uri != albumUri) return@LaunchedEffect
                                 albumDetail = detail
                                 albumTracks = detail?.tracks?.map { it.toTrackItem() }
+                                albumHasMore = detail != null &&
+                                    detail.fetched < detail.total && detail.tracks.isNotEmpty()
                                 albumFailed = detail == null
                             } finally {
                                 if (uri == albumUri) albumLoading = false
@@ -923,6 +928,25 @@ class MainActivity : ComponentActivity() {
                             albumDetail = albumDetail,
                             albumLoading = albumLoading,
                             albumFailed = albumFailed,
+                            albumHasMore = albumHasMore,
+                            albumLoadingMore = albumLoadingMore,
+                            onLoadMoreAlbumTracks = {
+                                val current = albumTracks
+                                if (!albumLoadingMore && albumHasMore && current != null) {
+                                    scope.launch {
+                                        albumLoadingMore = true
+                                        val page = Krespot.albums.albumMore(context, albumUri, current.size)
+                                        if (page != null && page.rows.isNotEmpty()) {
+                                            albumTracks = current + page.rows.map { it.toTrackItem() }
+                                            albumHasMore = page.hasMore
+                                        } else if (page != null) {
+                                            albumHasMore = page.hasMore
+                                        }
+                                        albumLoadingMore = false
+                                        log.i("album more '$albumUri' -> ${page?.rows?.size ?: 0} rows hasMore=${page?.hasMore}")
+                                    }
+                                }
+                            },
                             onRetryAlbum = { albumRetry++ },
                             nowPlayingArtistBio = nowPlayingArtist?.biography.orEmpty(),
                             nowPlayingMonthlyListeners = nowPlayingArtist?.monthlyListeners
