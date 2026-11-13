@@ -89,10 +89,12 @@ internal object AudioMeta {
         write(0x00)
         uris.forEach { uri ->
             val query = ByteArrayOutputStream().apply {
-                write(0x08)
-                writeVarint(this, KIND_AUDIO_FILES.toLong())
-                write(0x08)
-                writeVarint(this, KIND_TRACK_V4.toLong())
+                listOf(KIND_AUDIO_FILES, KIND_TRACK_V4).forEach { kind ->
+                    write(0x12)
+                    write(0x02)
+                    write(0x08)
+                    writeVarint(this, kind.toLong())
+                }
             }.toByteArray()
             val entity = ByteArrayOutputStream().apply {
                 field(1, uri.toByteArray())
