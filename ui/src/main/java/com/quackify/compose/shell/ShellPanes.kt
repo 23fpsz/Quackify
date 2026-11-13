@@ -51,6 +51,9 @@ import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.EpisodeRow
 import com.quackify.backend.model.HomeChip
+import com.quackify.backend.model.ProfileTopContent
+import com.quackify.backend.model.ProfileTopTrack
+import com.quackify.backend.model.UserProfile
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.SearchKind
 import com.quackify.backend.model.SearchResults
@@ -87,7 +90,9 @@ import com.quackify.compose.screens.EncoreArtistScreen
 import com.quackify.compose.screens.EncoreBrowseScreen
 import com.quackify.compose.screens.EncoreEpisodeScreen
 import com.quackify.compose.screens.EncoreNotification
+import com.quackify.compose.screens.EncoreProfileScreen
 import com.quackify.compose.screens.EncoreShowScreen
+import com.quackify.compose.screens.ProfileContextCard
 import com.quackify.compose.screens.getCategoryColor
 import com.quackify.compose.search.CategoryCard
 import com.quackify.compose.search.SearchHistoryItem
@@ -239,6 +244,45 @@ internal fun ShellNotificationsPane(
         loadFailed = loadFailed,
         onRetry = onRetry,
         onPlayClick = onPlay
+    )
+}
+
+@Composable
+internal fun ShellProfilePane(
+    profile: UserProfile?,
+    topContent: ProfileTopContent?,
+    contexts: List<ProfileContextCard>,
+    loading: Boolean,
+    loadFailed: Boolean,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+    currentTrackUri: String,
+    isPlaying: Boolean,
+    onFollowStatsClick: () -> Unit,
+    onArtistClick: (String, String) -> Unit,
+    onTrackSelect: (ProfileTopTrack) -> Unit,
+    onTrackOptionsClick: (ProfileTopTrack) -> Unit,
+    onContextClick: (ProfileContextCard) -> Unit,
+    fallbackName: String,
+    avatarUrl: String,
+) {
+    EncoreProfileScreen(
+        profile = profile,
+        topContent = topContent,
+        contexts = contexts,
+        loading = loading,
+        loadFailed = loadFailed,
+        onRetry = onRetry,
+        onBackClick = onBack,
+        currentTrackUri = currentTrackUri,
+        isPlaying = isPlaying,
+        onFollowStatsClick = onFollowStatsClick,
+        onArtistClick = onArtistClick,
+        onTrackSelect = onTrackSelect,
+        onTrackOptionsClick = onTrackOptionsClick,
+        onContextClick = onContextClick,
+        fallbackName = fallbackName,
+        avatarUrl = avatarUrl
     )
 }
 

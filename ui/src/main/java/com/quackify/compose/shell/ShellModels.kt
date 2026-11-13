@@ -34,7 +34,8 @@ enum class ShellScreen {
     SHOW,
     EPISODE,
     BROWSE,
-    ADD_TRACKS
+    ADD_TRACKS,
+    PROFILE
 }
 
 data class PlaylistEditDraft(
@@ -172,6 +173,7 @@ internal data class PlaybackOrigin(
 
 internal class ShellUiFlags {
     var isProfileDrawerOpen by mutableStateOf(false)
+    var isProfileFollowOpen by mutableStateOf(false)
     var isAccountsSheetOpen by mutableStateOf(false)
     var isTrackOptionsOpen by mutableStateOf(false)
     var isTrackOptionsFromPlayer by mutableStateOf(false)
