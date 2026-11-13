@@ -594,10 +594,18 @@ class MainActivity : ComponentActivity() {
                                 val detail = Krespot.albums.album(context, uri)
                                 if (uri != albumUri) return@LaunchedEffect
                                 albumDetail = detail
-                                albumTracks = detail?.tracks?.map { it.toTrackItem() }
+                                val rows = detail?.tracks?.map { it.toTrackItem() } ?: emptyList()
+                                albumTracks = rows
                                 albumHasMore = detail != null &&
                                     detail.fetched < detail.total && detail.tracks.isNotEmpty()
                                 albumFailed = detail == null
+                                val uris = rows.map { it.uri }.filter { it.isNotBlank() }
+                                if (uris.isNotEmpty()) {
+                                    val liked = Library.saved(context, uris)
+                                    if (uri == albumUri) {
+                                        albumTracks = rows.map { it.copy(saved = it.uri in liked) }
+                                    }
+                                }
                             } finally {
                                 if (uri == albumUri) albumLoading = false
                             }
@@ -998,7 +1006,14 @@ class MainActivity : ComponentActivity() {
                                         albumLoadingMore = true
                                         val page = Krespot.albums.albumMore(context, albumUri, current.size)
                                         if (page != null && page.rows.isNotEmpty()) {
-                                            albumTracks = current + page.rows.map { it.toTrackItem() }
+                                            val newRows = page.rows.map { it.toTrackItem() }
+                                            val newUris = newRows.map { it.uri }.filter { it.isNotBlank() }
+                                            val liked = if (newUris.isNotEmpty()) {
+                                                Library.saved(context, newUris)
+                                            } else {
+                                                emptySet()
+                                            }
+                                            albumTracks = current + newRows.map { it.copy(saved = it.uri in liked) }
                                             albumHasMore = page.hasMore
                                         } else if (page != null) {
                                             albumHasMore = page.hasMore
@@ -1265,6 +1280,49 @@ class MainActivity : ComponentActivity() {
                                     val ok = Library.setSaved(context, listOf(track.uri), next)
                                     log.i("artist heart '${track.title}' -> $next ok=$ok")
                                     if (!ok) swap(!next)
+                                }
+                            },
+                            onAlbumTrackLikeToggle = { track ->
+                                val next = track.saved != true
+                                val swap = { liked: Boolean ->
+                                    albumTracks = albumTracks?.map { t ->
+                                        if (t.uri == track.uri) t.copy(saved = liked) else t
+                                    }
+                                }
+                                swap(next)
+                                scope.launch {
+                                    val ok = Library.setSaved(context, listOf(track.uri), next)
+                                    log.i("album heart '${track.title}' -> $next ok=$ok")
+                                    if (!ok) swap(!next)
+                                }
+                            },
+                            onPlaylistTrackLikeToggle = { track ->
+                                val next = track.saved != true
+                                val isLikedSongs = playlistUri == "spotify:collection:tracks"
+                                val applyLocal = { liked: Boolean ->
+                                    if (!liked && isLikedSongs) {
+                                        playlistTracks = playlistTracks?.filterNot { it.uri == track.uri }
+                                        playlistDetail = playlistDetail?.let {
+                                            it.copy(total = (it.total - 1).coerceAtLeast(0))
+                                        }
+                                    } else {
+                                        playlistTracks = playlistTracks?.map { t ->
+                                            if (t.uri == track.uri) t.copy(saved = liked) else t
+                                        }
+                                    }
+                                }
+                                val revert = {
+                                    scope.launch {
+                                        val detail = Krespot.collections.collection(context, playlistUri)
+                                        playlistDetail = detail
+                                        playlistTracks = detail?.tracks?.map { it.toTrackItem() }
+                                    }
+                                }
+                                applyLocal(next)
+                                scope.launch {
+                                    val ok = Library.setSaved(context, listOf(track.uri), next)
+                                    log.i("playlist heart '${track.title}' -> $next ok=$ok")
+                                    if (!ok) revert()
                                 }
                             },
                             onArtistRadio = { uri ->

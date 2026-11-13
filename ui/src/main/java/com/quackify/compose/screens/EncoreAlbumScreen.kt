@@ -109,6 +109,7 @@ fun EncoreAlbumScreen(
     onPlayPauseClick: () -> Unit = {},
     onTrackSelect: (TrackItem) -> Unit = {},
     onTrackOptionsClick: (TrackItem) -> Unit = {},
+    onTrackLikeToggle: (TrackItem) -> Unit = {},
     onAlbumOptionsClick: () -> Unit = {},
     onArtistClick: (String) -> Unit = {},
     onAlbumClick: (ArtistRelease) -> Unit = {},
@@ -473,7 +474,8 @@ fun EncoreAlbumScreen(
                             track = track,
                             isPlaying = isCurrentTrack && isPlaying,
                             onClick = { onTrackSelect(track) },
-                            onMoreClick = { onTrackOptionsClick(track) }
+                            onMoreClick = { onTrackOptionsClick(track) },
+                            onLikeToggle = { onTrackLikeToggle(track) }
                         )
                     }
                 }
@@ -504,7 +506,8 @@ fun EncoreAlbumScreen(
                         track = track,
                         isPlaying = isCurrentTrack && isPlaying,
                         onClick = { onTrackSelect(track) },
-                        onMoreClick = { onTrackOptionsClick(track) }
+                        onMoreClick = { onTrackOptionsClick(track) },
+                        onLikeToggle = { onTrackLikeToggle(track) }
                     )
                 }
             }
@@ -746,6 +749,7 @@ private fun AlbumTrackRow(
     isPlaying: Boolean,
     onClick: () -> Unit,
     onMoreClick: () -> Unit,
+    onLikeToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -808,6 +812,13 @@ private fun AlbumTrackRow(
                 )
             }
         }
+
+        EncoreHeartButton(
+            isLiked = track.saved == true,
+            onLikeToggle = onLikeToggle,
+            size = 36.dp,
+            iconSize = 20.dp
+        )
 
         EncoreIconButton(
             iconRes = R.drawable.encore_icon_more_android_24,

@@ -266,6 +266,7 @@ internal fun ShellAlbumPane(
     handleBack: () -> Unit,
     handlePlayPause: () -> Unit,
     handleTrackOptions: (TrackItem) -> Unit,
+    onTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     openArtist: (String, String) -> Unit,
     openAlbum: (String, String, String) -> Unit,
     onAlbumOptions: () -> Unit,
@@ -323,6 +324,7 @@ internal fun ShellAlbumPane(
                 }
             },
             onTrackOptionsClick = handleTrackOptions,
+            onTrackLikeToggle = { onTrackLikeToggle?.invoke(it) },
             onAlbumOptionsClick = onAlbumOptions,
             onArtistClick = { artist -> openArtist(artist, albumDetail?.artistUri.orEmpty()) },
             onAlbumClick = { release -> openAlbum(release.title, activeAlbumArtist, release.uri) }
@@ -580,6 +582,7 @@ internal fun ShellPlaylistPane(
     onEditPlaylistDetails: (suspend (String, String, String, ByteArray?, Boolean) -> Boolean)?,
     onDeletePlaylist: ((String) -> Unit)?,
     onTogglePlaylistSaved: ((String, Boolean) -> Unit)?,
+    onTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     handleBack: () -> Unit,
     handleTrackOptions: (TrackItem) -> Unit,
     shareEntity: (String) -> Unit,
@@ -674,6 +677,7 @@ internal fun ShellPlaylistPane(
                 }
             },
             onTrackOptionsClick = handleTrackOptions,
+            onTrackLikeToggle = { onTrackLikeToggle?.invoke(it) },
             onPlaylistOptionsClick = onPlaylistOptions,
             onShareClick = {
                 if (activePlaylistUri.isNotEmpty()) shareEntity(activePlaylistUri)
