@@ -3514,9 +3514,7 @@ class PlaybackBridge(private val context: Context) {
         if (command == null) {
             when (event) {
                 is PlayerEvent.Started -> {
-                    if (event.uri.isNotBlank() && state.trackUri.isNotBlank() &&
-                        event.uri != state.trackUri && gaplessEnabled()
-                    ) {
+                    if (event.uri.isNotBlank() && event.uri == player.queuedNextUri) {
                         log.i("gapless: the engine moved to '${event.uri.takeLast(12)}' on its own")
                         scope.launch { adoptEngineAdvance(event.uri) }
                         return
@@ -3555,9 +3553,7 @@ class PlaybackBridge(private val context: Context) {
         val position = if (duration > 0L) raw.coerceAtMost(duration) else raw
         when (event) {
             is PlayerEvent.Started -> {
-                if (event.uri.isNotBlank() && state.trackUri.isNotBlank() &&
-                    event.uri != state.trackUri && gaplessEnabled()
-                ) {
+                if (event.uri.isNotBlank() && event.uri == player.queuedNextUri) {
                     log.i("gapless: the engine moved to '${event.uri.takeLast(12)}' on its own")
                     scope.launch { adoptEngineAdvance(event.uri) }
                     return

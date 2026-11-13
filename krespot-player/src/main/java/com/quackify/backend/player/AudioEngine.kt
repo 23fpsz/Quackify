@@ -200,7 +200,8 @@ internal class AudioEngine(
     fun queueNext(uri: String, source: AudioSource) {
         runOnMain {
             val p = player ?: return@runOnMain
-            if (p.mediaItemCount > 1) p.removeMediaItems(1, p.mediaItemCount)
+            val current = p.currentMediaItemIndex
+            if (p.mediaItemCount > current + 1) p.removeMediaItems(current + 1, p.mediaItemCount)
             p.addMediaItem(itemFor(uri, source))
         }
         log.i("audio queued next '$uri' '${source.fileId.take(12)}' ${if (source.seektable.pssh.isNotBlank()) "drm" else "clear"}")
