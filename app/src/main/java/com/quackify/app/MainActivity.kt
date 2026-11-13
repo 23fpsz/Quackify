@@ -9,7 +9,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
-import java.util.Calendar
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -24,9 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.quackify.app.search.decorateSearchTracks
 import com.quackify.backend.core.auth.EncoreAuth
-import com.quackify.backend.api.HomeFeed
-import com.quackify.backend.model.HomeSection
-import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
@@ -42,19 +38,32 @@ import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.ArtistRelease
-import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.home.toTrackItem
 import com.quackify.compose.home.toArtistRelease
 import com.quackify.backend.model.ShelfKind
 import androidx.compose.runtime.collectAsState
 import com.quackify.backend.api.Search
 import com.quackify.backend.api.WhatsNew
+import com.quackify.backend.api.HomeFeed
 import com.quackify.backend.api.Profile
+import com.quackify.backend.model.HomeChip
+import com.quackify.backend.model.HomeSection
+import com.quackify.backend.model.ProfileContext
+import com.quackify.backend.model.ProfileTopContent
+import com.quackify.backend.model.ProfileUser
+import com.quackify.backend.model.UserProfile
+import com.quackify.compose.home.toFavoriteArtistsShelf
+import com.quackify.compose.home.toQuickAccess
+import com.quackify.compose.home.toQuickAccessFallback
+import com.quackify.compose.home.toRecentlyPlayedShelf
+import com.quackify.compose.home.toShelves
+import com.quackify.compose.screens.HistoryStats
+import com.quackify.compose.screens.ProfileContextCard
+import java.util.Calendar
 import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.screens.SettingsLocks
 import com.quackify.backend.api.Settings
 import com.quackify.compose.screens.EncoreNotification
-import com.quackify.compose.screens.ProfileContextCard
 import com.quackify.compose.search.SearchHistoryItem
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.CategoryRecommendationItem
@@ -65,19 +74,11 @@ import com.quackify.backend.api.Podcasts
 import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.EpisodeDetail
-import com.quackify.backend.model.ProfileContext
-import com.quackify.backend.model.ProfileTopContent
-import com.quackify.backend.model.ProfileUser
-import com.quackify.backend.model.UserProfile
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.SearchKind
 import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.TrackLyrics
-import com.quackify.compose.home.toFavoriteArtistsShelf
-import com.quackify.compose.home.toQuickAccess
-import com.quackify.compose.home.toRecentlyPlayedShelf
-import com.quackify.compose.home.toShelves
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.screens.LoginScreen
@@ -98,7 +99,6 @@ import kotlinx.coroutines.withContext
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.library.Krespot
 import com.quackify.backend.library.PlaylistSource
-import com.quackify.compose.home.toQuickAccessFallback
 
 private val log = Logs.of(Logs.Module.MAIN)
 
@@ -474,6 +474,7 @@ class MainActivity : ComponentActivity() {
                         var playlistTracks by remember { mutableStateOf<List<TrackItem>?>(null) }
                         var playlistRecommendations by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
                         var playlistSaved by remember { mutableStateOf<Boolean?>(null) }
+                        val contributors = rememberPlaylistContributorController(context, playlistUri)
                         var playlistEditDraft by remember { mutableStateOf<PlaylistEditDraft?>(null) }
                         var editableUris by remember { mutableStateOf<Set<String>>(emptySet()) }
                         var albumDetail by remember { mutableStateOf<AlbumDetail?>(null) }
@@ -1163,6 +1164,16 @@ class MainActivity : ComponentActivity() {
                                 uri
                             },
                             playlistSaved = playlistSaved,
+                            playlistPermissions = contributors.permissions,
+                            contributorsLoading = contributors.loading,
+                            contributorBusyIds = contributors.busyIds,
+                            onLoadPlaylistContributors = contributors::refresh,
+                            onSearchUsers = { term ->
+                                Search.section(context, SearchKind.USER, term)
+                            },
+                            onAddPlaylistContributor = contributors::add,
+                            onRemovePlaylistContributor = contributors::removeAsContributor,
+                            onRemovePlaylistMember = contributors::removeFromPlaylist,
                             playlistEditDraft = playlistEditDraft,
                             editablePlaylistUris = editableUris,
                             onEditPlaylist = { uri ->
@@ -1729,9 +1740,9 @@ private suspend fun decorateSearchTracks(
     )
 }
 
-private const val FAVORITE_ARTIST_LIMIT = 10
-
 private const val PLAYLIST_PREFETCH_ROWS = 8
+
+private const val FAVORITE_ARTIST_LIMIT = 10
 
 private data class ArtistStanding(
     val plays: Int,

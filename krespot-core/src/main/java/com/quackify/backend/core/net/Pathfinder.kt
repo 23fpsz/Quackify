@@ -82,6 +82,8 @@ object Pathfinder {
             "087278b20b743578a6262c2b0b4bcd20d879c503cc359a2285baf083ef944240",
         "fetchPlaylist" to
             "21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf",
+        "playlistPermissions" to
+            "e43d1d35f231cf289c23c9d9c489f4a4f502e4eda09839c530608f107b6556b8",
         "browseAll" to
             "dbd8b55e09a58afc52eab438bc228ba28fd72ac2f2148c6c26354980e4579001",
         "browsePage" to

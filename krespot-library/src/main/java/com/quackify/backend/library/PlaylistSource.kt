@@ -30,6 +30,8 @@ import com.quackify.backend.core.net.Pathfinder
 import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.Net
 import com.quackify.backend.model.PlaylistChoice
+import com.quackify.backend.model.PlaylistMember
+import com.quackify.backend.model.PlaylistPermissions
 
 private val log = Logs.of(Logs.Module.PLAYLIST)
 
@@ -40,9 +42,13 @@ object PlaylistSource {
 
     const val OP_MOVE_ITEMS = "moveItemsInPlaylist"
 
+    const val OP_PERMISSIONS = "playlistPermissions"
+
     const val DUMMY_TRACK_URI = "spotify:track:0000000000000000000000"
 
     private const val BASE = "https://spclient.wg.spotify.com/playlist/v2"
+
+    private const val PERMISSIONS = "https://spclient.wg.spotify.com/playlist-permission/v1"
 
     private const val UPLOAD = "https://image-upload.spotify.com/v4"
 
@@ -357,6 +363,122 @@ object PlaylistSource {
         object BOTTOM : Position
         data class BeforeUid(val uid: String) : Position
         data class AfterUid(val uid: String) : Position
+    }
+
+    suspend fun permissions(context: Context, playlistUri: String): PlaylistPermissions? {
+        val token = EncoreAuth.token(context)
+        if (token.isBlank()) {
+            log.w("permissions: no token")
+            return null
+        }
+        if (id(playlistUri).isBlank()) {
+            log.w("permissions: bad uri '$playlistUri'")
+            return null
+        }
+        val variables = JSONObject().put("uri", playlistUri).toString()
+        val json = Pathfinder.queryPost(context, token, OP_PERMISSIONS, variables) ?: return null
+        val node = json.optJSONObject("data")?.optJSONObject("playlistV2")
+        if (node == null) {
+            log.w("permissions: no data.playlistV2 for $playlistUri")
+            return null
+        }
+        val caps = node.optJSONObject("currentUserCapabilities")
+        val items = node.optJSONObject("members")?.optJSONArray("items")
+        val members = (0 until (items?.length() ?: 0)).mapNotNull { member(items?.optJSONObject(it)) }
+        val parsed = PlaylistPermissions(
+            uri = playlistUri,
+            members = members,
+            canAdministratePermissions = caps?.optBoolean("canAdministratePermissions", false) == true,
+            canEditItems = caps?.optBoolean("canEditItems", false) == true,
+            canEditMetadata = caps?.optBoolean("canEditMetadata", false) == true,
+            grantableLevels = caps?.optJSONArray("grantableLevel")
+                ?.let { grants -> (0 until grants.length()).mapNotNull { grants.optString(it).ifBlank { null } } }
+                ?: emptyList(),
+        )
+        log.i("permissions $playlistUri -> ${parsed.members.size} member(s) " +
+                "admin=${parsed.canAdministratePermissions} levels=${parsed.grantableLevels}"
+        )
+        return parsed
+    }
+
+    suspend fun setMemberPermission(
+        context: Context,
+        playlistUri: String,
+        userId: String,
+        level: String,
+    ): Boolean {
+        val playlist = id(playlistUri)
+        if (playlist.isBlank() || userId.isBlank()) {
+            log.w("setMemberPermission: bad input '$playlistUri' '$userId'")
+            return false
+        }
+        val revision = memberRevisions(context, playlist)[userId].orEmpty()
+        val body = JSONObject().put("permissionLevel", level)
+        if (revision.isNotBlank()) body.put("revision", revision)
+        val response = Net.putJson(
+            "$PERMISSIONS/playlist/$playlist/permission/member/user/$userId",
+            body.toString(),
+            protoHeaders(context),
+            "playlist/setMemberPermission",
+        )
+        val ok = response?.ok == true
+        log.i("setMemberPermission $userId -> $level in $playlistUri ok=$ok " +
+                "http=${response?.code ?: -1} ${response?.body?.take(160).orEmpty()}"
+        )
+        return ok
+    }
+
+    suspend fun removeMember(context: Context, playlistUri: String, userId: String): Boolean {
+        val playlist = id(playlistUri)
+        if (playlist.isBlank() || userId.isBlank()) {
+            log.w("removeMember: bad input '$playlistUri' '$userId'")
+            return false
+        }
+        val response = Net.request(
+            "DELETE",
+            "$PERMISSIONS/playlist/$playlist/permission/member/user/$userId",
+            headers(context),
+            null,
+            "playlist/removeMember",
+        )
+        val ok = response?.ok == true
+        log.i("removeMember $userId from $playlistUri ok=$ok http=${response?.code ?: -1} " +
+                response?.body?.take(160).orEmpty()
+        )
+        return ok
+    }
+
+    private suspend fun memberRevisions(context: Context, playlist: String): Map<String, String> {
+        val response = Net.get(
+            "$PERMISSIONS/playlist/$playlist/permission/members",
+            headers(context),
+            "playlist/permissionMembers",
+        )
+        val root = response?.json()?.optJSONObject("memberPermissions")
+        if (root == null) {
+            log.i("permissionMembers $playlist -> none http=${response?.code ?: -1}")
+            return emptyMap()
+        }
+        val out = HashMap<String, String>()
+        root.keys().asSequence().forEach { key ->
+            root.optJSONObject(key)?.optString("revision")?.takeIf { it.isNotBlank() }?.let { out[key] = it }
+        }
+        log.i("permissionMembers $playlist -> ${out.size} revision(s)")
+        return out
+    }
+
+    private fun member(node: JSONObject?): PlaylistMember? {
+        val user = node?.optJSONObject("user")?.optJSONObject("data") ?: return null
+        val uri = user.optString("uri")
+        if (!uri.startsWith("spotify:user:")) return null
+        return PlaylistMember(
+            userId = uri.substringAfterLast(":"),
+            uri = uri,
+            name = user.optString("name").ifBlank { user.optString("username") },
+            avatarUrl = GraphQl.userAvatar(user),
+            isOwner = node.optBoolean("isOwner", false),
+            permissionLevel = node.optString("permissionLevel"),
+        )
     }
 
     suspend fun hasCustomCover(context: Context, playlistUri: String): Boolean {

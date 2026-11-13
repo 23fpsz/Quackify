@@ -193,6 +193,7 @@ internal class ShellUiFlags {
     var isAddToPlaylistOpen by mutableStateOf(false)
     var isRenamePlaylistDialogOpen by mutableStateOf(false)
     var isCreatePlaylistOpen by mutableStateOf(false)
+    var isContributorsOpen by mutableStateOf(false)
 }
 
 internal class ShellActiveEntity {

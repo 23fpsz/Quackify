@@ -27,6 +27,7 @@ import com.quackify.backend.core.net.GraphQl
 import com.quackify.backend.core.net.Pathfinder
 import com.quackify.backend.core.net.plainText
 import com.quackify.backend.model.CollectionDetail
+import com.quackify.backend.model.PlaylistMember
 import com.quackify.backend.model.TrackPage
 import com.quackify.backend.model.TrackRow
 import org.json.JSONObject
@@ -158,6 +159,26 @@ object CollectionSource {
         return rows
     }
 
+    private fun members(playlist: JSONObject?): List<PlaylistMember> {
+        val items = playlist?.optJSONObject("members")?.optJSONArray("items") ?: return emptyList()
+        val out = ArrayList<PlaylistMember>(items.length())
+        for (i in 0 until items.length()) {
+            val node = items.optJSONObject(i) ?: continue
+            val user = node.optJSONObject("user")?.optJSONObject("data") ?: continue
+            val uri = user.optString("uri")
+            if (!uri.startsWith("spotify:user:")) continue
+            out += PlaylistMember(
+                userId = uri.substringAfterLast(":"),
+                uri = uri,
+                name = user.optString("name").ifBlank { user.optString("username") },
+                avatarUrl = GraphQl.userAvatar(user),
+                isOwner = node.optBoolean("isOwner", false),
+                permissionLevel = node.optString("permissionLevel"),
+            )
+        }
+        return out
+    }
+
     private suspend fun playlist(context: Context, token: String, uri: String): CollectionDetail? {
         val playlist = playlistPage(context, token, uri, 0, PAGE) ?: return null
         val content = playlist.optJSONObject("content")
@@ -190,9 +211,11 @@ object CollectionSource {
             offset = 0,
             fetched = content?.optJSONArray("items")?.length() ?: 0,
             editable = editable,
+            members = members(playlist),
         )
         log.i("playlist $uri '${detail.title}' -> ${rows.size}/$total owner='${detail.creator}' " +
-                "followers=$followers editable=$editable saved=${rows.count { it.saved == true }} " +
+                "followers=$followers editable=$editable members=${detail.members.size} " +
+                "saved=${rows.count { it.saved == true }} " +
                 "video=${rows.count { it.video }}"
         )
         return detail

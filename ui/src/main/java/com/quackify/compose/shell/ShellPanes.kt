@@ -51,6 +51,7 @@ import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.EpisodeRow
 import com.quackify.backend.model.HomeChip
+import com.quackify.backend.model.PlaylistMember
 import com.quackify.backend.model.ProfileTopContent
 import com.quackify.backend.model.ProfileTopTrack
 import com.quackify.backend.model.UserProfile
@@ -633,6 +634,8 @@ internal fun ShellPlaylistPane(
     userDisplayName: String,
     playerListener: ComposePlayerListener?,
     playlistSaved: Boolean?,
+    playlistMembers: List<PlaylistMember> = emptyList(),
+    onOpenContributors: (() -> Unit)? = null,
     playlistRecommendations: List<TrackItem>,
     recommendationsLoading: Boolean,
     onRefreshRecommendations: (() -> Unit)?,
@@ -698,6 +701,8 @@ internal fun ShellPlaylistPane(
             coverUrl = activePlaylistCoverUrl
                 ?: playlistDetail?.imageUrl?.takeIf { it.isNotBlank() }
                 ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl,
+            contributors = playlistMembers,
+            onContributorsClick = { onOpenContributors?.invoke() },
             onBackClick = handleBack,
             onPlayPauseClick = {
                 if (playerListener != null) {
