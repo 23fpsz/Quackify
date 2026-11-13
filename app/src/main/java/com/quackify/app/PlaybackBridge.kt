@@ -70,6 +70,9 @@ const val AUTOPLAY_ON_STARTUP_PREF = "autoplayOnStartup"
 /** Settings toggle: keep playing from a station when the context runs out. */
 const val AUTOPLAY_ON_END_PREF = "autoplayOnEnd"
 
+/** Settings toggle: prebuffer the next track so transitions carry no silence. */
+const val GAPLESS_PREF = "gaplessPlayback"
+
 /** Last context this phone played, so a cold start can rebuild its row list. */
 const val CHAIN_CONTEXT_PREF = "chainContext"
 
@@ -97,6 +100,11 @@ class PlaybackBridge(private val context: Context) {
 
     /** Settings "Autoplay on startup": read from the local prefs at start(). */
     private var autoplayOnStartup: Boolean = false
+
+    /** Settings "Gapless playback": read on demand, so the toggle applies live. */
+    private fun gaplessEnabled(): Boolean =
+        com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
+            .getBoolean(GAPLESS_PREF, false)
     private var autoplayPending: Boolean = false
     private var autoplayArmedAt: Long = 0L
 

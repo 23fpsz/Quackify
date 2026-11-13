@@ -102,6 +102,9 @@ fun SettingsScreen(
     var fullArtwork by remember {
         mutableStateOf(clientPrefs.getBoolean("fullArtworkPlayer", true))
     }
+    var gapless by remember {
+        mutableStateOf(clientPrefs.getBoolean("gaplessPlayback", false))
+    }
 
 
     Column(
@@ -210,6 +213,16 @@ fun SettingsScreen(
                     onCheckedChange = { on ->
                         autoplayOnEnd = on
                         clientPrefs.edit().putBoolean("autoplayOnEnd", on).apply()
+                    }
+                )
+                SettingsToggleRow(
+                    title = "Gapless playback",
+                    subtitle = "Prepares the next track while the current one plays, so albums and playlists flow without silence between songs.",
+                    isChecked = gapless,
+                    enabled = true,
+                    onCheckedChange = { on ->
+                        gapless = on
+                        clientPrefs.edit().putBoolean("gaplessPlayback", on).apply()
                     }
                 )
                 SettingsToggleRow(
