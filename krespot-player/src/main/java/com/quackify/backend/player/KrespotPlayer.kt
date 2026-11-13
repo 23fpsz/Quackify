@@ -230,14 +230,21 @@ class KrespotPlayer(private val context: Context) {
         }
         scope.launch {
             val source = SourceResolver.resolvePlayplay(context, track.uri, track.durationMs)
-                ?: SourceResolver.resolve(
-                    context,
-                    spclient,
-                    track.uri,
-                    file?.fileId.orEmpty(),
-                    file?.format ?: 0,
-                    prefetched = if (file == null) manifestFor(track.uri) else null,
-                ) ?: return@launch
+                ?: if (PlayPlayKeys.rateLimitedRecently) {
+                    log.w("playplay rate limited, deferring '${track.name.ifBlank { track.uri }}' " +
+                        "instead of burning a drm licence request")
+                    _events.emit(PlayerEvent.Failed("rate limited"))
+                    null
+                } else {
+                    SourceResolver.resolve(
+                        context,
+                        spclient,
+                        track.uri,
+                        file?.fileId.orEmpty(),
+                        file?.format ?: 0,
+                        prefetched = if (file == null) manifestFor(track.uri) else null,
+                    )
+                } ?: return@launch
             rememberSource(track.uri, source)
             rememberFile(track.uri, source.fileId)
             val still = engine
@@ -515,14 +522,21 @@ class KrespotPlayer(private val context: Context) {
                 val source = sourceFor(track.uri)
                     ?: SourceResolver.resolvePlayplay(context, track.uri, track.durationMs)
                         ?.also { rememberSource(track.uri, it) }
-                    ?: SourceResolver.resolve(
-                        context,
-                        spclient,
-                        track.uri,
-                        file?.fileId.orEmpty(),
-                        file?.format ?: 0,
-                        prefetched = if (file == null) manifestFor(track.uri) else null,
-                    )?.also { rememberSource(track.uri, it) }
+                    ?: if (PlayPlayKeys.rateLimitedRecently) {
+                        log.w("playplay rate limited, deferring '${track.name.ifBlank { track.uri }}' " +
+                            "instead of burning a drm licence request")
+                        _events.emit(PlayerEvent.Failed("rate limited"))
+                        null
+                    } else {
+                        SourceResolver.resolve(
+                            context,
+                            spclient,
+                            track.uri,
+                            file?.fileId.orEmpty(),
+                            file?.format ?: 0,
+                            prefetched = if (file == null) manifestFor(track.uri) else null,
+                        )?.also { rememberSource(track.uri, it) }
+                    }
                 if (source == null) {
                     _events.emit(PlayerEvent.Failed("no source"))
                     return@launch

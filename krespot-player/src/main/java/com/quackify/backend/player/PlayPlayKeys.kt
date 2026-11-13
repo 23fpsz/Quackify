@@ -25,6 +25,9 @@ internal object PlayPlayKeys {
     val isRateLimited: Boolean
         get() = System.currentTimeMillis() < rateLimitedUntil
 
+    val rateLimitedRecently: Boolean
+        get() = System.currentTimeMillis() < rateLimitedUntil + RECENT_WINDOW_MS
+
     suspend fun key(context: Context, fileId: String): ByteArray? {
         if (!fileId.matches(Regex("[0-9a-fA-F]{40}"))) {
             log.w("playplay invalid file id '${fileId.take(12)}'")
@@ -45,7 +48,7 @@ internal object PlayPlayKeys {
         )
         if (blob != null && blob.code == 429) {
             val retryAfter = blob.headers["retry-after"]?.trim()?.toLongOrNull()
-            val wait = (retryAfter?.coerceIn(5L, 600L) ?: 60L) * 1000L
+            val wait = (retryAfter?.coerceIn(5L, 600L) ?: 300L) * 1000L
             rateLimitedUntil = System.currentTimeMillis() + wait
             log.w("playplay key rate limited, cooling down for ${wait / 1000}s")
             return null
@@ -66,4 +69,6 @@ internal object PlayPlayKeys {
         log.i("playplay key '${fileId.take(12)}' ${key.size}B (${blob.bytes.size}B response)")
         return key
     }
+
+    private const val RECENT_WINDOW_MS = 60_000L
 }
