@@ -50,7 +50,11 @@ internal object AudioMeta {
             URL,
             request(listOf(uri)),
             "application/x-protobuf",
-            PlayerHeaders.of(context),
+            PlayerHeaders.of(context) + mapOf(
+                "Accept" to "application/x-protobuf",
+                "Origin" to "https://open.spotify.com",
+                "Referer" to "https://open.spotify.com/",
+            ),
             tag = "extmeta",
         )?.takeIf { it.ok }
         if (blob == null) {
