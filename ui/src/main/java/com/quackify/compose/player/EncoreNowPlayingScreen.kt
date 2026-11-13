@@ -1205,62 +1205,64 @@ private fun NowPlayingArtworkCard(
                                 .background(Color.Black.copy(alpha = 0.25f))
                         ) {
                             var menuOpen by remember { mutableStateOf(false) }
-                            Box(
+                            Row(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    .padding(10.dp)
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
                                         .background(Color.Black.copy(alpha = 0.45f))
-                                        .clickable { menuOpen = true }
+                                        .clickable { onToggleVideoFullscreen() }
                                         .padding(7.dp)
                                 ) {
                                     Icon(
-                                        painter = painterResource(R.drawable.encore_icon_settings_24),
-                                        contentDescription = "Video quality",
+                                        painter = painterResource(R.drawable.encore_icon_fullscreen_24),
+                                        contentDescription = "Toggle fullscreen video",
                                         tint = Color.White,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
-                                EncoreMenu(
-                                    expanded = menuOpen,
-                                    onDismiss = { menuOpen = false },
-                                ) {
-                                    EncoreMenuItem(
-                                        label = "Auto",
-                                        onClick = {
-                                            onVideoQuality(0)
-                                            menuOpen = false
-                                        }
-                                    )
-                                    videoQualities.forEach { height ->
+                                Box {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(50))
+                                            .background(Color.Black.copy(alpha = 0.45f))
+                                            .clickable { menuOpen = true }
+                                            .padding(7.dp)
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.encore_icon_settings_24),
+                                            contentDescription = "Video quality",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    EncoreMenu(
+                                        expanded = menuOpen,
+                                        onDismiss = { menuOpen = false },
+                                    ) {
                                         EncoreMenuItem(
-                                            label = "${height}p",
+                                            label = "Auto",
                                             onClick = {
-                                                onVideoQuality(height)
+                                                onVideoQuality(0)
                                                 menuOpen = false
                                             }
                                         )
+                                        videoQualities.forEach { height ->
+                                            EncoreMenuItem(
+                                                label = "${height}p",
+                                                onClick = {
+                                                    onVideoQuality(height)
+                                                    menuOpen = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(10.dp)
-                                    .clip(RoundedCornerShape(50))
-                                    .background(Color.Black.copy(alpha = 0.45f))
-                                    .clickable { onToggleVideoFullscreen() }
-                                    .padding(7.dp)
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.encore_icon_fullscreen_24),
-                                    contentDescription = "Toggle fullscreen video",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
                             }
                         }
                     }
