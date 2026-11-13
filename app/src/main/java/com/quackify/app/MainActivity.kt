@@ -1779,15 +1779,18 @@ private fun launcherIconPref(context: Context): String =
 private fun applyLauncherIcon(context: Context, option: String) {
     val pm = context.packageManager
     val target = LAUNCHER_ALIASES[option] ?: return
+    val prefix = MainActivity::class.java.name.substringBeforeLast('.')
     LAUNCHER_ALIASES.forEach { (key, cls) ->
-        val component = ComponentName(context, context.packageName + cls)
+        val component = ComponentName(context, "$prefix$cls")
         val want = if (key == option) {
             PackageManager.COMPONENT_ENABLED_STATE_ENABLED
         } else {
             PackageManager.COMPONENT_ENABLED_STATE_DISABLED
         }
         if (pm.getComponentEnabledSetting(component) != want) {
-            pm.setComponentEnabledSetting(component, want, PackageManager.DONT_KILL_APP)
+            runCatching {
+                pm.setComponentEnabledSetting(component, want, PackageManager.DONT_KILL_APP)
+            }.onFailure { log.w("launcher icon '$key' -> ${want == PackageManager.COMPONENT_ENABLED_STATE_ENABLED} failed: $it") }
         }
     }
     log.i("launcher icon -> $option")
