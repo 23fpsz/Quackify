@@ -471,3 +471,12 @@ internal class VideoEngine(
         return result
     }
 }
+
+internal suspend fun provisionDevice(instance: android.media.MediaDrm): ByteArray? {
+    val request = runCatching { instance.getProvisionRequest() }.getOrNull() ?: return null
+    val signed = String(request.data, Charsets.UTF_8)
+    val separator = if (request.defaultUrl.contains("?")) "&" else "?"
+    val url = request.defaultUrl + separator + "signedRequest=" + java.net.URLEncoder.encode(signed, "UTF-8")
+    val response = Net.postBlob(url, ByteArray(0), "application/octet-stream", tag = "provision")
+    return response?.takeIf { it.ok }?.bytes
+}
