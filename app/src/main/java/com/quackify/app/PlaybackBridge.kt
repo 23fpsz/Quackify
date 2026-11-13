@@ -1135,13 +1135,6 @@ class PlaybackBridge(private val context: Context) {
         publishModes()
     }
 
-    /**
-     * Rebuilds the local play order the way the web player does: no server
-     * call carries the order - the array below is the source of truth for the
-     * skip, the advance and the queue panel. The current track keeps playing
-     * and only the rows after it change - a fresh shuffle of the context when
-     * shuffle turns on, the original context order when it turns off.
-     */
     private suspend fun applyShuffleOrder(
         turnOn: Boolean,
         contextUri: String = "",
