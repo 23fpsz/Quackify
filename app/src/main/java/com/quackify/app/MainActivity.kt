@@ -247,6 +247,8 @@ class MainActivity : ComponentActivity() {
                         var searchDataFor by remember { mutableStateOf("") }
                         val searchSavedOverrides = remember { mutableStateMapOf<String, Boolean>() }
                         var recentSearches by remember { mutableStateOf(RecentSearches.all(context)) }
+                        val playlistNames = remember { java.util.concurrent.ConcurrentHashMap<String, String>() }
+                        var submittedSearchQuery by remember { mutableStateOf<String?>(null) }
                         val scope = rememberCoroutineScope()
 
                         var showUri by remember { mutableStateOf("") }
@@ -786,7 +788,14 @@ class MainActivity : ComponentActivity() {
                                 PlayStats.recordListen(context)
                                 PlayStats.tallyArtist(context, now.artistUri, now.artist)
                                 if (now.contextUri.startsWith("spotify:playlist:")) {
-                                    PlayStats.tallyPlaylist(context, now.contextUri, now.contextLabel.ifBlank { "Playlist" })
+                                    val resolved = now.contextLabel.ifBlank {
+                                        playlistNames[now.contextUri] ?: runCatching {
+                                            Krespot.collections.collection(context, now.contextUri)?.title
+                                        }.getOrNull()?.trim().orEmpty().also { name ->
+                                            if (name.isNotBlank()) playlistNames[now.contextUri] = name
+                                        }
+                                    }
+                                    PlayStats.tallyPlaylist(context, now.contextUri, resolved.ifBlank { "Playlist" })
                                 }
                                 PlayHistory.record(
                                     context,
@@ -1252,6 +1261,11 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onSearchQueryChange = { query -> searchTerm = query },
+                            onSearchSubmit = { query ->
+                                RecentSearches.recordQuery(context, query)
+                                submittedSearchQuery = query
+                                recentSearches = RecentSearches.all(context)
+                            },
                             searchSuggestionHits = searchHits,
                             browseCategories = browseCategories,
                             searchSuggestions = remember(searchHits) {
@@ -1294,6 +1308,11 @@ class MainActivity : ComponentActivity() {
                             },
                             onRecordRecentSearch = { hit ->
                                 RecentSearches.record(context, hit)
+                                val submitted = submittedSearchQuery
+                                if (submitted != null && searchTerm.trim() == submitted) {
+                                    RecentSearches.remove(context, submitted)
+                                }
+                                submittedSearchQuery = null
                                 recentSearches = RecentSearches.all(context)
                             },
                             onLoadSearchSection = { kind, offset ->

@@ -104,6 +104,7 @@ fun EncoreAppShell(
     libraryLoading: Boolean = false,
     searchResults: List<TrackItem>? = null,
     onSearchQueryChange: ((String) -> Unit)? = null,
+    onSearchSubmit: ((String) -> Unit)? = null,
     searchSuggestions: List<TrackItem> = emptyList(),
     searchSuggestionHits: List<SearchHit> = emptyList(),
     searchRecent: List<SearchHistoryItem> = emptyList(),
@@ -538,6 +539,7 @@ fun EncoreAppShell(
                 initialQuery = searchQuery,
                 playerListener = playerListener,
                 onSearchQueryChange = onSearchQueryChange,
+                onSearchSubmit = onSearchSubmit,
                 onRetrySearch = { onRetrySearch?.invoke() },
                 onClearRecentSearches = { onClearRecentSearches?.invoke() },
                 onRemoveRecentSearch = { item -> onRemoveRecentSearch?.invoke(item) },
@@ -1085,7 +1087,8 @@ fun EncoreAppShell(
                 create = flags.isCreateSheetOpen,
                 device = flags.isDeviceSheetOpen,
                 queue = flags.isQueueSheetOpen,
-                sleepTimer = flags.isSleepTimerOpen
+                sleepTimer = flags.isSleepTimerOpen,
+                canvasResolutionSheet = flags.isCanvasResolutionSheetOpen
             ),
             selectedTrack = local.trackForOptions,
             devices = playbackState?.devices.orEmpty(),
@@ -1159,6 +1162,8 @@ fun EncoreAppShell(
             onDismissDevice = { flags.isDeviceSheetOpen = false },
             onDismissQueue = { flags.isQueueSheetOpen = false },
             onDismissSleepTimer = { flags.isSleepTimerOpen = false },
+            onCanvasResolutionClick = { flags.isCanvasResolutionSheetOpen = true },
+            onDismissCanvasResolution = { flags.isCanvasResolutionSheetOpen = false },
             onAddToPlaylist = {
                 local.trackForOptions?.let { track ->
                     flags.isAddToPlaylistOpen = true

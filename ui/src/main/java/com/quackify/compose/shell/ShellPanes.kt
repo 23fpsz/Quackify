@@ -350,6 +350,7 @@ internal fun ShellSearchPane(
     initialQuery: String,
     playerListener: ComposePlayerListener?,
     onSearchQueryChange: ((String) -> Unit)?,
+    onSearchSubmit: ((String) -> Unit)?,
     onRetrySearch: () -> Unit,
     onClearRecentSearches: () -> Unit,
     onRemoveRecentSearch: (SearchHistoryItem) -> Unit,
@@ -385,6 +386,7 @@ internal fun ShellSearchPane(
         onSearchQueryChange = { query ->
             onSearchQueryChange?.invoke(query) ?: playerListener?.onSearch(query)
         },
+        onSearchSubmit = { query -> onSearchSubmit?.invoke(query) },
         recentSearches = searchRecent,
         suggestions = searchSuggestions,
         suggestionHits = searchSuggestionHits,

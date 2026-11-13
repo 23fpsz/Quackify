@@ -176,6 +176,7 @@ fun EncoreSearchScreen(
     onPlaylistClick: (String, String) -> Unit = { _, _ -> },
     searchResults: List<TrackItem>? = null,
     onSearchQueryChange: (String) -> Unit = {},
+    onSearchSubmit: (String) -> Unit = {},
     recentSearches: List<SearchHistoryItem> = emptyList(),
     suggestions: List<TrackItem> = emptyList(),
     suggestionHits: List<SearchHit> = emptyList(),
@@ -492,7 +493,10 @@ fun EncoreSearchScreen(
                     singleLine = true,
                     cursorBrush = SolidColor(EncoreColors.Green),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        focusManager.clearFocus()
+                        if (searchQuery.isNotBlank()) onSearchSubmit(searchQuery.trim())
+                    }),
                     decorationBox = { innerTextField ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),

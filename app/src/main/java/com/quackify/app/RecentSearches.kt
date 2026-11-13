@@ -3,6 +3,7 @@ package com.quackify.app
 import android.content.Context
 import com.quackify.backend.core.store.AppPrefs
 import com.quackify.backend.model.SearchHit
+import com.quackify.backend.model.SearchKind
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -35,7 +36,7 @@ object RecentSearches {
                 imageUrl = node.optString("image"),
                 colorHex = node.optString("color"),
             )
-            if (entry.uri.isNotBlank() && entry.title.isNotBlank()) out += entry
+            if (entry.title.isNotBlank()) out += entry
         }
         return out
     }
@@ -55,9 +56,29 @@ object RecentSearches {
         write(context, next)
     }
 
-    fun remove(context: Context, uri: String) {
-        if (uri.isBlank()) return
-        write(context, all(context).filterNot { it.uri == uri })
+    fun recordQuery(context: Context, query: String) {
+        val title = query.trim()
+        if (title.isEmpty()) return
+        val next = ArrayList<Entry>(LIMIT)
+        next += Entry(
+            kind = SearchKind.QUERY.name,
+            uri = "",
+            title = title,
+            subtitle = "",
+            imageUrl = "",
+            colorHex = "",
+        )
+        all(context).filterNot {
+            it.uri.isBlank() && it.title.equals(title, ignoreCase = true)
+        }.take(LIMIT - 1).forEach(next::add)
+        write(context, next)
+    }
+
+    fun remove(context: Context, key: String) {
+        if (key.isBlank()) return
+        write(context, all(context).filterNot {
+            it.uri == key || (it.uri.isBlank() && it.title.equals(key, ignoreCase = true))
+        })
     }
 
     fun clear(context: Context) {
