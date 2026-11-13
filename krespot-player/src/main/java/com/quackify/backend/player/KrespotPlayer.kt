@@ -521,6 +521,10 @@ class KrespotPlayer(private val context: Context) {
                 throw cancellation
             } catch (failure: Throwable) {
                 log.e("play failed ${failure.javaClass.simpleName}: ${failure.message}")
+                if (player != null && engine === player) {
+                    player.stop()
+                    engine = null
+                }
                 if (LicenseGate.remainingMs() > 0L) {
                     refused = track
                     refusedFrom = fromMs
@@ -529,8 +533,6 @@ class KrespotPlayer(private val context: Context) {
                     )
                 }
                 _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
-            } finally {
-                if (player != null && engine === player) engine = null
             }
         }
     }
