@@ -1389,8 +1389,8 @@ class MainActivity : ComponentActivity() {
                             historyLoading = false,
                             onLogout = {
                                 log.i("logout tapped")
-                                EncoreAuth.logout(context)
                                 PlaybackHost.reset(context)
+                                EncoreAuth.logout(context)
                                 Krespot.library.invalidate()
                                 val remaining = EncoreAuth.savedAccounts(context)
                                 if (remaining.isNotEmpty()) {
@@ -1404,8 +1404,8 @@ class MainActivity : ComponentActivity() {
                             activeAccountId = activeAccountId,
                             onSwitchAccount = { id ->
                                 log.i("switch account tapped id=$id")
+                                PlaybackHost.reset(context)
                                 if (EncoreAuth.switchAccount(context, id)) {
-                                    PlaybackHost.reset(context)
                                     Krespot.library.invalidate()
                                     (context as? Activity)?.recreate()
                                 }
@@ -1424,15 +1424,14 @@ class MainActivity : ComponentActivity() {
                                 log.i("remove account tapped id=$id")
                                 val wasActive = EncoreAuth.forgetAccount(context, id)
                                 if (wasActive) {
+                                    PlaybackHost.reset(context)
                                     val remaining = EncoreAuth.savedAccounts(context)
                                     if (remaining.isNotEmpty()) {
                                         EncoreAuth.switchAccount(context, remaining.last().id)
-                                        PlaybackHost.reset(context)
                                         Krespot.library.invalidate()
                                         (context as? Activity)?.recreate()
                                     } else {
                                         EncoreAuth.logout(context)
-                                        PlaybackHost.reset(context)
                                         Krespot.library.invalidate()
                                         loggedIn = false
                                     }
