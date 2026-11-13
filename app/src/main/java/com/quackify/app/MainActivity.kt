@@ -82,6 +82,7 @@ import com.quackify.compose.format.formatCount
 import com.quackify.compose.screens.LoginScreen
 import com.quackify.compose.screens.PathfinderCaptureScreen
 import com.quackify.compose.shell.EncoreAppShell
+import com.quackify.compose.shell.ShellDeepLink
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.util.rememberIsOffline
 import com.quackify.backend.core.webview.SilentTokenRefresh
@@ -726,32 +727,9 @@ class MainActivity : ComponentActivity() {
 
                         LaunchedEffect(loggedIn, pendingLink) {
                             val link = pendingLink ?: return@LaunchedEffect
+                            if (link.kind != "track" && link.kind != "station") return@LaunchedEffect
                             pendingLink = null
-                            when (link.kind) {
-                                "track" -> PlaybackHost.bridge?.listener?.onPlayUri(link.uri)
-                                "album" -> albumUri = link.uri
-                                "artist" -> artistUri = link.uri
-                                "playlist" -> if (link.uri != playlistUri) {
-                                    playlistUri = link.uri
-                                    playlistDetail = null
-                                    playlistTracks = null
-                                    playlistHasMore = false
-                                    playlistLoading = true
-                                    playlistRecommendations = emptyList()
-                                    playlistSaved = null
-                                }
-                                "show" -> {
-                                    showUri = link.uri
-                                    showFetch++
-                                    showDetail = null
-                                }
-                                "episode" -> {
-                                    episodeUri = link.uri
-                                    episodeFetch++
-                                    episodeDetail = null
-                                }
-                                "search" -> if (searchTerm == link.query) searchFetch++ else searchTerm = link.query
-                            }
+                            PlaybackHost.bridge?.listener?.onPlayUri(link.uri)
                         }
 
                         val bridge = remember { PlaybackHost.ensure(context) }
@@ -944,6 +922,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         EncoreAppShell(
+                                deeplink = pendingLink?.let { ShellDeepLink(it.kind, it.uri, it.query) },
+                                onDeeplinkConsumed = { pendingLink = null },
+                                onDeeplinkSearch = { q -> if (searchTerm == q) searchFetch++ else searchTerm = q },
                                 userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
                                 userAvatarUrl = account?.imageUrl.orEmpty(),
                             playbackState = bridge.state,
