@@ -28,7 +28,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.SupervisorJob
@@ -41,7 +40,6 @@ import kotlinx.coroutines.launch
 import com.quackify.backend.connect.command.AudioFile
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
-import com.quackify.backend.core.net.Net
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
@@ -52,8 +50,6 @@ private const val FILE_ID_CACHE = 64
 private const val SOURCE_CACHE = 8
 
 private const val DEEP_LOOKAHEAD = 1
-
-private const val KEY_SETTLE_MS = 300L
 
 private const val DUCK_LEVEL = 0.2f
 
@@ -102,7 +98,7 @@ class KrespotPlayer(private val context: Context) {
     val events: SharedFlow<PlayerEvent> = _events
 
     @Volatile
-    private var engine: PlayerEngine? = null
+    private var engine: AudioEngine? = null
 
     @Volatile
     private var mp3: Mp3Engine? = null
@@ -130,8 +126,6 @@ class KrespotPlayer(private val context: Context) {
 
     @Volatile
     private var refusedFrom: Long = 0L
-
-    private val widevine = Widevine(context) { spclient }
 
     private val focus = AudioFocus(context)
 
@@ -270,8 +264,7 @@ class KrespotPlayer(private val context: Context) {
         }
         if (stale.isEmpty()) return
         stale.forEach { uri ->
-            val fileId = sourceFor(uri)?.fileId ?: fileIds[uri] ?: return@forEach
-            SegmentStore.evict(fileId)
+            sourceFor(uri) ?: fileIds[uri] ?: return@forEach
         }
         log.i("dropped ${stale.size} stale warmup(s): " +
                 stale.joinToString { it.takeLast(12) })
@@ -303,8 +296,6 @@ class KrespotPlayer(private val context: Context) {
                     prefetched = file,
                 ) ?: return@forEach
                 rememberSource(track.uri, source)
-                widevine.open(source.seektable.pssh)
-                SegmentStore.warm(source, 0L)
                 synchronized(deepWarmed) { deepWarmed.add(track.uri) }
                 log.i("deep warm '${track.title}' file=${source.fileId.take(8)}")
             }
@@ -355,33 +346,7 @@ class KrespotPlayer(private val context: Context) {
     }
 
     fun warm() {
-        scope.launch(Dispatchers.IO) {
-            val started = android.os.SystemClock.elapsedRealtime()
-            runCatching { AudioSink(44_100, 2).release() }
-            val sink = android.os.SystemClock.elapsedRealtime() - started
-            val decoder = warmDecoder()
-            log.i("audio sink warmed in ${sink}ms, decoder in ${decoder}ms")
-        }
-        scope.launch { widevine.warm() }
         video.prewarmDrm()
-    }
-
-    private fun warmDecoder(): Long {
-        val started = android.os.SystemClock.elapsedRealtime()
-        runCatching {
-            val format = android.media.MediaFormat
-                .createAudioFormat("audio/mp4a-latm", 44_100, 2)
-                .apply { setByteBuffer("csd-0", java.nio.ByteBuffer.wrap(byteArrayOf(0x12, 0x10))) }
-            val codec = android.media.MediaCodec.createDecoderByType("audio/mp4a-latm")
-            try {
-                codec.configure(format, null, null, 0)
-                codec.start()
-            } finally {
-                runCatching { codec.stop() }
-                runCatching { codec.release() }
-            }
-        }
-        return android.os.SystemClock.elapsedRealtime() - started
     }
 
     fun resumeLast(spclient: String) {
@@ -404,11 +369,7 @@ class KrespotPlayer(private val context: Context) {
                 return@launch
             }
             rememberSource(uri, source)
-            widevine.open(source.seektable.pssh)
-            SegmentStore.warm(source, at)
-            log.i("resume: '${uri.takeLast(12)}' file=${source.fileId.take(8)} " +
-                    "licence and segments warmed at ${at}ms"
-            )
+            log.i("resume: '${uri.takeLast(12)}' file=${source.fileId.take(8)} source warmed at ${at}ms")
         }
     }
 
@@ -473,9 +434,8 @@ class KrespotPlayer(private val context: Context) {
         log.i("play '${track.name}' ${track.uri} " +
                 "file=${file?.fileId ?: "by uri"} fmt=${file?.format ?: 0} ${file?.bitrate ?: 0}b"
         )
-        val startedAt = SystemClock.elapsedRealtime()
         job = scope.launch {
-            var player: PlayerEngine? = null
+            var player: AudioEngine? = null
             try {
                 val source = sourceFor(track.uri)
                     ?: SourceResolver.resolve(
@@ -491,50 +451,29 @@ class KrespotPlayer(private val context: Context) {
                     return@launch
                 }
                 rememberFile(track.uri, source.fileId)
-                val warmed = async(Dispatchers.IO) { SegmentStore.warm(source, fromMs) }
-                val drm = async(Dispatchers.IO) {
-                    if (source.seektable.pssh.isBlank()) {
-                        log.i("clear content, no drm session asked")
-                        return@async null
-                    }
-                    val left = KEY_SETTLE_MS - (SystemClock.elapsedRealtime() - startedAt)
-                    if (left > 0L) delay(left)
-                    if (id != generation) {
-                        log.i("play was skipped before its key, nothing asked")
-                        return@async null
-                    }
-                    widevine.open(source.seektable.pssh)
-                }
-                val entry = warmed.await()
-                val initBytes = entry.init
-                    ?: Net.fetch(source.url, 0, source.seektable.offset - 1)?.also { entry.init = it }
-                if (initBytes == null) {
-                    drm.cancel()
-                    _events.emit(PlayerEvent.Failed("no init range"))
-                    return@launch
-                }
                 if (id != generation) {
-                    log.i("play was skipped while its media was warming up")
+                    log.i("play was skipped while its source resolved")
                     return@launch
                 }
-                val parsed = Mp4.parseInit(initBytes)
-                val init = if (parsed.mediaDuration > 0) {
-                    parsed
-                } else {
-                    parsed.copy(mediaDuration = source.seektable.totalDuration + parsed.priming)
-                }
-                player = PlayerEngine(source, init, widevine, file?.gainDb ?: 0.0, drm, scope, entry.segments) { event ->
+                val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
+                player = AudioEngine(context, { spclient }, scope) { event ->
                     if (id == generation) {
-                        mirror(event, init.playableMs)
+                        mirror(event, totalMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                     }
+                }
+                val startAt = if (pendingSeekMs >= 0L) pendingSeekMs.also { pendingSeekMs = -1L } else fromMs
+                val ready = player.prepare(source, startAt, autoplay = !pendingPause, file?.gainDb ?: 0.0)
+                if (!ready || id != generation) {
+                    player.stop()
+                    return@launch
                 }
                 engine = player
                 _state.value = PlayerState(
                     playing = !pendingPause,
                     paused = pendingPause,
                     buffering = !pendingPause,
-                    durationMs = init.playableMs,
+                    durationMs = totalMs,
                     fileId = source.fileId,
                     format = source.format,
                     bitrate = source.bitrate,
@@ -542,18 +481,21 @@ class KrespotPlayer(private val context: Context) {
                     trackUri = track.uri,
                 )
                 if (pendingPause) {
-                    log.i("play was asked to stay paused, holding it at ${fromMs}ms")
-                    player.pause()
+                    log.i("play was asked to stay paused, holding it at ${startAt}ms")
                 }
-                val startAt = if (pendingSeekMs >= 0L) pendingSeekMs.also { pendingSeekMs = -1L } else fromMs
-                if (startAt != fromMs) {
-                    log.i("a seek parked while the engine was loading, starting at ${startAt}ms")
+                if (pendingSeekMs >= 0L) {
+                    val parked = pendingSeekMs.also { pendingSeekMs = -1L }
+                    log.i("a seek parked while the engine was loading, applying at ${parked}ms")
+                    player.seekTo(parked)
                 }
-                player.run(startAt)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Throwable) {
                 log.e("play failed ${failure.javaClass.simpleName}: ${failure.message}")
+                if (player != null && engine === player) {
+                    player.stop()
+                    engine = null
+                }
                 if (LicenseGate.remainingMs() > 0L) {
                     refused = track
                     refusedFrom = fromMs
@@ -562,8 +504,6 @@ class KrespotPlayer(private val context: Context) {
                     )
                 }
                 _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
-            } finally {
-                if (player != null && engine === player) engine = null
             }
         }
     }
@@ -697,7 +637,6 @@ class KrespotPlayer(private val context: Context) {
 
     fun release() {
         stop()
-        scope.launch { widevine.close() }
         LicenseEndpoint.reset()
     }
 
@@ -805,7 +744,6 @@ class KrespotPlayer(private val context: Context) {
     fun reset() {
         stop()
         _state.value = PlayerState()
-        scope.launch { widevine.close() }
         LicenseEndpoint.reset()
         log.i("reset, engine and state cleared")
     }
