@@ -17,6 +17,7 @@ import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.sheets.ProfileDrawerSheet
 import com.quackify.compose.sheets.SleepTimerOption
 import com.quackify.compose.sheets.SleepTimerSheet
+import com.quackify.compose.sheets.CanvasResolutionSheet
 import com.quackify.compose.sheets.EncoreConnectDeviceSheet
 import com.quackify.compose.sheets.EncoreQueueSheet
 import com.quackify.compose.sheets.TrackOptionsSheet
@@ -34,6 +35,7 @@ internal data class SheetFlags(
     val device: Boolean = false,
     val queue: Boolean = false,
     val sleepTimer: Boolean = false,
+    val canvasResolutionSheet: Boolean = false,
 )
 
 @Composable
@@ -79,6 +81,8 @@ internal fun ShellSheets(
     onCanvasToggle: () -> Unit = {},
     canvasResolution: Int = 1080,
     onCanvasResolution: (Int) -> Unit = {},
+    onCanvasResolutionClick: () -> Unit = {},
+    onDismissCanvasResolution: () -> Unit = {},
     onDismissProfile: () -> Unit,
     onDismissAccounts: () -> Unit,
     onSwitchAccount: (String) -> Unit,
@@ -165,7 +169,7 @@ internal fun ShellSheets(
         isCanvasEnabled = isCanvasEnabled,
         onCanvasToggle = onCanvasToggle,
         canvasResolution = canvasResolution,
-        onCanvasResolution = onCanvasResolution,
+        onCanvasResolutionClick = onCanvasResolutionClick,
         isTasteExcluded = trackTasteExcluded,
         onToggleTasteExclusion = onToggleTasteExclusion,
         onRemoveFromPlaylist = onRemoveTrackFromPlaylist,
@@ -267,6 +271,14 @@ internal fun ShellSheets(
             activeOption = sleepTimer,
             onOptionSelected = onSleepTimerSelected,
             onDismiss = onDismissSleepTimer
+        )
+    }
+
+    if (flags.canvasResolutionSheet) {
+        CanvasResolutionSheet(
+            selectedHeight = canvasResolution,
+            onHeightSelected = onCanvasResolution,
+            onDismiss = onDismissCanvasResolution
         )
     }
 }
