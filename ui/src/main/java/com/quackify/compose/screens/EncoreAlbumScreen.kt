@@ -613,12 +613,7 @@ fun EncoreAlbumScreen(
             }
         }
 
-        EncoreFastScroll(
-            listState = listState,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 2.dp),
-        )
+        EncoreFastScroll(listState = listState)
 
         Box(
             modifier = Modifier
