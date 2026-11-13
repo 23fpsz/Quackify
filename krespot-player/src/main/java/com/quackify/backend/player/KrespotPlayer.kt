@@ -127,8 +127,6 @@ class KrespotPlayer(private val context: Context) {
     @Volatile
     private var refusedFrom: Long = 0L
 
-    private val widevine = Widevine(context) { spclient }
-
     private val focus = AudioFocus(context)
 
     private val video = VideoEngine(context, { spclient }, scope) { event ->
@@ -266,8 +264,7 @@ class KrespotPlayer(private val context: Context) {
         }
         if (stale.isEmpty()) return
         stale.forEach { uri ->
-            val fileId = sourceFor(uri)?.fileId ?: fileIds[uri] ?: return@forEach
-            SegmentStore.evict(fileId)
+            sourceFor(uri) ?: fileIds[uri] ?: return@forEach
         }
         log.i("dropped ${stale.size} stale warmup(s): " +
                 stale.joinToString { it.takeLast(12) })
@@ -349,33 +346,7 @@ class KrespotPlayer(private val context: Context) {
     }
 
     fun warm() {
-        scope.launch(Dispatchers.IO) {
-            val started = android.os.SystemClock.elapsedRealtime()
-            runCatching { AudioSink(44_100, 2).release() }
-            val sink = android.os.SystemClock.elapsedRealtime() - started
-            val decoder = warmDecoder()
-            log.i("audio sink warmed in ${sink}ms, decoder in ${decoder}ms")
-        }
-        scope.launch { widevine.warm() }
         video.prewarmDrm()
-    }
-
-    private fun warmDecoder(): Long {
-        val started = android.os.SystemClock.elapsedRealtime()
-        runCatching {
-            val format = android.media.MediaFormat
-                .createAudioFormat("audio/mp4a-latm", 44_100, 2)
-                .apply { setByteBuffer("csd-0", java.nio.ByteBuffer.wrap(byteArrayOf(0x12, 0x10))) }
-            val codec = android.media.MediaCodec.createDecoderByType("audio/mp4a-latm")
-            try {
-                codec.configure(format, null, null, 0)
-                codec.start()
-            } finally {
-                runCatching { codec.stop() }
-                runCatching { codec.release() }
-            }
-        }
-        return android.os.SystemClock.elapsedRealtime() - started
     }
 
     fun resumeLast(spclient: String) {
@@ -666,7 +637,6 @@ class KrespotPlayer(private val context: Context) {
 
     fun release() {
         stop()
-        scope.launch { widevine.close() }
         LicenseEndpoint.reset()
     }
 
@@ -774,7 +744,6 @@ class KrespotPlayer(private val context: Context) {
     fun reset() {
         stop()
         _state.value = PlayerState()
-        scope.launch { widevine.close() }
         LicenseEndpoint.reset()
         log.i("reset, engine and state cleared")
     }
