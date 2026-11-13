@@ -20,6 +20,32 @@
 
 package com.quackify.backend.model
 
+data class PlaylistMember(
+    val userId: String,
+    val uri: String,
+    val name: String,
+    val avatarUrl: String = "",
+    val isOwner: Boolean = false,
+    val permissionLevel: String = "",
+) {
+    val isContributor: Boolean get() = !isOwner && permissionLevel == PERMISSION_CONTRIBUTOR
+
+    companion object {
+        const val PERMISSION_CONTRIBUTOR = "CONTRIBUTOR"
+        const val PERMISSION_VIEWER = "VIEWER"
+        const val PERMISSION_BLOCKED = "BLOCKED"
+    }
+}
+
+data class PlaylistPermissions(
+    val uri: String,
+    val members: List<PlaylistMember> = emptyList(),
+    val canAdministratePermissions: Boolean = false,
+    val canEditItems: Boolean = false,
+    val canEditMetadata: Boolean = false,
+    val grantableLevels: List<String> = emptyList(),
+)
+
 data class CollectionDetail(
     val uri: String,
     val title: String,
@@ -34,6 +60,7 @@ data class CollectionDetail(
     val offset: Int = 0,
     val fetched: Int = 0,
     val editable: Boolean = false,
+    val members: List<PlaylistMember> = emptyList(),
 ) {
     val hasMore: Boolean get() = fetched > 0 && offset + fetched < total
     val complete: Boolean get() = fetched > 0 && offset + fetched >= total
