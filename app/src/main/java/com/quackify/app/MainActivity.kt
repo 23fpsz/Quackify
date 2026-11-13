@@ -90,6 +90,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.quackify.backend.core.log.Logs
@@ -101,6 +102,11 @@ private val log = Logs.of(Logs.Module.MAIN)
 
 class MainActivity : ComponentActivity() {
 
+    private var canvasResolution by mutableStateOf(1080)
+    private var fullArtworkPlayer by mutableStateOf(true)
+    private val clientPrefs by lazy {
+        com.quackify.backend.core.store.AppPrefs.prefs(applicationContext, CLIENT_PREFS)
+    }
     private var resumeSignal by mutableStateOf(0)
 
     /** Bumped every time the playback notification's body is tapped; the
@@ -109,6 +115,67 @@ class MainActivity : ComponentActivity() {
     private var openPlayerSignal by mutableStateOf(0)
     private var pausedAt = 0L
     private var sawStop = false
+
+    private var homeGreeting by mutableStateOf("")
+    private var homeFacet by mutableStateOf("")
+    private var loading by mutableStateOf(true)
+    private var playHistory by mutableStateOf(PlayHistory.all(applicationContext))
+    private var playStats by mutableStateOf(PlayStats.snapshot(applicationContext))
+    private var searchTerm by mutableStateOf("")
+    private var searchLoading by mutableStateOf(false)
+    private var searchFailed by mutableStateOf(false)
+    private var searchFetch by mutableStateOf(0)
+    private var searchDataFor by mutableStateOf("")
+    private var recentSearches by mutableStateOf(RecentSearches.all(applicationContext))
+    private var showUri by mutableStateOf("")
+    private var showLoading by mutableStateOf(false)
+    private var showFetch by mutableStateOf(0)
+    private var episodeUri by mutableStateOf("")
+    private var episodeLoading by mutableStateOf(false)
+    private var episodeFetch by mutableStateOf(0)
+    private var browseUri by mutableStateOf("")
+    private var browseFetch by mutableStateOf(0)
+    private var categoryUri by mutableStateOf("")
+    private var folderUri by mutableStateOf("")
+    private var folderFetch by mutableStateOf(0)
+    private var settingsSwitches by mutableStateOf(SettingsSwitches())
+    private var settingsLocks by mutableStateOf(SettingsLocks())
+    private var settingsProduct by mutableStateOf("")
+    private var settingsCountry by mutableStateOf("")
+    private var settingsLoading by mutableStateOf(false)
+    private var whatsNewLoading by mutableStateOf(false)
+    private var whatsNewFailed by mutableStateOf(false)
+    private var whatsNewFetch by mutableStateOf(0)
+    private var savedAccountsList by mutableStateOf(EncoreAuth.savedAccounts(applicationContext))
+    private var addingAccount by mutableStateOf(false)
+    private var profileLoading by mutableStateOf(false)
+    private var profileFailed by mutableStateOf(false)
+    private var profileFetch by mutableStateOf(0)
+    private var profileUserId by mutableStateOf("")
+    private var profileFollowLoading by mutableStateOf(false)
+    private var profileFollowFetch by mutableStateOf(0)
+    private var playlistUri by mutableStateOf("")
+    private var playlistLoading by mutableStateOf(false)
+    private var playlistHasMore by mutableStateOf(false)
+    private var playlistLoadingMore by mutableStateOf(false)
+    private var playlistFetch by mutableStateOf(0)
+    private var recommendationsLoading by mutableStateOf(false)
+    private var recommendationsNonce by mutableStateOf(0)
+    private var playlistCanRemoveCover by mutableStateOf(false)
+    private var albumUri by mutableStateOf("")
+    private var albumLoading by mutableStateOf(false)
+    private var albumFailed by mutableStateOf(false)
+    private var albumRetry by mutableStateOf(0)
+    private var albumHasMore by mutableStateOf(false)
+    private var albumLoadingMore by mutableStateOf(false)
+    private var artistUri by mutableStateOf("")
+    private var artistLoading by mutableStateOf(false)
+    private var artistFailed by mutableStateOf(false)
+    private var artistRetry by mutableStateOf(0)
+    private var addTracksLoading by mutableStateOf(false)
+    private var addTracksFetch by mutableStateOf(0)
+    private var sawOffline by mutableStateOf(false)
+    private var canvasEnabled by mutableStateOf(clientPrefs.getBoolean("canvasNpvEnabled", true))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -121,6 +188,8 @@ class MainActivity : ComponentActivity() {
         }
         Pathfinder.silentRefresh = { context, reason -> SilentTokenRefresh.refresh(context, reason) }
         syncLauncherIcon(applicationContext)
+        canvasResolution = clientPrefs.getInt("canvasResolution", 1080)
+        fullArtworkPlayer = clientPrefs.getBoolean("fullArtworkPlayer", true)
         val appContext = applicationContext
         Net.onUnauthorized = { sent, reason ->
             val current = EncoreAuth.token(appContext)
@@ -171,11 +240,6 @@ class MainActivity : ComponentActivity() {
                     } else {
                         var feed by remember { mutableStateOf<List<HomeSection>>(emptyList()) }
                         var homeChips by remember { mutableStateOf<List<HomeChip>>(emptyList()) }
-                        var homeGreeting by remember { mutableStateOf("") }
-                        var homeFacet by remember { mutableStateOf("") }
-                        var loading by remember { mutableStateOf(true) }
-                        var playHistory by remember { mutableStateOf(PlayHistory.all(context)) }
-                        var playStats by remember { mutableStateOf(PlayStats.snapshot(context)) }
                         LaunchedEffect(Unit) {
                             playStats = PlayStats.recordLogin(context)
                         }
@@ -247,31 +311,16 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        var searchTerm by remember { mutableStateOf("") }
                         var searchData by remember { mutableStateOf<SearchResults?>(null) }
                         var searchHits by remember { mutableStateOf<List<SearchHit>>(emptyList()) }
-                        var searchLoading by remember { mutableStateOf(false) }
-                        var searchFailed by remember { mutableStateOf(false) }
-                        var searchFetch by remember { mutableStateOf(0) }
-                        var searchDataFor by remember { mutableStateOf("") }
                         val searchSavedOverrides = remember { mutableStateMapOf<String, Boolean>() }
-                        var recentSearches by remember { mutableStateOf(RecentSearches.all(context)) }
                         val playlistNames = remember { java.util.concurrent.ConcurrentHashMap<String, String>() }
                         var submittedSearchQuery by remember { mutableStateOf<String?>(null) }
                         val scope = rememberCoroutineScope()
 
-                        var showUri by remember { mutableStateOf("") }
                         var showDetail by remember { mutableStateOf<ShowDetail?>(null) }
-                        var showLoading by remember { mutableStateOf(false) }
-                        var showFetch by remember { mutableStateOf(0) }
-                        var episodeUri by remember { mutableStateOf("") }
                         var episodeDetail by remember { mutableStateOf<EpisodeDetail?>(null) }
-                        var episodeLoading by remember { mutableStateOf(false) }
-                        var episodeFetch by remember { mutableStateOf(0) }
-                        var browseUri by remember { mutableStateOf("") }
-                        var browseFetch by remember { mutableStateOf(0) }
                         var browsePage by remember { mutableStateOf<BrowsePage?>(null) }
-                        var categoryUri by remember { mutableStateOf("") }
                         var categoryShelves by remember { mutableStateOf<List<CategoryShelf>?>(null) }
                         var browseCategories by remember { mutableStateOf<List<BrowseCard>>(emptyList()) }
 
@@ -299,16 +348,9 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
-                        var folderUri by remember { mutableStateOf("") }
                         var folderItems by remember { mutableStateOf<List<LibraryItem>?>(null) }
-                        var folderFetch by remember { mutableStateOf(0) }
 
                         var libraryItems by remember { mutableStateOf<List<LibraryItem>?>(null) }
-                        var settingsSwitches by remember { mutableStateOf(SettingsSwitches()) }
-                        var settingsLocks by remember { mutableStateOf(SettingsLocks()) }
-                        var settingsProduct by remember { mutableStateOf("") }
-                        var settingsCountry by remember { mutableStateOf("") }
-                        var settingsLoading by remember { mutableStateOf(false) }
 
                         LaunchedEffect(Unit) {
                             settingsLoading = true
@@ -330,13 +372,8 @@ class MainActivity : ComponentActivity() {
                             settingsLoading = false
                         }
                         var whatsNew by remember { mutableStateOf<List<EncoreNotification>>(emptyList()) }
-                        var whatsNewLoading by remember { mutableStateOf(false) }
-                        var whatsNewFailed by remember { mutableStateOf(false) }
-                        var whatsNewFetch by remember { mutableStateOf(0) }
 
-                        var savedAccountsList by remember { mutableStateOf(EncoreAuth.savedAccounts(context)) }
                         val activeAccountId = remember { EncoreAuth.activeAccountId(context) }
-                        var addingAccount by remember { mutableStateOf(false) }
                         LaunchedEffect(Unit) {
                             if (EncoreAuth.activeAccountId(context).isBlank()) {
                                 EncoreAuth.userId(context)
@@ -367,14 +404,8 @@ class MainActivity : ComponentActivity() {
                         var profileDetail by remember { mutableStateOf<UserProfile?>(null) }
                         var profileTop by remember { mutableStateOf<ProfileTopContent?>(null) }
                         var profileContexts by remember { mutableStateOf<List<ProfileContextCard>>(emptyList()) }
-                        var profileLoading by remember { mutableStateOf(false) }
-                        var profileFailed by remember { mutableStateOf(false) }
-                        var profileFetch by remember { mutableStateOf(0) }
-                        var profileUserId by remember { mutableStateOf("") }
                         var profileFollowers by remember { mutableStateOf<List<ProfileUser>>(emptyList()) }
                         var profileFollowing by remember { mutableStateOf<List<ProfileUser>>(emptyList()) }
-                        var profileFollowLoading by remember { mutableStateOf(false) }
-                        var profileFollowFetch by remember { mutableStateOf(0) }
 
                         LaunchedEffect(profileFetch) {
                             if (profileFetch == 0) return@LaunchedEffect
@@ -426,41 +457,21 @@ class MainActivity : ComponentActivity() {
                             }
                             profileFollowLoading = false
                         }
-                        var playlistUri by remember { mutableStateOf("") }
                         var playlistDetail by remember { mutableStateOf<CollectionDetail?>(null) }
                         var playlistTracks by remember { mutableStateOf<List<TrackItem>?>(null) }
-                        var playlistLoading by remember { mutableStateOf(false) }
-                        var playlistHasMore by remember { mutableStateOf(false) }
-                        var playlistLoadingMore by remember { mutableStateOf(false) }
-                        var playlistFetch by remember { mutableStateOf(0) }
                         var playlistRecommendations by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
-                        var recommendationsLoading by remember { mutableStateOf(false) }
-                        var recommendationsNonce by remember { mutableStateOf(0) }
                         var playlistSaved by remember { mutableStateOf<Boolean?>(null) }
-                        var playlistCanRemoveCover by remember { mutableStateOf(false) }
                         var playlistEditDraft by remember { mutableStateOf<PlaylistEditDraft?>(null) }
                         var editableUris by remember { mutableStateOf<Set<String>>(emptySet()) }
-                        var albumUri by remember { mutableStateOf("") }
                         var albumDetail by remember { mutableStateOf<AlbumDetail?>(null) }
                         var albumTracks by remember { mutableStateOf<List<TrackItem>?>(null) }
-                        var albumLoading by remember { mutableStateOf(false) }
-                        var albumFailed by remember { mutableStateOf(false) }
-                        var albumRetry by remember { mutableStateOf(0) }
-                        var albumHasMore by remember { mutableStateOf(false) }
-                        var albumLoadingMore by remember { mutableStateOf(false) }
-                        var artistUri by remember { mutableStateOf("") }
                         var artistDetail by remember { mutableStateOf<ArtistDetail?>(null) }
-                        var artistLoading by remember { mutableStateOf(false) }
-                        var artistFailed by remember { mutableStateOf(false) }
-                        var artistRetry by remember { mutableStateOf(0) }
                         var trackCredits by remember { mutableStateOf<Credits?>(null) }
                         var addToPlaylistChoices by remember { mutableStateOf<List<PlaylistChoice>?>(null) }
                         var addTracksSongs by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
                         var addTracksEpisodes by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
                         var addTracksLiked by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
                         var addTracksRecent by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
-                        var addTracksLoading by remember { mutableStateOf(false) }
-                        var addTracksFetch by remember { mutableStateOf(0) }
                         var artistTracks by remember { mutableStateOf<List<PopularTrack>?>(null) }
                         var artistReleases by remember { mutableStateOf<List<ArtistRelease>?>(null) }
                         var artistListeners by remember { mutableStateOf<String?>(null) }
@@ -488,7 +499,6 @@ class MainActivity : ComponentActivity() {
                             editableUris = Krespot.playlists.editable(context, "").map { it.uri }.toSet()
                         }
 
-                        var sawOffline by remember { mutableStateOf(false) }
                         val offlineNow = rememberIsOffline()
                         LaunchedEffect(offlineNow) {
                             if (offlineNow) {
@@ -589,59 +599,7 @@ class MainActivity : ComponentActivity() {
                                 .toHashSet()
                             recommendationsLoading = true
                             try {
-                                val seedArtists = if (inPlaylist.isNotEmpty()) {
-                                    tracks
-                                        .filter { it.artistUri.startsWith("spotify:artist:") }
-                                        .groupingBy { it.artistUri }
-                                        .eachCount()
-                                        .entries
-                                        .sortedByDescending { it.value }
-                                        .take(6)
-                                        .map { it.key }
-                                        .shuffled()
-                                        .take(3)
-                                } else {
-                                    val candidateArtists = LinkedHashSet<String>()
-                                    val likedDetail = Krespot.collections.collection(context, "spotify:user:@me:collection")
-                                    likedDetail?.tracks?.forEach { t ->
-                                        if (t.artistUri.startsWith("spotify:artist:")) candidateArtists.add(t.artistUri)
-                                    }
-
-                                    if (candidateArtists.size < 5) {
-                                        val libraryPage = Krespot.library.page(context)
-                                        libraryPage?.items?.forEach { item ->
-                                            if (item.uri.startsWith("spotify:artist:")) {
-                                                candidateArtists.add(item.uri)
-                                            }
-                                        }
-                                    }
-
-                                    if (candidateArtists.isNotEmpty()) {
-                                        candidateArtists.shuffled().take(4)
-                                    } else {
-                                        listOf(
-                                            "spotify:artist:4YRxDV8wJFPHPTeXepOstw",
-                                            "spotify:artist:3g2kUQ6tHLLbmkV7T4GPdf",
-                                            "spotify:artist:246dkjvS1zLTtiykYqq8Gv"
-                                        )
-                                    }
-                                }
-                                val picks = LinkedHashMap<String, TrackItem>()
-                                val overviews = coroutineScope {
-                                    seedArtists.map { artist ->
-                                        async { Krespot.artists.artist(context, artist) }
-                                    }.awaitAll()
-                                }
-                                for (detail in overviews.filterNotNull()) {
-                                    for (row in detail.topTracks) {
-                                        if (row.uri in inPlaylist || picks.containsKey(row.uri)) continue
-                                        picks[row.uri] = row.toTrackItem()
-                                        if (picks.size >= 10) break
-                                    }
-                                    if (picks.size >= 10) break
-                                }
-                                playlistRecommendations = picks.values.toList()
-                                log.i("recommended ${picks.size} client track(s) from ${seedArtists.size} artist(s)")
+                                playlistRecommendations = buildPlaylistRecommendations(context, tracks, inPlaylist)
                             } finally {
                                 recommendationsLoading = false
                             }
@@ -665,18 +623,11 @@ class MainActivity : ComponentActivity() {
                                 val detail = Krespot.albums.album(context, uri)
                                 if (uri != albumUri) return@LaunchedEffect
                                 albumDetail = detail
-                                val rows = detail?.tracks?.map { it.toTrackItem() } ?: emptyList()
-                                albumTracks = rows
+                                albumTracks = detail?.tracks?.map { it.toTrackItem() }
+                                    ?.let { withSavedStates(context, it) }
                                 albumHasMore = detail != null &&
                                     detail.fetched < detail.total && detail.tracks.isNotEmpty()
                                 albumFailed = detail == null
-                                val uris = rows.map { it.uri }.filter { it.isNotBlank() }
-                                if (uris.isNotEmpty()) {
-                                    val liked = Library.saved(context, uris)
-                                    if (uri == albumUri) {
-                                        albumTracks = rows.map { it.copy(saved = it.uri in liked) }
-                                    }
-                                }
                             } finally {
                                 if (uri == albumUri) albumLoading = false
                             }
@@ -702,28 +653,14 @@ class MainActivity : ComponentActivity() {
                             artistFailed = false
                             artistLoading = true
                             try {
-                                val detail = Krespot.artists.artist(context, uri)
+                                val load = loadArtistDetail(context, uri)
                                 if (uri != artistUri) return@LaunchedEffect
-                                artistDetail = detail
-                                artistFailed = detail == null
-                                artistTracks = detail?.topTracks?.map { row ->
-                                    val countFormatted = if (row.plays > 0L) {
-                                        java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(row.plays)
-                                    } else ""
-                                    PopularTrack(row.toTrackItem(), countFormatted)
-                                }
-                                var releaseRows = detail?.releases.orEmpty()
-                                if (releaseRows.isEmpty()) {
-                                    releaseRows = Krespot.artists.discography(context, uri, "all")?.rows.orEmpty()
-                                }
-                                artistReleases = releaseRows.map { it.toArtistRelease() }
-                                artistListeners = detail?.monthlyListeners?.takeIf { it > 0L }?.let { formatCount(it) }
-                                val inLibrary = Library.saved(context, listOf(uri))
-                                artistFollowed = if (inLibrary.isEmpty()) {
-                                    detail?.saved == true
-                                } else {
-                                    uri in inLibrary
-                                }
+                                artistDetail = load.detail
+                                artistFailed = load.detail == null
+                                artistTracks = load.tracks
+                                artistReleases = load.releases
+                                artistListeners = load.listeners
+                                artistFollowed = load.followed
                             } finally {
                                 artistLoading = false
                             }
@@ -732,13 +669,7 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(artistUri, artistTracks?.size, libraryRevision) {
                             val rows = artistTracks ?: return@LaunchedEffect
                             if (artistUri.isBlank()) return@LaunchedEffect
-                            val uris = rows.map { it.track.uri }.filter { it.isNotBlank() }
-                            if (uris.isEmpty()) return@LaunchedEffect
-                            val liked = Library.saved(context, uris)
-                            if (artistUri.isBlank()) return@LaunchedEffect
-                            artistTracks = rows.map { popTrack ->
-                                popTrack.copy(track = popTrack.track.copy(saved = popTrack.track.uri in liked))
-                            }
+                            artistTracks = withSavedPopularTracks(context, rows)
                         }
 
                         LaunchedEffect(folderUri, folderFetch) {
@@ -834,14 +765,6 @@ class MainActivity : ComponentActivity() {
                         }
                         var canvasFile by remember { mutableStateOf<String?>(null) }
                         val canvasAllowed = settingsSwitches.canvas
-                        val clientPrefs = remember { com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS) }
-                        var canvasEnabled by remember { mutableStateOf(clientPrefs.getBoolean("canvasNpvEnabled", true)) }
-                        var canvasResolution by remember {
-                            mutableStateOf(clientPrefs.getInt("canvasResolution", 1080))
-                        }
-                        var fullArtworkPlayer by remember {
-                            mutableStateOf(clientPrefs.getBoolean("fullArtworkPlayer", true))
-                        }
                         LaunchedEffect(playback.trackUri, canvasAllowed, canvasResolution) {
                             canvasFile = null
                             if (!canvasAllowed) return@LaunchedEffect
@@ -1078,13 +1001,7 @@ class MainActivity : ComponentActivity() {
                                         val page = Krespot.albums.albumMore(context, albumUri, current.size)
                                         if (page != null && page.rows.isNotEmpty()) {
                                             val newRows = page.rows.map { it.toTrackItem() }
-                                            val newUris = newRows.map { it.uri }.filter { it.isNotBlank() }
-                                            val liked = if (newUris.isNotEmpty()) {
-                                                Library.saved(context, newUris)
-                                            } else {
-                                                emptySet()
-                                            }
-                                            albumTracks = current + newRows.map { it.copy(saved = it.uri in liked) }
+                                            albumTracks = current + withSavedStates(context, newRows)
                                             albumHasMore = page.hasMore
                                         } else if (page != null) {
                                             albumHasMore = page.hasMore
@@ -1336,65 +1253,17 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onArtistTrackLikeToggle = { track ->
-                                val next = track.saved != true
-                                val swap = { liked: Boolean ->
-                                    artistTracks = artistTracks?.map { popTrack ->
-                                        if (popTrack.track.uri == track.uri) {
-                                            popTrack.copy(track = popTrack.track.copy(saved = liked))
-                                        } else {
-                                            popTrack
-                                        }
-                                    }
-                                }
-                                swap(next)
-                                scope.launch {
-                                    val ok = Library.setSaved(context, listOf(track.uri), next)
-                                    log.i("artist heart '${track.title}' -> $next ok=$ok")
-                                    if (!ok) swap(!next)
-                                }
+                                toggleArtistTrackLike(context, scope, track, { artistTracks }) { artistTracks = it }
                             },
                             onAlbumTrackLikeToggle = { track ->
-                                val next = track.saved != true
-                                val swap = { liked: Boolean ->
-                                    albumTracks = albumTracks?.map { t ->
-                                        if (t.uri == track.uri) t.copy(saved = liked) else t
-                                    }
-                                }
-                                swap(next)
-                                scope.launch {
-                                    val ok = Library.setSaved(context, listOf(track.uri), next)
-                                    log.i("album heart '${track.title}' -> $next ok=$ok")
-                                    if (!ok) swap(!next)
-                                }
+                                toggleAlbumTrackLike(context, scope, track, { albumTracks }) { albumTracks = it }
                             },
                             onPlaylistTrackLikeToggle = { track ->
-                                val next = track.saved != true
-                                val isLikedSongs = playlistUri == "spotify:collection:tracks"
-                                val applyLocal = { liked: Boolean ->
-                                    if (!liked && isLikedSongs) {
-                                        playlistTracks = playlistTracks?.filterNot { it.uri == track.uri }
-                                        playlistDetail = playlistDetail?.let {
-                                            it.copy(total = (it.total - 1).coerceAtLeast(0))
-                                        }
-                                    } else {
-                                        playlistTracks = playlistTracks?.map { t ->
-                                            if (t.uri == track.uri) t.copy(saved = liked) else t
-                                        }
-                                    }
-                                }
-                                val revert = {
-                                    scope.launch {
-                                        val detail = Krespot.collections.collection(context, playlistUri)
-                                        playlistDetail = detail
-                                        playlistTracks = detail?.tracks?.map { it.toTrackItem() }
-                                    }
-                                }
-                                applyLocal(next)
-                                scope.launch {
-                                    val ok = Library.setSaved(context, listOf(track.uri), next)
-                                    log.i("playlist heart '${track.title}' -> $next ok=$ok")
-                                    if (!ok) revert()
-                                }
+                                togglePlaylistTrackLike(
+                                    context, scope, playlistUri, track,
+                                    getTracks = { playlistTracks }, setTracks = { playlistTracks = it },
+                                    getDetail = { playlistDetail }, setDetail = { playlistDetail = it },
+                                )
                             },
                             onArtistRadio = { uri ->
                                 val radio = Krespot.artists.artistRadio(context, uri)
@@ -1629,7 +1498,7 @@ class MainActivity : ComponentActivity() {
                                     EncoreAuth.switchAccount(context, remaining.last().id)
                                     (context as? Activity)?.recreate()
                                 } else {
-                                    loggedIn = false
+                                    (context as? Activity)?.recreate()
                                 }
                             },
                             savedAccounts = savedAccountsList,
@@ -1780,6 +1649,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private companion object {
+        const val CLIENT_PREFS = "quackify.client"
         const val RESUME_REFRESH_AFTER_MS = 60_000L
         const val TOKEN_STILL_GOOD_MS = 60_000L
     }
@@ -1888,6 +1758,8 @@ private suspend fun resolveProfileContexts(
             else -> null
         }
     }
+}
+
 private val LAUNCHER_ALIASES = linkedMapOf(
     "default" to ".LauncherDefault",
     "normal" to ".LauncherNormal",
@@ -1918,4 +1790,182 @@ private fun applyLauncherIcon(context: Context, option: String) {
 
 private fun syncLauncherIcon(context: Context) {
     applyLauncherIcon(context, launcherIconPref(context))
+}
+
+private suspend fun withSavedStates(context: Context, rows: List<TrackItem>): List<TrackItem> {
+    val uris = rows.map { it.uri }.filter { it.isNotBlank() }
+    if (uris.isEmpty()) return rows
+    val liked = Library.saved(context, uris)
+    return rows.map { it.copy(saved = it.uri in liked) }
+}
+
+private suspend fun withSavedPopularTracks(context: Context, rows: List<PopularTrack>): List<PopularTrack> {
+    val uris = rows.map { it.track.uri }.filter { it.isNotBlank() }
+    if (uris.isEmpty()) return rows
+    val liked = Library.saved(context, uris)
+    return rows.map { popTrack ->
+        popTrack.copy(track = popTrack.track.copy(saved = popTrack.track.uri in liked))
+    }
+}
+
+private fun toggleArtistTrackLike(
+    context: Context,
+    scope: CoroutineScope,
+    track: TrackItem,
+    getTracks: () -> List<PopularTrack>?,
+    setTracks: (List<PopularTrack>?) -> Unit,
+) {
+    val next = track.saved != true
+    val swap = { liked: Boolean ->
+        setTracks(
+            getTracks()?.map { popTrack ->
+                if (popTrack.track.uri == track.uri) {
+                    popTrack.copy(track = popTrack.track.copy(saved = liked))
+                } else {
+                    popTrack
+                }
+            }
+        )
+    }
+    swap(next)
+    scope.launch {
+        val ok = Library.setSaved(context, listOf(track.uri), next)
+        log.i("artist heart '${track.title}' -> $next ok=$ok")
+        if (!ok) swap(!next)
+    }
+}
+
+private fun toggleAlbumTrackLike(
+    context: Context,
+    scope: CoroutineScope,
+    track: TrackItem,
+    getTracks: () -> List<TrackItem>?,
+    setTracks: (List<TrackItem>?) -> Unit,
+) {
+    val next = track.saved != true
+    val swap = { liked: Boolean ->
+        setTracks(getTracks()?.map { if (it.uri == track.uri) it.copy(saved = liked) else it })
+    }
+    swap(next)
+    scope.launch {
+        val ok = Library.setSaved(context, listOf(track.uri), next)
+        log.i("album heart '${track.title}' -> $next ok=$ok")
+        if (!ok) swap(!next)
+    }
+}
+
+private fun togglePlaylistTrackLike(
+    context: Context,
+    scope: CoroutineScope,
+    playlistUri: String,
+    track: TrackItem,
+    getTracks: () -> List<TrackItem>?,
+    setTracks: (List<TrackItem>?) -> Unit,
+    getDetail: () -> CollectionDetail?,
+    setDetail: (CollectionDetail?) -> Unit,
+) {
+    val next = track.saved != true
+    val isLikedSongs = playlistUri == "spotify:collection:tracks"
+    if (!next && isLikedSongs) {
+        setTracks(getTracks()?.filterNot { it.uri == track.uri })
+        setDetail(getDetail()?.let { it.copy(total = (it.total - 1).coerceAtLeast(0)) })
+    } else {
+        setTracks(getTracks()?.map { if (it.uri == track.uri) it.copy(saved = next) else it })
+    }
+    scope.launch {
+        val ok = Library.setSaved(context, listOf(track.uri), next)
+        log.i("playlist heart '${track.title}' -> $next ok=$ok")
+        if (!ok) {
+            val fresh = Krespot.collections.collection(context, playlistUri)
+            setDetail(fresh)
+            setTracks(fresh?.tracks?.map { it.toTrackItem() })
+        }
+    }
+}
+
+private suspend fun buildPlaylistRecommendations(
+    context: Context,
+    tracks: List<TrackItem>,
+    inPlaylist: Set<String>,
+): List<TrackItem> {
+    val seedArtists = if (inPlaylist.isNotEmpty()) {
+        tracks
+            .filter { it.artistUri.startsWith("spotify:artist:") }
+            .groupingBy { it.artistUri }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(6)
+            .map { it.key }
+            .shuffled()
+            .take(3)
+    } else {
+        val candidateArtists = LinkedHashSet<String>()
+        val likedDetail = Krespot.collections.collection(context, "spotify:user:@me:collection")
+        likedDetail?.tracks?.forEach { t ->
+            if (t.artistUri.startsWith("spotify:artist:")) candidateArtists.add(t.artistUri)
+        }
+        if (candidateArtists.size < 5) {
+            val libraryPage = Krespot.library.page(context)
+            libraryPage?.items?.forEach { item ->
+                if (item.uri.startsWith("spotify:artist:")) {
+                    candidateArtists.add(item.uri)
+                }
+            }
+        }
+        if (candidateArtists.isNotEmpty()) {
+            candidateArtists.shuffled().take(4)
+        } else {
+            listOf(
+                "spotify:artist:4YRxDV8wJFPHPTeXepOstw",
+                "spotify:artist:3g2kUQ6tHLLbmkV7T4GPdf",
+                "spotify:artist:246dkjvS1zLTtiykYqq8Gv"
+            )
+        }
+    }
+    val picks = LinkedHashMap<String, TrackItem>()
+    val overviews = coroutineScope {
+        seedArtists.map { artist ->
+            async { Krespot.artists.artist(context, artist) }
+        }.awaitAll()
+    }
+    for (detail in overviews.filterNotNull()) {
+        for (row in detail.topTracks) {
+            if (row.uri in inPlaylist || picks.containsKey(row.uri)) continue
+            picks[row.uri] = row.toTrackItem()
+            if (picks.size >= 10) break
+        }
+        if (picks.size >= 10) break
+    }
+    log.i("recommended ${picks.size} client track(s) from ${seedArtists.size} artist(s)")
+    return picks.values.toList()
+}
+
+private data class ArtistLoad(
+    val detail: ArtistDetail?,
+    val tracks: List<PopularTrack>,
+    val releases: List<ArtistRelease>,
+    val listeners: String?,
+    val followed: Boolean?,
+)
+
+private suspend fun loadArtistDetail(context: Context, uri: String): ArtistLoad {
+    val detail = Krespot.artists.artist(context, uri)
+    var releaseRows = detail?.releases.orEmpty()
+    if (releaseRows.isEmpty()) {
+        releaseRows = Krespot.artists.discography(context, uri, "all")?.rows.orEmpty()
+    }
+    val inLibrary = Library.saved(context, listOf(uri))
+    return ArtistLoad(
+        detail = detail,
+        tracks = detail?.topTracks?.map { row ->
+            val countFormatted = if (row.plays > 0L) {
+                java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(row.plays)
+            } else ""
+            PopularTrack(row.toTrackItem(), countFormatted)
+        }.orEmpty(),
+        releases = releaseRows.map { it.toArtistRelease() },
+        listeners = detail?.monthlyListeners?.takeIf { it > 0L }?.let { formatCount(it) },
+        followed = if (inLibrary.isEmpty()) detail?.saved == true else uri in inLibrary,
+    )
 }
