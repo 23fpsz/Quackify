@@ -367,6 +367,7 @@ class MainActivity : ComponentActivity() {
                         var profileLoading by remember { mutableStateOf(false) }
                         var profileFailed by remember { mutableStateOf(false) }
                         var profileFetch by remember { mutableStateOf(0) }
+                        var profileUserId by remember { mutableStateOf("") }
                         var profileFollowers by remember { mutableStateOf<List<ProfileUser>>(emptyList()) }
                         var profileFollowing by remember { mutableStateOf<List<ProfileUser>>(emptyList()) }
                         var profileFollowLoading by remember { mutableStateOf(false) }
@@ -377,17 +378,32 @@ class MainActivity : ComponentActivity() {
                             profileLoading = true
                             profileFailed = false
                             coroutineScope {
-                                val profileJob = async { runCatching { Profile.profile(context) }.getOrNull() }
-                                val topJob = async { runCatching { Profile.topContent(context) }.getOrNull() }
-                                val recentJob = async { runCatching { Profile.recentlyPlayed(context) }.getOrNull() }
-                                val profile = profileJob.await()
-                                val top = topJob.await()
-                                val recent = recentJob.await()
+                                val target = profileUserId
+                                val profile = async { runCatching { Profile.profile(context, target) }.getOrNull() }.await()
+                                val isSelf = target.isBlank() || profile?.isCurrentUser == true
+                                val (top, recent) = if (isSelf) {
+                                    val topJob = async { runCatching { Profile.topContent(context) }.getOrNull() }
+                                    val recentJob = async { runCatching { Profile.recentlyPlayed(context) }.getOrNull() }
+                                    topJob.await() to recentJob.await()
+                                } else {
+                                    null to null
+                                }
                                 profileDetail = profile
                                 profileTop = top
-                                profileContexts = resolveProfileContexts(context, profile, recent)
+                                profileContexts = if (isSelf) {
+                                    resolveProfileContexts(context, profile, recent)
+                                } else {
+                                    profile?.publicPlaylists.orEmpty().map {
+                                        ProfileContextCard(
+                                            uri = it.uri,
+                                            title = it.name,
+                                            subtitle = "Playlist",
+                                            imageUrl = it.imageUrl,
+                                        )
+                                    }
+                                }
                                 profileFailed = profile == null && top == null
-                                log.i("profile loaded failed=${profile == null} " +
+                                log.i("profile loaded self=$isSelf failed=${profile == null} " +
                                         "topArtists=${top?.topArtists?.size ?: 0} " +
                                         "contexts=${profileContexts.size}"
                                 )
@@ -399,8 +415,9 @@ class MainActivity : ComponentActivity() {
                             if (profileFollowFetch == 0) return@LaunchedEffect
                             profileFollowLoading = true
                             coroutineScope {
-                                val followersJob = async { runCatching { Profile.followers(context) }.getOrNull() }
-                                val followingJob = async { runCatching { Profile.following(context) }.getOrNull() }
+                                val id = profileUserId
+                                val followersJob = async { runCatching { Profile.followers(context, id) }.getOrNull() }
+                                val followingJob = async { runCatching { Profile.following(context, id) }.getOrNull() }
                                 profileFollowers = followersJob.await().orEmpty()
                                 profileFollowing = followingJob.await().orEmpty()
                             }
@@ -1305,11 +1322,28 @@ class MainActivity : ComponentActivity() {
                             profileContexts = profileContexts,
                             profileLoading = profileLoading,
                             profileFailed = profileFailed,
-                            onLoadProfile = { profileFetch++ },
+                            onLoadProfile = {
+                                if (profileUserId.isNotBlank()) {
+                                    profileUserId = ""
+                                    profileDetail = null
+                                    profileTop = null
+                                    profileContexts = emptyList()
+                                }
+                                profileFetch++
+                            },
                             onRetryProfile = {
                                 profileDetail = null
                                 profileTop = null
                                 profileContexts = emptyList()
+                                profileFetch++
+                            },
+                            onOpenUserProfile = { uri, _ ->
+                                if (profileUserId != uri) {
+                                    profileUserId = uri
+                                    profileDetail = null
+                                    profileTop = null
+                                    profileContexts = emptyList()
+                                }
                                 profileFetch++
                             },
                             profileFollowers = profileFollowers,
