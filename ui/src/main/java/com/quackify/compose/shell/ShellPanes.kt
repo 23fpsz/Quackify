@@ -25,11 +25,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,6 +56,8 @@ import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.PlaylistMember
 import com.quackify.backend.model.ProfileTopContent
 import com.quackify.backend.model.ProfileTopTrack
+import com.quackify.backend.model.ActivityNotification
+import com.quackify.backend.model.SelfProfile
 import com.quackify.backend.model.UserProfile
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.SearchKind
@@ -77,6 +81,7 @@ import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.library.EncoreLibraryScreen
 import com.quackify.compose.playlist.EncorePlaylistScreen
 import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.screens.ActivityScreen
 import com.quackify.compose.screens.ArtistRelease
 import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.CategoryShelf
@@ -256,6 +261,38 @@ internal fun ShellNotificationsPane(
         loadFailed = loadFailed,
         onRetry = onRetry,
         onPlayClick = onPlay
+    )
+}
+
+@Composable
+internal fun ShellActivityPane(
+    onBackClick: () -> Unit,
+    notifications: List<ActivityNotification>,
+    loading: Boolean,
+    loadFailed: Boolean,
+    onRetry: () -> Unit,
+    self: SelfProfile?,
+    fallbackName: String,
+    fallbackAvatarUrl: String,
+    onOpenNotification: (ActivityNotification) -> Unit,
+    onLeave: () -> Unit = {}
+) {
+    /** Leaving the screen — back, row tap, anything — resets the server-side
+     * read cursor the way the web player does when the panel closes. */
+    val leave by rememberUpdatedState(onLeave)
+    DisposableEffect(Unit) {
+        onDispose { leave() }
+    }
+    ActivityScreen(
+        onBackClick = onBackClick,
+        notifications = notifications,
+        loading = loading,
+        loadFailed = loadFailed,
+        onRetry = onRetry,
+        selfName = self?.name?.takeIf { it.isNotBlank() } ?: fallbackName,
+        selfAvatarUrl = self?.avatarUrl?.takeIf { it.isNotBlank() } ?: fallbackAvatarUrl,
+        selfAvatarColor = self?.avatarBackgroundColor ?: 0,
+        onOpenNotification = onOpenNotification
     )
 }
 

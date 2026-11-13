@@ -91,6 +91,7 @@ import com.quackify.compose.screens.SettingsLocks
 import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.search.SearchHistoryItem
 import com.quackify.compose.shell.EncoreAppShell
+import com.quackify.compose.shell.ActivityFeedState
 import com.quackify.compose.shell.PlaylistEditDraft
 import com.quackify.compose.shell.ShellDeepLink
 import com.quackify.compose.theme.EncoreAppTheme
@@ -1267,6 +1268,13 @@ class MainActivity : ComponentActivity() {
         )
     }
     val contributors = rememberPlaylistContributorController(context, playlistUri)
+    val activity = remember { ActivityFeedController(context.applicationContext, scope) }
+    LaunchedEffect(activity.fetchTick) {
+        if (activity.fetchTick > 0) activity.load()
+    }
+    LaunchedEffect(Unit) {
+        activity.refreshUnread()
+    }
 
     val nowPlayingArtistUri = remember(playback.trackUri, playback.artistUri, playback.queue, playback.queueFromContext) {
         playback.artistUri.ifBlank {
@@ -1822,6 +1830,17 @@ class MainActivity : ComponentActivity() {
         notificationsLoading = whatsNewLoading,
         notificationsFailed = whatsNewFailed,
         onRefreshWhatsNew = { whatsNewFetch++ },
+        activityState = ActivityFeedState(
+            feed = activity.feed,
+            loading = activity.loading,
+            failed = activity.failed,
+            self = activity.self,
+            unread = activity.unread,
+            onOpen = activity::open,
+            onRetry = activity::open,
+            onLeave = activity::leave,
+            onDrawerOpened = activity::refreshUnread,
+        ),
         historyToday = historyToday,
         historyYesterday = historyYesterday,
         historyEarlier = historyEarlier,

@@ -56,6 +56,7 @@ object Logs {
         TRACKS("tracks"),
         PODCASTS("podcasts"),
         WHATS_NEW("whats-new"),
+        NOTIFICATIONS("notifications"),
         PROFILE("profile"),
         SETTINGS("settings"),
         LYRICS("lyrics"),
