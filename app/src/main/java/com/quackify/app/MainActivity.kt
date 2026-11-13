@@ -7,7 +7,6 @@ import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
-import java.util.Calendar
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -22,9 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.quackify.app.search.decorateSearchTracks
 import com.quackify.backend.core.auth.EncoreAuth
-import com.quackify.backend.api.HomeFeed
-import com.quackify.backend.model.HomeSection
-import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
@@ -39,19 +35,16 @@ import com.quackify.compose.shell.PlaylistEditDraft
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.ArtistRelease
-import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.home.toTrackItem
 import com.quackify.compose.home.toArtistRelease
 import com.quackify.backend.model.ShelfKind
 import androidx.compose.runtime.collectAsState
 import com.quackify.backend.api.Search
 import com.quackify.backend.api.WhatsNew
-import com.quackify.backend.api.Profile
 import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.screens.SettingsLocks
 import com.quackify.backend.api.Settings
 import com.quackify.compose.screens.EncoreNotification
-import com.quackify.compose.screens.ProfileContextCard
 import com.quackify.compose.search.SearchHistoryItem
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.CategoryRecommendationItem
@@ -62,19 +55,11 @@ import com.quackify.backend.api.Podcasts
 import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.EpisodeDetail
-import com.quackify.backend.model.ProfileContext
-import com.quackify.backend.model.ProfileTopContent
-import com.quackify.backend.model.ProfileUser
-import com.quackify.backend.model.UserProfile
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.SearchKind
 import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.TrackLyrics
-import com.quackify.compose.home.toFavoriteArtistsShelf
-import com.quackify.compose.home.toQuickAccess
-import com.quackify.compose.home.toRecentlyPlayedShelf
-import com.quackify.compose.home.toShelves
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.screens.LoginScreen
@@ -93,7 +78,6 @@ import kotlinx.coroutines.withContext
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.library.Krespot
 import com.quackify.backend.library.PlaylistSource
-import com.quackify.compose.home.toQuickAccessFallback
 
 private val log = Logs.of(Logs.Module.MAIN)
 
@@ -166,83 +150,7 @@ class MainActivity : ComponentActivity() {
                             capturing = false
                         })
                     } else {
-                        var feed by remember { mutableStateOf<List<HomeSection>>(emptyList()) }
-                        var homeChips by remember { mutableStateOf<List<HomeChip>>(emptyList()) }
-                        var homeGreeting by remember { mutableStateOf("") }
-                        var homeFacet by remember { mutableStateOf("") }
-                        var loading by remember { mutableStateOf(true) }
-                        var playHistory by remember { mutableStateOf(PlayHistory.all(context)) }
-                        var playStats by remember { mutableStateOf(PlayStats.snapshot(context)) }
-                        LaunchedEffect(Unit) {
-                            playStats = PlayStats.recordLogin(context)
-                        }
-                        LaunchedEffect(resumeSignal, homeFacet) {
-                            if (resumeSignal == 0) loading = true
-                            val payload = HomeFeed.load(context, homeFacet)
-                            if (payload.sections.isNotEmpty() || resumeSignal == 0) {
-                                feed = payload.sections
-                                homeGreeting = payload.greeting
-                            }
-                            if (payload.chips.isNotEmpty()) homeChips = payload.chips
-                            loading = false
-                            log.i("home feed loaded facet='$homeFacet' sections=${feed.size} " +
-                                    "chips=${homeChips.size} signal=$resumeSignal"
-                            )
-                        }
-                        LaunchedEffect(resumeSignal) {
-                            if (resumeSignal > 0) SilentTokenRefresh.maybeRefresh(context)
-                        }
-                        val account = remember(loggedIn) { EncoreAuth.account(context) }
-                        val quick = remember(feed, playHistory, loading) {
-                            val fromFeed = feed.toQuickAccess()
-                            when {
-                                fromFeed.isNotEmpty() -> fromFeed
-                                loading -> emptyList()
-                                else -> {
-                                    log.i("feed has no shorts section, deriving the shortcut grid from history")
-                                    playHistory.map { it.item }.toQuickAccessFallback()
-                                }
-                            }
-                        }
-                        LaunchedEffect(quick) {
-                            log.i("home quick access tiles=${quick.size}")
-                        }
-                        val shelves = remember(feed) { feed.toShelves() }
-                        val homeArtistImages = remember { mutableStateMapOf<String, String>() }
-                        LaunchedEffect(feed) {
-                            feed.forEach { section ->
-                                section.items.forEach { item ->
-                                    if (item.uri.startsWith("spotify:artist:") && item.imageUrl.isNotBlank()) {
-                                        homeArtistImages[item.uri] = item.imageUrl
-                                    }
-                                }
-                            }
-                        }
-                        LaunchedEffect(playHistory, loading) {
-                            if (loading) return@LaunchedEffect
-                            favoriteArtistsOf(playHistory).forEach { artist ->
-                                val uri = artist.artistUri
-                                if (homeArtistImages.containsKey(uri)) return@forEach
-                                val fetched = runCatching {
-                                    Search.section(context, com.quackify.backend.model.SearchKind.ARTIST, artist.artist.substringBefore(", "))
-                                        .firstOrNull { it.uri == uri }
-                                }.getOrNull()?.imageUrl?.takeIf { it.isNotBlank() }
-                                if (fetched != null) homeArtistImages[uri] = fetched
-                            }
-                        }
-                        val historyShelves = remember(playHistory, homeArtistImages.size) {
-                            listOfNotNull(
-                                playHistory.map { it.item }.toRecentlyPlayedShelf(),
-                                favoriteArtistsOf(playHistory).toFavoriteArtistsShelf(homeArtistImages),
-                            )
-                        }
-                        LaunchedEffect(shelves) {
-                            log.i("home shelves=${shelves.size} " +
-                                    "grids=${shelves.count { it.grid }} " +
-                                    "cards=${shelves.sumOf { it.cards.size }} " +
-                                    "titles=${shelves.take(8).joinToString(" | ") { it.title.ifBlank { "-" } }}"
-                            )
-                        }
+                        val home = rememberHomeState(context, loggedIn, resumeSignal)
 
                         var searchTerm by remember { mutableStateOf("") }
                         var searchData by remember { mutableStateOf<SearchResults?>(null) }
@@ -361,68 +269,8 @@ class MainActivity : ComponentActivity() {
                             }
                             whatsNewLoading = false
                         }
-                        var profileDetail by remember { mutableStateOf<UserProfile?>(null) }
-                        var profileTop by remember { mutableStateOf<ProfileTopContent?>(null) }
-                        var profileContexts by remember { mutableStateOf<List<ProfileContextCard>>(emptyList()) }
-                        var profileLoading by remember { mutableStateOf(false) }
-                        var profileFailed by remember { mutableStateOf(false) }
-                        var profileFetch by remember { mutableStateOf(0) }
-                        var profileUserId by remember { mutableStateOf("") }
-                        var profileFollowers by remember { mutableStateOf<List<ProfileUser>>(emptyList()) }
-                        var profileFollowing by remember { mutableStateOf<List<ProfileUser>>(emptyList()) }
-                        var profileFollowLoading by remember { mutableStateOf(false) }
-                        var profileFollowFetch by remember { mutableStateOf(0) }
+                        val profileState = rememberProfileState(context)
 
-                        LaunchedEffect(profileFetch) {
-                            if (profileFetch == 0) return@LaunchedEffect
-                            profileLoading = true
-                            profileFailed = false
-                            coroutineScope {
-                                val target = profileUserId
-                                val profile = async { runCatching { Profile.profile(context, target) }.getOrNull() }.await()
-                                val isSelf = target.isBlank() || profile?.isCurrentUser == true
-                                val (top, recent) = if (isSelf) {
-                                    val topJob = async { runCatching { Profile.topContent(context) }.getOrNull() }
-                                    val recentJob = async { runCatching { Profile.recentlyPlayed(context) }.getOrNull() }
-                                    topJob.await() to recentJob.await()
-                                } else {
-                                    null to null
-                                }
-                                profileDetail = profile
-                                profileTop = top
-                                profileContexts = if (isSelf) {
-                                    resolveProfileContexts(context, profile, recent)
-                                } else {
-                                    profile?.publicPlaylists.orEmpty().map {
-                                        ProfileContextCard(
-                                            uri = it.uri,
-                                            title = it.name,
-                                            subtitle = "Playlist",
-                                            imageUrl = it.imageUrl,
-                                        )
-                                    }
-                                }
-                                profileFailed = profile == null && top == null
-                                log.i("profile loaded self=$isSelf failed=${profile == null} " +
-                                        "topArtists=${top?.topArtists?.size ?: 0} " +
-                                        "contexts=${profileContexts.size}"
-                                )
-                            }
-                            profileLoading = false
-                        }
-
-                        LaunchedEffect(profileFollowFetch) {
-                            if (profileFollowFetch == 0) return@LaunchedEffect
-                            profileFollowLoading = true
-                            coroutineScope {
-                                val id = profileUserId
-                                val followersJob = async { runCatching { Profile.followers(context, id) }.getOrNull() }
-                                val followingJob = async { runCatching { Profile.following(context, id) }.getOrNull() }
-                                profileFollowers = followersJob.await().orEmpty()
-                                profileFollowing = followingJob.await().orEmpty()
-                            }
-                            profileFollowLoading = false
-                        }
                         var playlistUri by remember { mutableStateOf("") }
                         var playlistDetail by remember { mutableStateOf<CollectionDetail?>(null) }
                         var playlistTracks by remember { mutableStateOf<List<TrackItem>?>(null) }
@@ -435,6 +283,7 @@ class MainActivity : ComponentActivity() {
                         var recommendationsNonce by remember { mutableStateOf(0) }
                         var playlistSaved by remember { mutableStateOf<Boolean?>(null) }
                         var playlistCanRemoveCover by remember { mutableStateOf(false) }
+                        val contributors = rememberPlaylistContributorController(context, playlistUri)
                         var playlistEditDraft by remember { mutableStateOf<PlaylistEditDraft?>(null) }
                         var editableUris by remember { mutableStateOf<Set<String>>(emptySet()) }
                         var albumUri by remember { mutableStateOf("") }
@@ -493,7 +342,7 @@ class MainActivity : ComponentActivity() {
                             } else if (sawOffline) {
                                 sawOffline = false
                                 log.i("network is back, retrying the screens that came back empty")
-                                if (feed.isEmpty()) resumeSignal++
+                                if (home.feed.isEmpty()) resumeSignal++
                                 if (libraryItems.isNullOrEmpty()) Krespot.library.invalidate()
                                 if (whatsNew.isEmpty()) whatsNewFetch++
                             }
@@ -866,13 +715,13 @@ class MainActivity : ComponentActivity() {
                                 return@LaunchedEffect
                             }
                             val cover = now.coverUrl.takeIf { it.isNotBlank() }
-                            val head = playHistory.firstOrNull()?.item
+                            val head = home.playHistory.firstOrNull()?.item
                             if (head?.uri == now.trackUri && head.title == now.title &&
                                 head.artistUri == now.artistUri && head.imageUrl == cover
                             ) {
                                 return@LaunchedEffect
                             }
-                            playHistory = withContext(Dispatchers.Default) {
+                            home.playHistory = withContext(Dispatchers.Default) {
                                 PlayStats.recordListen(context)
                                 PlayStats.tallyArtist(context, now.artistUri, now.artist)
                                 if (now.contextUri.startsWith("spotify:playlist:")) {
@@ -898,7 +747,7 @@ class MainActivity : ComponentActivity() {
                                     System.currentTimeMillis(),
                                 )
                             }
-                            playStats = PlayStats.snapshot(context)
+                            home.playStats = PlayStats.snapshot(context)
                         }
 
                         LaunchedEffect(playback.isPlaying) {
@@ -906,45 +755,8 @@ class MainActivity : ComponentActivity() {
                             while (true) {
                                 delay(10_000L)
                                 PlayStats.addPlayedMs(context, 10_000L)
-                                playStats = PlayStats.snapshot(context)
+                                home.playStats = PlayStats.snapshot(context)
                             }
-                        }
-
-                        val startOfToday = remember {
-                            Calendar.getInstance().apply {
-                                set(Calendar.HOUR_OF_DAY, 0)
-                                set(Calendar.MINUTE, 0)
-                                set(Calendar.SECOND, 0)
-                                set(Calendar.MILLISECOND, 0)
-                            }.timeInMillis
-                        }
-                        val startOfYesterday = remember { startOfToday - 24L * 60 * 60 * 1000 }
-                        val historyRows = playHistory
-                        val historyToday = remember(playHistory, startOfToday) {
-                            historyRows.filter { it.playedAtMs >= startOfToday }.map { it.item }
-                        }
-                        val historyYesterday = remember(playHistory, startOfToday, startOfYesterday) {
-                            historyRows
-                                .filter { it.playedAtMs >= startOfYesterday && it.playedAtMs < startOfToday }
-                                .map { it.item }
-                        }
-                        val historyEarlier = remember(playHistory, startOfYesterday) {
-                            historyRows.filter { it.playedAtMs in 1 until startOfYesterday }.map { it.item }
-                        }
-                        val historyStats = remember(playStats, playHistory) {
-                            val replayed = playHistory.filter { it.plays > 1 }.maxByOrNull { it.plays }
-                            HistoryStats(
-                                totalPlayedMs = playStats.totalMs,
-                                listenStreakDays = playStats.listenStreak,
-                                loginStreakDays = playStats.loginStreak,
-                                topArtistName = playStats.topArtistName,
-                                topArtistPlays = playStats.topArtistPlays,
-                                topPlaylistName = playStats.topPlaylistName,
-                                topPlaylistPlays = playStats.topPlaylistPlays,
-                                topReplayTitle = replayed?.item?.title.orEmpty(),
-                                topReplayArtist = replayed?.item?.artist.orEmpty(),
-                                topReplayPlays = replayed?.plays ?: 0,
-                            )
                         }
 
                         LaunchedEffect(searchTerm, searchFetch, offlineNow) {
@@ -981,17 +793,17 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         EncoreAppShell(
-                                userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
-                                userAvatarUrl = account?.imageUrl.orEmpty(),
+                                userDisplayName = home.account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
+                                userAvatarUrl = home.account?.imageUrl.orEmpty(),
                             playbackState = bridge.state,
                             playerListener = bridge.listener,
                             expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
-                                homeQuickAccessItems = quick,
-                            homeShelves = if (homeFacet.isBlank() && !loading) historyShelves + shelves else shelves,
-                            homeChips = homeChips,
-                            homeFacet = homeFacet,
-                            homeGreeting = homeGreeting,
-                            onHomeFacetSelected = { facet -> homeFacet = facet },
+                                homeQuickAccessItems = home.quick,
+                            homeShelves = home.homeShelves(),
+                            homeChips = home.chips,
+                            homeFacet = home.facet,
+                            homeGreeting = home.greeting,
+                            onHomeFacetSelected = home::selectFacet,
                             libraryItems = libraryItems,
                             libraryLoading = libraryItems == null,
                             playlistTracks = playlistTracks,
@@ -1207,6 +1019,16 @@ class MainActivity : ComponentActivity() {
                                 uri
                             },
                             playlistSaved = playlistSaved,
+                            playlistPermissions = contributors.permissions,
+                            contributorsLoading = contributors.loading,
+                            contributorBusyIds = contributors.busyIds,
+                            onLoadPlaylistContributors = contributors::refresh,
+                            onSearchUsers = { term ->
+                                Search.section(context, SearchKind.USER, term)
+                            },
+                            onAddPlaylistContributor = contributors::add,
+                            onRemovePlaylistContributor = contributors::removeAsContributor,
+                            onRemovePlaylistMember = contributors::removeFromPlaylist,
                             playlistEditDraft = playlistEditDraft,
                             editablePlaylistUris = editableUris,
                             onEditPlaylist = { uri ->
@@ -1405,40 +1227,19 @@ class MainActivity : ComponentActivity() {
                                 }
                                 radio
                             },
-                            profile = profileDetail,
-                            profileTop = profileTop,
-                            profileContexts = profileContexts,
-                            profileLoading = profileLoading,
-                            profileFailed = profileFailed,
-                            onLoadProfile = {
-                                if (profileUserId.isNotBlank()) {
-                                    profileUserId = ""
-                                    profileDetail = null
-                                    profileTop = null
-                                    profileContexts = emptyList()
-                                }
-                                profileFetch++
-                            },
-                            onRetryProfile = {
-                                profileDetail = null
-                                profileTop = null
-                                profileContexts = emptyList()
-                                profileFetch++
-                            },
-                            onOpenUserProfile = { uri, _ ->
-                                if (profileUserId != uri) {
-                                    profileUserId = uri
-                                    profileDetail = null
-                                    profileTop = null
-                                    profileContexts = emptyList()
-                                }
-                                profileFetch++
-                            },
-                            profileFollowers = profileFollowers,
-                            profileFollowing = profileFollowing,
-                            profileFollowLoading = profileFollowLoading,
-                            onLoadProfileFollows = { profileFollowFetch++ },
-                            homeLoading = loading,
+                            profile = profileState.detail,
+                            profileTop = profileState.top,
+                            profileContexts = profileState.contexts,
+                            profileLoading = profileState.loading,
+                            profileFailed = profileState.failed,
+                            onLoadProfile = profileState::openMyProfile,
+                            onRetryProfile = profileState::retry,
+                            onOpenUserProfile = { uri, _ -> profileState.openUser(uri) },
+                            profileFollowers = profileState.followers,
+                            profileFollowing = profileState.following,
+                            profileFollowLoading = profileState.followLoading,
+                            onLoadProfileFollows = profileState::loadFollows,
+                            homeLoading = home.loading,
                             searchResults = remember(searchHits) {
                                 searchHits.map { hit ->
                                     com.quackify.compose.playlist.TrackItem(
@@ -1593,10 +1394,10 @@ class MainActivity : ComponentActivity() {
                                 scope.launch {
                                     val ok = when (field) {
                                         "showFollows" -> Settings.setPrivacy(
-                                            context, account?.id.orEmpty(), showFollows = !value,
+                                            context, home.account?.id.orEmpty(), showFollows = !value,
                                         )
                                         "showPublishedPlaylists" -> Settings.setPrivacy(
-                                            context, account?.id.orEmpty(), showPublishedPlaylists = !value,
+                                            context, home.account?.id.orEmpty(), showPublishedPlaylists = !value,
                                         )
                                         else -> Settings.setAttribute(context, field, value)
                                     }
@@ -1608,10 +1409,10 @@ class MainActivity : ComponentActivity() {
                             notificationsLoading = whatsNewLoading,
                             notificationsFailed = whatsNewFailed,
                             onRefreshWhatsNew = { whatsNewFetch++ },
-                            historyToday = historyToday,
-                            historyYesterday = historyYesterday,
-                            historyEarlier = historyEarlier,
-                            historyStats = historyStats,
+                            historyToday = home.historyToday,
+                            historyYesterday = home.historyYesterday,
+                            historyEarlier = home.historyEarlier,
+                            historyStats = home.historyStats,
                             historyLoading = false,
                             onLogout = {
                                 log.i("logout tapped")
@@ -1816,70 +1617,5 @@ private suspend fun decorateSearchTracks(
     )
 }
 
-private const val FAVORITE_ARTIST_LIMIT = 10
-
 private const val PLAYLIST_PREFETCH_ROWS = 8
 
-private data class ArtistStanding(
-    val plays: Int,
-    val lastPlayedAtMs: Long,
-    val latestTrack: TrackItem,
-)
-
-/**
- * The history's favorite artists: every artist uri ranked by total plays,
- * the most recent play breaking ties. Each artist is represented by its
- * newest track so the shelf card carries a cover.
- */
-private fun favoriteArtistsOf(history: List<PlayedTrack>): List<TrackItem> =
-    history
-        .filter { it.item.artistUri.startsWith("spotify:artist:") && it.item.artist.isNotBlank() }
-        .groupBy { it.item.artistUri }
-        .values
-        .map { plays ->
-            ArtistStanding(
-                plays = plays.sumOf { it.plays },
-                lastPlayedAtMs = plays.maxOf { it.playedAtMs },
-                latestTrack = plays.maxByOrNull { it.playedAtMs }!!.item,
-            )
-        }
-        .sortedWith(compareByDescending<ArtistStanding> { it.plays }.thenByDescending { it.lastPlayedAtMs })
-        .take(FAVORITE_ARTIST_LIMIT)
-        .map { it.latestTrack }
-
-private const val PROFILE_CONTEXT_LIMIT = 12
-
-/**
- * The recently-played feed only carries context uris, so each entry is turned
- * into a displayable card: artists come straight from the profile response,
- * playlists and albums are resolved through their existing sources.
- */
-private suspend fun resolveProfileContexts(
-    context: android.content.Context,
-    profile: UserProfile?,
-    contexts: List<ProfileContext>?,
-): List<ProfileContextCard> {
-    if (contexts.isNullOrEmpty()) return emptyList()
-    val artistByUri = profile?.recentlyPlayedArtists?.associateBy { it.uri }.orEmpty()
-    return contexts.take(PROFILE_CONTEXT_LIMIT).mapNotNull { entry ->
-        when {
-            entry.uri.startsWith("spotify:artist:") -> {
-                val artist = artistByUri[entry.uri] ?: return@mapNotNull null
-                ProfileContextCard(entry.uri, artist.name, "Artist", artist.imageUrl)
-            }
-            entry.uri.startsWith("spotify:playlist:") -> {
-                val detail = runCatching {
-                    Krespot.collections.collection(context, entry.uri)
-                }.getOrNull() ?: return@mapNotNull null
-                ProfileContextCard(entry.uri, detail.title, "Playlist", detail.imageUrl)
-            }
-            entry.uri.startsWith("spotify:album:") -> {
-                val detail = runCatching {
-                    Krespot.albums.album(context, entry.uri)
-                }.getOrNull() ?: return@mapNotNull null
-                ProfileContextCard(entry.uri, detail.title, detail.artists, detail.imageUrl)
-            }
-            else -> null
-        }
-    }
-}
