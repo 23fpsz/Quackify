@@ -5,7 +5,7 @@
     <a href="https://github.com/23fpsz/Quackify/stargazers"><img src="https://img.shields.io/github/stars/23fpsz/Quackify?style=flat-square&color=yellow" alt="Stars" /></a>
     <a href="https://github.com/23fpsz/Quackify/releases"><img src="https://img.shields.io/github/downloads/23fpsz/Quackify/total?style=flat-square&color=green" alt="Downloads" /></a>
     <a href="https://deepwiki.com/23fpsz/Quackify"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki" /></a>
-    <a href="https://discord.gg/NNXDGZEDFs"><img src="https://img.shields.io/discord/NNXDGZEDFs?style=flat-square&color=blurple&logo=discord&logoColor=white" alt="Discord" /></a>
+    <a href="https://discord.gg/NNXDGZEDFs"><img src="https://img.shields.io/discord/1528706169256808528?style=flat-square&color=blurple&logo=discord&logoColor=white" alt="Discord" /></a>
   </p>
 </div>
 
