@@ -44,8 +44,10 @@ internal object PlayPlayKeys {
             tag = "playplay",
         )
         if (blob != null && blob.code == 429) {
-            rateLimitedUntil = System.currentTimeMillis() + RATE_LIMIT_COOLDOWN_MS
-            log.w("playplay key rate limited, cooling down for ${RATE_LIMIT_COOLDOWN_MS / 1000}s")
+            val retryAfter = blob.headers["retry-after"]?.trim()?.toLongOrNull()
+            val wait = (retryAfter?.coerceIn(5L, 600L) ?: 60L) * 1000L
+            rateLimitedUntil = System.currentTimeMillis() + wait
+            log.w("playplay key rate limited, cooling down for ${wait / 1000}s")
             return null
         }
         if (blob?.ok != true) {
@@ -64,6 +66,4 @@ internal object PlayPlayKeys {
         log.i("playplay key '${fileId.take(12)}' ${key.size}B (${blob.bytes.size}B response)")
         return key
     }
-
-    private const val RATE_LIMIT_COOLDOWN_MS = 60_000L
 }
