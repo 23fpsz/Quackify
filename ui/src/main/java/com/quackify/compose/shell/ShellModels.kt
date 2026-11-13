@@ -264,3 +264,9 @@ internal fun isCollectionUri(uri: String): Boolean =
     uri.startsWith("spotify:collection:") ||
         uri.endsWith(":collection") ||
         uri == "spotify:user:@:collection"
+
+data class ShellDeepLink(
+    val kind: String,
+    val uri: String,
+    val query: String = "",
+)

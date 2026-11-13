@@ -31,6 +31,7 @@ import com.quackify.compose.library.EncoreLibraryScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.SettingsSwitches
@@ -137,6 +138,11 @@ fun EncoreAppShell(
     settingsLoading: Boolean = false,
     onToggleSetting: ((String, Boolean) -> Unit)? = null,
     onToggleFullArtwork: (Boolean) -> Unit = {},
+    onAppIconChange: ((String) -> Unit)? = null,
+    appUpdate: AppUpdate? = null,
+    updateChecking: Boolean = false,
+    updateChecked: Boolean = false,
+    onCheckUpdates: (() -> Unit)? = null,
     browsePage: BrowsePage? = null,
     categoryShelves: List<CategoryShelf>? = null,
     onOpenCategory: ((String) -> Unit)? = null,
@@ -167,6 +173,9 @@ fun EncoreAppShell(
     onLoadArtist: ((String, String) -> Unit)? = null,
     onOpenShow: ((String) -> Unit)? = null,
     onOpenEpisode: ((String) -> Unit)? = null,
+    deeplink: ShellDeepLink? = null,
+    onDeeplinkConsumed: () -> Unit = {},
+    onDeeplinkSearch: ((String) -> Unit)? = null,
     onOpenBrowse: ((String) -> Unit)? = null,
     onLoadMoreBrowse: (() -> Unit)? = null,
     onLoadMoreEpisodes: (() -> Unit)? = null,
@@ -322,6 +331,23 @@ fun EncoreAppShell(
     val navBackStack = navController.nav.backStack
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    LaunchedEffect(deeplink) {
+        val link = deeplink ?: return@LaunchedEffect
+        onDeeplinkConsumed()
+        when (link.kind) {
+            "artist" -> navController.openArtist(context, "", link.uri)
+            "album" -> navController.openAlbum(context, "", "", link.uri)
+            "playlist" -> navController.openPlaylist(context, "", link.uri)
+            "show" -> navController.openShow(link.uri)
+            "episode" -> navController.openEpisode(link.uri)
+            "search" -> {
+                selectedNavIndex = 1
+                currentScreen = ShellScreen.SEARCH
+                onDeeplinkSearch?.invoke(link.query)
+            }
+        }
+    }
 
     val actions = ShellActions(
         flags = flags,
@@ -791,7 +817,12 @@ fun EncoreAppShell(
                 country = settingsCountry,
                 loading = settingsLoading,
                 onToggleSetting = onToggleSetting,
-                onToggleFullArtwork = onToggleFullArtwork
+                onToggleFullArtwork = onToggleFullArtwork,
+                onAppIconChange = { onAppIconChange?.invoke(it) },
+                update = appUpdate,
+                updateChecking = updateChecking,
+                updateChecked = updateChecked,
+                onCheckUpdates = { onCheckUpdates?.invoke() }
             )
             ShellScreen.NOTIFICATIONS -> ShellNotificationsPane(
                 onBackClick = handleBack,

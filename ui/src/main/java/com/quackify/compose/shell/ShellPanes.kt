@@ -78,6 +78,7 @@ import com.quackify.compose.library.EncoreLibraryScreen
 import com.quackify.compose.playlist.EncorePlaylistScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.HistoryScreen
@@ -211,6 +212,11 @@ internal fun ShellSettingsPane(
     loading: Boolean,
     onToggleSetting: ((String, Boolean) -> Unit)?,
     onToggleFullArtwork: (Boolean) -> Unit = {},
+    onAppIconChange: (String) -> Unit = {},
+    update: AppUpdate? = null,
+    updateChecking: Boolean = false,
+    updateChecked: Boolean = false,
+    onCheckUpdates: () -> Unit = {},
 ) {
     SettingsScreen(
         onBackClick = onBackClick,
@@ -225,7 +231,12 @@ internal fun ShellSettingsPane(
         onToggleOtherVideos = { onToggleSetting?.invoke("otherVideoDisabled", !it) },
         onToggleShowFollows = { onToggleSetting?.invoke("showFollows", !it) },
         onToggleShowPlaylists = { onToggleSetting?.invoke("showPublishedPlaylists", !it) },
-        onToggleFullArtwork = onToggleFullArtwork
+        onToggleFullArtwork = onToggleFullArtwork,
+        onAppIconChange = onAppIconChange,
+        update = update,
+        updateChecking = updateChecking,
+        updateChecked = updateChecked,
+        onCheckUpdates = onCheckUpdates
     )
 }
 

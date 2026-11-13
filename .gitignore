@@ -33,3 +33,4 @@ log.log
 # Local signing material, never publish
 keystore/
 keystore.properties
+SpotiDuck.png
