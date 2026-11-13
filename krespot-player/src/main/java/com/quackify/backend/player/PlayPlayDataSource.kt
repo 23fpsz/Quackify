@@ -8,7 +8,6 @@ import androidx.media3.datasource.DataSource
 import com.quackify.backend.core.log.Logs
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.math.BigInteger
@@ -22,9 +21,10 @@ private val log = Logs.of(Logs.Module.SOURCE)
 
 /**
  * Serves a PlayPlay encrypted OGG/FLAC file to ExoPlayer as if it were clear.
- * The first 0xA7 bytes of an OGG file are the plaintext container header; the
- * rest is AES-128-CTR with the fixed audio IV, keystream indexed by absolute
- * file position. FLAC files are encrypted from byte 0 with no header skip.
+ * Mirrors the echo extension contract: the decrypted file starts with a
+ * 0xA7 byte record header before the actual OGG data, so player position p
+ * maps to decrypted file byte p + 0xA7 (FLAC has no skip). The AES-128-CTR
+ * keystream is indexed by absolute file position.
  */
 internal class PlayPlayDataSource(
     private val url: String,
@@ -41,9 +41,9 @@ internal class PlayPlayDataSource(
 
     private var stream: InputStream? = null
 
-    private var header = ByteArray(0)
+    private var lead = ByteArray(0)
 
-    private var headerPos = 0
+    private var leadPos = 0
 
     private var remaining = 0L
 
@@ -53,92 +53,86 @@ internal class PlayPlayDataSource(
         transferInitializing(dataSpec)
         val position = dataSpec.position.coerceAtLeast(0L)
         val length = dataSpec.length
-        val headerEnd = if (byteSkip > 0 && position < byteSkip) {
-            if (length >= 0) minOf(byteSkip, position + length) else byteSkip
-        } else {
-            position
+        val shifted = position + byteSkip
+        val alignedPos = shifted - (shifted % 16)
+        val blockOffset = (shifted % 16).toInt()
+        val rangeEnd = if (length >= 0) alignedPos + blockOffset + length - 1 else null
+        val range = if (rangeEnd != null) "bytes=$alignedPos-$rangeEnd" else "bytes=$alignedPos-"
+        val call = client.newCall(
+            Request.Builder()
+                .url(url)
+                .header("Range", range)
+                .header("Accept-Encoding", "identity")
+                .build()
+        ).execute()
+        if (!call.isSuccessful || (call.code != 206 && !(call.code == 200 && alignedPos == 0L))) {
+            val code = call.code
+            call.close()
+            throw IOException("playplay cdn http $code for range $range")
         }
-        header = if (headerEnd > position) plainRange(position, headerEnd) else ByteArray(0)
-        headerPos = 0
-        val headerLen = header.size.toLong()
-        val encStart = maxOf(position, byteSkip)
-        val encLen = if (length >= 0) (length - headerLen).coerceAtLeast(0L) else -1L
-        var contentLength = -1L
-        var blockOffset = 0
-        if (encLen != 0L) {
-            val alignedPos = encStart - (encStart % 16)
-            blockOffset = (encStart % 16).toInt()
-            val rangeEnd = if (encLen >= 0) alignedPos + blockOffset + encLen - 1 else null
-            val range = if (rangeEnd != null) "bytes=$alignedPos-$rangeEnd" else "bytes=$alignedPos-"
-            val call = client.newCall(
-                Request.Builder()
-                    .url(url)
-                    .header("Range", range)
-                    .header("Accept-Encoding", "identity")
-                    .build()
-            ).execute()
-            if (!call.isSuccessful || (call.code != 206 && !(call.code == 200 && alignedPos == 0L))) {
-                val code = call.code
-                call.close()
-                throw IOException("playplay cdn http $code for range $range")
-            }
-            val body = call.body ?: run {
-                call.close()
-                throw IOException("playplay cdn empty body")
-            }
-            contentLength = body.contentLength()
-            val ivCounter = AUDIO_IV.add(BigInteger.valueOf(alignedPos / 16))
-            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
-            cipher.init(
-                Cipher.DECRYPT_MODE,
-                SecretKeySpec(key, "AES"),
-                IvParameterSpec(counterBytes(ivCounter)),
-            )
-            val cipherStream = CipherInputStream(body.byteStream(), cipher)
-            if (blockOffset > 0) {
-                val scratch = ByteArray(blockOffset)
-                var skipped = 0
-                while (skipped < blockOffset) {
-                    val n = cipherStream.read(scratch, skipped, blockOffset - skipped)
-                    if (n == -1) {
-                        call.close()
-                        throw IOException("playplay stream ended inside the skipped block")
-                    }
-                    skipped += n
+        val body = call.body ?: run {
+            call.close()
+            throw IOException("playplay cdn empty body")
+        }
+        val contentLength = body.contentLength()
+        val ivCounter = AUDIO_IV.add(BigInteger.valueOf(alignedPos / 16))
+        val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+        cipher.init(
+            Cipher.DECRYPT_MODE,
+            SecretKeySpec(key, "AES"),
+            IvParameterSpec(counterBytes(ivCounter)),
+        )
+        val cipherStream = CipherInputStream(body.byteStream(), cipher)
+        if (blockOffset > 0) {
+            val scratch = ByteArray(blockOffset)
+            var skipped = 0
+            while (skipped < blockOffset) {
+                val n = cipherStream.read(scratch, skipped, blockOffset - skipped)
+                if (n == -1) {
+                    call.close()
+                    throw IOException("playplay stream ended inside the skipped block")
                 }
+                skipped += n
             }
-            response = call
-            stream = cipherStream
         }
-        remaining = when {
-            length >= 0 -> length
-            contentLength >= 0 -> headerLen + (contentLength - blockOffset).coerceAtLeast(0L)
-            else -> C.LENGTH_UNSET.toLong()
+        lead = ByteArray(0)
+        leadPos = 0
+        if (position == 0L) {
+            val probe = ByteArray(32)
+            var filled = 0
+            while (filled < probe.size) {
+                val n = cipherStream.read(probe, filled, probe.size - filled)
+                if (n == -1) break
+                filled += n
+            }
+            lead = probe.copyOf(filled)
+            log.i("playplay open pos=$position served head " +
+                    lead.joinToString("") { "%02x".format(it) })
         }
+        response = call
+        stream = cipherStream
+        remaining = length
         opened = true
         transferStarted(dataSpec)
         return when {
             length >= 0 -> length
-            remaining >= 0 -> remaining
+            contentLength >= 0 -> (contentLength - blockOffset).coerceAtLeast(0L)
             else -> C.LENGTH_UNSET.toLong()
         }
     }
 
     override fun read(buffer: ByteArray, offset: Int, readLength: Int): Int {
         if (remaining == 0L) return C.RESULT_END_OF_INPUT
-        if (headerPos < header.size) {
-            var take = minOf(readLength, header.size - headerPos)
+        if (leadPos < lead.size) {
+            var take = minOf(readLength, lead.size - leadPos)
             if (remaining > 0) take = minOf(take, remaining.toInt())
-            System.arraycopy(header, headerPos, buffer, offset, take)
-            headerPos += take
+            System.arraycopy(lead, leadPos, buffer, offset, take)
+            leadPos += take
             if (remaining > 0) remaining -= take
             bytesTransferred(take)
             return take
         }
-        val source = stream ?: run {
-            if (remaining > 0) throw IOException("playplay stream ended early")
-            return C.RESULT_END_OF_INPUT
-        }
+        val source = stream ?: throw IOException("playplay source not open")
         val read = source.read(buffer, offset, readLength)
         if (read == -1) {
             if (remaining > 0) throw IOException("playplay stream ended early")
@@ -149,32 +143,6 @@ internal class PlayPlayDataSource(
         return read
     }
 
-    private fun plainRange(from: Long, to: Long): ByteArray {
-        val range = "bytes=$from-${to - 1}"
-        val call = client.newCall(
-            Request.Builder()
-                .url(url)
-                .header("Range", range)
-                .header("Accept-Encoding", "identity")
-                .build()
-        ).execute()
-        if (!call.isSuccessful) {
-            val code = call.code
-            call.close()
-            throw IOException("playplay cdn http $code for header range $range")
-        }
-        call.body!!.use { body ->
-            val out = ByteArrayOutputStream()
-            val chunk = ByteArray(4096)
-            while (out.size() < (to - from).toInt()) {
-                val n = body.byteStream().read(chunk)
-                if (n == -1) break
-                out.write(chunk, 0, n)
-            }
-            return out.toByteArray()
-        }
-    }
-
     override fun getUri(): Uri? = response?.request?.url?.toString()?.let { Uri.parse(it) }
 
     override fun close() {
@@ -182,8 +150,8 @@ internal class PlayPlayDataSource(
         runCatching { response?.close() }
         stream = null
         response = null
-        header = ByteArray(0)
-        headerPos = 0
+        lead = ByteArray(0)
+        leadPos = 0
         remaining = 0L
         if (opened) {
             opened = false
