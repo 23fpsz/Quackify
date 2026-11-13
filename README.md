@@ -1,6 +1,12 @@
 <div align="center">
   <img src="art/quackifyart.png" alt="Quackify" width="480" />
   <p>Quackify is the continuation of SpotiDuck, a native Android music client built with Jetpack Compose and Material 3. It offers a familiar streaming experience, inspired by modern player apps, without needing a WebView.</p>
+  <p>
+    <a href="https://github.com/23fpsz/Quackify/stargazers"><img src="https://img.shields.io/github/stars/23fpsz/Quackify?style=flat-square&color=yellow" alt="Stars" /></a>
+    <a href="https://github.com/23fpsz/Quackify/releases"><img src="https://img.shields.io/github/downloads/23fpsz/Quackify/total?style=flat-square&color=green" alt="Downloads" /></a>
+    <a href="https://deepwiki.com/23fpsz/Quackify"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki" /></a>
+    <a href="https://discord.gg/NNXDGZEDFs"><img src="https://img.shields.io/discord/NNXDGZEDFs?style=flat-square&color=blurple&logo=discord&logoColor=white" alt="Discord" /></a>
+  </p>
 </div>
 
 > [!WARNING]
