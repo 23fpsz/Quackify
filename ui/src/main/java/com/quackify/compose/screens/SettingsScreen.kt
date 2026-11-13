@@ -285,7 +285,7 @@ fun SettingsScreen(
                     )
                     SettingsIconOption(
                         label = "Buffed",
-                        iconRes = R.drawable.ic_launcher_buffed,
+                        iconRes = R.mipmap.ic_launcher_buffed,
                         selected = appIcon == "buffed",
                         onClick = {
                             appIcon = "buffed"
@@ -295,7 +295,7 @@ fun SettingsScreen(
                     )
                     SettingsIconOption(
                         label = "Custom",
-                        iconRes = R.drawable.ic_launcher_custom,
+                        iconRes = R.mipmap.ic_launcher_custom,
                         selected = appIcon == "custom",
                         onClick = {
                             appIcon = "custom"
