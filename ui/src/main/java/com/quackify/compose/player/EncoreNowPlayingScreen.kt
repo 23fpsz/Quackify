@@ -479,6 +479,7 @@ fun EncoreNowPlayingScreen(
                             videoQualities = videoQualities,
                             onVideoQuality = onVideoQuality,
                             onVideoSurface = onVideoSurface,
+                            onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                             modifier = Modifier
                                 .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
                         )
@@ -512,8 +513,7 @@ fun EncoreNowPlayingScreen(
                             available = musicVideoAvailable,
                             active = videoActive,
                             switching = videoSwitching,
-                            onSwitch = onSwitchVideo,
-                            onFull = { onToggleVideoFullscreen(true) }
+                            onSwitch = onSwitchVideo
                         )
 
                         if (effectiveLyricsVisible) {
@@ -650,6 +650,7 @@ fun EncoreNowPlayingScreen(
                                         videoQualities = videoQualities,
                                         onVideoQuality = onVideoQuality,
                                         onVideoSurface = onVideoSurface,
+                                        onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .then(
@@ -725,6 +726,7 @@ fun EncoreNowPlayingScreen(
                                     videoQualities = videoQualities,
                                     onVideoQuality = onVideoQuality,
                                     onVideoSurface = onVideoSurface,
+                                    onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .then(
@@ -754,8 +756,7 @@ fun EncoreNowPlayingScreen(
                                 available = musicVideoAvailable,
                                 active = videoActive,
                                 switching = videoSwitching,
-                                onSwitch = onSwitchVideo,
-                                onFull = { onToggleVideoFullscreen(true) }
+                                onSwitch = onSwitchVideo
                             )
 
                             Spacer(modifier = Modifier.height(lyricBottomSpacerHeight))
@@ -1133,6 +1134,7 @@ private fun NowPlayingArtworkCard(
     videoQualities: List<Int> = emptyList(),
     onVideoQuality: (Int) -> Unit = {},
     onVideoSurface: (android.view.Surface?) -> Unit = {},
+    onToggleVideoFullscreen: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val corner = if (fullBleed) 0.dp else EncoreCornerRadii.Larger2
@@ -1232,6 +1234,22 @@ private fun NowPlayingArtworkCard(
                                     }
                                 }
                             }
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(10.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.Black.copy(alpha = 0.45f))
+                                    .clickable { onToggleVideoFullscreen() }
+                                    .padding(7.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.encore_icon_fullscreen_24),
+                                    contentDescription = "Toggle fullscreen video",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -1288,21 +1306,8 @@ private fun VideoFullscreenLayout(
             videoQualities = videoQualities,
             onVideoQuality = onVideoQuality,
             onVideoSurface = onVideoSurface,
+            onToggleVideoFullscreen = onExit,
             modifier = Modifier.fillMaxSize()
-        )
-        Icon(
-            painter = painterResource(R.drawable.encore_icon_arrow_down_24),
-            contentDescription = "Exit fullscreen",
-            tint = Color.White,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(16.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.35f))
-                .clickable { onExit() }
-                .padding(8.dp)
-                .size(20.dp)
         )
         NowPlayingSeekBarSection(
             progress = progress,
@@ -1325,15 +1330,13 @@ private fun MusicVideoSwitchRow(
     active: Boolean,
     switching: Boolean,
     onSwitch: (Boolean) -> Unit,
-    onFull: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (!available && !active) return
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 24.dp)
     ) {
         MusicVideoSwitchPill(
             label = if (active) "Audio" else "Music video",
@@ -1341,14 +1344,6 @@ private fun MusicVideoSwitchRow(
             switching = switching,
             onClick = { onSwitch(!active) }
         )
-        if (active) {
-            MusicVideoSwitchPill(
-                label = "Full",
-                iconRes = R.drawable.encore_icon_fullscreen_24,
-                switching = false,
-                onClick = onFull
-            )
-        }
     }
 }
 
