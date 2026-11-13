@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -308,13 +309,62 @@ fun SettingsScreen(
 
             item {
                 SettingsSectionHeader(title = "About")
+                Text(
+                    text = "Quackify is a native Android music client built with Jetpack Compose, continuing the SpotiDuck project.",
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
                 SettingsInfoRow(
                     title = "Version",
                     value = version,
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AboutLinkButton(label = "GitHub", iconRes = R.drawable.ic_github_24, url = GITHUB_URL)
+                    AboutLinkButton(label = "Discord", iconRes = R.drawable.ic_discord_24, url = DISCORD_URL)
+                }
+                Text(
+                    text = "\u00A9 2026 Quackify Team \u00B7 xzyyysh & AldySan",
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
                 Spacer(modifier = Modifier.height(120.dp))
             }
         }
+    }
+}
+
+private const val GITHUB_URL = "https://github.com/23fpsz/Quackify"
+private const val DISCORD_URL = "https://discord.gg/NNXDGZEDFs"
+
+@Composable
+private fun AboutLinkButton(label: String, iconRes: Int, url: String) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(EncoreColors.Card)
+            .clickable {
+                runCatching {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                }
+            }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = label,
+            modifier = Modifier.size(18.dp),
+            tint = EncoreColors.TextPrimary
+        )
+        Text(
+            text = label,
+            style = EncoreTheme.typography.bodyMediumBold
+        )
     }
 }
 
