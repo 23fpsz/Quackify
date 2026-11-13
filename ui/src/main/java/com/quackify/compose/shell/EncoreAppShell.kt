@@ -135,6 +135,7 @@ fun EncoreAppShell(
     settingsLoading: Boolean = false,
     onToggleSetting: ((String, Boolean) -> Unit)? = null,
     onToggleFullArtwork: (Boolean) -> Unit = {},
+    onAppIconChange: ((String) -> Unit)? = null,
     browsePage: BrowsePage? = null,
     categoryShelves: List<CategoryShelf>? = null,
     onOpenCategory: ((String) -> Unit)? = null,
@@ -165,6 +166,9 @@ fun EncoreAppShell(
     onLoadArtist: ((String, String) -> Unit)? = null,
     onOpenShow: ((String) -> Unit)? = null,
     onOpenEpisode: ((String) -> Unit)? = null,
+    deeplink: ShellDeepLink? = null,
+    onDeeplinkConsumed: () -> Unit = {},
+    onDeeplinkSearch: ((String) -> Unit)? = null,
     onOpenBrowse: ((String) -> Unit)? = null,
     onLoadMoreBrowse: (() -> Unit)? = null,
     onLoadMoreEpisodes: (() -> Unit)? = null,
@@ -312,6 +316,23 @@ fun EncoreAppShell(
     val navBackStack = navController.nav.backStack
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    LaunchedEffect(deeplink) {
+        val link = deeplink ?: return@LaunchedEffect
+        onDeeplinkConsumed()
+        when (link.kind) {
+            "artist" -> navController.openArtist(context, "", link.uri)
+            "album" -> navController.openAlbum(context, "", "", link.uri)
+            "playlist" -> navController.openPlaylist(context, "", link.uri)
+            "show" -> navController.openShow(link.uri)
+            "episode" -> navController.openEpisode(link.uri)
+            "search" -> {
+                selectedNavIndex = 1
+                currentScreen = ShellScreen.SEARCH
+                onDeeplinkSearch?.invoke(link.query)
+            }
+        }
+    }
 
     val actions = ShellActions(
         flags = flags,
@@ -776,7 +797,8 @@ fun EncoreAppShell(
                 country = settingsCountry,
                 loading = settingsLoading,
                 onToggleSetting = onToggleSetting,
-                onToggleFullArtwork = onToggleFullArtwork
+                onToggleFullArtwork = onToggleFullArtwork,
+                onAppIconChange = { onAppIconChange?.invoke(it) }
             )
             ShellScreen.NOTIFICATIONS -> ShellNotificationsPane(
                 onBackClick = handleBack,

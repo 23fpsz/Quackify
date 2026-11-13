@@ -1,5 +1,6 @@
 package com.quackify.compose.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -88,6 +91,7 @@ fun SettingsScreen(
     onToggleShowFollows: (Boolean) -> Unit = {},
     onToggleShowPlaylists: (Boolean) -> Unit = {},
     onToggleFullArtwork: (Boolean) -> Unit = {},
+    onAppIconChange: (String) -> Unit = {},
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
@@ -113,6 +117,9 @@ fun SettingsScreen(
     }
     var gapless by remember {
         mutableStateOf(clientPrefs.getBoolean("gaplessPlayback", false))
+    }
+    var appIcon by remember {
+        mutableStateOf(clientPrefs.getString("appIcon", "default").orEmpty().ifBlank { "default" })
     }
 
 
@@ -250,6 +257,37 @@ fun SettingsScreen(
             }
 
             item {
+                SettingsSectionHeader(title = "App icon")
+                Text(
+                    text = "Pick the launcher icon. It can take a moment for your home screen to update, and the app may restart once.",
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SettingsIconOption(
+                        label = "Default",
+                        iconRes = R.mipmap.ic_launcher_default,
+                        selected = appIcon == "default",
+                        onClick = {
+                            appIcon = "default"
+                            clientPrefs.edit().putString("appIcon", "default").apply()
+                            onAppIconChange("default")
+                        }
+                    )
+                    SettingsIconOption(
+                        label = "Normal",
+                        iconRes = R.mipmap.ic_launcher_normal,
+                        selected = appIcon == "normal",
+                        onClick = {
+                            appIcon = "normal"
+                            clientPrefs.edit().putString("appIcon", "normal").apply()
+                            onAppIconChange("normal")
+                        }
+                    )
+                }
+            }
+
+            item {
                 SettingsSectionHeader(title = "Account")
                 val detail = listOfNotNull(
                     product.takeIf { it.isNotBlank() },
@@ -271,13 +309,62 @@ fun SettingsScreen(
 
             item {
                 SettingsSectionHeader(title = "About")
+                Text(
+                    text = "Quackify is a native Android music client built with Jetpack Compose, continuing the SpotiDuck project.",
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
                 SettingsInfoRow(
                     title = "Version",
                     value = version,
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AboutLinkButton(label = "GitHub", iconRes = R.drawable.ic_github_24, url = GITHUB_URL)
+                    AboutLinkButton(label = "Discord", iconRes = R.drawable.ic_discord_24, url = DISCORD_URL)
+                }
+                Text(
+                    text = "\u00A9 2026 Quackify Team",
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
                 Spacer(modifier = Modifier.height(120.dp))
             }
         }
+    }
+}
+
+private const val GITHUB_URL = "https://github.com/23fpsz/Quackify"
+private const val DISCORD_URL = "https://discord.gg/NNXDGZEDFs"
+
+@Composable
+private fun AboutLinkButton(label: String, iconRes: Int, url: String) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(EncoreColors.Card)
+            .clickable {
+                runCatching {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                }
+            }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = label,
+            modifier = Modifier.size(18.dp),
+            tint = EncoreColors.TextPrimary
+        )
+        Text(
+            text = label,
+            style = EncoreTheme.typography.bodyMediumBold
+        )
     }
 }
 
@@ -462,6 +549,42 @@ private fun SettingsBadge(text: String, info: String) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsIconOption(
+    label: String,
+    iconRes: Int,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .border(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = if (selected) EncoreColors.Green else EncoreColors.Divider,
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .clickable(onClick = onClick)
+        ) {
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = label,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = EncoreTheme.typography.marginal.copy(
+                color = if (selected) EncoreColors.Green else EncoreColors.TextSecondary
+            )
+        )
     }
 }
 

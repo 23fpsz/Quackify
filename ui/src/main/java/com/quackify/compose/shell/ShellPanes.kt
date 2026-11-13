@@ -210,6 +210,7 @@ internal fun ShellSettingsPane(
     loading: Boolean,
     onToggleSetting: ((String, Boolean) -> Unit)?,
     onToggleFullArtwork: (Boolean) -> Unit = {},
+    onAppIconChange: (String) -> Unit = {},
 ) {
     SettingsScreen(
         onBackClick = onBackClick,
@@ -224,7 +225,8 @@ internal fun ShellSettingsPane(
         onToggleOtherVideos = { onToggleSetting?.invoke("otherVideoDisabled", !it) },
         onToggleShowFollows = { onToggleSetting?.invoke("showFollows", !it) },
         onToggleShowPlaylists = { onToggleSetting?.invoke("showPublishedPlaylists", !it) },
-        onToggleFullArtwork = onToggleFullArtwork
+        onToggleFullArtwork = onToggleFullArtwork,
+        onAppIconChange = onAppIconChange
     )
 }
 
