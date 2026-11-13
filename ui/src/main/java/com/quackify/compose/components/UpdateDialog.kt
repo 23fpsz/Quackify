@@ -60,21 +60,21 @@ fun UpdateDialog(
             modifier = Modifier
                 .widthIn(max = 380.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(EncoreTheme.colors.cardElevated)
+                .background(EncoreColors.CardElevated)
                 .padding(20.dp)
         ) {
             Text(
                 text = "Update available",
                 style = EncoreTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    color = EncoreTheme.colors.textPrimary
+                    color = EncoreColors.TextPrimary
                 )
             )
             Spacer(modifier = Modifier.padding(top = 14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = currentVersion,
-                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary)
+                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                 )
                 Icon(
                     painter = painterResource(R.drawable.encore_icon_arrow_right_24),
@@ -82,7 +82,7 @@ fun UpdateDialog(
                     modifier = Modifier
                         .padding(horizontal = 10.dp)
                         .size(18.dp),
-                    tint = EncoreTheme.colors.textSecondary
+                    tint = EncoreColors.TextSecondary
                 )
                 Text(
                     text = update.version,
@@ -102,7 +102,7 @@ fun UpdateDialog(
                 if (update.notes.isBlank()) {
                     Text(
                         text = "No release notes.",
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary)
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                     )
                 } else {
                     MarkdownText(markdown = update.notes)
@@ -126,7 +126,7 @@ fun UpdateDialog(
                         } else {
                             "%.1f MB \u00B7 %.1f MB/s".format(downloadedMb, speedMbps)
                         },
-                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -145,7 +145,7 @@ fun UpdateDialog(
                         Spacer(modifier = Modifier.padding(horizontal = 5.dp))
                         Text(
                             text = "Installing\u2026",
-                            style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreTheme.colors.textPrimary)
+                            style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary)
                         )
                     }
                 }
@@ -156,7 +156,7 @@ fun UpdateDialog(
                     ) {
                         Text(
                             text = "Later",
-                            style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable { onLater() }

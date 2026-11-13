@@ -393,7 +393,7 @@ fun EncorePlaylistScreen(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
                         contentDescription = "Exit search",
-                        tint = EncoreTheme.colors.textPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -414,7 +414,7 @@ fun EncorePlaylistScreen(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_search_24),
                             contentDescription = null,
-                            tint = EncoreTheme.colors.textSecondary,
+                            tint = EncoreColors.TextSecondary,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -424,7 +424,7 @@ fun EncorePlaylistScreen(
                                 Text(
                                     text = "Find in playlist",
                                     style = EncoreTheme.typography.bodyMedium.copy(
-                                        color = EncoreTheme.colors.textSecondary,
+                                        color = EncoreColors.TextSecondary,
                                         fontSize = 14.sp
                                     )
                                 )
@@ -435,7 +435,7 @@ fun EncorePlaylistScreen(
                                 singleLine = true,
                                 cursorBrush = SolidColor(EncoreColors.Green),
                                 textStyle = TextStyle(
-                                    color = EncoreTheme.colors.textPrimary,
+                                    color = Color.White,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium
                                 ),
@@ -447,7 +447,7 @@ fun EncorePlaylistScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_x_24),
                                 contentDescription = "Clear search",
-                                tint = EncoreTheme.colors.textPrimary,
+                                tint = Color.White,
                                 modifier = Modifier
                                     .size(18.dp)
                                     .clickable { searchQuery = "" }
@@ -460,7 +460,7 @@ fun EncorePlaylistScreen(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_more_android_24),
                         contentDescription = "Playlist options",
-                        tint = EncoreTheme.colors.textPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -486,7 +486,7 @@ fun EncorePlaylistScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "Try searching for a different track title or artist",
-                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
+                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                             )
                         }
                     }
@@ -643,7 +643,7 @@ fun EncorePlaylistScreen(
                                                 Icon(
                                                     painter = painterResource(id = R.drawable.encore_icon_search_24),
                                                     contentDescription = null,
-                                                    tint = EncoreTheme.colors.textPrimary,
+                                                    tint = Color.White,
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
@@ -798,7 +798,7 @@ fun EncorePlaylistScreen(
                                                         Icon(
                                                             painter = painterResource(id = R.drawable.encore_icon_user_24),
                                                             contentDescription = null,
-                                                            tint = EncoreTheme.colors.textPrimary,
+                                                            tint = Color.White,
                                                             modifier = Modifier.size(if (index == 0) 14.dp else 12.dp)
                                                         )
                                                     }
@@ -814,7 +814,7 @@ fun EncorePlaylistScreen(
                                             },
                                             style = EncoreTheme.typography.bodyMedium.copy(
                                                 fontWeight = FontWeight.Bold,
-                                                color = EncoreTheme.colors.textPrimary,
+                                                color = Color.White,
                                                 fontSize = 13.sp
                                             )
                                         )
@@ -858,13 +858,13 @@ fun EncorePlaylistScreen(
                                     Icon(
                                         painter = painterResource(id = R.drawable.encore_icon_globe_24),
                                         contentDescription = "Public playlist",
-                                        tint = EncoreTheme.colors.textSecondary,
+                                        tint = EncoreColors.TextSecondary,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Text(
                                         text = metadataText,
                                         style = EncoreTheme.typography.bodySmall.copy(
-                                            color = EncoreTheme.colors.textSecondary,
+                                            color = EncoreColors.TextSecondary,
                                             fontSize = 12.5.sp
                                         )
                                     )
@@ -934,7 +934,7 @@ fun EncorePlaylistScreen(
                                                 id = if (isDownloaded) R.drawable.encore_icon_downloaded_24 else R.drawable.encore_icon_download_24
                                             ),
                                             contentDescription = if (isDownloaded) "Downloaded" else "Download",
-                                            tint = if (isDownloaded) EncoreColors.Green else EncoreTheme.colors.textSecondary,
+                                            tint = if (isDownloaded) EncoreColors.Green else EncoreColors.TextSecondary,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -950,7 +950,7 @@ fun EncorePlaylistScreen(
                                         Icon(
                                             painter = painterResource(id = R.drawable.encore_icon_share_android_24),
                                             contentDescription = "Share",
-                                            tint = EncoreTheme.colors.textSecondary,
+                                            tint = EncoreColors.TextSecondary,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -966,7 +966,7 @@ fun EncorePlaylistScreen(
                                         Icon(
                                             painter = painterResource(id = R.drawable.encore_icon_sort_by_24),
                                             contentDescription = "Sort",
-                                            tint = if (sortOption != PlaylistSort.CUSTOM) EncoreColors.Green else EncoreTheme.colors.textSecondary,
+                                            tint = if (sortOption != PlaylistSort.CUSTOM) EncoreColors.Green else EncoreColors.TextSecondary,
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -986,7 +986,7 @@ fun EncorePlaylistScreen(
                                         Icon(
                                             painter = painterResource(id = R.drawable.encore_icon_shuffle_24),
                                             contentDescription = "Shuffle",
-                                            tint = if (isShuffle) EncoreColors.Green else EncoreTheme.colors.textSecondary,
+                                            tint = if (isShuffle) EncoreColors.Green else EncoreColors.TextSecondary,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -1055,14 +1055,14 @@ fun EncorePlaylistScreen(
                             Text(
                                 text = "Couldn't load this playlist",
                                 style = EncoreTheme.typography.titleMedium.copy(
-                                    color = EncoreTheme.colors.textPrimary
+                                    color = EncoreColors.TextPrimary
                                 )
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "Check your internet connection and try again.",
                                 style = EncoreTheme.typography.bodySmall.copy(
-                                    color = EncoreTheme.colors.textSecondary
+                                    color = EncoreColors.TextSecondary
                                 )
                             )
                             Spacer(modifier = Modifier.height(12.dp))
@@ -1117,7 +1117,7 @@ fun EncorePlaylistScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "Based on what's in this playlist",
-                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                                 )
                             }
                         }
@@ -1153,7 +1153,7 @@ fun EncorePlaylistScreen(
                                     text = recTrack.title,
                                     style = EncoreTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.SemiBold,
-                                        color = EncoreTheme.colors.textPrimary,
+                                        color = Color.White,
                                         fontSize = 15.sp
                                     ),
                                     maxLines = 1,
@@ -1169,7 +1169,7 @@ fun EncorePlaylistScreen(
                                     Text(
                                         text = recTrack.artist,
                                         style = EncoreTheme.typography.bodySmall.copy(
-                                            color = EncoreTheme.colors.textSecondary,
+                                            color = EncoreColors.TextSecondary,
                                             fontSize = 13.sp
                                         ),
                                         maxLines = 1,
@@ -1197,7 +1197,7 @@ fun EncorePlaylistScreen(
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_plus_24),
                                     contentDescription = "Add to playlist",
-                                    tint = EncoreTheme.colors.textPrimary,
+                                    tint = Color.White,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -1214,7 +1214,7 @@ fun EncorePlaylistScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(24.dp))
-                                    .background(EncoreTheme.colors.canvas)
+                                    .background(Color.White)
                                     .clickable(enabled = !recommendationsLoading, onClick = onRecommendRefresh)
                                     .padding(horizontal = 24.dp, vertical = 10.dp)
                             ) {
@@ -1271,7 +1271,7 @@ fun EncorePlaylistScreen(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
                         contentDescription = "Back",
-                        tint = EncoreTheme.colors.textPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -1286,7 +1286,7 @@ fun EncorePlaylistScreen(
                         text = title,
                         style = EncoreTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = EncoreTheme.colors.textPrimary,
+                            color = Color.White,
                             fontSize = 17.sp
                         ),
                         maxLines = 1,
@@ -1312,7 +1312,7 @@ fun EncorePlaylistScreen(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_more_android_24),
                             contentDescription = "Playlist options",
-                            tint = EncoreTheme.colors.textPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1439,7 +1439,7 @@ private fun PlaylistChip(
             Icon(
                 painter = painterResource(id = iconRes),
                 contentDescription = label,
-                tint = EncoreTheme.colors.textPrimary,
+                tint = Color.White,
                 modifier = Modifier.size(19.dp)
             )
             Spacer(modifier = Modifier.width(7.dp))
@@ -1447,7 +1447,7 @@ private fun PlaylistChip(
                 text = label,
                 style = EncoreTheme.typography.bodySmallBold.copy(
                     fontSize = 13.sp,
-                    color = EncoreTheme.colors.textPrimary,
+                    color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
             )
@@ -1545,7 +1545,7 @@ private fun PlaylistEmptyCurationHeader(
                             text = "Change",
                             style = EncoreTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = EncoreTheme.colors.textPrimary,
+                                color = Color.White,
                                 fontSize = 12.sp
                             )
                         )
@@ -1568,7 +1568,7 @@ private fun PlaylistEmptyCurationHeader(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_plus_24),
                             contentDescription = null,
-                            tint = EncoreTheme.colors.textPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(12.dp)
                         )
                     }
@@ -1583,7 +1583,7 @@ private fun PlaylistEmptyCurationHeader(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_user_24),
                             contentDescription = null,
-                            tint = EncoreTheme.colors.textPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(14.dp)
                         )
                     }
@@ -1592,7 +1592,7 @@ private fun PlaylistEmptyCurationHeader(
                         text = creator,
                         style = EncoreTheme.typography.bodySmall.copy(
                             fontWeight = FontWeight.Bold,
-                            color = EncoreTheme.colors.textPrimary,
+                            color = Color.White,
                             fontSize = 12.sp
                         ),
                         maxLines = 1,
@@ -1633,7 +1633,7 @@ private fun PlaylistEmptyCurationHeader(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(24.dp))
-                    .background(EncoreTheme.colors.canvas)
+                    .background(Color.White)
                     .clickable(onClick = onAddTracksClick)
                     .padding(horizontal = 28.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center

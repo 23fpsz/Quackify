@@ -199,7 +199,7 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.background),
+            .background(EncoreColors.Background),
     ) {
         AndroidView(
             modifier = Modifier
@@ -236,7 +236,7 @@ private fun WebViewUnavailableScreen(onRetry: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.background)
+            .background(EncoreColors.Background)
             .padding(horizontal = 32.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -244,7 +244,7 @@ private fun WebViewUnavailableScreen(onRetry: () -> Unit) {
             Text(
                 text = "System WebView unavailable",
                 style = EncoreTheme.typography.titleMedium,
-                color = EncoreTheme.colors.textPrimary,
+                color = EncoreColors.TextPrimary,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(10.dp))
@@ -254,7 +254,7 @@ private fun WebViewUnavailableScreen(onRetry: () -> Unit) {
                         "Enable or update Android System WebView in system settings, " +
                         "then retry.",
                 style = EncoreTheme.typography.bodyMedium,
-                color = EncoreTheme.colors.textSecondary,
+                color = EncoreColors.TextSecondary,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(22.dp))

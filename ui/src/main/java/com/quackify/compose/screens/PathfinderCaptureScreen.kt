@@ -14,7 +14,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.auth.LoginFlow
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.EncoreTheme
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.webview.LoginWebViewHost
 import com.quackify.backend.core.webview.PLAYER_URL
@@ -66,7 +65,7 @@ fun PathfinderCaptureScreen(onDone: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.background),
+            .background(EncoreColors.Background),
     ) {
         host?.let { captureHost ->
             AndroidView(

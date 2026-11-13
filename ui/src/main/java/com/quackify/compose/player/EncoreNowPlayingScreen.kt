@@ -1626,7 +1626,7 @@ private fun EpisodeControlsRow(
             iconRes = R.drawable.encore_icon_seek_back_15,
             contentDescription = "Back 15 seconds",
             onClick = { onSkipSeek(-15_000L) },
-            tint = EncoreTheme.colors.textPrimary,
+            tint = EncoreColors.TextPrimary,
             size = 48.dp,
             iconSize = 26.dp
         )
@@ -1635,7 +1635,7 @@ private fun EpisodeControlsRow(
             iconRes = R.drawable.encore_icon_skip_back_24,
             contentDescription = "Previous",
             onClick = onSkipPreviousClick,
-            tint = EncoreTheme.colors.textPrimary,
+            tint = EncoreColors.TextPrimary,
             size = 44.dp,
             iconSize = 26.dp
         )
@@ -1654,7 +1654,7 @@ private fun EpisodeControlsRow(
             iconRes = R.drawable.encore_icon_skip_forward_24,
             contentDescription = "Next",
             onClick = onSkipNextClick,
-            tint = EncoreTheme.colors.textPrimary,
+            tint = EncoreColors.TextPrimary,
             size = 48.dp,
             iconSize = 30.dp
         )
@@ -1663,7 +1663,7 @@ private fun EpisodeControlsRow(
             iconRes = R.drawable.encore_icon_seek_forward_15,
             contentDescription = "Forward 15 seconds",
             onClick = { onSkipSeek(15_000L) },
-            tint = EncoreTheme.colors.textPrimary,
+            tint = EncoreColors.TextPrimary,
             size = 48.dp,
             iconSize = 26.dp
         )
@@ -1758,7 +1758,7 @@ private fun NowPlayingControlsRow(
             iconRes = R.drawable.encore_icon_skip_back_24,
             contentDescription = "Previous",
             onClick = onSkipPreviousClick,
-            tint = EncoreTheme.colors.textPrimary,
+            tint = EncoreColors.TextPrimary,
             size = 48.dp,
             iconSize = 30.dp,
             enabled = canSkipPrevious
@@ -1778,7 +1778,7 @@ private fun NowPlayingControlsRow(
             iconRes = R.drawable.encore_icon_skip_forward_24,
             contentDescription = "Next",
             onClick = onSkipNextClick,
-            tint = EncoreTheme.colors.textPrimary,
+            tint = EncoreColors.TextPrimary,
             size = 48.dp,
             iconSize = 30.dp
         )
@@ -1985,7 +1985,7 @@ private fun NowPlayingAboutArtistCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
-            .background(EncoreTheme.colors.card)
+            .background(EncoreColors.Card)
     ) {
         Column {
             Box(
@@ -2067,7 +2067,7 @@ private fun NowPlayingAboutArtistCard(
                         }
                         Text(
                             text = monthlyListeners,
-                            style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
+                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                         )
                     }
                 }
@@ -2077,7 +2077,7 @@ private fun NowPlayingAboutArtistCard(
                         .clip(RoundedCornerShape(EncoreCornerRadii.FollowPill))
                         .border(
                             width = 1.dp,
-                            color = if (isFollowingArtist) EncoreColors.Green else EncoreTheme.colors.textSecondary,
+                            color = if (isFollowingArtist) EncoreColors.Green else EncoreColors.TextSecondary,
                             shape = RoundedCornerShape(EncoreCornerRadii.FollowPill)
                         )
                         .clickable { onFollowToggle() }
@@ -2087,7 +2087,7 @@ private fun NowPlayingAboutArtistCard(
                     Text(
                         text = if (isFollowingArtist) "Following" else "Follow",
                         style = EncoreTheme.typography.bodySmallBold.copy(
-                            color = if (isFollowingArtist) EncoreColors.Green else EncoreTheme.colors.textPrimary
+                            color = if (isFollowingArtist) EncoreColors.Green else EncoreColors.TextPrimary
                         )
                     )
                 }
@@ -2098,7 +2098,7 @@ private fun NowPlayingAboutArtistCard(
             Text(
                 text = artistBio,
                 style = EncoreTheme.typography.bodySmall.copy(
-                    color = EncoreTheme.colors.textSecondary,
+                    color = EncoreColors.TextSecondary,
                     lineHeight = 18.sp
                 ),
                 maxLines = 3,

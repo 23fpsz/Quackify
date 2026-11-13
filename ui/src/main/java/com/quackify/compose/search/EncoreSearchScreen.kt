@@ -422,7 +422,7 @@ fun EncoreSearchScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.background)
+            .background(EncoreColors.Background)
             .statusBarsPadding()
     ) {
         Column(
@@ -450,7 +450,7 @@ fun EncoreSearchScreen(
                         style = EncoreTheme.typography.titleMedium.copy(
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = EncoreTheme.colors.textPrimary
+                            color = EncoreColors.TextPrimary
                         ),
                         modifier = Modifier.weight(1f)
                     )
@@ -507,7 +507,7 @@ fun EncoreSearchScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_search_24),
                                 contentDescription = "Search",
-                                tint = if (isSearching) EncoreTheme.colors.textSecondary else Color(0xFF121212),
+                                tint = if (isSearching) EncoreColors.TextSecondary else Color(0xFF121212),
                                 modifier = Modifier.size(22.dp)
                             )
 
@@ -519,7 +519,7 @@ fun EncoreSearchScreen(
                                         text = "What do you want to listen to?",
                                         style = EncoreTheme.typography.bodyMedium.copy(
                                             fontWeight = FontWeight.Medium,
-                                            color = if (isSearching) EncoreTheme.colors.textSecondary else Color(0xFF757575)
+                                            color = if (isSearching) EncoreColors.TextSecondary else Color(0xFF757575)
                                         )
                                     )
                                 }
@@ -530,7 +530,7 @@ fun EncoreSearchScreen(
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_x_24),
                                     contentDescription = "Clear search",
-                                    tint = EncoreTheme.colors.textSecondary,
+                                    tint = EncoreColors.TextSecondary,
                                     modifier = Modifier
                                         .size(24.dp)
                                         .clickable {
@@ -545,7 +545,7 @@ fun EncoreSearchScreen(
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_mic_24),
                                     contentDescription = "Voice search",
-                                    tint = EncoreTheme.colors.textSecondary,
+                                    tint = EncoreColors.TextSecondary,
                                     modifier = Modifier
                                         .size(22.dp)
                                         .clickable {
@@ -596,7 +596,7 @@ fun EncoreSearchScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(EncoreTheme.colors.background),
+                    .background(EncoreColors.Background),
                 contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding)
             ) {
                 item {
@@ -604,7 +604,7 @@ fun EncoreSearchScreen(
                         text = "Recent searches",
                         style = EncoreTheme.typography.headlineLarge.copy(fontSize = 18.sp),
                         fontWeight = FontWeight.Bold,
-                        color = EncoreTheme.colors.textPrimary,
+                        color = EncoreColors.TextPrimary,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -655,7 +655,7 @@ fun EncoreSearchScreen(
                             Text(
                                 text = searchItem.title,
                                 style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = EncoreTheme.colors.textPrimary,
+                                color = EncoreColors.TextPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -663,7 +663,7 @@ fun EncoreSearchScreen(
                             Text(
                                 text = searchItem.subtitle,
                                 style = EncoreTheme.typography.bodySmall,
-                                color = EncoreTheme.colors.textSecondary,
+                                color = EncoreColors.TextSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -681,7 +681,7 @@ fun EncoreSearchScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_x_24),
                                 contentDescription = "Remove from recent searches",
-                                tint = EncoreTheme.colors.textSecondary,
+                                tint = EncoreColors.TextSecondary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -714,7 +714,7 @@ fun EncoreSearchScreen(
                                 Text(
                                     text = "Clear recent searches",
                                     style = EncoreTheme.typography.bodySmallBold.copy(
-                                        color = EncoreTheme.colors.textPrimary,
+                                        color = EncoreColors.TextPrimary,
                                         fontSize = 12.sp
                                     )
                                 )
@@ -730,7 +730,7 @@ fun EncoreSearchScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(EncoreTheme.colors.background),
+                    .background(EncoreColors.Background),
                 contentPadding = PaddingValues(top = 4.dp, bottom = bottomPadding)
             ) {
                 items(dropHits, key = { it.uri.ifBlank { it.title } }) { hit ->
@@ -759,7 +759,7 @@ fun EncoreSearchScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_search_24),
                                 contentDescription = null,
-                                tint = EncoreTheme.colors.textSecondary,
+                                tint = EncoreColors.TextSecondary,
                                 modifier = Modifier.size(24.dp)
                             )
                         } else {
@@ -770,7 +770,7 @@ fun EncoreSearchScreen(
                             Text(
                                 text = hit.title,
                                 style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = EncoreTheme.colors.textPrimary,
+                                color = EncoreColors.TextPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -778,7 +778,7 @@ fun EncoreSearchScreen(
                                 Text(
                                     text = hit.subtitle,
                                     style = EncoreTheme.typography.bodySmall,
-                                    color = EncoreTheme.colors.textSecondary,
+                                    color = EncoreColors.TextSecondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -793,7 +793,7 @@ fun EncoreSearchScreen(
                                 onClick = { onToggleSaved(hit.uri, hit.saved) },
                                 size = 36.dp,
                                 iconSize = 20.dp,
-                                tint = if (hit.saved) EncoreColors.Green else EncoreTheme.colors.textSecondary
+                                tint = if (hit.saved) EncoreColors.Green else EncoreColors.TextSecondary
                             )
                         }
                     }
@@ -826,7 +826,7 @@ fun EncoreSearchScreen(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_cloud_off_24),
                             contentDescription = null,
-                            tint = EncoreTheme.colors.textSecondary,
+                            tint = EncoreColors.TextSecondary,
                             modifier = Modifier.size(32.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -838,7 +838,7 @@ fun EncoreSearchScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Check your internet connection and try again.",
-                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -863,7 +863,7 @@ fun EncoreSearchScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Try searching again using a different spelling or keyword.",
-                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                             textAlign = TextAlign.Center
                         )
                     }
@@ -910,7 +910,7 @@ fun EncoreSearchScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(EncoreTheme.colors.card)
+                                        .background(EncoreColors.Card)
                                         .clickable { openTopResult() }
                                         .padding(16.dp)
                                 ) {
@@ -952,12 +952,12 @@ fun EncoreSearchScreen(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
                                                 text = topLabel,
-                                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textSecondary)
+                                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary)
                                             )
                                             if (top.artist.isNotBlank() && !top.artist.equals(topLabel, ignoreCase = true)) {
                                                 Text(
                                                     text = " • ${top.artist}",
-                                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -1240,12 +1240,12 @@ fun EncoreSearchScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (loading || !sectionExhausted) {
-                                        InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
+                                        InlineLoadingDots(color = EncoreColors.TextSecondary)
                                     } else {
                                         Text(
                                             text = "No ${kindLabel(tabKind)} found for \"$searchQuery\"",
                                             style = EncoreTheme.typography.bodyMedium.copy(
-                                                color = EncoreTheme.colors.textSecondary
+                                                color = EncoreColors.TextSecondary
                                             ),
                                             textAlign = TextAlign.Center
                                         )
@@ -1265,7 +1265,7 @@ fun EncoreSearchScreen(
                                         .height(56.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
+                                    InlineLoadingDots(color = EncoreColors.TextSecondary)
                                 }
                             }
                         }
@@ -1306,11 +1306,11 @@ fun EncoreSearchScreen(
                                 Text(
                                     text = "Couldn't load categories",
                                     style = EncoreTheme.typography.bodyMedium.copy(
-                                        color = EncoreTheme.colors.textSecondary
+                                        color = EncoreColors.TextSecondary
                                     )
                                 )
                             } else {
-                                InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
+                                InlineLoadingDots(color = EncoreColors.TextSecondary)
                             }
                         }
                     }
@@ -1410,7 +1410,7 @@ private fun SearchTrackRow(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(EncoreTheme.colors.card),
+                .background(EncoreColors.Card),
             contentAlignment = Alignment.Center
         ) {
             if (track.imageUrl != null) {
@@ -1424,7 +1424,7 @@ private fun SearchTrackRow(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_track_24),
                     contentDescription = null,
-                    tint = EncoreTheme.colors.textSecondary,
+                    tint = EncoreColors.TextSecondary,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -1448,7 +1448,7 @@ private fun SearchTrackRow(
                     text = track.title,
                     style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.SemiBold,
-                        color = if (isPlaying) EncoreColors.Green else EncoreTheme.colors.textPrimary
+                        color = if (isPlaying) EncoreColors.Green else EncoreColors.TextPrimary
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1463,7 +1463,7 @@ private fun SearchTrackRow(
                 }
                 Text(
                     text = "Song • ${track.artist}",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1478,7 +1478,7 @@ private fun SearchTrackRow(
             onClick = onLikeClick,
             size = 36.dp,
             iconSize = 20.dp,
-            tint = if (track.saved == true) EncoreColors.Green else EncoreTheme.colors.textSecondary
+            tint = if (track.saved == true) EncoreColors.Green else EncoreColors.TextSecondary
         )
 
         EncoreIconButton(
@@ -1521,7 +1521,7 @@ private fun ArtistRow(
                     cornerRadius = 26.dp
                 )
             } else {
-                Text(text = "★", color = EncoreTheme.colors.textPrimary, fontSize = 22.sp)
+                Text(text = "★", color = Color.White, fontSize = 22.sp)
             }
         }
         Spacer(modifier = Modifier.width(14.dp))
@@ -1535,13 +1535,13 @@ private fun ArtistRow(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "Artist",
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
         }
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(16.dp))
-                .background(if (isFollowing) EncoreColors.Green else EncoreTheme.colors.card)
+                .background(if (isFollowing) EncoreColors.Green else EncoreColors.Card)
                 .clickable {
                     isFollowing = !isFollowing
                     onFollowToggle()
@@ -1551,7 +1551,7 @@ private fun ArtistRow(
             Text(
                 text = if (isFollowing) "Following" else "Follow",
                 style = EncoreTheme.typography.bodySmallBold.copy(
-                    color = if (isFollowing) Color.Black else EncoreTheme.colors.textPrimary
+                    color = if (isFollowing) Color.Black else EncoreColors.TextPrimary
                 )
             )
         }
@@ -1586,7 +1586,7 @@ private fun AlbumRow(
                     cornerRadius = 4.dp
                 )
             } else {
-                Text(text = "♫", color = EncoreTheme.colors.textPrimary, fontSize = 22.sp)
+                Text(text = "♫", color = Color.White, fontSize = 22.sp)
             }
         }
         Spacer(modifier = Modifier.width(14.dp))
@@ -1600,7 +1600,7 @@ private fun AlbumRow(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = if (album.year.isBlank()) "Album • ${album.artist}" else "Album • ${album.year} • ${album.artist}",
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1644,7 +1644,7 @@ private fun PlaylistRow(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_playlist_24),
                     contentDescription = null,
-                    tint = EncoreTheme.colors.textPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -1660,7 +1660,7 @@ private fun PlaylistRow(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "Playlist • By ${playlist.creator}",
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1758,7 +1758,7 @@ private fun RecentSearchArtwork(item: SearchHistoryItem) {
             Icon(
                 painter = painterResource(id = item.kind.recentIconRes()),
                 contentDescription = null,
-                tint = EncoreTheme.colors.textPrimary,
+                tint = Color.White,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -1846,7 +1846,7 @@ private fun GenericHitRow(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = hit.subtitle,
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1927,7 +1927,7 @@ private fun PodcastRow(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_podcasts_24),
                     contentDescription = null,
-                    tint = EncoreTheme.colors.textPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -1943,7 +1943,7 @@ private fun PodcastRow(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "Podcast • ${podcast.publisher}",
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

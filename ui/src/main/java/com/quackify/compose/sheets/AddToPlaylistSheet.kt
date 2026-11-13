@@ -197,14 +197,14 @@ fun AddToPlaylistSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreTheme.colors.card,
+        containerColor = EncoreColors.Card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(top = 10.dp, bottom = 4.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
+                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -225,7 +225,7 @@ fun AddToPlaylistSheet(
                     text = "Cancel",
                     style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = EncoreTheme.colors.textPrimary,
+                        color = EncoreColors.TextPrimary,
                         fontSize = 15.sp
                     ),
                     modifier = Modifier
@@ -237,7 +237,7 @@ fun AddToPlaylistSheet(
                     text = "Done",
                     style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = EncoreTheme.colors.textPrimary,
+                        color = EncoreColors.TextPrimary,
                         fontSize = 15.sp
                     ),
                     modifier = Modifier
@@ -259,7 +259,7 @@ fun AddToPlaylistSheet(
                     style = EncoreTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
-                        color = EncoreTheme.colors.textPrimary
+                        color = EncoreColors.TextPrimary
                     )
                 )
 
@@ -293,7 +293,7 @@ fun AddToPlaylistSheet(
                         .height(180.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
+                    InlineLoadingDots(color = EncoreColors.TextSecondary)
                 }
 
                 else -> LazyColumn(
@@ -314,14 +314,14 @@ fun AddToPlaylistSheet(
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_chevron_left_24),
                                     contentDescription = null,
-                                    tint = EncoreTheme.colors.textSecondary,
+                                    tint = EncoreColors.TextSecondary,
                                     modifier = Modifier.size(22.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = parentName?.let { "Back to $it" } ?: "Back to your playlists",
                                     style = EncoreTheme.typography.bodyMedium.copy(
-                                        color = EncoreTheme.colors.textSecondary,
+                                        color = EncoreColors.TextSecondary,
                                         fontWeight = FontWeight.Medium
                                     ),
                                     maxLines = 1,
@@ -340,7 +340,7 @@ fun AddToPlaylistSheet(
                                     else -> "No playlists you can add to"
                                 },
                                 style = EncoreTheme.typography.bodyMedium.copy(
-                                    color = EncoreTheme.colors.textSecondary
+                                    color = EncoreColors.TextSecondary
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -384,7 +384,7 @@ fun AddToPlaylistSheet(
                                     Icon(
                                         painter = painterResource(id = R.drawable.encore_icon_plus_24),
                                         contentDescription = "New playlist",
-                                        tint = EncoreTheme.colors.textSecondary,
+                                        tint = EncoreColors.TextSecondary,
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
@@ -394,7 +394,7 @@ fun AddToPlaylistSheet(
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Medium
                                     ),
-                                    color = EncoreTheme.colors.textPrimary,
+                                    color = EncoreColors.TextPrimary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f)
@@ -445,7 +445,7 @@ private fun AddToPlaylistSearchBox(
             .fillMaxWidth()
             .height(44.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(EncoreTheme.colors.background)
+            .background(EncoreColors.Background)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -453,7 +453,7 @@ private fun AddToPlaylistSearchBox(
         Icon(
             painter = painterResource(id = R.drawable.encore_icon_search_24),
             contentDescription = null,
-            tint = EncoreTheme.colors.textSecondary,
+            tint = EncoreColors.TextSecondary,
             modifier = Modifier.size(20.dp)
         )
         BasicTextField(
@@ -461,10 +461,10 @@ private fun AddToPlaylistSearchBox(
             onValueChange = onQueryChange,
             singleLine = true,
             textStyle = EncoreTheme.typography.bodyMedium.copy(
-                color = EncoreTheme.colors.textPrimary,
+                color = EncoreColors.TextPrimary,
                 fontSize = 15.sp
             ),
-            cursorBrush = SolidColor(EncoreTheme.colors.textPrimary),
+            cursorBrush = SolidColor(EncoreColors.TextPrimary),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             modifier = Modifier.weight(1f),
             decorationBox = { field ->
@@ -476,7 +476,7 @@ private fun AddToPlaylistSearchBox(
                         Text(
                             text = "Search",
                             style = EncoreTheme.typography.bodyMedium.copy(
-                                color = EncoreTheme.colors.textSecondary,
+                                color = EncoreColors.TextSecondary,
                                 fontSize = 15.sp
                             )
                         )
@@ -489,7 +489,7 @@ private fun AddToPlaylistSearchBox(
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_x_24),
                 contentDescription = "Clear search",
-                tint = EncoreTheme.colors.textSecondary,
+                tint = EncoreColors.TextSecondary,
                 modifier = Modifier
                     .size(20.dp)
                     .clip(CircleShape)
@@ -532,7 +532,7 @@ private fun AddToPlaylistRow(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_heart_active_24),
                     contentDescription = choice.name,
-                    tint = EncoreTheme.colors.textPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -552,7 +552,7 @@ private fun AddToPlaylistRow(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
                 ),
-                color = EncoreTheme.colors.textPrimary,
+                color = EncoreColors.TextPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -561,7 +561,7 @@ private fun AddToPlaylistRow(
                 Text(
                     text = "$songCount song" + if (songCount == 1) "" else "s",
                     style = EncoreTheme.typography.bodySmall.copy(
-                        color = EncoreTheme.colors.textSecondary,
+                        color = EncoreColors.TextSecondary,
                         fontSize = 13.sp
                     ),
                     maxLines = 1
@@ -590,7 +590,7 @@ private fun AddToPlaylistRow(
                     .size(24.dp)
                     .clip(CircleShape)
                     .border(
-                        BorderStroke(1.5.dp, EncoreTheme.colors.textSecondary.copy(alpha = 0.65f)),
+                        BorderStroke(1.5.dp, EncoreColors.TextSecondary.copy(alpha = 0.65f)),
                         CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -598,7 +598,7 @@ private fun AddToPlaylistRow(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_plus_24),
                     contentDescription = "Save in ${choice.name}",
-                    tint = EncoreTheme.colors.textSecondary,
+                    tint = EncoreColors.TextSecondary,
                     modifier = Modifier.size(13.dp)
                 )
             }
@@ -630,7 +630,7 @@ private fun AddToFolderRow(
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_folder_24),
                 contentDescription = null,
-                tint = EncoreTheme.colors.textSecondary,
+                tint = EncoreColors.TextSecondary,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -640,7 +640,7 @@ private fun AddToFolderRow(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium
             ),
-            color = EncoreTheme.colors.textPrimary,
+            color = EncoreColors.TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
@@ -648,7 +648,7 @@ private fun AddToFolderRow(
         Icon(
             painter = painterResource(id = R.drawable.encore_icon_chevron_right_24),
             contentDescription = "Open ${folder.name}",
-            tint = EncoreTheme.colors.textSecondary,
+            tint = EncoreColors.TextSecondary,
             modifier = Modifier.size(18.dp)
         )
     }

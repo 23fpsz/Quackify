@@ -63,14 +63,14 @@ fun AccountsSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreTheme.colors.card,
+        containerColor = EncoreColors.Card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
+                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -128,7 +128,7 @@ fun AccountsSheet(
                             Text(
                                 text = account.email,
                                 style = EncoreTheme.typography.bodySmall.copy(
-                                    color = EncoreTheme.colors.textSecondary
+                                    color = EncoreColors.TextSecondary
                                 )
                             )
                         } else if (isActive) {
@@ -136,7 +136,7 @@ fun AccountsSheet(
                             Text(
                                 text = "Current account",
                                 style = EncoreTheme.typography.bodySmall.copy(
-                                    color = EncoreTheme.colors.textSecondary
+                                    color = EncoreColors.TextSecondary
                                 )
                             )
                         }
@@ -158,7 +158,7 @@ fun AccountsSheet(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_trash_24),
                             contentDescription = "Delete ${account.name}",
-                            tint = EncoreTheme.colors.textSecondary,
+                            tint = EncoreColors.TextSecondary,
                             modifier = Modifier
                                 .size(22.dp)
                                 .clip(RoundedCornerShape(999.dp))
@@ -190,7 +190,7 @@ fun AccountsSheet(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_plus_24),
                     contentDescription = null,
-                    tint = EncoreTheme.colors.textPrimary,
+                    tint = EncoreColors.TextPrimary,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(16.dp))

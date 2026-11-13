@@ -117,7 +117,7 @@ fun EncoreCreateNameDialog(
                     style = EncoreTheme.typography.titleLarge.copy(
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        color = EncoreTheme.colors.textPrimary,
+                        color = Color.White,
                         textAlign = TextAlign.Center
                     ),
                     modifier = Modifier.padding(horizontal = 16.dp)
@@ -138,7 +138,7 @@ fun EncoreCreateNameDialog(
                         textStyle = EncoreTheme.typography.headlineMedium.copy(
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
-                            color = EncoreTheme.colors.textPrimary,
+                            color = Color.White,
                             textAlign = TextAlign.Center
                         ),
                         singleLine = true,
@@ -184,7 +184,7 @@ fun EncoreCreateNameDialog(
                             text = cancelLabel,
                             style = EncoreTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = EncoreTheme.colors.textPrimary,
+                                color = Color.White,
                                 fontSize = 14.sp
                             )
                         )

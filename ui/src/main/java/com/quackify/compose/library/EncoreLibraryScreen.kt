@@ -175,7 +175,7 @@ fun EncoreLibraryScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.background)
+            .background(EncoreColors.Background)
             .statusBarsPadding()
     ) {
         Column(
@@ -199,7 +199,7 @@ fun EncoreLibraryScreen(
                         },
                         size = 40.dp,
                         iconSize = 24.dp,
-                        tint = EncoreTheme.colors.textPrimary
+                        tint = EncoreColors.TextPrimary
                     )
 
                     Spacer(modifier = Modifier.width(4.dp))
@@ -263,7 +263,7 @@ fun EncoreLibraryScreen(
                         onClick = { onBackClick?.invoke() },
                         size = 40.dp,
                         iconSize = 24.dp,
-                        tint = EncoreTheme.colors.textPrimary
+                        tint = EncoreColors.TextPrimary
                     )
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -273,7 +273,7 @@ fun EncoreLibraryScreen(
                         style = EncoreTheme.typography.titleMedium.copy(
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = EncoreTheme.colors.textPrimary
+                            color = EncoreColors.TextPrimary
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -286,7 +286,7 @@ fun EncoreLibraryScreen(
                         onClick = { onFolderOptionsClick?.invoke() },
                         size = 40.dp,
                         iconSize = 22.dp,
-                        tint = EncoreTheme.colors.textPrimary
+                        tint = EncoreColors.TextPrimary
                     )
 
                     EncoreIconButton(
@@ -295,7 +295,7 @@ fun EncoreLibraryScreen(
                         onClick = onPlusClick,
                         size = 40.dp,
                         iconSize = 24.dp,
-                        tint = EncoreTheme.colors.textPrimary
+                        tint = EncoreColors.TextPrimary
                     )
 
                     EncoreIconButton(
@@ -327,7 +327,7 @@ fun EncoreLibraryScreen(
                         style = EncoreTheme.typography.titleMedium.copy(
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = EncoreTheme.colors.textPrimary
+                            color = EncoreColors.TextPrimary
                         ),
                         modifier = Modifier.weight(1f)
                     )
@@ -338,7 +338,7 @@ fun EncoreLibraryScreen(
                         onClick = { isSearchActive = true },
                         size = 40.dp,
                         iconSize = 24.dp,
-                        tint = EncoreTheme.colors.textPrimary
+                        tint = EncoreColors.TextPrimary
                     )
 
                     EncoreIconButton(
@@ -347,7 +347,7 @@ fun EncoreLibraryScreen(
                         onClick = onPlusClick,
                         size = 40.dp,
                         iconSize = 24.dp,
-                        tint = EncoreTheme.colors.textPrimary
+                        tint = EncoreColors.TextPrimary
                     )
                 }
             }
@@ -390,13 +390,13 @@ fun EncoreLibraryScreen(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_sort_24),
                             contentDescription = "Sort order",
-                            tint = EncoreTheme.colors.textPrimary,
+                            tint = EncoreColors.TextPrimary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = currentSort.displayName,
-                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textPrimary)
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
                         )
                         if (currentSort.reversible) {
                             Spacer(modifier = Modifier.width(4.dp))
@@ -409,7 +409,7 @@ fun EncoreLibraryScreen(
                                     }
                                 ),
                                 contentDescription = if (sortDirection == SortDirection.ASCENDING) "Sorted ascending" else "Sorted descending",
-                                tint = EncoreTheme.colors.textPrimary,
+                                tint = EncoreColors.TextPrimary,
                                 modifier = Modifier.size(12.dp)
                             )
                         }
@@ -419,7 +419,7 @@ fun EncoreLibraryScreen(
                         iconRes = if (isGridView) R.drawable.encore_icon_list_view_24 else R.drawable.encore_icon_grid_view_24,
                         contentDescription = if (isGridView) "List view" else "Grid view",
                         onClick = { isGridView = !isGridView },
-                        tint = EncoreTheme.colors.textPrimary,
+                        tint = EncoreColors.TextPrimary,
                         size = 32.dp,
                         iconSize = 18.dp
                     )
@@ -464,7 +464,7 @@ fun EncoreLibraryScreen(
                         Text(
                             text = "Add playlists from Your Library.",
                             style = EncoreTheme.typography.bodyMedium.copy(
-                                color = EncoreTheme.colors.textSecondary,
+                                color = EncoreColors.TextSecondary,
                                 fontSize = 14.sp
                             ),
                             textAlign = TextAlign.Center
@@ -488,7 +488,7 @@ fun EncoreLibraryScreen(
                             } else {
                                 "Search everything you've saved, followed, or created."
                             },
-                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary)
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                         )
                     }
                 }
@@ -540,14 +540,14 @@ fun EncoreLibraryScreen(
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_heart_active_24),
                                     contentDescription = null,
-                                    tint = EncoreTheme.colors.textPrimary,
+                                    tint = Color.White,
                                     modifier = Modifier.size(28.dp)
                                 )
                             } else if (item.type == LibraryItemType.FOLDER) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_folder_24),
                                     contentDescription = null,
-                                    tint = EncoreTheme.colors.textPrimary,
+                                    tint = Color.White,
                                     modifier = Modifier.size(32.dp)
                                 )
                             } else {
@@ -576,7 +576,7 @@ fun EncoreLibraryScreen(
                         Text(
                             text = item.subtitle,
                             style = EncoreTheme.typography.bodySmall.copy(
-                                color = EncoreTheme.colors.textSecondary,
+                                color = EncoreColors.TextSecondary,
                                 fontSize = 11.sp
                             ),
                             maxLines = 1,
@@ -628,14 +628,14 @@ fun EncoreLibraryScreen(
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_heart_active_24),
                                     contentDescription = null,
-                                    tint = EncoreTheme.colors.textPrimary,
+                                    tint = Color.White,
                                     modifier = Modifier.size(24.dp)
                                 )
                             } else if (item.type == LibraryItemType.FOLDER) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.encore_icon_folder_24),
                                     contentDescription = null,
-                                    tint = EncoreTheme.colors.textPrimary,
+                                    tint = Color.White,
                                     modifier = Modifier.size(28.dp)
                                 )
                             } else {
@@ -685,7 +685,7 @@ fun EncoreLibraryScreen(
                                 }
                                 Text(
                                     text = item.subtitle,
-                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

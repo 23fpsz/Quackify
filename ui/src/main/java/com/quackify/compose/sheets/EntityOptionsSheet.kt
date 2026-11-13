@@ -71,14 +71,14 @@ fun EntityOptionsSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreTheme.colors.card,
+        containerColor = EncoreColors.Card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
+                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -107,7 +107,7 @@ fun EntityOptionsSheet(
                     if (entity.subtitle.isNotBlank()) {
                         Text(
                             text = entity.subtitle,
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -264,7 +264,7 @@ private fun EntityRow(
         Icon(
             painter = painterResource(id = iconRes),
             contentDescription = title,
-            tint = EncoreTheme.colors.textPrimary,
+            tint = EncoreColors.TextPrimary,
             modifier = Modifier.size(22.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))

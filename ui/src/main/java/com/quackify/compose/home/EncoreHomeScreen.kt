@@ -134,10 +134,9 @@ fun EncoreHomeScreen(
     }
 
     val tintSeed = quickItems.firstOrNull()?.coverColor
-    val schemeBackground = EncoreTheme.colors.background
-    val resolvedTint = remember(tintSeed, schemeBackground) {
+    val resolvedTint = remember(tintSeed) {
         if (tintSeed == null) {
-            schemeBackground
+            EncoreColors.Background
         } else {
             Color(
                 red = tintSeed.red * TINT_WEIGHT + SURFACE_RED * (1f - TINT_WEIGHT),
@@ -147,12 +146,12 @@ fun EncoreHomeScreen(
         }
     }
     val heroTint by rememberSmoothColor(target = resolvedTint)
-    val heroBackdropBrush = remember(heroTint, schemeBackground) {
+    val heroBackdropBrush = remember(heroTint) {
         Brush.verticalGradient(
             0f to heroTint,
             HEADER_HOLD to heroTint,
-            0.55f to schemeBackground,
-            1f to schemeBackground
+            0.55f to EncoreColors.Background,
+            1f to EncoreColors.Background
         )
     }
 
@@ -242,7 +241,7 @@ fun EncoreHomeScreen(
                         style = EncoreTheme.typography.headlineMedium.copy(
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
-                            color = EncoreTheme.colors.textPrimary
+                            color = EncoreColors.TextPrimary
                         )
                     )
 
@@ -287,7 +286,7 @@ fun EncoreHomeScreen(
                     ) {
                         Text(
                             text = "Couldn't load your feed",
-                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary)
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                         )
                     }
                 }
@@ -359,13 +358,13 @@ private fun QuickAccessCard(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_heart_active_24),
                         contentDescription = null,
-                        tint = EncoreTheme.colors.textPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 } else {
                     Text(
                         text = "♫",
-                        color = EncoreTheme.colors.textPrimary,
+                        color = Color.White,
                         fontSize = 20.sp
                     )
                 }
@@ -448,7 +447,7 @@ private fun SectionHeading(
                 style = EncoreTheme.typography.titleLarge.copy(
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = EncoreTheme.colors.textPrimary
+                    color = EncoreColors.TextPrimary
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -459,7 +458,7 @@ private fun SectionHeading(
                     text = subtitle,
                     style = EncoreTheme.typography.marginal.copy(
                         fontSize = 12.sp,
-                        color = EncoreTheme.colors.textSecondary
+                        color = EncoreColors.TextSecondary
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -471,7 +470,7 @@ private fun SectionHeading(
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_chevron_right_24),
                 contentDescription = "See all $title",
-                tint = EncoreTheme.colors.textSecondary,
+                tint = EncoreColors.TextSecondary,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -564,7 +563,7 @@ private fun ShelfSection(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = card.title,
-                        style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textPrimary),
+                        style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -573,7 +572,7 @@ private fun ShelfSection(
                         text = card.subtitle,
                         style = EncoreTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
-                            color = EncoreTheme.colors.textSecondary
+                            color = EncoreColors.TextSecondary
                         ),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -626,7 +625,7 @@ private fun ArtistShelfSection(
                         } else {
                             Text(
                                 text = "★",
-                                color = EncoreTheme.colors.textPrimary,
+                                color = Color.White,
                                 fontSize = 38.sp
                             )
                         }
@@ -641,7 +640,7 @@ private fun ArtistShelfSection(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Artist",
-                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                     )
                 }
             }
@@ -688,7 +687,7 @@ private fun BaselineGridSection(
                             text = card.caption,
                             style = EncoreTheme.typography.bodySmall.copy(
                                 fontSize = 11.sp,
-                                color = EncoreTheme.colors.textSecondary
+                                color = EncoreColors.TextSecondary
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -699,7 +698,7 @@ private fun BaselineGridSection(
                         text = card.title,
                         style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = EncoreTheme.colors.textPrimary
+                            color = EncoreColors.TextPrimary
                         ),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -710,7 +709,7 @@ private fun BaselineGridSection(
                             text = card.subtitle,
                             style = EncoreTheme.typography.bodySmall.copy(
                                 fontSize = 12.sp,
-                                color = EncoreTheme.colors.textSecondary
+                                color = EncoreColors.TextSecondary
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis

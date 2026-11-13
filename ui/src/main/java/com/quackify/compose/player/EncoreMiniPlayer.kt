@@ -216,7 +216,7 @@ fun EncoreMiniPlayer(
                                 text = title,
                                 style = EncoreTheme.typography.bodySmallBold.copy(
                                     fontWeight = FontWeight.SemiBold,
-                                    color = EncoreTheme.colors.textPrimary
+                                    color = EncoreColors.TextPrimary
                                 ),
                                 maxLines = 1,
                                 overflow = TextOverflow.Clip,
@@ -259,7 +259,7 @@ fun EncoreMiniPlayer(
                                     Text(
                                         text = artist,
                                         style = EncoreTheme.typography.marginal.copy(
-                                            color = EncoreTheme.colors.textSecondary
+                                            color = EncoreColors.TextSecondary
                                         ),
                                         maxLines = 1,
                                         overflow = TextOverflow.Clip
@@ -300,7 +300,7 @@ fun EncoreMiniPlayer(
                     onClick = if (hasTrack) onPlayPauseClick else ({}),
                     size = EncoreControlSizes.FloatingPlayerButtonSize,
                     iconSize = 24.dp,
-                    tint = if (hasTrack) EncoreTheme.colors.textPrimary else EncoreTheme.colors.textSecondary,
+                    tint = if (hasTrack) EncoreColors.TextPrimary else EncoreColors.TextSecondary,
                     isLoading = isBuffering,
                     modifier = Modifier.padding(end = 4.dp)
                 )
@@ -311,8 +311,8 @@ fun EncoreMiniPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp),
-                color = EncoreTheme.colors.textPrimary,
-                trackColor = EncoreTheme.colors.progressBarBackground
+                color = EncoreColors.TextPrimary,
+                trackColor = EncoreColors.ProgressBarBackground
             )
         }
     }

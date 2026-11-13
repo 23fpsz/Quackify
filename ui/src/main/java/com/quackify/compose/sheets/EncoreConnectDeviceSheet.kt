@@ -91,8 +91,8 @@ fun EncoreConnectDeviceSheet(
         onDismissRequest = onDismissRequest,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreTheme.colors.card,
-        contentColor = EncoreTheme.colors.textPrimary,
+        containerColor = EncoreColors.Card,
+        contentColor = EncoreColors.TextPrimary,
         shape = RoundedCornerShape(topStart = EncoreCornerRadii.Larger3, topEnd = EncoreCornerRadii.Larger3),
         dragHandle = null,
         modifier = modifier
@@ -119,7 +119,7 @@ fun EncoreConnectDeviceSheet(
                     iconRes = R.drawable.encore_icon_x_24,
                     contentDescription = "Close",
                     onClick = onDismissRequest,
-                    tint = EncoreTheme.colors.textPrimary,
+                    tint = EncoreColors.TextPrimary,
                     size = 36.dp,
                     iconSize = 20.dp
                 )
@@ -164,7 +164,7 @@ fun EncoreConnectDeviceSheet(
                             )
                             Text(
                                 text = currentDeviceName,
-                                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreTheme.colors.textPrimary)
+                                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary)
                             )
                         }
 
@@ -186,7 +186,7 @@ fun EncoreConnectDeviceSheet(
                                 id = if (volume == 0f) R.drawable.encore_icon_volume_off_24 else R.drawable.encore_icon_volume_24
                             ),
                             contentDescription = "Volume",
-                            tint = if (volumeEnabled) EncoreColors.Green else EncoreTheme.colors.textDisabled,
+                            tint = if (volumeEnabled) EncoreColors.Green else EncoreColors.TextDisabled,
                             modifier = Modifier.size(20.dp)
                         )
 
@@ -204,9 +204,9 @@ fun EncoreConnectDeviceSheet(
                             enabled = volumeEnabled,
                             modifier = Modifier.weight(1f),
                             colors = SliderDefaults.colors(
-                                thumbColor = EncoreTheme.colors.textPrimary,
+                                thumbColor = EncoreColors.TextPrimary,
                                 activeTrackColor = EncoreColors.Green,
-                                inactiveTrackColor = EncoreTheme.colors.divider
+                                inactiveTrackColor = EncoreColors.Divider
                             )
                         )
                     }
@@ -217,7 +217,7 @@ fun EncoreConnectDeviceSheet(
 
             Text(
                 text = "Select another device",
-                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textSecondary),
+                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                 modifier = Modifier.padding(horizontal = EncoreSpacers.Base)
             )
 
@@ -261,7 +261,7 @@ private fun DeviceRow(
         Icon(
             painter = painterResource(id = iconRes),
             contentDescription = device.name,
-            tint = EncoreTheme.colors.textSecondary,
+            tint = EncoreColors.TextSecondary,
             modifier = Modifier.size(26.dp)
         )
 
@@ -270,12 +270,12 @@ private fun DeviceRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = device.name,
-                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreTheme.colors.textPrimary)
+                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary)
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = device.protocol,
-                style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
+                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
             )
         }
     }

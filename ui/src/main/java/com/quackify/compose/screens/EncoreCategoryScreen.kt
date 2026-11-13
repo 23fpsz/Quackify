@@ -154,7 +154,7 @@ fun EncoreCategoryScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.canvas)
+            .background(EncoreColors.PureBlack)
     ) {
         Box(
             modifier = Modifier
@@ -209,7 +209,7 @@ fun EncoreCategoryScreen(
                             text = shelf.subtitle,
                             style = EncoreTheme.typography.bodySmall.copy(
                                 fontSize = 13.sp,
-                                color = EncoreTheme.colors.textSecondary
+                                color = EncoreColors.TextSecondary
                             ),
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
                         )
@@ -282,7 +282,7 @@ fun EncoreCategoryScreen(
                                     text = item.title,
                                     style = EncoreTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = EncoreTheme.colors.textPrimary,
+                                        color = EncoreColors.TextPrimary,
                                         fontSize = 14.sp
                                     ),
                                     maxLines = 1,
@@ -295,7 +295,7 @@ fun EncoreCategoryScreen(
                                     text = item.subtitle,
                                     style = EncoreTheme.typography.bodySmall.copy(
                                         fontSize = 12.sp,
-                                        color = EncoreTheme.colors.textSecondary,
+                                        color = EncoreColors.TextSecondary,
                                         lineHeight = 16.sp
                                     ),
                                     maxLines = 2,
@@ -347,7 +347,7 @@ fun EncoreCategoryScreen(
                                     text = sub.title,
                                     style = EncoreTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = EncoreTheme.colors.textPrimary,
+                                        color = Color.White,
                                         fontSize = 15.sp
                                     ),
                                     modifier = Modifier.align(Alignment.TopStart)
@@ -388,7 +388,7 @@ fun EncoreCategoryScreen(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
                     contentDescription = "Back",
-                    tint = EncoreTheme.colors.textPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
             }

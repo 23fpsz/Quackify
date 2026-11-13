@@ -3,8 +3,6 @@ package com.quackify.compose.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
@@ -29,30 +27,17 @@ object EncoreTheme {
 fun EncoreAppTheme(
     content: @Composable () -> Unit
 ) {
-    val dark = isSystemInDarkTheme()
-    val colors = if (dark) EncoreColorScheme() else EncoreColorScheme.light()
-    val typography = if (dark) EncoreTypography()
-    else EncoreTypography(ink = EncoreColors.TextPrimaryLight, inkSecondary = EncoreColors.TextSecondaryLight)
+    val colors = EncoreColorScheme()
+    val typography = EncoreTypography()
 
-    val materialColorScheme = if (dark) {
-        darkColorScheme(
-            primary = EncoreColors.Green,
-            onPrimary = EncoreColors.PureBlack,
-            background = EncoreTheme.colors.background,
-            surface = EncoreTheme.colors.surface,
-            onBackground = EncoreTheme.colors.textPrimary,
-            onSurface = EncoreTheme.colors.textPrimary
-        )
-    } else {
-        lightColorScheme(
-            primary = EncoreColors.GreenDark,
-            onPrimary = Color.White,
-            background = EncoreColors.BackgroundLight,
-            surface = EncoreColors.SurfaceLight,
-            onBackground = EncoreColors.TextPrimaryLight,
-            onSurface = EncoreColors.TextPrimaryLight
-        )
-    }
+    val materialColorScheme = darkColorScheme(
+        primary = EncoreColors.Green,
+        onPrimary = EncoreColors.PureBlack,
+        background = EncoreColors.Background,
+        surface = EncoreColors.Surface,
+        onBackground = EncoreColors.TextPrimary,
+        onSurface = EncoreColors.TextPrimary
+    )
 
     CompositionLocalProvider(
         LocalEncoreColors provides colors,

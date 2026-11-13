@@ -184,11 +184,11 @@ fun EncoreArtistScreen(
     val circleBtnAlpha = ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f)
 
     val followBorderColor by animateColorAsState(
-        targetValue = if (isFollowing) EncoreColors.Green else EncoreTheme.colors.textSecondary,
+        targetValue = if (isFollowing) EncoreColors.Green else EncoreColors.TextSecondary,
         label = "followBorder"
     )
     val followTextColor by animateColorAsState(
-        targetValue = if (isFollowing) EncoreColors.Green else EncoreTheme.colors.textPrimary,
+        targetValue = if (isFollowing) EncoreColors.Green else EncoreColors.TextPrimary,
         label = "followText"
     )
 
@@ -285,7 +285,7 @@ fun EncoreArtistScreen(
                         Text(
                             text = artistName,
                             style = EncoreTheme.typography.headlineLarge.copy(
-                                color = EncoreTheme.colors.textPrimary,
+                                color = Color.White,
                                 fontSize = 44.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = (-1).sp,
@@ -309,7 +309,7 @@ fun EncoreArtistScreen(
                                 Text(
                                     text = "Verified Artist",
                                     style = EncoreTheme.typography.bodySmall.copy(
-                                        color = EncoreTheme.colors.textPrimary,
+                                        color = Color.White,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
@@ -383,7 +383,7 @@ fun EncoreArtistScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_more_android_24),
                                 contentDescription = "Artist options",
-                                tint = EncoreTheme.colors.textSecondary,
+                                tint = EncoreColors.TextSecondary,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -403,7 +403,7 @@ fun EncoreArtistScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_shuffle_24),
                                 contentDescription = "Shuffle artist",
-                                tint = if (isShuffle) EncoreColors.Green else EncoreTheme.colors.textSecondary,
+                                tint = if (isShuffle) EncoreColors.Green else EncoreColors.TextSecondary,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -463,7 +463,7 @@ fun EncoreArtistScreen(
                                 text = "${index + 1}",
                                 style = EncoreTheme.typography.bodySmall.copy(
                                     fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isCurrentTrack) EncoreColors.Green else EncoreTheme.colors.textSecondary
+                                    color = if (isCurrentTrack) EncoreColors.Green else EncoreColors.TextSecondary
                                 )
                             )
                         }
@@ -484,7 +484,7 @@ fun EncoreArtistScreen(
                                 cornerRadius = 4.dp
                             )
                         } else {
-                            Text("♫", color = EncoreTheme.colors.textPrimary, fontSize = 16.sp)
+                            Text("♫", color = Color.White, fontSize = 16.sp)
                         }
                     }
 
@@ -505,7 +505,7 @@ fun EncoreArtistScreen(
                         if (popTrack.streamCount.isNotBlank()) {
                             Text(
                                 text = popTrack.streamCount,
-                                style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary),
+                                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
                                 maxLines = 1
                             )
                         }
@@ -515,7 +515,7 @@ fun EncoreArtistScreen(
                         iconRes = if (track.saved == true) R.drawable.encore_icon_heart_active_24 else R.drawable.encore_icon_heart_24,
                         contentDescription = if (track.saved == true) "Remove from Liked Songs" else "Add to Liked Songs",
                         onClick = { onTrackLikeToggle(track) },
-                        tint = if (track.saved == true) EncoreColors.Green else EncoreTheme.colors.textSecondary,
+                        tint = if (track.saved == true) EncoreColors.Green else EncoreColors.TextSecondary,
                         size = 32.dp,
                         iconSize = 18.dp
                     )
@@ -524,7 +524,7 @@ fun EncoreArtistScreen(
                         iconRes = R.drawable.encore_icon_more_android_24,
                         contentDescription = "Track options",
                         onClick = { onTrackOptionsClick(track) },
-                        tint = EncoreTheme.colors.textSecondary,
+                        tint = EncoreColors.TextSecondary,
                         size = 32.dp,
                         iconSize = 18.dp
                     )
@@ -556,7 +556,7 @@ fun EncoreArtistScreen(
                     Text(
                         text = "Discography",
                         style = EncoreTheme.typography.bodyMedium.copy(
-                            color = EncoreTheme.colors.textSecondary,
+                            color = EncoreColors.TextSecondary,
                             fontWeight = FontWeight.SemiBold
                         ),
                         modifier = Modifier.clickable { onDiscographyClick() }
@@ -640,14 +640,14 @@ fun EncoreArtistScreen(
                                     }
                                     Text(
                                         text = aboutStatLine,
-                                        style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
+                                        style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                                     )
                                 }
                                 if (topCities.isNotEmpty()) {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "Popular in " + topCities.take(3).joinToString(", ") { it.city },
-                                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -656,7 +656,7 @@ fun EncoreArtistScreen(
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = biography,
-                                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                                         maxLines = 3,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -726,7 +726,7 @@ fun EncoreArtistScreen(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
                     contentDescription = "Back",
-                    tint = EncoreTheme.colors.textPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -741,7 +741,7 @@ fun EncoreArtistScreen(
                     text = artistName,
                     style = EncoreTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = EncoreTheme.colors.textPrimary,
+                        color = Color.White,
                         fontSize = 17.sp
                     ),
                     maxLines = 1,
@@ -767,7 +767,7 @@ fun EncoreArtistScreen(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_more_android_24),
                         contentDescription = "Artist options",
-                        tint = EncoreTheme.colors.textPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -823,7 +823,7 @@ private fun ArtistReleaseCard(
                     cornerRadius = 4.dp
                 )
             } else {
-                Text("♫", color = EncoreTheme.colors.textPrimary, fontSize = 36.sp)
+                Text("♫", color = Color.White, fontSize = 36.sp)
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -839,7 +839,7 @@ private fun ArtistReleaseCard(
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = "${release.type} • ${release.year}",
-            style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
+            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
         )
     }
 }
