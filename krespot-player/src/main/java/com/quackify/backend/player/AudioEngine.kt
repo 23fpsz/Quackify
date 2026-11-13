@@ -171,6 +171,7 @@ internal class AudioEngine(
                     if (existing != null) return@DrmSessionManagerProvider existing
                     DefaultDrmSessionManager.Builder()
                         .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                        .setMultiSession(true)
                         .build(callback)
                         .also { cachedManager = it }
                 })
