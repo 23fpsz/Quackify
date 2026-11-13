@@ -268,6 +268,11 @@ internal class AudioEngine(
         applyVolume()
     }
 
+    fun retune(gainDb: Double) {
+        gainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
+        applyVolume()
+    }
+
     fun rate(mult: Float) {
         runOnMain { player?.playbackParameters = PlaybackParameters(mult.coerceIn(0.5f, 3.5f)) }
     }
