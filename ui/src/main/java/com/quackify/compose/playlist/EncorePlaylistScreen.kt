@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreExplicitTag
+import com.quackify.compose.components.EncoreFastScroll
 import com.quackify.compose.components.EncoreTrackRow
 import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.TrackListSkeleton
@@ -1171,6 +1172,13 @@ fun EncorePlaylistScreen(
                     }
                 }
             }
+
+            EncoreFastScroll(
+                listState = listState,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 2.dp),
+            )
 
             Box(
                 modifier = Modifier
