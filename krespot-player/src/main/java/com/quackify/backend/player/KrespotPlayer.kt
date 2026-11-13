@@ -466,6 +466,9 @@ class KrespotPlayer(private val context: Context) {
 
     val hasQueuedNext: Boolean get() = !videoActive && mp3 == null && (engine?.hasQueuedNext ?: false)
 
+    val currentUri: String
+        get() = engine?.currentUri ?: _state.value.trackUri
+
     fun play(
         track: CommandTrack,
         spclient: String,

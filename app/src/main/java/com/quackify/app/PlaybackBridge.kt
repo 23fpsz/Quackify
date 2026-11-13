@@ -3529,7 +3529,7 @@ class PlaybackBridge(private val context: Context) {
                 is PlayerEvent.Seeked -> scope.launch { publishLocalFromEngine(event.positionMs) }
                 is PlayerEvent.Ended -> {
                     val ended = event.uri.ifBlank { player.state.value.trackUri }
-                    if (gaplessEnabled() && player.hasQueuedNext) {
+                    if (gaplessEnabled() && player.currentUri != ended) {
                         log.i("player ended '$ended', the queued track takes over without a restart")
                         return
                     }
@@ -3643,7 +3643,7 @@ class PlaybackBridge(private val context: Context) {
                     val ended = event.uri.ifBlank {
                         command.currentTrack?.uri.orEmpty().ifBlank { player.state.value.trackUri }
                     }
-                    if (gaplessEnabled() && player.hasQueuedNext) {
+                    if (gaplessEnabled() && player.currentUri != ended) {
                         log.i("player ended '$ended', the queued track takes over without a restart")
                         return@launch
                     }
