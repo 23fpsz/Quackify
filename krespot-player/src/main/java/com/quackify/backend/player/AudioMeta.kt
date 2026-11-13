@@ -80,6 +80,8 @@ internal object AudioMeta {
         }
 
     private fun request(uris: List<String>): ByteArray = ByteArrayOutputStream(64 + uris.size * 48).apply {
+        write(0x0A)
+        write(0x00)
         uris.forEach { uri ->
             val query = ByteArrayOutputStream().apply {
                 write(0x08)
