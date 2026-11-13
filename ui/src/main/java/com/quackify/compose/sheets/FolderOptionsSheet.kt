@@ -108,7 +108,7 @@ fun FolderOptionsSheet(
                         text = folderTitle,
                         style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = EncoreTheme.colors.textPrimary,
+                            color = Color.White,
                             fontSize = 16.sp
                         ),
                         maxLines = 1
@@ -117,7 +117,7 @@ fun FolderOptionsSheet(
                     Text(
                         text = playlistSubtitle,
                         style = EncoreTheme.typography.bodySmall.copy(
-                            color = EncoreTheme.colors.textSecondary,
+                            color = EncoreColors.TextSecondary,
                             fontSize = 13.sp
                         )
                     )
@@ -187,7 +187,7 @@ private fun FolderActionItem(
         Icon(
             painter = painterResource(id = iconRes),
             contentDescription = title,
-            tint = EncoreTheme.colors.textPrimary,
+            tint = Color.White,
             modifier = Modifier.size(24.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))
@@ -195,7 +195,7 @@ private fun FolderActionItem(
             text = title,
             style = EncoreTheme.typography.bodyMedium.copy(
                 fontWeight = FontWeight.Medium,
-                color = EncoreTheme.colors.textPrimary,
+                color = Color.White,
                 fontSize = 15.sp
             )
         )

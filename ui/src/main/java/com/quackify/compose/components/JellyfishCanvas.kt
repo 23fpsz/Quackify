@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.EncoreTheme
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -32,7 +31,7 @@ fun JellyfishCanvas(
     dominantColor: Color,
     modifier: Modifier = Modifier,
     accentColor: Color = dominantColor.copy(alpha = 0.7f),
-    deepBackgroundColor: Color = EncoreTheme.colors.background,
+    deepBackgroundColor: Color = EncoreColors.Background,
     speedFactor: Float = 1.0f
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "jellyfishMotion")

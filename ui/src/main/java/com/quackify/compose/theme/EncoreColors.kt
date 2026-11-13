@@ -27,24 +27,10 @@ object EncoreColors {
     val HeartActive = Color(0xFF1DB954)
     val ProgressBarBackground = Color(0x33FFFFFF)
     val ScrubberThumb = Color(0xFFFFFFFF)
-
-    val BackgroundLight = Color(0xFFF6F6F6)
-    val SurfaceLight = Color(0xFFFFFFFF)
-    val CardLight = Color(0xFFF0F0F0)
-    val CardElevatedLight = Color(0xFFE4E4E4)
-    val DividerLight = Color(0xFFCCCCCC)
-    val OutlineLight = Color(0x33000000)
-
-    val TextPrimaryLight = Color(0xFF191919)
-    val TextSecondaryLight = Color(0xFF5E5E5E)
-    val TextDisabledLight = Color(0xFF9A9A9A)
-    val ProgressBarBackgroundLight = Color(0x33000000)
-    val ScrubberThumbLight = Color(0xFF191919)
 }
 
 @Immutable
 data class EncoreColorScheme(
-    val canvas: Color = EncoreColors.PureBlack,
     val background: Color = EncoreColors.Background,
     val surface: Color = EncoreColors.Surface,
     val card: Color = EncoreColors.Card,
@@ -53,30 +39,6 @@ data class EncoreColorScheme(
     val onPrimary: Color = EncoreColors.PureBlack,
     val textPrimary: Color = EncoreColors.TextPrimary,
     val textSecondary: Color = EncoreColors.TextSecondary,
-    val textDisabled: Color = EncoreColors.TextDisabled,
     val divider: Color = EncoreColors.Divider,
-    val outline: Color = EncoreColors.Outline,
-    val progressBarBackground: Color = EncoreColors.ProgressBarBackground,
-    val scrubberThumb: Color = EncoreColors.ScrubberThumb,
     val error: Color = EncoreColors.Error
-) {
-    companion object {
-        fun light() = EncoreColorScheme(
-            canvas = Color.White,
-            background = EncoreColors.BackgroundLight,
-            surface = EncoreColors.SurfaceLight,
-            card = EncoreColors.CardLight,
-            cardElevated = EncoreColors.CardElevatedLight,
-            primary = EncoreColors.GreenDark,
-            onPrimary = Color.White,
-            textPrimary = EncoreColors.TextPrimaryLight,
-            textSecondary = EncoreColors.TextSecondaryLight,
-            textDisabled = EncoreColors.TextDisabledLight,
-            divider = EncoreColors.DividerLight,
-            outline = EncoreColors.OutlineLight,
-            progressBarBackground = EncoreColors.ProgressBarBackgroundLight,
-            scrubberThumb = EncoreColors.ScrubberThumbLight,
-            error = EncoreColors.Error
-        )
-    }
-}
+)

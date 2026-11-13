@@ -69,15 +69,14 @@ fun ActivityScreen(
     modifier: Modifier = Modifier
 ) {
     val bottomPadding = rememberBottomPadding()
-    val schemeCard = EncoreTheme.colors.cardElevated
-    val selfColor = remember(selfAvatarColor, schemeCard) {
-        if (selfAvatarColor != 0) Color(0xFF000000.toInt() or selfAvatarColor) else schemeCard
+    val selfColor = remember(selfAvatarColor) {
+        if (selfAvatarColor != 0) Color(0xFF000000.toInt() or selfAvatarColor) else EncoreColors.CardElevated
     }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.background)
+            .background(EncoreColors.Background)
             .statusBarsPadding()
     ) {
         Row(
@@ -90,7 +89,7 @@ fun ActivityScreen(
                 iconRes = R.drawable.encore_icon_arrow_left_24,
                 contentDescription = "Back",
                 onClick = onBackClick,
-                tint = EncoreTheme.colors.textPrimary
+                tint = EncoreColors.TextPrimary
             )
             Text(
                 text = "Notifikasi",
@@ -123,7 +122,7 @@ fun ActivityScreen(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_cloud_off_24),
                         contentDescription = null,
-                        tint = EncoreTheme.colors.textSecondary,
+                        tint = EncoreColors.TextSecondary,
                         modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -134,7 +133,7 @@ fun ActivityScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Check your internet connection and try again.",
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -154,7 +153,7 @@ fun ActivityScreen(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_notifications_active_24),
                         contentDescription = null,
-                        tint = EncoreTheme.colors.textSecondary,
+                        tint = EncoreColors.TextSecondary,
                         modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -165,7 +164,7 @@ fun ActivityScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "When someone follows you or interacts with your playlists, you'll see it here.",
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }
@@ -214,7 +213,7 @@ private fun ActivityRow(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = relativeTime(item.atMillis),
-                style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
+                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
             )
         }
         if (item.entityImageUrl.isNotBlank()) {

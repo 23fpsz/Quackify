@@ -230,7 +230,7 @@ fun PlaylistEditModeContent(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
                         contentDescription = "Back",
-                        tint = EncoreTheme.colors.textPrimary,
+                        tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -443,7 +443,7 @@ fun PlaylistEditModeContent(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_x_24),
                             contentDescription = "Exit select mode",
-                            tint = EncoreTheme.colors.textPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -516,7 +516,7 @@ fun PlaylistEditModeContent(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
                             contentDescription = "Back to actions",
-                            tint = EncoreTheme.colors.textPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -693,7 +693,7 @@ private fun EditTrackRow(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_play_16),
                     contentDescription = "Play preview",
-                    tint = EncoreTheme.colors.textPrimary,
+                    tint = Color.White,
                     modifier = Modifier.size(10.dp)
                 )
             }
@@ -722,7 +722,7 @@ private fun EditTrackRow(
                 text = track.artist,
                 style = EncoreTheme.typography.bodySmall.copy(
                     fontSize = 13.sp,
-                    color = EncoreTheme.colors.textSecondary
+                    color = EncoreColors.TextSecondary
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

@@ -103,7 +103,7 @@ fun EncoreProfileScreen(
         derivedStateOf { listState.firstVisibleItemScrollOffset > 32 }
     }
     val topBarColor by rememberSmoothColor(
-        if (topBarRaised) EncoreTheme.colors.background else Color.Transparent
+        if (topBarRaised) EncoreColors.Background else Color.Transparent
     )
 
     val hasData = profile != null || topContent != null || contexts.isNotEmpty()
@@ -111,7 +111,7 @@ fun EncoreProfileScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.background)
+            .background(EncoreColors.Background)
     ) {
         when {
             loading && !hasData -> DetailPageSkeleton(
@@ -129,7 +129,7 @@ fun EncoreProfileScreen(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_cloud_off_24),
                         contentDescription = null,
-                        tint = EncoreTheme.colors.textSecondary,
+                        tint = EncoreColors.TextSecondary,
                         modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -140,7 +140,7 @@ fun EncoreProfileScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Check your internet connection and try again.",
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -242,7 +242,7 @@ fun EncoreProfileScreen(
                 iconRes = R.drawable.encore_icon_arrow_left_24,
                 contentDescription = "Back",
                 onClick = onBackClick,
-                tint = EncoreTheme.colors.textPrimary
+                tint = EncoreColors.TextPrimary
             )
         }
     }
@@ -262,7 +262,7 @@ private fun ProfileHeader(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val name = profile?.name?.takeIf { it.isNotBlank() } ?: fallbackName.ifBlank { "Quackify" }
-        val fallbackColor = parseHexColor(profile?.colorHex) ?: EncoreTheme.colors.cardElevated
+        val fallbackColor = parseHexColor(profile?.colorHex) ?: EncoreColors.CardElevated
         Box(
             modifier = Modifier
                 .size(104.dp)
@@ -303,7 +303,7 @@ private fun ProfileHeader(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "${formatCount(profile.followersCount)} followers • ${formatCount(profile.followingCount)} following",
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
@@ -341,7 +341,7 @@ private fun ProfileArtistCard(
             imageUrl = artist.imageUrl.takeIf { it.isNotBlank() },
             contentDescription = artist.name,
             shape = CircleShape,
-            fallbackColor = EncoreTheme.colors.card,
+            fallbackColor = EncoreColors.Card,
             modifier = Modifier.size(116.dp),
             requestSize = 256
         )
@@ -372,7 +372,7 @@ private fun ProfileContextCardItem(
             imageUrl = card.imageUrl.takeIf { it.isNotBlank() },
             contentDescription = card.title,
             shape = if (card.uri.startsWith("spotify:artist:")) CircleShape else RoundedCornerShape(4.dp),
-            fallbackColor = EncoreTheme.colors.card,
+            fallbackColor = EncoreColors.Card,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f),
@@ -388,7 +388,7 @@ private fun ProfileContextCardItem(
         if (card.subtitle.isNotBlank()) {
             Text(
                 text = card.subtitle,
-                style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary),
+                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

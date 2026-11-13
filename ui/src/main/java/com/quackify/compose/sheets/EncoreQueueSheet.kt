@@ -74,8 +74,8 @@ fun EncoreQueueSheet(
         onDismissRequest = onDismissRequest,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreTheme.colors.background,
-        contentColor = EncoreTheme.colors.textPrimary,
+        containerColor = EncoreColors.Background,
+        contentColor = EncoreColors.TextPrimary,
         shape = RoundedCornerShape(topStart = EncoreCornerRadii.Larger3, topEnd = EncoreCornerRadii.Larger3),
         dragHandle = null,
         modifier = modifier
@@ -99,7 +99,7 @@ fun EncoreQueueSheet(
                     onClick = onDismissRequest,
                     size = 40.dp,
                     iconSize = 24.dp,
-                    tint = EncoreTheme.colors.textPrimary
+                    tint = EncoreColors.TextPrimary
                 )
 
                 Text(
@@ -127,7 +127,7 @@ fun EncoreQueueSheet(
                 item {
                     Text(
                         text = "Now playing",
-                        style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textSecondary),
+                        style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                         modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                     )
 
@@ -156,7 +156,7 @@ fun EncoreQueueSheet(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = currentTrackArtist,
-                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -176,7 +176,7 @@ fun EncoreQueueSheet(
                     item {
                         Text(
                             text = "Next in queue",
-                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                         )
                     }
@@ -203,7 +203,7 @@ fun EncoreQueueSheet(
                             } else {
                                 "Next from: $queueSourceContext"
                             },
-                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                         )
                     }
@@ -248,7 +248,7 @@ private fun QueueTrackRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title,
-                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreTheme.colors.textPrimary),
+                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextPrimary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -269,7 +269,7 @@ private fun QueueTrackRow(
                 }
                 Text(
                     text = track.artist,
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -283,7 +283,7 @@ private fun QueueTrackRow(
                 onClick = onRemove,
                 size = 36.dp,
                 iconSize = 18.dp,
-                tint = EncoreTheme.colors.textSecondary
+                tint = EncoreColors.TextSecondary
             )
         }
 
@@ -291,7 +291,7 @@ private fun QueueTrackRow(
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_sort_24),
                 contentDescription = "Reorder",
-                tint = EncoreTheme.colors.textSecondary,
+                tint = EncoreColors.TextSecondary,
                 modifier = Modifier.size(20.dp)
             )
         }

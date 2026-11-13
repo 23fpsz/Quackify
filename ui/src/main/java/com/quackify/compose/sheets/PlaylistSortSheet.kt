@@ -54,7 +54,7 @@ fun PlaylistSortSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreTheme.colors.card,
+        containerColor = EncoreColors.Card,
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         dragHandle = {
             Box(
@@ -78,7 +78,7 @@ fun PlaylistSortSheet(
                 style = EncoreTheme.typography.titleMedium.copy(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = EncoreTheme.colors.textPrimary
+                    color = EncoreColors.TextPrimary
                 ),
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
@@ -106,7 +106,7 @@ fun PlaylistSortSheet(
                         style = EncoreTheme.typography.bodyMedium.copy(
                             fontSize = 15.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) EncoreColors.Green else EncoreTheme.colors.textPrimary
+                            color = if (isSelected) EncoreColors.Green else EncoreColors.TextPrimary
                         ),
                         modifier = Modifier.weight(1f)
                     )

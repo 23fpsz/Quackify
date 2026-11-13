@@ -20,7 +20,6 @@ import com.quackify.compose.sheets.LibrarySortOption
 import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.sheets.SleepTimerOption
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.EncoreTheme
 
 enum class ShellScreen {
     HOME,

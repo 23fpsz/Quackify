@@ -55,14 +55,14 @@ fun CreditsSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreTheme.colors.card,
+        containerColor = EncoreColors.Card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
+                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -86,7 +86,7 @@ fun CreditsSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Credits",
-                        style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
+                        style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                     )
                     Text(
                         text = title,
@@ -97,7 +97,7 @@ fun CreditsSheet(
                     if (subtitle.isNotBlank()) {
                         Text(
                             text = subtitle,
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -109,13 +109,13 @@ fun CreditsSheet(
                 Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                 Text(
                     text = "Loading credits…",
-                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary)
+                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                 )
             } else if (credits.isEmpty) {
                 Spacer(modifier = Modifier.height(EncoreSpacers.Looser))
                 Text(
                     text = "No credits for this track",
-                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary)
+                    style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                 )
             } else {
                 credits.groups.forEach { group ->
@@ -144,7 +144,7 @@ fun CreditsSheet(
                                 text = person.name,
                                 style = EncoreTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = EncoreTheme.colors.textPrimary
+                                    color = EncoreColors.TextPrimary
                                 ),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -155,7 +155,7 @@ fun CreditsSheet(
                                 Text(
                                     text = person.role,
                                     style = EncoreTheme.typography.bodySmall.copy(
-                                        color = EncoreTheme.colors.textSecondary
+                                        color = EncoreColors.TextSecondary
                                     ),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -177,7 +177,7 @@ fun CreditsSheet(
                     credits.sources.forEach { source ->
                         Text(
                             text = source,
-                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier.padding(vertical = 3.dp)
                         )
                     }

@@ -24,7 +24,7 @@ fun ProfileAvatar(
     displayName: String,
     avatarUrl: String = "",
     size: Dp = 36.dp,
-    backgroundColor: Color = EncoreTheme.colors.card,
+    backgroundColor: Color = EncoreColors.Card,
     textStyle: TextStyle? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -45,7 +45,7 @@ fun ProfileAvatar(
     } else {
         val style = textStyle ?: EncoreTheme.typography.bodyMedium.copy(
             fontWeight = FontWeight.Bold,
-            color = EncoreTheme.colors.textPrimary,
+            color = EncoreColors.TextPrimary,
             fontSize = (size.value * 0.36f).sp
         )
         Box(modifier = base.background(backgroundColor), contentAlignment = Alignment.Center) {

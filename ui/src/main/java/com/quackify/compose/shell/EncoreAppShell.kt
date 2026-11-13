@@ -50,7 +50,6 @@ import com.quackify.compose.sheets.ProfileFollowSheet
 import com.quackify.compose.sheets.PlaylistContributorsSheet
 import com.quackify.compose.sheets.EntityOptions
 import com.quackify.compose.theme.EncoreColors
-import com.quackify.compose.theme.EncoreTheme
 import com.quackify.backend.api.Collection2
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.AlbumDetail
@@ -567,7 +566,7 @@ fun EncoreAppShell(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.canvas)
+            .background(EncoreColors.PureBlack)
     ) {
         val playlistLoadFailed = !playlistLoading && playlistTracks == null
         ShellScreenSlot {

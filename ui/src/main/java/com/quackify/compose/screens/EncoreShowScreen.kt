@@ -105,18 +105,18 @@ fun EncoreShowScreen(
     }
 
     val followBorderColor by animateColorAsState(
-        targetValue = if (isFollowing) EncoreColors.Green else EncoreTheme.colors.textSecondary,
+        targetValue = if (isFollowing) EncoreColors.Green else EncoreColors.TextSecondary,
         label = "showFollowBorder",
     )
     val followTextColor by animateColorAsState(
-        targetValue = if (isFollowing) EncoreColors.Green else EncoreTheme.colors.textPrimary,
+        targetValue = if (isFollowing) EncoreColors.Green else EncoreColors.TextPrimary,
         label = "showFollowText",
     )
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreTheme.colors.background),
+            .background(EncoreColors.Background),
     ) {
         LazyColumn(
             state = listState,
@@ -132,7 +132,7 @@ fun EncoreShowScreen(
                                 colors = listOf(
                                     smoothHeaderColor,
                                     smoothHeaderColor.copy(alpha = 0.55f),
-                                    EncoreTheme.colors.background,
+                                    EncoreColors.Background,
                                 ),
                             ),
                         )
@@ -150,14 +150,14 @@ fun EncoreShowScreen(
                             iconRes = R.drawable.encore_icon_arrow_left_24,
                             contentDescription = "Back",
                             onClick = onBackClick,
-                            tint = EncoreTheme.colors.textPrimary,
+                            tint = EncoreColors.TextPrimary,
                         )
                         if (onMoreClick != null) {
                             EncoreIconButton(
                                 iconRes = R.drawable.encore_icon_more_android_24,
                                 contentDescription = "More options",
                                 onClick = onMoreClick,
-                                tint = EncoreTheme.colors.textPrimary,
+                                tint = EncoreColors.TextPrimary,
                             )
                         } else {
                             Spacer(modifier = Modifier.size(48.dp))
@@ -192,7 +192,7 @@ fun EncoreShowScreen(
                     Text(
                         text = showName,
                         style = EncoreTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                        color = EncoreTheme.colors.textPrimary,
+                        color = EncoreColors.TextPrimary,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -201,7 +201,7 @@ fun EncoreShowScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = publisher,
-                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textPrimary),
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary),
                         )
                     }
 
@@ -214,7 +214,7 @@ fun EncoreShowScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = ratingLabel,
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                         )
                     }
 
@@ -222,7 +222,7 @@ fun EncoreShowScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = description,
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                             maxLines = if (descriptionExpanded) Int.MAX_VALUE else 3,
                             overflow = TextOverflow.Ellipsis,
                             onTextLayout = { if (!descriptionExpanded) descriptionOverflows = it.hasVisualOverflow },
@@ -230,7 +230,7 @@ fun EncoreShowScreen(
                         if (descriptionOverflows || descriptionExpanded) {
                             Text(
                                 text = if (descriptionExpanded) "Show less" else "Show more",
-                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textPrimary),
+                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
                                 modifier = Modifier
                                     .padding(top = 6.dp)
                                     .clickable { descriptionExpanded = !descriptionExpanded },
@@ -288,12 +288,12 @@ fun EncoreShowScreen(
                     Text(
                         text = "All Episodes",
                         style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = EncoreTheme.colors.textPrimary,
+                        color = EncoreColors.TextPrimary,
                     )
                     if (total > 0) {
                         Text(
                             text = formatCount(total.toLong()),
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                         )
                     }
                 }
@@ -319,7 +319,7 @@ fun EncoreShowScreen(
                             .padding(vertical = 16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
+                        InlineLoadingDots(color = EncoreColors.TextSecondary)
                     }
                 }
             }
@@ -330,7 +330,7 @@ fun EncoreShowScreen(
                         Text(
                             text = "More podcasts like this",
                             style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = EncoreTheme.colors.textPrimary,
+                            color = EncoreColors.TextPrimary,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
                         LazyRow(
@@ -364,12 +364,12 @@ fun EncoreShowScreen(
                     iconRes = R.drawable.encore_icon_arrow_left_24,
                     contentDescription = "Back",
                     onClick = onBackClick,
-                    tint = EncoreTheme.colors.textPrimary,
+                    tint = EncoreColors.TextPrimary,
                 )
                 Text(
                     text = showName,
                     style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = EncoreTheme.colors.textPrimary,
+                    color = EncoreColors.TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
@@ -407,7 +407,7 @@ private fun EpisodeListRow(
             modifier = Modifier
                 .size(56.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(EncoreTheme.colors.card),
+                .background(EncoreColors.Card),
         ) {
             if (episode.imageUrl.isNotBlank()) {
                 EncoreArtworkImage(
@@ -430,7 +430,7 @@ private fun EpisodeListRow(
                             else R.drawable.encore_icon_play_24
                         ),
                         contentDescription = if (isCurrent && isPlaying) "Pause episode" else "Play episode",
-                        tint = EncoreTheme.colors.textPrimary,
+                        tint = Color.White,
                         modifier = Modifier
                             .size(20.dp)
                             .background(Color.Black.copy(alpha = 0.45f), CircleShape)
@@ -447,7 +447,7 @@ private fun EpisodeListRow(
                 text = episode.title,
                 style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isCurrent) EncoreColors.Green else EncoreTheme.colors.textPrimary,
+                    color = if (isCurrent) EncoreColors.Green else EncoreColors.TextPrimary,
                 ),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -455,7 +455,7 @@ private fun EpisodeListRow(
             Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = episodeSubtitle(episode),
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -466,7 +466,7 @@ private fun EpisodeListRow(
                 iconRes = R.drawable.encore_icon_more_android_24,
                 contentDescription = "Episode options",
                 onClick = onMoreClick,
-                tint = EncoreTheme.colors.textSecondary,
+                tint = EncoreColors.TextSecondary,
             )
         }
     }
@@ -483,7 +483,7 @@ private fun RelatedShowCard(card: ShowCard, onClick: () -> Unit) {
             modifier = Modifier
                 .size(132.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(EncoreTheme.colors.card),
+                .background(EncoreColors.Card),
         ) {
             if (card.imageUrl.isNotBlank()) {
                 EncoreArtworkImage(
@@ -497,14 +497,14 @@ private fun RelatedShowCard(card: ShowCard, onClick: () -> Unit) {
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = card.name,
-            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreTheme.colors.textPrimary),
+            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         if (card.publisher.isNotBlank()) {
             Text(
                 text = card.publisher,
-                style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary),
+                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
