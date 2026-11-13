@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -154,6 +155,7 @@ fun EncoreAppShell(
     notificationsLoading: Boolean = false,
     notificationsFailed: Boolean = false,
     onRefreshWhatsNew: (() -> Unit)? = null,
+    activityState: ActivityFeedState? = null,
     historyToday: List<TrackItem> = emptyList(),
     historyYesterday: List<TrackItem> = emptyList(),
     historyEarlier: List<TrackItem> = emptyList(),
@@ -285,6 +287,15 @@ fun EncoreAppShell(
     val active = remember { ShellActiveEntity() }
     val navState = remember { ShellNavState() }
     val local = remember { ShellLocalState() }
+    val activityFeed = activityState?.feed.orEmpty()
+    val activityLoading = activityState?.loading == true
+    val activityFailed = activityState?.failed == true
+    val activitySelf = activityState?.self
+    val activityUnread = activityState?.unread == true
+    val onOpenActivity = activityState?.onOpen
+    val onRetryActivity = activityState?.onRetry
+    val onLeaveActivity = activityState?.onLeave
+    val onProfileDrawerOpened = activityState?.onDrawerOpened
     val searchQueryNow = searchQuery
     val navController = ShellNavController(
         nav = navState,
@@ -308,6 +319,16 @@ fun EncoreAppShell(
     var currentScreen by navController.nav::currentScreen
     var selectedNavIndex by navController.nav::selectedNavIndex
     var isPlayerExpanded by navController.nav::isPlayerExpanded
+
+    /** Leaving the activity feed resets the server-side read cursor, the way
+     * the web player does when the notifications panel closes. */
+    var previousScreen by remember { mutableStateOf(ShellScreen.HOME) }
+    LaunchedEffect(currentScreen) {
+        if (previousScreen == ShellScreen.ACTIVITY && currentScreen != ShellScreen.ACTIVITY) {
+            onLeaveActivity?.invoke()
+        }
+        previousScreen = currentScreen
+    }
 
     LaunchedEffect(expandPlayerSignal) {
         if (expandPlayerSignal > 0) isPlayerExpanded = true
@@ -451,7 +472,10 @@ fun EncoreAppShell(
         if (uri.isNotEmpty()) openShow(uri)
     }
 
-    val openProfileDrawer: () -> Unit = { navController.openProfileDrawer() }
+    val openProfileDrawer: () -> Unit = {
+        navController.openProfileDrawer()
+        onProfileDrawerOpened?.invoke()
+    }
 
     val openUserProfile: (String, String) -> Unit = { uri, name ->
         navController.openUserProfile(context, uri, name)
@@ -846,6 +870,28 @@ fun EncoreAppShell(
                             currentScreen = ShellScreen.PLAYLIST
                             if (onLoadPlaylist != null) onLoadPlaylist?.invoke(item.uri) else playerListener?.onLoadPlaylist(item.uri)
                         }
+                    }
+                }
+            )
+            ShellScreen.ACTIVITY -> ShellActivityPane(
+                onBackClick = handleBack,
+                notifications = activityFeed,
+                loading = activityLoading,
+                loadFailed = activityFailed,
+                onRetry = { onRetryActivity?.invoke() },
+                self = activitySelf,
+                fallbackName = userDisplayName,
+                fallbackAvatarUrl = userAvatarUrl,
+                onOpenNotification = { item ->
+                    when {
+                        item.actionUri.startsWith("spotify:playlist:") ->
+                            openPlaylist(item.title, item.actionUri)
+                        item.actionUri.startsWith("spotify:user:") ->
+                            openUserProfile(item.actionUri, item.primaryActor.ifBlank { item.title })
+                        item.actionUri.startsWith("spotify:artist:") ->
+                            openArtist(item.primaryActor.ifBlank { item.title }, item.actionUri)
+                        item.actionUri.startsWith("spotify:album:") ->
+                            openAlbum(item.title, "", item.actionUri)
                     }
                 }
             )
@@ -1315,6 +1361,11 @@ fun EncoreAppShell(
             onCopyLink = { uri -> copyEntityLink(uri) },
             onShare = { uri -> shareEntity(uri) },
             onWhatsNew = { pushCurrentState(); currentScreen = ShellScreen.NOTIFICATIONS },
+            onNotifications = {
+                navController.openActivity()
+                onOpenActivity?.invoke()
+            },
+            notificationsUnread = activityUnread,
             onProfile = {
                 pushCurrentState()
                 currentScreen = ShellScreen.PROFILE

@@ -8,7 +8,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import com.quackify.backend.model.ActivityNotification
 import com.quackify.backend.model.ConnectDevice
+import com.quackify.backend.model.SelfProfile
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.library.LibraryItem
@@ -29,6 +31,7 @@ enum class ShellScreen {
     CATEGORY,
     SETTINGS,
     NOTIFICATIONS,
+    ACTIVITY,
     HISTORY,
     FOLDER,
     SHOW,
@@ -50,6 +53,20 @@ data class NavItem(
     val title: String,
     val iconRes: Int,
     val activeIconRes: Int = iconRes
+)
+
+/** Everything the shell needs to draw the "Notifikasi" feed, passed as one
+ * object so the app's shell call site stays under the JVM method limit. */
+data class ActivityFeedState(
+    val feed: List<ActivityNotification> = emptyList(),
+    val loading: Boolean = false,
+    val failed: Boolean = false,
+    val self: SelfProfile? = null,
+    val unread: Boolean = false,
+    val onOpen: () -> Unit = {},
+    val onRetry: () -> Unit = {},
+    val onLeave: () -> Unit = {},
+    val onDrawerOpened: () -> Unit = {},
 )
 
 data class BackStackItem(

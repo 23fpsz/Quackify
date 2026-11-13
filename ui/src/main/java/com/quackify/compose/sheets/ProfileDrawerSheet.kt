@@ -48,6 +48,8 @@ fun ProfileDrawerSheet(
     onWhatsNewClick: () -> Unit,
     onListeningHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onNotificationsClick: (() -> Unit)? = null,
+    notificationsUnread: Boolean = false,
     onLogoutClick: (() -> Unit)? = null,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
@@ -131,6 +133,18 @@ fun ProfileDrawerSheet(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
+            if (onNotificationsClick != null) {
+                ProfileDrawerItem(
+                    title = "Notifikasi",
+                    iconRes = R.drawable.encore_icon_notifications_active_24,
+                    onClick = {
+                        onDismiss()
+                        onNotificationsClick()
+                    },
+                    showUnreadDot = notificationsUnread
+                )
+            }
+
             ProfileDrawerItem(
                 title = "My profile",
                 iconRes = R.drawable.encore_icon_user_24,
@@ -188,7 +202,8 @@ private fun ProfileDrawerItem(
     title: String,
     iconRes: Int,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showUnreadDot: Boolean = false
 ) {
     Row(
         modifier = modifier
@@ -212,6 +227,15 @@ private fun ProfileDrawerItem(
             ),
             modifier = Modifier.weight(1f)
         )
+        if (showUnreadDot) {
+            Box(
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF3D91F4))
+            )
+        }
     }
 }
 
