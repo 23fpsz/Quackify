@@ -274,7 +274,7 @@ internal object SourceResolver {
     }
 
     private suspend fun cdnUrlNamed(context: Context, fileId: String, format: String): String? {
-        val url = "https://$RESOLVE_HOST${RESOLVE_PREFIX.replace("{format}", format)}$fileId$RESOLVE_QUERY"
+        val url = "https://spclient.wg.spotify.com${RESOLVE_PREFIX.replace("{format}", format)}$fileId$RESOLVE_QUERY"
         val response = Net.get(url, PlayerHeaders.of(context), tag = "resolve")
         val urls = response?.takeIf { it.ok }?.json()?.optJSONArray("cdnurl")
         val first = urls?.optString(0).orEmpty()
