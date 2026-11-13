@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,15 +42,34 @@ import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncoreTrackRow
 import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.TrackListSkeleton
+import com.quackify.compose.format.formatCount
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.theme.EncoreTheme
+import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.rememberBottomPadding
 
 /**
  * artist that follow each other collapse into one expandable artist group,
  */
+data class HistoryStats(
+    val totalPlayedMs: Long = 0L,
+    val listenStreakDays: Int = 0,
+    val loginStreakDays: Int = 0,
+    val topArtistName: String = "",
+    val topArtistPlays: Int = 0,
+    val topPlaylistName: String = "",
+    val topPlaylistPlays: Int = 0,
+    val topReplayTitle: String = "",
+    val topReplayArtist: String = "",
+    val topReplayPlays: Int = 0,
+) {
+    val hasAny: Boolean
+        get() = totalPlayedMs > 0L || listenStreakDays > 0 || loginStreakDays > 0 ||
+            topArtistName.isNotBlank() || topPlaylistName.isNotBlank() || topReplayTitle.isNotBlank()
+}
+
 @Composable
 fun HistoryScreen(
     onBackClick: () -> Unit,
@@ -61,6 +81,7 @@ fun HistoryScreen(
     todayTracks: List<TrackItem> = emptyList(),
     yesterdayTracks: List<TrackItem> = emptyList(),
     earlierTracks: List<TrackItem> = emptyList(),
+    stats: HistoryStats? = null,
     loading: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -126,6 +147,11 @@ fun HistoryScreen(
                     start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomPadding
                 )
             ) {
+                if (stats != null && stats.hasAny) {
+                    item(key = "stats") {
+                        HistoryStatsSection(stats = stats)
+                    }
+                }
                 historySection(
                     label = "Today",
                     tracks = todayTracks,
@@ -340,13 +366,143 @@ private fun HistoryArtistGroup(
     }
 }
 
+@Composable
+private fun HistoryStatsSection(
+    stats: HistoryStats,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+    ) {
+        Text(
+            text = "Your stats",
+            style = EncoreTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            ),
+            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HistoryStatCard(
+                label = "Minutes played",
+                value = formatMinutes(stats.totalPlayedMs),
+                modifier = Modifier.weight(1f)
+            )
+            HistoryStatCard(
+                label = "Listening streak",
+                value = daysLabel(stats.listenStreakDays),
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HistoryStatCard(
+                label = "Login streak",
+                value = daysLabel(stats.loginStreakDays),
+                modifier = Modifier.weight(1f)
+            )
+            HistoryStatCard(
+                label = "Top artist",
+                value = stats.topArtistName.ifBlank { "—" },
+                sub = playsLabel(stats.topArtistPlays),
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HistoryStatCard(
+                label = "Top playlist",
+                value = stats.topPlaylistName.ifBlank { "—" },
+                sub = playsLabel(stats.topPlaylistPlays),
+                modifier = Modifier.weight(1f)
+            )
+            HistoryStatCard(
+                label = "Most replayed",
+                value = stats.topReplayTitle.ifBlank { "—" },
+                sub = listOfNotNull(
+                    stats.topReplayArtist.takeIf { it.isNotBlank() },
+                    playsLabel(stats.topReplayPlays).takeIf { stats.topReplayPlays > 1 },
+                ).joinToString(" · ").ifBlank { null },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryStatCard(
+    label: String,
+    value: String,
+    sub: String? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(EncoreColors.Card, RoundedCornerShape(EncoreCornerRadii.Larger2))
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = label,
+            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = EncoreTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = EncoreColors.TextPrimary
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (sub != null) {
+            Text(
+                text = sub,
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+private fun formatMinutes(totalMs: Long): String {
+    val minutes = totalMs / 60_000L
+    return when {
+        minutes >= 60L -> "${minutes / 60L}h ${minutes % 60L}m"
+        else -> "$minutes min"
+    }
+}
+
+private fun daysLabel(days: Int): String =
+    if (days == 1) "1 day" else "$days days"
+
+private fun playsLabel(plays: Int): String =
+    if (plays <= 1) "1 play" else "${formatCount(plays.toLong())} plays"
+
 @Preview
 @Composable
 fun PreviewHistoryScreen() {
     EncoreAppTheme {
         HistoryScreen(
             onBackClick = {},
-            onTrackSelect = {}
+            onTrackSelect = {},
+            stats = HistoryStats(
+                totalPlayedMs = 1_512_000L,
+                listenStreakDays = 4,
+                loginStreakDays = 12,
+                topArtistName = "Piche Kota",
+                topArtistPlays = 37,
+                topPlaylistName = "My Playlist #18",
+                topPlaylistPlays = 21,
+                topReplayTitle = "Bahagia Lagi",
+                topReplayArtist = "Piche Kota",
+                topReplayPlays = 9,
+            )
         )
     }
 }

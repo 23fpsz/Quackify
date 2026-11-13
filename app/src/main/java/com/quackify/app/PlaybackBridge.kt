@@ -1119,6 +1119,7 @@ class PlaybackBridge(private val context: Context) {
             enhancedRows = emptyList()
             enhancedFor = ""
             playedSmart.clear()
+            publishQueue(connect.cluster.value)
             if (enhanceWasOn) {
                 val contextUri = cluster?.contextUri.orEmpty().ifBlank { chainContext }
                 if (contextUri.isNotBlank()) {
@@ -1216,6 +1217,7 @@ class PlaybackBridge(private val context: Context) {
         scope.launch {
             try {
                 val rows = SmartShuffleSource.reset(context, EncoreAuth.token(context), connect.spclientHost, lens)
+                if (!smartOn(connect.cluster.value)) return@launch
                 enhancedRows = rows
                 enhancedFor = contextUri
                 playedSmart.clear()
@@ -1271,6 +1273,7 @@ class PlaybackBridge(private val context: Context) {
                     return@launch
                 }
                 val rows = SmartShuffleSource.reset(context, EncoreAuth.token(context), connect.spclientHost, lens)
+                if (!smartOn(connect.cluster.value)) return@launch
                 enhancedRows = rows
                 enhancedFor = contextUri
                 playedSmart.clear()
@@ -2833,7 +2836,11 @@ class PlaybackBridge(private val context: Context) {
                 clusterContext.startsWith("spotify:episode:")
         val follows = clusterContext.isNotBlank() &&
                 (clusterContext == context || (single && context.isBlank()))
-        val serverRows = if (server && follows) cluster!!.fromContext.map { it.asTrackItem() } else emptyList()
+        val smartActive = smartOn(cluster)
+        val serverTracks = if (server && follows) {
+            if (smartActive) cluster!!.fromContext else cluster!!.fromContext.filterNot { it.isEnhanced }
+        } else emptyList()
+        val serverRows = serverTracks.map { it.asTrackItem() }
         val localRows = sessionQueue
             .takeIf { sessionQueueContext == context && it.isNotEmpty() }
             ?.map { uri -> decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri) }
@@ -2875,7 +2882,7 @@ class PlaybackBridge(private val context: Context) {
             emptyList()
         }
         val knownUpcoming = contextRows.mapTo(HashSet()) { it.uri }
-        val enhanced = if (chainFits) enhancedQueue(context) else emptyList()
+        val enhanced = if (chainFits && smartActive) enhancedQueue(context) else emptyList()
         val enhancedTail = if (enhanced.isNotEmpty()) {
             enhancedUpcoming(context, anchor)
                 .asSequence()

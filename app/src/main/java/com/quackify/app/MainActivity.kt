@@ -39,6 +39,7 @@ import com.quackify.compose.shell.PlaylistEditDraft
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.home.toTrackItem
 import com.quackify.compose.home.toArtistRelease
 import com.quackify.backend.model.ShelfKind
@@ -164,6 +165,10 @@ class MainActivity : ComponentActivity() {
                         var homeFacet by remember { mutableStateOf("") }
                         var loading by remember { mutableStateOf(true) }
                         var playHistory by remember { mutableStateOf(PlayHistory.all(context)) }
+                        var playStats by remember { mutableStateOf(PlayStats.snapshot(context)) }
+                        LaunchedEffect(Unit) {
+                            playStats = PlayStats.recordLogin(context)
+                        }
                         LaunchedEffect(resumeSignal, homeFacet) {
                             if (resumeSignal == 0) loading = true
                             val payload = HomeFeed.load(context, homeFacet)
@@ -771,6 +776,11 @@ class MainActivity : ComponentActivity() {
                                 return@LaunchedEffect
                             }
                             playHistory = withContext(Dispatchers.Default) {
+                                PlayStats.recordListen(context)
+                                PlayStats.tallyArtist(context, now.artistUri, now.artist)
+                                if (now.contextUri.startsWith("spotify:playlist:")) {
+                                    PlayStats.tallyPlaylist(context, now.contextUri, now.contextLabel.ifBlank { "Playlist" })
+                                }
                                 PlayHistory.record(
                                     context,
                                     TrackItem(
@@ -783,6 +793,16 @@ class MainActivity : ComponentActivity() {
                                     ),
                                     System.currentTimeMillis(),
                                 )
+                            }
+                            playStats = PlayStats.snapshot(context)
+                        }
+
+                        LaunchedEffect(playback.isPlaying) {
+                            if (!playback.isPlaying) return@LaunchedEffect
+                            while (true) {
+                                delay(10_000L)
+                                PlayStats.addPlayedMs(context, 10_000L)
+                                playStats = PlayStats.snapshot(context)
                             }
                         }
 
@@ -806,6 +826,21 @@ class MainActivity : ComponentActivity() {
                         }
                         val historyEarlier = remember(playHistory, startOfYesterday) {
                             historyRows.filter { it.playedAtMs in 1 until startOfYesterday }.map { it.item }
+                        }
+                        val historyStats = remember(playStats, playHistory) {
+                            val replayed = playHistory.filter { it.plays > 1 }.maxByOrNull { it.plays }
+                            HistoryStats(
+                                totalPlayedMs = playStats.totalMs,
+                                listenStreakDays = playStats.listenStreak,
+                                loginStreakDays = playStats.loginStreak,
+                                topArtistName = playStats.topArtistName,
+                                topArtistPlays = playStats.topArtistPlays,
+                                topPlaylistName = playStats.topPlaylistName,
+                                topPlaylistPlays = playStats.topPlaylistPlays,
+                                topReplayTitle = replayed?.item?.title.orEmpty(),
+                                topReplayArtist = replayed?.item?.artist.orEmpty(),
+                                topReplayPlays = replayed?.plays ?: 0,
+                            )
                         }
 
                         LaunchedEffect(searchTerm, searchFetch, offlineNow) {
@@ -1350,6 +1385,7 @@ class MainActivity : ComponentActivity() {
                             historyToday = historyToday,
                             historyYesterday = historyYesterday,
                             historyEarlier = historyEarlier,
+                            historyStats = historyStats,
                             historyLoading = false,
                             onLogout = {
                                 log.i("logout tapped")
