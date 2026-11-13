@@ -10,8 +10,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.quackify.compose.theme.EncoreTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  */
@@ -60,12 +64,15 @@ fun EncoreArtworkImage(
     shape: Shape? = null,
     cornerRadius: Dp? = null,
     fallbackColor: Color = Color(0xFF282828),
-    contentScale: ContentScale = ContentScale.Crop
+    contentScale: ContentScale = ContentScale.Crop,
+    requestSize: Int = 256
 ) {
     val effectiveShape = shape ?: (if (cornerRadius != null && cornerRadius > 0.dp) RoundedCornerShape(cornerRadius) else null)
     val clipModifier = if (effectiveShape != null) modifier.clip(effectiveShape) else modifier
     val resolvedUrl = resolveRemoteImageUrl(imageUrl)
     var loaded by remember(resolvedUrl) { mutableStateOf(false) }
+    var attempt by remember(resolvedUrl) { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
     val artworkAlpha by animateFloatAsState(
         targetValue = if (loaded) 1f else 0f,
         animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
@@ -81,12 +88,22 @@ fun EncoreArtworkImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(resolvedUrl)
                     .crossfade(true)
-                    .size(256)
+                    .size(requestSize)
+                    .setParameter("retry", attempt)
                     .build(),
                 contentDescription = contentDescription,
                 contentScale = contentScale,
                 onSuccess = { loaded = true },
-                onError = { loaded = true },
+                onError = {
+                    if (attempt < 2) {
+                        scope.launch {
+                            delay(400L * (attempt + 1))
+                            attempt++
+                        }
+                    } else {
+                        loaded = true
+                    }
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = artworkAlpha }
