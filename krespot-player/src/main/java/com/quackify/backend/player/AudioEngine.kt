@@ -312,7 +312,8 @@ internal class AudioEngine(
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
             val newUri = item?.mediaId.orEmpty()
-            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && lastItemUri.isNotBlank()) {
+            val auto = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
+            if (auto && lastItemUri.isNotBlank()) {
                 onEvent(PlayerEvent.Ended(lastItemUri))
             }
             if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
@@ -320,6 +321,14 @@ internal class AudioEngine(
                 lastPositionMs = 0L
                 lastItemUri = newUri
                 itemDurations[newUri]?.let { durationMs = it }
+            }
+            if (auto) {
+                val ready = runOnMain { player?.playbackState == Player.STATE_READY } ?: false
+                if (ready && !announced) {
+                    announced = true
+                    onEvent(PlayerEvent.Started(newUri))
+                    if (started) startProgress()
+                }
             }
         }
 
@@ -366,7 +375,9 @@ internal class AudioEngine(
             result = block()
             done.countDown()
         }
-        done.await()
+        if (!done.await(2500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+            log.w("the main thread did not answer in 2500ms, giving up on the read")
+        }
         return result
     }
 }
