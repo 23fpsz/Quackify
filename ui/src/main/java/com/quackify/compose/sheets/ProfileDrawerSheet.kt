@@ -44,6 +44,7 @@ fun ProfileDrawerSheet(
     isOpen: Boolean,
     onDismiss: () -> Unit,
     onAccountsClick: () -> Unit,
+    onProfileClick: () -> Unit,
     onWhatsNewClick: () -> Unit,
     onListeningHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -131,6 +132,15 @@ fun ProfileDrawerSheet(
             )
 
             ProfileDrawerItem(
+                title = "My profile",
+                iconRes = R.drawable.encore_icon_user_24,
+                onClick = {
+                    onDismiss()
+                    onProfileClick()
+                }
+            )
+
+            ProfileDrawerItem(
                 title = "What's new",
                 iconRes = R.drawable.encore_icon_notification_new_24,
                 onClick = {
@@ -213,6 +223,7 @@ fun PreviewProfileDrawerSheet() {
             isOpen = true,
             onDismiss = {},
             onAccountsClick = {},
+            onProfileClick = {},
             onWhatsNewClick = {},
             onListeningHistoryClick = {},
             onSettingsClick = {}

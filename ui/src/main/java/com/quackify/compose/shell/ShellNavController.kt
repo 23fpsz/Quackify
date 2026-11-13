@@ -230,6 +230,11 @@ internal class ShellNavController(
         currentScreen = ShellScreen.NOTIFICATIONS
     }
 
+    fun openProfile() {
+        pushCurrentState()
+        currentScreen = ShellScreen.PROFILE
+    }
+
     fun openHistory(onOpenHistory: (() -> Unit)?) {
         pushCurrentState()
         currentScreen = ShellScreen.HISTORY

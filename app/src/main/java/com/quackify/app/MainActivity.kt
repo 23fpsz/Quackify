@@ -46,10 +46,12 @@ import com.quackify.backend.model.ShelfKind
 import androidx.compose.runtime.collectAsState
 import com.quackify.backend.api.Search
 import com.quackify.backend.api.WhatsNew
+import com.quackify.backend.api.Profile
 import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.screens.SettingsLocks
 import com.quackify.backend.api.Settings
 import com.quackify.compose.screens.EncoreNotification
+import com.quackify.compose.screens.ProfileContextCard
 import com.quackify.compose.search.SearchHistoryItem
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.CategoryRecommendationItem
@@ -60,6 +62,10 @@ import com.quackify.backend.api.Podcasts
 import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.EpisodeDetail
+import com.quackify.backend.model.ProfileContext
+import com.quackify.backend.model.ProfileTopContent
+import com.quackify.backend.model.ProfileUser
+import com.quackify.backend.model.UserProfile
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.SearchKind
@@ -354,6 +360,51 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             whatsNewLoading = false
+                        }
+                        var profileDetail by remember { mutableStateOf<UserProfile?>(null) }
+                        var profileTop by remember { mutableStateOf<ProfileTopContent?>(null) }
+                        var profileContexts by remember { mutableStateOf<List<ProfileContextCard>>(emptyList()) }
+                        var profileLoading by remember { mutableStateOf(false) }
+                        var profileFailed by remember { mutableStateOf(false) }
+                        var profileFetch by remember { mutableStateOf(0) }
+                        var profileFollowers by remember { mutableStateOf<List<ProfileUser>>(emptyList()) }
+                        var profileFollowing by remember { mutableStateOf<List<ProfileUser>>(emptyList()) }
+                        var profileFollowLoading by remember { mutableStateOf(false) }
+                        var profileFollowFetch by remember { mutableStateOf(0) }
+
+                        LaunchedEffect(profileFetch) {
+                            if (profileFetch == 0) return@LaunchedEffect
+                            profileLoading = true
+                            profileFailed = false
+                            coroutineScope {
+                                val profileJob = async { runCatching { Profile.profile(context) }.getOrNull() }
+                                val topJob = async { runCatching { Profile.topContent(context) }.getOrNull() }
+                                val recentJob = async { runCatching { Profile.recentlyPlayed(context) }.getOrNull() }
+                                val profile = profileJob.await()
+                                val top = topJob.await()
+                                val recent = recentJob.await()
+                                profileDetail = profile
+                                profileTop = top
+                                profileContexts = resolveProfileContexts(context, profile, recent)
+                                profileFailed = profile == null && top == null
+                                log.i("profile loaded failed=${profile == null} " +
+                                        "topArtists=${top?.topArtists?.size ?: 0} " +
+                                        "contexts=${profileContexts.size}"
+                                )
+                            }
+                            profileLoading = false
+                        }
+
+                        LaunchedEffect(profileFollowFetch) {
+                            if (profileFollowFetch == 0) return@LaunchedEffect
+                            profileFollowLoading = true
+                            coroutineScope {
+                                val followersJob = async { runCatching { Profile.followers(context) }.getOrNull() }
+                                val followingJob = async { runCatching { Profile.following(context) }.getOrNull() }
+                                profileFollowers = followersJob.await().orEmpty()
+                                profileFollowing = followingJob.await().orEmpty()
+                            }
+                            profileFollowLoading = false
                         }
                         var playlistUri by remember { mutableStateOf("") }
                         var playlistDetail by remember { mutableStateOf<CollectionDetail?>(null) }
@@ -1249,6 +1300,22 @@ class MainActivity : ComponentActivity() {
                                 }
                                 radio
                             },
+                            profile = profileDetail,
+                            profileTop = profileTop,
+                            profileContexts = profileContexts,
+                            profileLoading = profileLoading,
+                            profileFailed = profileFailed,
+                            onLoadProfile = { profileFetch++ },
+                            onRetryProfile = {
+                                profileDetail = null
+                                profileTop = null
+                                profileContexts = emptyList()
+                                profileFetch++
+                            },
+                            profileFollowers = profileFollowers,
+                            profileFollowing = profileFollowing,
+                            profileFollowLoading = profileFollowLoading,
+                            onLoadProfileFollows = { profileFollowFetch++ },
                             homeLoading = loading,
                             searchResults = remember(searchHits) {
                                 searchHits.map { hit ->
@@ -1657,3 +1724,40 @@ private fun favoriteArtistsOf(history: List<PlayedTrack>): List<TrackItem> =
         .sortedWith(compareByDescending<ArtistStanding> { it.plays }.thenByDescending { it.lastPlayedAtMs })
         .take(FAVORITE_ARTIST_LIMIT)
         .map { it.latestTrack }
+
+private const val PROFILE_CONTEXT_LIMIT = 12
+
+/**
+ * The recently-played feed only carries context uris, so each entry is turned
+ * into a displayable card: artists come straight from the profile response,
+ * playlists and albums are resolved through their existing sources.
+ */
+private suspend fun resolveProfileContexts(
+    context: android.content.Context,
+    profile: UserProfile?,
+    contexts: List<ProfileContext>?,
+): List<ProfileContextCard> {
+    if (contexts.isNullOrEmpty()) return emptyList()
+    val artistByUri = profile?.recentlyPlayedArtists?.associateBy { it.uri }.orEmpty()
+    return contexts.take(PROFILE_CONTEXT_LIMIT).mapNotNull { entry ->
+        when {
+            entry.uri.startsWith("spotify:artist:") -> {
+                val artist = artistByUri[entry.uri] ?: return@mapNotNull null
+                ProfileContextCard(entry.uri, artist.name, "Artist", artist.imageUrl)
+            }
+            entry.uri.startsWith("spotify:playlist:") -> {
+                val detail = runCatching {
+                    Krespot.collections.collection(context, entry.uri)
+                }.getOrNull() ?: return@mapNotNull null
+                ProfileContextCard(entry.uri, detail.title, "Playlist", detail.imageUrl)
+            }
+            entry.uri.startsWith("spotify:album:") -> {
+                val detail = runCatching {
+                    Krespot.albums.album(context, entry.uri)
+                }.getOrNull() ?: return@mapNotNull null
+                ProfileContextCard(entry.uri, detail.title, detail.artists, detail.imageUrl)
+            }
+            else -> null
+        }
+    }
+}
