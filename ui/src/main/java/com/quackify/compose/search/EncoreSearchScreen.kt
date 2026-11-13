@@ -147,9 +147,8 @@ data class SearchPodcastItem(
 data class SearchHistoryItem(
     val title: String,
     val subtitle: String,
-    val isArtist: Boolean = false,
-    val isQuery: Boolean = false,
-    val color: Color = Color(0xFF1E3264),
+    val kind: SearchKind = SearchKind.QUERY,
+    val colorHex: String = "",
     val uri: String = "",
     val imageUrl: String = ""
 )
@@ -185,6 +184,7 @@ fun EncoreSearchScreen(
     onRetry: () -> Unit = {},
     onClearRecent: () -> Unit = {},
     onRemoveRecent: (SearchHistoryItem) -> Unit = {},
+    onRecordRecent: (SearchHit) -> Unit = {},
     onLoadSection: (suspend (SearchKind, Int) -> List<SearchHit>)? = null,
     onToggleSaved: (uri: String, currentlySaved: Boolean) -> Unit = { _, _ -> },
     savedOverrides: Map<String, Boolean> = emptyMap(),
@@ -404,6 +404,7 @@ fun EncoreSearchScreen(
     }
 
     val openHit: (SearchHit) -> Unit = { hit ->
+        onRecordRecent(hit)
         when (hit.kind) {
             SearchKind.ARTIST -> onArtistClick(hit.title, hit.uri)
             SearchKind.ALBUM -> onAlbumClick(hit.title, hit.subtitle, hit.uri)
@@ -604,41 +605,37 @@ fun EncoreSearchScreen(
                     )
                 }
 
-                items(recentSearches, key = { it.title }) { searchItem ->
+                items(recentSearches, key = { it.uri.ifBlank { it.title } }) { searchItem ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
                                 suggestionsPinned = false
-                                searchQuery = searchItem.title
-                                onSearchQueryChange(searchItem.title)
+                                when (searchItem.kind) {
+                                    SearchKind.TRACK -> playFromSearch(
+                                        TrackItem(
+                                            title = searchItem.title,
+                                            artist = searchItem.subtitle,
+                                            uri = searchItem.uri,
+                                            imageUrl = searchItem.imageUrl.takeIf { it.isNotBlank() },
+                                        )
+                                    )
+                                    SearchKind.ARTIST -> onArtistClick(searchItem.title, searchItem.uri)
+                                    SearchKind.ALBUM -> onAlbumClick(searchItem.title, searchItem.subtitle, searchItem.uri)
+                                    SearchKind.PLAYLIST -> onPlaylistClick(searchItem.title, searchItem.uri)
+                                    SearchKind.EPISODE -> onEpisodeClick(searchItem.title, searchItem.uri)
+                                    SearchKind.SHOW -> onShowClick(searchItem.title, searchItem.uri)
+                                    else -> {
+                                        searchQuery = searchItem.title
+                                        onSearchQueryChange(searchItem.title)
+                                    }
+                                }
                             }
                             .padding(start = 16.dp, end = 0.dp)
                             .height(64.dp), // minHeight = 64.0dp from history_row_search_layout.xml
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(if (searchItem.isArtist) CircleShape else RoundedCornerShape(4.dp))
-                                .background(searchItem.color),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (searchItem.isQuery) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.encore_icon_search_24),
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = if (searchItem.isArtist) "★" else "♫",
-                                    fontSize = 20.sp,
-                                    color = Color.White
-                                )
-                            }
-                        }
+                        RecentSearchArtwork(item = searchItem)
 
                         Spacer(modifier = Modifier.width(12.dp))
 
@@ -878,7 +875,18 @@ fun EncoreSearchScreen(
                                 val topLabel = topHit?.kind?.sectionLabel() ?: "Song"
                                 val openTopResult = {
                                     val hit = topHit
-                                    if (hit == null) playFromSearch(top) else openHit(hit)
+                                    if (hit == null) {
+                                        onRecordRecent(
+                                            SearchHit(
+                                                kind = SearchKind.TRACK,
+                                                uri = top.uri,
+                                                title = top.title,
+                                                subtitle = top.artist,
+                                                imageUrl = top.imageUrl.orEmpty(),
+                                            )
+                                        )
+                                        playFromSearch(top)
+                                    } else openHit(hit)
                                 }
                                 val isThisPlaying = isPlaying && matchesCurrent(
                                     top.uri, currentTrackUri, top.title, currentTrackTitle
@@ -975,7 +983,18 @@ fun EncoreSearchScreen(
                                 SearchTrackRow(
                                     track = track,
                                     isPlaying = isThisPlaying,
-                                    onClick = { playFromSearch(track) },
+                                    onClick = {
+                                        onRecordRecent(
+                                            SearchHit(
+                                                kind = SearchKind.TRACK,
+                                                uri = track.uri,
+                                                title = track.title,
+                                                subtitle = track.artist,
+                                                imageUrl = track.imageUrl.orEmpty(),
+                                            )
+                                        )
+                                        playFromSearch(track)
+                                    },
                                     onMoreClick = { onTrackOptionsClick(track) },
                                     onLikeClick = { onToggleSaved(track.uri, track.saved == true) }
                                 )
@@ -998,7 +1017,18 @@ fun EncoreSearchScreen(
                             items(filteredArtists.take(2), key = { it.uri }) { artist ->
                                 ArtistRow(
                                     artist = artist,
-                                    onArtistClick = { onArtistClick(artist.name, artist.uri) },
+                                    onArtistClick = {
+                                        onRecordRecent(
+                                            SearchHit(
+                                                kind = SearchKind.ARTIST,
+                                                uri = artist.uri,
+                                                title = artist.name,
+                                                subtitle = artist.monthlyListeners,
+                                                imageUrl = artist.imageUrl,
+                                            )
+                                        )
+                                        onArtistClick(artist.name, artist.uri)
+                                    },
                                     onFollowToggle = { onToggleSaved(artist.uri, artist.saved) }
                                 )
                             }
@@ -1020,7 +1050,18 @@ fun EncoreSearchScreen(
                             items(filteredAlbums.take(2), key = { it.uri }) { album ->
                                 AlbumRow(
                                     album = album,
-                                    onClick = { onAlbumClick(album.title, album.artist, album.uri) },
+                                    onClick = {
+                                        onRecordRecent(
+                                            SearchHit(
+                                                kind = SearchKind.ALBUM,
+                                                uri = album.uri,
+                                                title = album.title,
+                                                subtitle = album.artist,
+                                                imageUrl = album.imageUrl,
+                                            )
+                                        )
+                                        onAlbumClick(album.title, album.artist, album.uri)
+                                    },
                                     onToggleSaved = { onToggleSaved(album.uri, album.saved) }
                                 )
                             }
@@ -1042,7 +1083,18 @@ fun EncoreSearchScreen(
                             items(filteredPlaylists.take(2), key = { it.uri }) { playlist ->
                                 PlaylistRow(
                                     playlist = playlist,
-                                    onClick = { onPlaylistClick(playlist.title, playlist.uri) }
+                                    onClick = {
+                                        onRecordRecent(
+                                            SearchHit(
+                                                kind = SearchKind.PLAYLIST,
+                                                uri = playlist.uri,
+                                                title = playlist.title,
+                                                subtitle = playlist.creator,
+                                                imageUrl = playlist.imageUrl,
+                                            )
+                                        )
+                                        onPlaylistClick(playlist.title, playlist.uri)
+                                    }
                                 )
                             }
 
@@ -1063,7 +1115,18 @@ fun EncoreSearchScreen(
                             items(filteredPodcasts.take(2), key = { it.uri }) { podcast ->
                                 PodcastRow(
                                     podcast = podcast,
-                                    onClick = { onPodcastClick(podcast.title, podcast.uri) }
+                                    onClick = {
+                                        onRecordRecent(
+                                            SearchHit(
+                                                kind = SearchKind.SHOW,
+                                                uri = podcast.uri,
+                                                title = podcast.title,
+                                                subtitle = podcast.publisher,
+                                                imageUrl = podcast.imageUrl,
+                                            )
+                                        )
+                                        onPodcastClick(podcast.title, podcast.uri)
+                                    }
                                 )
                             }
 
@@ -1094,7 +1157,8 @@ fun EncoreSearchScreen(
                                         onArtistClick = onArtistClick,
                                         onPlaylistClick = onPlaylistClick,
                                         onToggleSaved = onToggleSaved,
-                                        onOpen = { openHit(hit) }
+                                        onOpen = { openHit(hit) },
+                                        onRecordRecent = onRecordRecent
                                     )
                                 }
 
@@ -1118,7 +1182,8 @@ fun EncoreSearchScreen(
                                 onArtistClick = onArtistClick,
                                 onPlaylistClick = onPlaylistClick,
                                 onToggleSaved = onToggleSaved,
-                                onOpen = { openHit(hit) }
+                                onOpen = { openHit(hit) },
+                                onRecordRecent = onRecordRecent
                             )
                         }
 
@@ -1615,6 +1680,43 @@ private fun SearchHit.toPlaylistItem(): SearchPlaylistItem = SearchPlaylistItem(
     imageUrl = imageUrl
 )
 
+private fun SearchKind.recentIconRes(): Int = when (this) {
+    SearchKind.TRACK -> R.drawable.encore_icon_track_24
+    SearchKind.ARTIST -> R.drawable.encore_icon_artist_24
+    SearchKind.ALBUM -> R.drawable.encore_icon_album_24
+    SearchKind.PLAYLIST -> R.drawable.encore_icon_playlist_24
+    SearchKind.EPISODE, SearchKind.SHOW -> R.drawable.encore_icon_podcasts_24
+    else -> R.drawable.encore_icon_search_24
+}
+
+@Composable
+private fun RecentSearchArtwork(item: SearchHistoryItem) {
+    val round = item.kind == SearchKind.ARTIST || item.kind == SearchKind.USER
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(if (round) CircleShape else RoundedCornerShape(4.dp))
+            .background(parseHexColor(item.colorHex) ?: Color(0xFF1E3264)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (item.imageUrl.isNotBlank()) {
+            EncoreArtworkImage(
+                imageUrl = item.imageUrl,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = if (round) 24.dp else 4.dp
+            )
+        } else {
+            Icon(
+                painter = painterResource(id = item.kind.recentIconRes()),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
 @Composable
 private fun SearchHitRow(
     hit: SearchHit,
@@ -1628,6 +1730,7 @@ private fun SearchHitRow(
     onPlaylistClick: (String, String) -> Unit,
     onToggleSaved: (uri: String, currentlySaved: Boolean) -> Unit,
     onOpen: () -> Unit,
+    onRecordRecent: (SearchHit) -> Unit = {},
 ) {
     when (hit.kind) {
         SearchKind.TRACK -> {
@@ -1635,23 +1738,35 @@ private fun SearchHitRow(
             SearchTrackRow(
                 track = item,
                 isPlaying = isPlaying && matchesCurrent(item.uri, currentTrackUri, item.title, currentTrackTitle),
-                onClick = { onTrackSelect(item) },
+                onClick = {
+                    onRecordRecent(hit)
+                    onTrackSelect(item)
+                },
                 onMoreClick = { onTrackOptionsClick(item) },
                 onLikeClick = { onToggleSaved(item.uri, item.saved == true) }
             )
         }
         SearchKind.PLAYLIST -> PlaylistRow(
             playlist = hit.toPlaylistItem(),
-            onClick = { onPlaylistClick(hit.title, hit.uri) }
+            onClick = {
+                onRecordRecent(hit)
+                onPlaylistClick(hit.title, hit.uri)
+            }
         )
         SearchKind.ALBUM -> AlbumRow(
             album = hit.toAlbumItem(),
-            onClick = { onAlbumClick(hit.title, hit.subtitle, hit.uri) },
+            onClick = {
+                onRecordRecent(hit)
+                onAlbumClick(hit.title, hit.subtitle, hit.uri)
+            },
             onToggleSaved = { onToggleSaved(hit.uri, hit.saved) }
         )
         SearchKind.ARTIST -> ArtistRow(
             artist = hit.toArtistItem(),
-            onArtistClick = { onArtistClick(hit.title, hit.uri) },
+            onArtistClick = {
+                onRecordRecent(hit)
+                onArtistClick(hit.title, hit.uri)
+            },
             onFollowToggle = { onToggleSaved(hit.uri, hit.saved) }
         )
         else -> GenericHitRow(hit = hit, onClick = onOpen)
