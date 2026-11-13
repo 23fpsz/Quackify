@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
+import com.quackify.compose.components.matchesCurrent
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.backend.model.CityStat
 import com.quackify.compose.components.EncorePlayIndicator
@@ -108,6 +109,7 @@ fun EncoreArtistScreen(
     /** The overview's singles group (EPs included); falls back to splitting [releases]. */
     singles: List<ArtistRelease> = emptyList(),
     currentTrackTitle: String,
+    currentTrackUri: String,
     isPlaying: Boolean,
     onBackClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
@@ -437,7 +439,7 @@ fun EncoreArtistScreen(
 
             itemsIndexed(popularTracks) { index, popTrack ->
                 val track = popTrack.track
-                val isCurrentTrack = track.title == currentTrackTitle
+                val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -949,6 +951,7 @@ fun PreviewEncoreArtistScreen() {
                 ArtistRelease("Timeless", "2024", "Single", Color(0xFF333333))
             ),
             currentTrackTitle = "Starboy",
+            currentTrackUri = "",
             isPlaying = true,
             onBackClick = {},
             onPlayPauseClick = {},

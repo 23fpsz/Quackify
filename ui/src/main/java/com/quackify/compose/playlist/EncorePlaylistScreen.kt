@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncorePlayButton
+import com.quackify.compose.components.matchesCurrent
 import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreFastScroll
 import com.quackify.compose.components.EncoreTrackRow
@@ -155,6 +156,7 @@ fun EncorePlaylistScreen(
     saveCount: String,
     tracks: List<TrackItem>,
     currentTrackTitle: String,
+    currentTrackUri: String,
     isPlaying: Boolean,
     onBackClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
@@ -482,7 +484,7 @@ fun EncorePlaylistScreen(
                     }
                 } else {
                     itemsIndexed(displayedTracks) { _, track ->
-                        val isCurrentTrack = track.title == currentTrackTitle
+                        val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                         EncoreTrackRow(
                             trackNumber = null,
                             title = track.title,
@@ -568,6 +570,7 @@ fun EncorePlaylistScreen(
                         )
                 )
 
+                EncoreFastScroll(listState) {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -1021,7 +1024,7 @@ fun EncorePlaylistScreen(
                     }
                 }
                 itemsIndexed(displayedTracks) { _, track ->
-                    val isCurrentTrack = track.title == currentTrackTitle
+                    val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                     EncoreTrackRow(
                         trackNumber = null,
                         title = track.title,
@@ -1173,12 +1176,7 @@ fun EncorePlaylistScreen(
                 }
             }
 
-            EncoreFastScroll(
-                listState = listState,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 2.dp),
-            )
+            }
 
             Box(
                 modifier = Modifier

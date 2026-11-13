@@ -75,6 +75,7 @@ internal fun ShellBottomBar(
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
     hasTrack: Boolean = true,
+    showMiniPlayer: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val isOffline = rememberIsOffline()
@@ -117,25 +118,33 @@ internal fun ShellBottomBar(
             }
         }
 
-        EncoreMiniPlayer(
-            title = title,
-            artist = artist,
-            isPlaying = isPlaying,
-            isBuffering = isBuffering,
-            progress = progress,
-            isLiked = isLiked,
-            coverUrl = coverUrl,
-            coverColor = coverColor,
-            connectedDeviceName = connectedDevice,
-            connectedDeviceKind = connectedDeviceKind,
-            onPlayPauseClick = onPlayPause,
-            onLikeClick = onLike,
-            onDeviceClick = onDeviceClick,
-            onBarClick = onBarClick,
-            onSkipNextClick = onSkipNext,
-            onSkipPreviousClick = onSkipPrevious,
-            hasTrack = hasTrack
-        )
+        AnimatedVisibility(
+            visible = showMiniPlayer,
+            enter = fadeIn(animationSpec = tween(EncoreAnimation.ButtonDuration)) +
+                    expandVertically(animationSpec = tween(EncoreAnimation.ButtonDuration)),
+            exit = fadeOut(animationSpec = tween(EncoreAnimation.ButtonDuration)) +
+                    shrinkVertically(animationSpec = tween(EncoreAnimation.ButtonDuration))
+        ) {
+            EncoreMiniPlayer(
+                title = title,
+                artist = artist,
+                isPlaying = isPlaying,
+                isBuffering = isBuffering,
+                progress = progress,
+                isLiked = isLiked,
+                coverUrl = coverUrl,
+                coverColor = coverColor,
+                connectedDeviceName = connectedDevice,
+                connectedDeviceKind = connectedDeviceKind,
+                onPlayPauseClick = onPlayPause,
+                onLikeClick = onLike,
+                onDeviceClick = onDeviceClick,
+                onBarClick = onBarClick,
+                onSkipNextClick = onSkipNext,
+                onSkipPreviousClick = onSkipPrevious,
+                hasTrack = hasTrack
+            )
+        }
 
         Row(
             modifier = Modifier

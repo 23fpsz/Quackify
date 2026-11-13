@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreExplicitTag
+import com.quackify.compose.components.matchesCurrent
 import com.quackify.compose.components.EncoreFastScroll
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
@@ -101,6 +102,7 @@ fun EncoreAlbumScreen(
     copyrightNotice: String = "",
     phonographicNotice: String = "",
     currentTrackTitle: String = "",
+    currentTrackUri: String = "",
     isPlaying: Boolean = false,
     moreByArtist: List<ArtistRelease>? = null,
     onBackClick: () -> Unit = {},
@@ -209,6 +211,7 @@ fun EncoreAlbumScreen(
                 )
         )
 
+        EncoreFastScroll(listState) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -464,7 +467,7 @@ fun EncoreAlbumScreen(
                     }
 
                     itemsIndexed(disc.tracks) { index, track ->
-                        val isCurrentTrack = track.title == currentTrackTitle
+                        val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                         AlbumTrackRow(
                             trackNumber = index + 1,
                             track = track,
@@ -495,7 +498,7 @@ fun EncoreAlbumScreen(
                     if (index == tracks.lastIndex - 8) {
                         AlbumLoadMoreSentinel(hasMore = hasMore, loadingMore = loadingMore, onLoadMore = onLoadMore)
                     }
-                    val isCurrentTrack = track.title == currentTrackTitle
+                    val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                     AlbumTrackRow(
                         trackNumber = index + 1,
                         track = track,
@@ -613,12 +616,7 @@ fun EncoreAlbumScreen(
             }
         }
 
-        EncoreFastScroll(
-            listState = listState,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 2.dp),
-        )
+        }
 
         Box(
             modifier = Modifier

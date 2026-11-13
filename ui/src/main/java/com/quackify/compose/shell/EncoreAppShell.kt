@@ -598,6 +598,7 @@ fun EncoreAppShell(
                 playlistLoadFailed = playlistLoadFailed,
                 onRetryPlaylist = onRetryPlaylist,
                 currentTrackTitle = currentTrackTitle,
+                currentTrackUri = playbackState?.trackUri.orEmpty(),
                 isPlaying = isPlaying,
                 userDisplayName = userDisplayName,
                 playerListener = playerListener,
@@ -654,6 +655,7 @@ fun EncoreAppShell(
                 onLoadMoreAlbumTracks = onLoadMoreAlbumTracks,
                 onRetryAlbum = onRetryAlbum,
                 currentTrackTitle = currentTrackTitle,
+                currentTrackUri = playbackState?.trackUri.orEmpty(),
                 isPlaying = isPlaying,
                 playerListener = playerListener,
                 handleBack = handleBack,
@@ -677,6 +679,7 @@ fun EncoreAppShell(
                 onRetryArtist = onRetryArtist,
                 artistFollowed = artistFollowed,
                 currentTrackTitle = currentTrackTitle,
+                currentTrackUri = playbackState?.trackUri.orEmpty(),
                 isPlaying = isPlaying,
                 onBackClick = handleBack,
                 onPlayPauseClick = handlePlayPause,
@@ -936,6 +939,7 @@ fun EncoreAppShell(
                 onSkipNext = handleSkipNext,
                 onSkipPrevious = handleSkipPrevious,
                 hasTrack = playerIdentity.trackLoaded,
+                showMiniPlayer = playbackState?.trackUri.isNullOrBlank() || currentTrackTitle.isNotBlank(),
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
