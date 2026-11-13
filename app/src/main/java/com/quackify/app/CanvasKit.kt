@@ -73,9 +73,9 @@ object CanvasKit {
     private const val MAX_BYTES = 12 * 1024 * 1024
     private const val MAX_CACHED = 16
 
-    /** Playback pick: the web player's canvas ABR settles at 720p; the
-     * 1080p top rung (~9 Mbps) stutters in the card-sized artwork slot. */
-    private const val PLAYBACK_RESOLUTION_CAP = 720
+    /** Playback ceiling: the ladder tops out at 1080p and the resolution
+     * picker in the player decides how high we climb. */
+    private const val PLAYBACK_RESOLUTION_CAP = 1080
 
     /** Hard ceiling for degenerate ladders with no rung at or under the
      * playback cap. */
@@ -85,14 +85,23 @@ object CanvasKit {
     private class Target(val initUrl: String, val stride: Int?)
 
     /** Resolve the best available canvas url for a track, null when the track has none. */
-    suspend fun canvasUrl(context: Context, trackUri: String): String? =
-        resolve(context, trackUri)?.initUrl
+    suspend fun canvasUrl(
+        context: Context,
+        trackUri: String,
+        preferredHeight: Int = PLAYBACK_RESOLUTION_CAP,
+    ): String? =
+        resolve(context, trackUri, preferredHeight)?.initUrl
 
     /**
      * Ask the canvas query, then upgrade to the manifest ladder: the direct
-     * canvaz file varies in quality, the ladder offers a capped 720p pick.
+     * canvaz file varies in quality, the ladder offers a capped pick at the
+     * preferred height.
      */
-    private suspend fun resolve(context: Context, trackUri: String): Target? {
+    private suspend fun resolve(
+        context: Context,
+        trackUri: String,
+        preferredHeight: Int,
+    ): Target? {
         val id = trackUri.substringAfterLast(":")
         if (!trackUri.startsWith("spotify:track:") || id.isBlank()) return null
         val token = EncoreAuth.token(context)
@@ -140,14 +149,14 @@ object CanvasKit {
         log.i("canvas $id -> ${url.substringBefore('?')}")
         val fileId = canvas.optString("fileId")
         if (fileId.isNotBlank()) {
-            manifestTarget(context, fileId, headers)?.let { return it }
+            manifestTarget(context, fileId, headers, preferredHeight)?.let { return it }
         }
         return Target(url, null)
     }
 
     /**
      * manifests/v9 knows every rendition of a canvas source. Pick the best
-     * mp4 profile at or under the playback cap and rebuild its init url
+     * mp4 profile at or under the preferred height and rebuild its init url
      * from the signed template. The template tokens are scoped to the whole
      * encoding, so segment urls follow from the init url by name like the
      * legacy segmented ones.
@@ -156,6 +165,7 @@ object CanvasKit {
         context: Context,
         fileId: String,
         headers: Map<String, String>,
+        preferredHeight: Int,
     ): Target? {
         val spclient = DealerHost.resolve(context)?.second ?: return null
         val response = Net.get(
@@ -173,6 +183,7 @@ object CanvasKit {
         if (!initTemplate.startsWith("v1/") || baseUrl.isBlank()) return null
         val encodingId = initTemplate.substringAfter("/encodings/", "").substringBefore("/")
         val contents = root.optJSONArray("contents") ?: return null
+        val want = preferredHeight.coerceIn(1, PLAYBACK_RESOLUTION_CAP)
         var best: JSONObject? = null
         var fallback: JSONObject? = null
         var stride = 0
@@ -187,7 +198,7 @@ object CanvasKit {
                 if (profile.optString("file_type") != "mp4") continue
                 val resolution = profile.optInt("video_resolution", 0)
                 if (resolution <= 0) continue
-                if (resolution <= PLAYBACK_RESOLUTION_CAP) {
+                if (resolution <= want) {
                     if (best == null ||
                         resolution > best.optInt("video_resolution")
                     ) {
@@ -213,16 +224,23 @@ object CanvasKit {
     }
 
     /** Download and stitch the canvas of a track, returning a playable local file path. */
-    suspend fun download(context: Context, trackUri: String): String? = withContext(Dispatchers.IO) {
+    suspend fun download(
+        context: Context,
+        trackUri: String,
+        preferredHeight: Int,
+    ): String? = withContext(Dispatchers.IO) {
         val id = trackUri.substringAfterLast(":")
         val dir = File(context.cacheDir, "canvas")
-        val cache = File(dir, "v7-$id.mp4")
+        val cache = File(dir, "v8-$id-$preferredHeight.mp4")
         if (cache.isFile && cache.length() > 0L) return@withContext cache.absolutePath
-        dir.listFiles()?.filter { it.isFile && it.name.startsWith("v6-") }?.forEach {
+        dir.listFiles()?.filter { it.isFile && (it.name.startsWith("v6-") || it.name.startsWith("v7-")) }?.forEach {
+            if (it.delete()) log.i("canvas cache dropped ${it.name}")
+        }
+        dir.listFiles()?.filter { it.isFile && it.name.startsWith("v8-$id-") && it.name != cache.name }?.forEach {
             if (it.delete()) log.i("canvas cache dropped ${it.name}")
         }
 
-        val target = resolve(context, trackUri) ?: return@withContext null
+        val target = resolve(context, trackUri, preferredHeight) ?: return@withContext null
         val initUrl = target.initUrl
         val headers = mapOf(
             "User-Agent" to Net.DESKTOP_UA,
