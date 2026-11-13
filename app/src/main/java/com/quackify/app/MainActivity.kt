@@ -117,20 +117,6 @@ class MainActivity : ComponentActivity() {
     }
     private var resumeSignal by mutableStateOf(0)
     private var pendingLink by mutableStateOf<SpotLink?>(null)
-    private var appUpdate by mutableStateOf<AppUpdate?>(null)
-    private var updateChecking by mutableStateOf(false)
-    private var updateChecked by mutableStateOf(false)
-    private var updateFetch by mutableStateOf(0)
-    private var updatePrompt by mutableStateOf<AppUpdate?>(null)
-    private var updateAutoTick by mutableStateOf(0)
-    private var updateTimerTick by mutableStateOf(0)
-    private var updateManualPending = false
-    private var lastUpdateCheckAt = 0L
-    private var updatePhase by mutableStateOf(UpdateInstallPhase.Idle)
-    private var updateDownloadedMb by mutableStateOf(0f)
-    private var updateTotalMb by mutableStateOf(0f)
-    private var updateSpeedMbps by mutableStateOf(0f)
-    private var installTick by mutableStateOf(0)
     private var videoFullscreen by mutableStateOf(false)
 
     /** Bumped every time the playback notification's body is tapped; the
@@ -725,56 +711,6 @@ class MainActivity : ComponentActivity() {
                             browsePage = Browse.page(context, browseUri)
                         }
 
-                        LaunchedEffect(updateFetch) {
-                            updateChecking = true
-                            appUpdate = withContext(Dispatchers.IO) {
-                                runCatching { UpdateChecker.check(context) }.getOrNull()
-                            }
-                            updateChecking = false
-                            updateChecked = true
-                        }
-
-                        LaunchedEffect(Unit) {
-                            withContext(Dispatchers.IO) { UpdateInstaller.cleanup(context) }
-                        }
-
-                        LaunchedEffect(Unit) {
-                            while (isActive) {
-                                delay(30 * 60 * 1000L)
-                                updateTimerTick++
-                            }
-                        }
-
-                        LaunchedEffect(updateAutoTick, updateTimerTick, updateFetch) {
-                            if (updateAutoTick == 0 && updateTimerTick == 0 && updateFetch == 0) return@LaunchedEffect
-                            runUpdateCheck()
-                        }
-
-                        LaunchedEffect(installTick) {
-                            if (installTick == 0) return@LaunchedEffect
-                            runUpdateInstall()
-                        }
-
-                        if (updatePrompt != null) {
-                            UpdateDialog(
-                                update = updatePrompt!!,
-                                currentVersion = UpdateChecker.currentVersion(context).orEmpty(),
-                                phase = updatePhase,
-                                downloadedMb = updateDownloadedMb,
-                                totalMb = updateTotalMb,
-                                speedMbps = updateSpeedMbps,
-                                onLater = {
-                                    clientPrefs.edit().putLong(
-                                        "updateSnoozeUntil",
-                                        System.currentTimeMillis() + 6 * 60 * 60 * 1000L
-                                    ).apply()
-                                    updatePrompt = null
-                                },
-                                onInstall = { installTick++ },
-                                onDismiss = { updatePrompt = null }
-                            )
-                        }
-
                         LaunchedEffect(loggedIn, pendingLink) {
                             val link = pendingLink ?: return@LaunchedEffect
                             if (link.kind != "track" && link.kind != "station") return@LaunchedEffect
@@ -880,6 +816,10 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
+                        val updates = rememberUpdateController()
+
+                        UpdateEffects(updates)
+
                         ShellSection(
                             bridge = bridge,
                             account = account,
@@ -887,6 +827,7 @@ class MainActivity : ComponentActivity() {
                             loggedIn = loggedIn,
                             activeAccountId = activeAccountId,
                             onSignedOut = { loggedIn = false },
+                            updates = updates,
                         )
 
                         if (addingAccount) {
@@ -963,55 +904,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun runUpdateCheck() {
-        val manual = updateManualPending
-        updateManualPending = false
-        val now = System.currentTimeMillis()
-        if (!manual && now - lastUpdateCheckAt < 30 * 60_000L) return
-        lastUpdateCheckAt = now
-        updateChecking = true
-        val found = withContext(Dispatchers.IO) {
-            runCatching { UpdateChecker.check(applicationContext) }.getOrNull()
-        }
-        updateChecking = false
-        updateChecked = true
-        appUpdate = found
-        if (found == null) {
-            if (manual) {
-                Toast.makeText(this, "No new updates yet", Toast.LENGTH_SHORT).show()
-            }
-            return
-        }
-        if (!manual && clientPrefs.getLong("updateSnoozeUntil", 0L) > now) return
-        updatePhase = UpdateInstallPhase.Idle
-        updatePrompt = found
-    }
-
-    private suspend fun runUpdateInstall() {
-        val target = updatePrompt ?: return
-        updatePhase = UpdateInstallPhase.Downloading
-        updateDownloadedMb = 0f
-        updateTotalMb = 0f
-        updateSpeedMbps = 0f
-        val file = withContext(Dispatchers.IO) {
-            UpdateInstaller.download(applicationContext, target) { done, total, speed ->
-                updateDownloadedMb = done / 1_000_000f
-                updateTotalMb = total / 1_000_000f
-                updateSpeedMbps = speed / 1_000_000f
-            }
-        }
-        if (file == null) {
-            updatePhase = UpdateInstallPhase.Idle
-            Toast.makeText(this, "Download failed", Toast.LENGTH_SHORT).show()
-            return
-        }
-        updatePhase = UpdateInstallPhase.Installing
-        runCatching { UpdateInstaller.install(applicationContext, file) }
-            .onFailure {
-                updatePhase = UpdateInstallPhase.Idle
-                Toast.makeText(this, "Install failed", Toast.LENGTH_SHORT).show()
-            }
-    }
 
     private suspend fun loadMorePlaylistTracks(currentSize: Int): Pair<List<TrackItem>, Boolean>? {
         val page = Krespot.collections.collectionMore(applicationContext, playlistUri, currentSize)
@@ -1342,6 +1234,7 @@ class MainActivity : ComponentActivity() {
         loggedIn: Boolean,
         activeAccountId: String,
         onSignedOut: () -> Unit,
+        updates: UpdateController,
     ) {
         val scope = rememberCoroutineScope()
         val playback = bridge.state
@@ -1449,14 +1342,11 @@ class MainActivity : ComponentActivity() {
             deeplink = pendingLink?.let { ShellDeepLink(it.kind, it.uri, it.query) },
             onDeeplinkConsumed = { pendingLink = null },
             onDeeplinkSearch = { q -> if (searchTerm == q) searchFetch++ else searchTerm = q },
-            appUpdate = appUpdate,
-            updateChecking = updateChecking,
-            updateChecked = updateChecked,
-            onCheckUpdates = {
-                updateManualPending = true
-                updateFetch++
-            },
-            onHomeEntered = { updateAutoTick++ },
+            appUpdate = updates.appUpdate,
+            updateChecking = updates.checking,
+            updateChecked = updates.checked,
+            onCheckUpdates = updates::requestManualCheck,
+            onHomeEntered = updates::onHomeEntered,
             userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
             userAvatarUrl = account?.imageUrl.orEmpty(),
         playbackState = bridge.state,
@@ -2002,314 +1892,3 @@ class MainActivity : ComponentActivity() {
  * Songs list without covers or artist lines. One decorateContextTracks
  * batch fills exactly those rows before the list reaches the screen.
  */
-private suspend fun decorateSearchTracks(
-    context: android.content.Context,
-    results: com.quackify.backend.model.SearchResults,
-): com.quackify.backend.model.SearchResults {
-    fun thin(hit: com.quackify.backend.model.SearchHit) =
-        hit.kind == com.quackify.backend.model.SearchKind.TRACK &&
-                (hit.imageUrl.isBlank() || hit.subtitle.isBlank())
-    val missing = (listOfNotNull(results.top) + results.tracks)
-        .filter(::thin)
-        .map { it.uri }
-        .distinct()
-    if (missing.isEmpty()) return results
-    val rows = runCatching {
-        com.quackify.backend.library.TrackSource.decorate(context, missing)
-    }.getOrDefault(emptyMap())
-    if (rows.isEmpty()) return results
-    fun fill(hit: com.quackify.backend.model.SearchHit): com.quackify.backend.model.SearchHit {
-        val row = rows[hit.uri] ?: return hit
-        return hit.copy(
-            subtitle = hit.subtitle.ifBlank { row.artists },
-            imageUrl = hit.imageUrl.ifBlank { row.imageUrl },
-            durationMs = row.durationMs.takeIf { it > 0L } ?: hit.durationMs,
-            explicit = hit.explicit || row.explicit,
-        )
-    }
-    return results.copy(
-        top = results.top?.let(::fill),
-        tracks = results.tracks.map(::fill),
-    )
-}
-
-private const val FAVORITE_ARTIST_LIMIT = 10
-
-private const val PLAYLIST_PREFETCH_ROWS = 8
-
-private data class ArtistStanding(
-    val plays: Int,
-    val lastPlayedAtMs: Long,
-    val latestTrack: TrackItem,
-)
-
-/**
- * The history's favorite artists: every artist uri ranked by total plays,
- * the most recent play breaking ties. Each artist is represented by its
- * newest track so the shelf card carries a cover.
- */
-private fun favoriteArtistsOf(history: List<PlayedTrack>): List<TrackItem> =
-    history
-        .filter { it.item.artistUri.startsWith("spotify:artist:") && it.item.artist.isNotBlank() }
-        .groupBy { it.item.artistUri }
-        .values
-        .map { plays ->
-            ArtistStanding(
-                plays = plays.sumOf { it.plays },
-                lastPlayedAtMs = plays.maxOf { it.playedAtMs },
-                latestTrack = plays.maxByOrNull { it.playedAtMs }!!.item,
-            )
-        }
-        .sortedWith(compareByDescending<ArtistStanding> { it.plays }.thenByDescending { it.lastPlayedAtMs })
-        .take(FAVORITE_ARTIST_LIMIT)
-        .map { it.latestTrack }
-
-private const val PROFILE_CONTEXT_LIMIT = 12
-
-/**
- * The recently-played feed only carries context uris, so each entry is turned
- * into a displayable card: artists come straight from the profile response,
- * playlists and albums are resolved through their existing sources.
- */
-private suspend fun resolveProfileContexts(
-    context: android.content.Context,
-    profile: UserProfile?,
-    contexts: List<ProfileContext>?,
-): List<ProfileContextCard> {
-    if (contexts.isNullOrEmpty()) return emptyList()
-    val artistByUri = profile?.recentlyPlayedArtists?.associateBy { it.uri }.orEmpty()
-    return contexts.take(PROFILE_CONTEXT_LIMIT).mapNotNull { entry ->
-        when {
-            entry.uri.startsWith("spotify:artist:") -> {
-                val artist = artistByUri[entry.uri] ?: return@mapNotNull null
-                ProfileContextCard(entry.uri, artist.name, "Artist", artist.imageUrl)
-            }
-            entry.uri.startsWith("spotify:playlist:") -> {
-                val detail = runCatching {
-                    Krespot.collections.collection(context, entry.uri)
-                }.getOrNull() ?: return@mapNotNull null
-                ProfileContextCard(entry.uri, detail.title, "Playlist", detail.imageUrl)
-            }
-            entry.uri.startsWith("spotify:album:") -> {
-                val detail = runCatching {
-                    Krespot.albums.album(context, entry.uri)
-                }.getOrNull() ?: return@mapNotNull null
-                ProfileContextCard(entry.uri, detail.title, detail.artists, detail.imageUrl)
-            }
-            else -> null
-        }
-    }
-}
-
-private val LAUNCHER_ALIASES = linkedMapOf(
-    "default" to ".LauncherDefault",
-    "normal" to ".LauncherNormal",
-)
-
-private fun launcherIconPref(context: Context): String {
-    val saved = com.quackify.backend.core.store.AppPrefs.prefs(context, "quackify.client")
-        .getString("appIcon", "default").orEmpty().ifBlank { "default" }
-    return if (saved in LAUNCHER_ALIASES) saved else "default"
-}
-
-private fun applyLauncherIcon(context: Context, option: String) {
-    val pm = context.packageManager
-    val target = LAUNCHER_ALIASES[option] ?: return
-    val prefix = MainActivity::class.java.name.substringBeforeLast('.')
-    LAUNCHER_ALIASES.forEach { (key, cls) ->
-        val component = ComponentName(context, "$prefix$cls")
-        val want = if (key == option) {
-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-        } else {
-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-        }
-        if (pm.getComponentEnabledSetting(component) != want) {
-            runCatching {
-                pm.setComponentEnabledSetting(component, want, PackageManager.DONT_KILL_APP)
-            }.onFailure { log.w("launcher icon '$key' -> ${want == PackageManager.COMPONENT_ENABLED_STATE_ENABLED} failed: $it") }
-        }
-    }
-    log.i("launcher icon -> $option")
-}
-
-private fun syncLauncherIcon(context: Context) {
-    applyLauncherIcon(context, launcherIconPref(context))
-}
-
-private suspend fun withSavedStates(context: Context, rows: List<TrackItem>): List<TrackItem> {
-    val uris = rows.map { it.uri }.filter { it.isNotBlank() }
-    if (uris.isEmpty()) return rows
-    val liked = Library.saved(context, uris)
-    return rows.map { it.copy(saved = it.uri in liked) }
-}
-
-private suspend fun withSavedPopularTracks(context: Context, rows: List<PopularTrack>): List<PopularTrack> {
-    val uris = rows.map { it.track.uri }.filter { it.isNotBlank() }
-    if (uris.isEmpty()) return rows
-    val liked = Library.saved(context, uris)
-    return rows.map { popTrack ->
-        popTrack.copy(track = popTrack.track.copy(saved = popTrack.track.uri in liked))
-    }
-}
-
-private fun toggleArtistTrackLike(
-    context: Context,
-    scope: CoroutineScope,
-    track: TrackItem,
-    getTracks: () -> List<PopularTrack>?,
-    setTracks: (List<PopularTrack>?) -> Unit,
-) {
-    val next = track.saved != true
-    val swap = { liked: Boolean ->
-        setTracks(
-            getTracks()?.map { popTrack ->
-                if (popTrack.track.uri == track.uri) {
-                    popTrack.copy(track = popTrack.track.copy(saved = liked))
-                } else {
-                    popTrack
-                }
-            }
-        )
-    }
-    swap(next)
-    scope.launch {
-        val ok = Library.setSaved(context, listOf(track.uri), next)
-        log.i("artist heart '${track.title}' -> $next ok=$ok")
-        if (!ok) swap(!next)
-    }
-}
-
-private fun toggleAlbumTrackLike(
-    context: Context,
-    scope: CoroutineScope,
-    track: TrackItem,
-    getTracks: () -> List<TrackItem>?,
-    setTracks: (List<TrackItem>?) -> Unit,
-) {
-    val next = track.saved != true
-    val swap = { liked: Boolean ->
-        setTracks(getTracks()?.map { if (it.uri == track.uri) it.copy(saved = liked) else it })
-    }
-    swap(next)
-    scope.launch {
-        val ok = Library.setSaved(context, listOf(track.uri), next)
-        log.i("album heart '${track.title}' -> $next ok=$ok")
-        if (!ok) swap(!next)
-    }
-}
-
-private fun togglePlaylistTrackLike(
-    context: Context,
-    scope: CoroutineScope,
-    playlistUri: String,
-    track: TrackItem,
-    getTracks: () -> List<TrackItem>?,
-    setTracks: (List<TrackItem>?) -> Unit,
-    getDetail: () -> CollectionDetail?,
-    setDetail: (CollectionDetail?) -> Unit,
-) {
-    val next = track.saved != true
-    val isLikedSongs = playlistUri == "spotify:collection:tracks"
-    if (!next && isLikedSongs) {
-        setTracks(getTracks()?.filterNot { it.uri == track.uri })
-        setDetail(getDetail()?.let { it.copy(total = (it.total - 1).coerceAtLeast(0)) })
-    } else {
-        setTracks(getTracks()?.map { if (it.uri == track.uri) it.copy(saved = next) else it })
-    }
-    scope.launch {
-        val ok = Library.setSaved(context, listOf(track.uri), next)
-        log.i("playlist heart '${track.title}' -> $next ok=$ok")
-        if (!ok) {
-            val fresh = Krespot.collections.collection(context, playlistUri)
-            setDetail(fresh)
-            setTracks(fresh?.tracks?.map { it.toTrackItem() })
-        }
-    }
-}
-
-private suspend fun buildPlaylistRecommendations(
-    context: Context,
-    tracks: List<TrackItem>,
-    inPlaylist: Set<String>,
-): List<TrackItem> {
-    val seedArtists = if (inPlaylist.isNotEmpty()) {
-        tracks
-            .filter { it.artistUri.startsWith("spotify:artist:") }
-            .groupingBy { it.artistUri }
-            .eachCount()
-            .entries
-            .sortedByDescending { it.value }
-            .take(6)
-            .map { it.key }
-            .shuffled()
-            .take(3)
-    } else {
-        val candidateArtists = LinkedHashSet<String>()
-        val likedDetail = Krespot.collections.collection(context, "spotify:user:@me:collection")
-        likedDetail?.tracks?.forEach { t ->
-            if (t.artistUri.startsWith("spotify:artist:")) candidateArtists.add(t.artistUri)
-        }
-        if (candidateArtists.size < 5) {
-            val libraryPage = Krespot.library.page(context)
-            libraryPage?.items?.forEach { item ->
-                if (item.uri.startsWith("spotify:artist:")) {
-                    candidateArtists.add(item.uri)
-                }
-            }
-        }
-        if (candidateArtists.isNotEmpty()) {
-            candidateArtists.shuffled().take(4)
-        } else {
-            listOf(
-                "spotify:artist:4YRxDV8wJFPHPTeXepOstw",
-                "spotify:artist:3g2kUQ6tHLLbmkV7T4GPdf",
-                "spotify:artist:246dkjvS1zLTtiykYqq8Gv"
-            )
-        }
-    }
-    val picks = LinkedHashMap<String, TrackItem>()
-    val overviews = coroutineScope {
-        seedArtists.map { artist ->
-            async { Krespot.artists.artist(context, artist) }
-        }.awaitAll()
-    }
-    for (detail in overviews.filterNotNull()) {
-        for (row in detail.topTracks) {
-            if (row.uri in inPlaylist || picks.containsKey(row.uri)) continue
-            picks[row.uri] = row.toTrackItem()
-            if (picks.size >= 10) break
-        }
-        if (picks.size >= 10) break
-    }
-    log.i("recommended ${picks.size} client track(s) from ${seedArtists.size} artist(s)")
-    return picks.values.toList()
-}
-
-private data class ArtistLoad(
-    val detail: ArtistDetail?,
-    val tracks: List<PopularTrack>,
-    val releases: List<ArtistRelease>,
-    val listeners: String?,
-    val followed: Boolean?,
-)
-
-private suspend fun loadArtistDetail(context: Context, uri: String): ArtistLoad {
-    val detail = Krespot.artists.artist(context, uri)
-    var releaseRows = detail?.releases.orEmpty()
-    if (releaseRows.isEmpty()) {
-        releaseRows = Krespot.artists.discography(context, uri, "all")?.rows.orEmpty()
-    }
-    val inLibrary = Library.saved(context, listOf(uri))
-    return ArtistLoad(
-        detail = detail,
-        tracks = detail?.topTracks?.map { row ->
-            val countFormatted = if (row.plays > 0L) {
-                java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(row.plays)
-            } else ""
-            PopularTrack(row.toTrackItem(), countFormatted)
-        }.orEmpty(),
-        releases = releaseRows.map { it.toArtistRelease() },
-        listeners = detail?.monthlyListeners?.takeIf { it > 0L }?.let { formatCount(it) },
-        followed = if (inLibrary.isEmpty()) detail?.saved == true else uri in inLibrary,
-    )
-}
