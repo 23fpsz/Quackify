@@ -9,6 +9,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
+import com.quackify.compose.components.UpdateDialog
+import com.quackify.compose.components.UpdateInstallPhase
 import java.util.Calendar
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -93,6 +95,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.quackify.backend.core.log.Logs
@@ -115,6 +118,16 @@ class MainActivity : ComponentActivity() {
     private var updateChecking by mutableStateOf(false)
     private var updateChecked by mutableStateOf(false)
     private var updateFetch by mutableStateOf(0)
+    private var updatePrompt by mutableStateOf<AppUpdate?>(null)
+    private var updateAutoTick by mutableStateOf(0)
+    private var updateTimerTick by mutableStateOf(0)
+    private var updateManualPending = false
+    private var lastUpdateCheckAt = 0L
+    private var updatePhase by mutableStateOf(UpdateInstallPhase.Idle)
+    private var updateDownloadedMb by mutableStateOf(0f)
+    private var updateTotalMb by mutableStateOf(0f)
+    private var updateSpeedMbps by mutableStateOf(0f)
+    private var installTick by mutableStateOf(0)
 
     /** Bumped every time the playback notification's body is tapped; the
      * shell watches it and slides the Now Playing view over whatever is
@@ -739,6 +752,89 @@ class MainActivity : ComponentActivity() {
                             updateChecked = true
                         }
 
+                        LaunchedEffect(Unit) {
+                            withContext(Dispatchers.IO) { UpdateInstaller.cleanup(context) }
+                        }
+
+                        LaunchedEffect(Unit) {
+                            while (isActive) {
+                                delay(30 * 60 * 1000L)
+                                updateTimerTick++
+                            }
+                        }
+
+                        LaunchedEffect(updateAutoTick, updateTimerTick, updateFetch) {
+                            if (updateAutoTick == 0 && updateTimerTick == 0 && updateFetch == 0) return@LaunchedEffect
+                            val manual = updateManualPending
+                            updateManualPending = false
+                            val now = System.currentTimeMillis()
+                            if (!manual && now - lastUpdateCheckAt < 30 * 60_000L) return@LaunchedEffect
+                            lastUpdateCheckAt = now
+                            updateChecking = true
+                            val found = withContext(Dispatchers.IO) {
+                                runCatching { UpdateChecker.check(context) }.getOrNull()
+                            }
+                            updateChecking = false
+                            updateChecked = true
+                            appUpdate = found
+                            if (found == null) {
+                                if (manual) {
+                                    Toast.makeText(context, "No new updates yet", Toast.LENGTH_SHORT).show()
+                                }
+                                return@LaunchedEffect
+                            }
+                            if (!manual && clientPrefs.getLong("updateSnoozeUntil", 0L) > now) return@LaunchedEffect
+                            updatePhase = UpdateInstallPhase.Idle
+                            updatePrompt = found
+                        }
+
+                        LaunchedEffect(installTick) {
+                            if (installTick == 0) return@LaunchedEffect
+                            val target = updatePrompt ?: return@LaunchedEffect
+                            updatePhase = UpdateInstallPhase.Downloading
+                            updateDownloadedMb = 0f
+                            updateTotalMb = 0f
+                            updateSpeedMbps = 0f
+                            val file = withContext(Dispatchers.IO) {
+                                UpdateInstaller.download(context, target) { done, total, speed ->
+                                    updateDownloadedMb = done / 1_000_000f
+                                    updateTotalMb = total / 1_000_000f
+                                    updateSpeedMbps = speed / 1_000_000f
+                                }
+                            }
+                            if (file == null) {
+                                updatePhase = UpdateInstallPhase.Idle
+                                Toast.makeText(context, "Download failed", Toast.LENGTH_SHORT).show()
+                                return@LaunchedEffect
+                            }
+                            updatePhase = UpdateInstallPhase.Installing
+                            runCatching { UpdateInstaller.install(context, file) }
+                                .onFailure {
+                                    updatePhase = UpdateInstallPhase.Idle
+                                    Toast.makeText(context, "Install failed", Toast.LENGTH_SHORT).show()
+                                }
+                        }
+
+                        if (updatePrompt != null) {
+                            UpdateDialog(
+                                update = updatePrompt!!,
+                                currentVersion = UpdateChecker.currentVersion(context).orEmpty(),
+                                phase = updatePhase,
+                                downloadedMb = updateDownloadedMb,
+                                totalMb = updateTotalMb,
+                                speedMbps = updateSpeedMbps,
+                                onLater = {
+                                    clientPrefs.edit().putLong(
+                                        "updateSnoozeUntil",
+                                        System.currentTimeMillis() + 6 * 60 * 60 * 1000L
+                                    ).apply()
+                                    updatePrompt = null
+                                },
+                                onInstall = { installTick++ },
+                                onDismiss = { updatePrompt = null }
+                            )
+                        }
+
                         LaunchedEffect(loggedIn, pendingLink) {
                             val link = pendingLink ?: return@LaunchedEffect
                             if (link.kind != "track" && link.kind != "station") return@LaunchedEffect
@@ -942,7 +1038,11 @@ class MainActivity : ComponentActivity() {
                                 appUpdate = appUpdate,
                                 updateChecking = updateChecking,
                                 updateChecked = updateChecked,
-                                onCheckUpdates = { updateFetch++ },
+                                onCheckUpdates = {
+                                    updateManualPending = true
+                                    updateFetch++
+                                },
+                                onHomeEntered = { updateAutoTick++ },
                                 userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
                                 userAvatarUrl = account?.imageUrl.orEmpty(),
                             playbackState = bridge.state,

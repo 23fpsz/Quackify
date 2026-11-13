@@ -141,6 +141,7 @@ fun EncoreAppShell(
     updateChecking: Boolean = false,
     updateChecked: Boolean = false,
     onCheckUpdates: (() -> Unit)? = null,
+    onHomeEntered: () -> Unit = {},
     browsePage: BrowsePage? = null,
     categoryShelves: List<CategoryShelf>? = null,
     onOpenCategory: ((String) -> Unit)? = null,
@@ -298,6 +299,10 @@ fun EncoreAppShell(
     var currentScreen by navController.nav::currentScreen
     var selectedNavIndex by navController.nav::selectedNavIndex
     var isPlayerExpanded by navController.nav::isPlayerExpanded
+
+    LaunchedEffect(currentScreen) {
+        if (currentScreen == ShellScreen.HOME) onHomeEntered()
+    }
 
     LaunchedEffect(expandPlayerSignal) {
         if (expandPlayerSignal > 0) isPlayerExpanded = true
