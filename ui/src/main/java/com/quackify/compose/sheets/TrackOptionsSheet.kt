@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.components.EncoreMenu
+import com.quackify.compose.components.EncoreMenuItem
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
@@ -77,6 +79,8 @@ fun TrackOptionsSheet(
     canvasAvailable: Boolean = false,
     isCanvasEnabled: Boolean = false,
     onCanvasToggle: () -> Unit = {},
+    canvasResolution: Int = 1080,
+    onCanvasResolution: (Int) -> Unit = {},
     /** null while the taste-profile check is still loading (row hidden). */
     isTasteExcluded: Boolean? = null,
     onToggleTasteExclusion: (Boolean) -> Unit = {},
@@ -364,6 +368,42 @@ fun TrackOptionsSheet(
                 )
             }
 
+            if (canvasAvailable) {
+                var canvasMenuOpen by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    ContextMenuRowItem(
+                        title = "Canvas resolution",
+                        iconRes = R.drawable.encore_icon_settings_24,
+                        trailing = {
+                            Text(
+                                text = "${canvasResolution}p",
+                                style = EncoreTheme.typography.bodyMedium.copy(
+                                    fontSize = 14.sp,
+                                    color = EncoreColors.TextSecondary
+                                )
+                            )
+                        },
+                        onClick = { canvasMenuOpen = true }
+                    )
+                    EncoreMenu(
+                        expanded = canvasMenuOpen,
+                        onDismiss = { canvasMenuOpen = false },
+                    ) {
+                        listOf(480, 720, 1080).forEach { height ->
+                            EncoreMenuItem(
+                                label = "${height}p",
+                                selected = height == canvasResolution,
+                                onClick = {
+                                    canvasMenuOpen = false
+                                    onDismiss()
+                                    onCanvasResolution(height)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             ContextMenuRowItem(
                 title = "Share",
                 iconRes = R.drawable.encore_icon_share_android_24,
@@ -385,7 +425,8 @@ fun ContextMenuRowItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     iconTint: Color = EncoreColors.TextPrimary,
-    textColor: Color = EncoreColors.TextPrimary
+    textColor: Color = EncoreColors.TextPrimary,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -410,6 +451,7 @@ fun ContextMenuRowItem(
             ),
             modifier = Modifier.weight(1f)
         )
+        trailing?.invoke()
     }
 }
 

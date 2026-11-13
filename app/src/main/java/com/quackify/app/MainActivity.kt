@@ -740,15 +740,18 @@ class MainActivity : ComponentActivity() {
                         val canvasAllowed = settingsSwitches.canvas
                         val clientPrefs = remember { com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS) }
                         var canvasEnabled by remember { mutableStateOf(clientPrefs.getBoolean("canvasNpvEnabled", true)) }
+                        var canvasResolution by remember {
+                            mutableStateOf(clientPrefs.getInt("canvasResolution", 1080))
+                        }
                         var fullArtworkPlayer by remember {
                             mutableStateOf(clientPrefs.getBoolean("fullArtworkPlayer", true))
                         }
-                        LaunchedEffect(playback.trackUri, canvasAllowed) {
+                        LaunchedEffect(playback.trackUri, canvasAllowed, canvasResolution) {
                             canvasFile = null
                             if (!canvasAllowed) return@LaunchedEffect
                             val uri = playback.trackUri
                             if (!uri.startsWith("spotify:track:")) return@LaunchedEffect
-                            val file = CanvasKit.download(context, uri)
+                            val file = CanvasKit.download(context, uri, canvasResolution)
                             if (uri == playback.trackUri) canvasFile = file
                         }
                         LaunchedEffect(playlistTracks) {
@@ -999,6 +1002,11 @@ class MainActivity : ComponentActivity() {
                                 canvasEnabled = on
                                 clientPrefs.edit().putBoolean("canvasNpvEnabled", on).apply()
                                 bridge.setCanvas(on)
+                            },
+                            canvasResolution = canvasResolution,
+                            onCanvasResolution = { height ->
+                                canvasResolution = height
+                                clientPrefs.edit().putInt("canvasResolution", height).apply()
                             },
                             artistDetail = artistDetail,
                             artistLoading = artistLoading,
