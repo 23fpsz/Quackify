@@ -20,7 +20,7 @@ private val log = Logs.of(Logs.Module.SOURCE)
  */
 internal object AudioMeta {
 
-    private const val URL = "https://spclient.wg.spotify.com/extended-metadata/v0/extended-metadata"
+    private const val URL = "https://guc3-spclient.spotify.com/extended-metadata/v0/extended-metadata"
 
     private const val KIND_AUDIO_FILES = 5
 
