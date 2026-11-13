@@ -222,6 +222,12 @@ class PlaybackBridge(private val context: Context) {
         java.util.concurrent.ConcurrentHashMap<String, Boolean>()
     )
 
+    private val playlistNames = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    private val playlistNameTried = java.util.Collections.newSetFromMap(
+        java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    )
+
     private var decorateJob: Job? = null
 
     @Volatile
@@ -2895,7 +2901,7 @@ class PlaybackBridge(private val context: Context) {
         val label = if (server && follows && !radio && !single) {
             cluster!!.contextDescription.ifBlank {
                 state.queueContextLabel.takeIf { state.queueContext == context }.orEmpty()
-            }
+            }.ifBlank { playlistLabelOf(context) }
         } else ""
         val queued = if (server) {
             val onServer = cluster!!.queued.map { it.asTrackItem() }
@@ -2971,6 +2977,27 @@ class PlaybackBridge(private val context: Context) {
                 "'${label.ifBlank { context.ifBlank { "?" } }}' " +
                 "${if (server) "the server" else "the list on screen"}"
         )
+    }
+
+    private fun playlistLabelOf(contextUri: String): String {
+        if (contextUri == "spotify:collection:tracks" || contextUri == "spotify:user:@me:collection") {
+            return "Liked Songs"
+        }
+        if (!contextUri.startsWith("spotify:playlist:")) return ""
+        playlistNames[contextUri]?.let { return it }
+        if (playlistNameTried.add(contextUri)) {
+            scope.launch {
+                val name = runCatching {
+                    Krespot.collections.collection(context, contextUri)?.title
+                }.getOrNull()?.trim().orEmpty()
+                if (name.isBlank()) return@launch
+                playlistNames[contextUri] = name
+                log.i("context '$name' resolved for '${contextUri.takeLast(24)}'")
+                publishQueue(connect.cluster.value)
+                if (connect.holdsStream && player.hasSource) publishLocalFromEngine()
+            }
+        }
+        return ""
     }
 
     private fun scheduleDecorate(uris: List<String>) {
