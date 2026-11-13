@@ -68,14 +68,22 @@ object Profile {
         val parsed = (0 until artists.length()).mapNotNull { parseArtist(artists.optJSONObject(it)) }
         val playlists = root.optJSONArray("public_playlists") ?: JSONArray()
         val parsedPlaylists = (0 until playlists.length()).mapNotNull { parsePlaylist(playlists.optJSONObject(it)) }
+        // The v3 endpoint only sends "is_current_user" sometimes (it is absent for
+        // other users), so a missing field must never default to true — otherwise
+        // someone else's profile would be treated as our own. The uri check makes
+        // the decision reliable in both directions.
+        val selfId = EncoreAuth.userId(context)
+        val profileUri = root.optString("uri")
+        val isSelf = root.optBoolean("is_current_user", false) ||
+            (selfId.isNotBlank() && profileUri.endsWith(":$selfId"))
         val profile = UserProfile(
-            uri = root.optString("uri"),
+            uri = profileUri,
             name = root.optString("name"),
             followersCount = root.optLong("followers_count", 0L),
             followingCount = root.optLong("following_count", 0L),
             recentlyPlayedArtists = parsed,
             colorHex = colorHexOf(root.optInt("color", 0)),
-            isCurrentUser = root.optBoolean("is_current_user", true),
+            isCurrentUser = isSelf,
             avatarUrl = root.optString("image_url"),
             publicPlaylists = parsedPlaylists,
         )
@@ -92,12 +100,23 @@ object Profile {
     suspend fun followers(context: Context, userId: String = ""): List<ProfileUser>? =
         people(context, "followers", userId)
 
-    suspend fun topContent(context: Context): ProfileTopContent? {
+    /**
+     * Top artists/tracks of a profile. Without [userUri] the persisted query
+     * answers for the signed-in user (`me`); with it we ask for another user's
+     * public top content — when that user keeps it private (or the query has
+     * nothing to say about them) this returns null and the caller should say so
+     * instead of falling back to our own data.
+     */
+    suspend fun topContent(context: Context, userUri: String = ""): ProfileTopContent? {
         val token = EncoreAuth.token(context)
         if (token.isBlank()) {
             log.w("topContent: no token")
             return null
         }
+        val target = userUri.trim().takeIf { it.isNotBlank() }
+            ?.let { uri ->
+                if (uri.startsWith("spotify:user:")) uri else "spotify:user:$uri"
+            }
         val variables = JSONObject()
             .put(
                 "topArtistsInput",
@@ -117,11 +136,22 @@ object Profile {
             )
             .put("includeTopArtists", true)
             .put("includeTopTracks", true)
-            .toString()
-        val data = Pathfinder.queryPost(context, token, OP_TOP_CONTENT, variables) ?: return null
-        val profile = data.optJSONObject("data")?.optJSONObject("me")?.optJSONObject("profile")
+        if (target != null) {
+            variables.put("userUri", target)
+        }
+        val data = Pathfinder.queryPost(context, token, OP_TOP_CONTENT, variables.toString()) ?: return null
+        // The self variant nests under data.me.profile. When another user is
+        // requested, `me` (by definition the signed-in user) must never be
+        // accepted — otherwise our own taste would leak onto their profile.
+        val dataNode = data.optJSONObject("data") ?: return null
+        val profile = if (target == null) {
+            dataNode.optJSONObject("me")?.optJSONObject("profile")
+        } else {
+            dataNode.optJSONObject("user")?.optJSONObject("profile")
+                ?: dataNode.optJSONObject("user")
+        }
         if (profile == null) {
-            log.w("topContent: no data.me.profile")
+            log.w("topContent: no profile node${if (target != null) " for $target" else ""}")
             return null
         }
         val artists = profile.optJSONObject("topArtists")?.optJSONArray("items") ?: JSONArray()

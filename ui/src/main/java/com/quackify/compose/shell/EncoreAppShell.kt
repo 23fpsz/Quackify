@@ -273,6 +273,8 @@ fun EncoreAppShell(
     onArtistRadio: (suspend (artistUri: String) -> String?)? = null,
     profile: UserProfile? = null,
     profileTop: ProfileTopContent? = null,
+    /** True when viewing someone else and their top artists/tracks are private or empty. */
+    profileTopUnavailable: Boolean = false,
     profileContexts: List<ProfileContextCard> = emptyList(),
     profileLoading: Boolean = false,
     profileFailed: Boolean = false,
@@ -1006,6 +1008,7 @@ fun EncoreAppShell(
             ShellScreen.PROFILE -> ShellProfilePane(
                 profile = profile,
                 topContent = profileTop,
+                topContentUnavailable = profileTopUnavailable,
                 contexts = profileContexts,
                 loading = profileLoading,
                 loadFailed = profileFailed,

@@ -174,7 +174,7 @@ fun EncorePlaylistScreen(
     onDeletePlaylist: (() -> Unit)? = null,
     isEditable: Boolean = false,
     contributors: List<PlaylistMember> = emptyList(),
-    onContributorsClick: () -> Unit = {},
+    onContributorsClick: (() -> Unit)? = null,
     onShareClick: () -> Unit = {},
     isSaved: Boolean? = null,
     onSaveToggle: () -> Unit = {},
@@ -610,6 +610,9 @@ fun EncorePlaylistScreen(
                                     coverUrl = coverUrl,
                                     title = currentTitle,
                                     creator = creator,
+                                    contributors = contributors,
+                                    creatorAvatarUrl = creatorAvatarUrl,
+                                    onContributorsClick = onContributorsClick,
                                     onEditCoverClick = { onEditCoverClick?.invoke() ?: onPlaylistOptionsClick() },
                                     onChangeTitle = onChangeTitle,
                                     onShareClick = onShareClick,
@@ -763,10 +766,10 @@ fun EncorePlaylistScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         modifier = Modifier
                                             .then(
-                                                if (contributors.isNotEmpty()) {
+                                                if (onContributorsClick != null) {
                                                     Modifier
                                                         .clip(RoundedCornerShape(8.dp))
-                                                        .clickable { onContributorsClick() }
+                                                        .clickable { onContributorsClick?.invoke() }
                                                 } else {
                                                     Modifier
                                                 }
@@ -1459,7 +1462,8 @@ private fun PlaylistChip(
 /**
  * - Square Cover placeholder (120dp x 120dp) with centered edit pencil icon
  * - Playlist Title with right-side "Change" pill button
- * - Collaborator row with (+) circle button, Avatar circle, and User name
+ * - Collaborator row with (+) circle button, stacked owner/contributor avatars
+ *   and "owner + N more" — tapping it (or the +) opens the contributors sheet
  * - Action row: Globe (public) and Share icon
  * - Large centered solid white pill button: "+ Add to this playlist"
  */
@@ -1468,6 +1472,9 @@ private fun PlaylistEmptyCurationHeader(
     coverUrl: String?,
     title: String,
     creator: String,
+    contributors: List<PlaylistMember>,
+    creatorAvatarUrl: String,
+    onContributorsClick: (() -> Unit)?,
     onEditCoverClick: () -> Unit,
     onChangeTitle: (() -> Unit)?,
     onShareClick: () -> Unit,
@@ -1554,42 +1561,95 @@ private fun PlaylistEmptyCurationHeader(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                val ownerMember = contributors.firstOrNull { it.isOwner }
+                val ownerName = ownerMember?.name?.takeIf { it.isNotBlank() } ?: creator
+                val extraContributors = contributors.count { !it.isOwner }
+                val avatarStack = remember(creatorAvatarUrl, contributors) {
+                    val ownerAvatar = ownerMember?.avatarUrl?.takeIf { it.isNotBlank() }
+                        ?: creatorAvatarUrl.takeIf { it.isNotBlank() }
+                        ?: ""
+                    val others = contributors.filterNot { it.isOwner }
+                        .mapNotNull { it.avatarUrl.takeIf { url -> url.isNotBlank() } }
+                        .take(2)
+                    (listOf(ownerAvatar) + others).take(3)
+                }
+                val contributorsClickable = onContributorsClick != null
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .then(
+                            if (contributorsClickable) {
+                                Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { onContributorsClick?.invoke() }
+                            } else {
+                                Modifier
+                            }
+                        )
                 ) {
                     Box(
                         modifier = Modifier
                             .size(24.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF333333)),
+                            .background(Color(0xFF333333))
+                            .then(
+                                if (contributorsClickable) {
+                                    Modifier.clickable { onContributorsClick?.invoke() }
+                                } else {
+                                    Modifier
+                                }
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_plus_24),
-                            contentDescription = null,
+                            contentDescription = "Add contributor",
                             tint = Color.White,
                             modifier = Modifier.size(12.dp)
                         )
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF444444)),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy((-8).dp)
                     ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.encore_icon_user_24),
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
-                        )
+                        avatarStack.forEachIndexed { index, url ->
+                            Box(
+                                modifier = Modifier
+                                    .size(if (index == 0) 24.dp else 20.dp)
+                                    .zIndex(if (index == 0) 2f else 1f)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF333333)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (url.isNotBlank()) {
+                                    EncoreArtworkImage(
+                                        imageUrl = url,
+                                        contentDescription = ownerName,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape),
+                                        cornerRadius = 12.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.encore_icon_user_24),
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(if (index == 0) 14.dp else 12.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     Text(
-                        text = creator,
+                        text = if (extraContributors > 0) {
+                            "$ownerName + $extraContributors more"
+                        } else {
+                            ownerName
+                        },
                         style = EncoreTheme.typography.bodySmall.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
