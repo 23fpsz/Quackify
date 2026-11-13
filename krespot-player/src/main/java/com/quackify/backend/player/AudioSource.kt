@@ -236,7 +236,11 @@ internal object SourceResolver {
         durationMs: Long,
     ): AudioSource? {
         val files = AudioMeta.audioFiles(context, uri)
-        val best = AudioMeta.best(files) ?: return null
+        val best = AudioMeta.best(files) ?: run {
+            log.i("no direct file ids for '${uri.takeLast(12)}' " +
+                    "(free accounts only get drm manifests), falling back")
+            return null
+        }
         val format = formatName(best.format) ?: return null
         val key = PlayPlayKeys.key(context, best.fileId) ?: return null
         val (table, url) = coroutineScope {
