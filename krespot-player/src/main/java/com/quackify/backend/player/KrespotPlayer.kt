@@ -218,6 +218,10 @@ class KrespotPlayer(private val context: Context) {
         val file = track.best() ?: track.files.firstOrNull()
         val cached = sourceFor(track.uri)
         if (cached != null) {
+            if (!live.canQueue(cached)) {
+                log.i("queued next skipped, '${track.name}' is a different source type")
+                return
+            }
             live.queueNext(track.uri, cached)
             queuedNextUri = track.uri
             queuedGainDb = file?.gainDb ?: 0.0
@@ -225,18 +229,23 @@ class KrespotPlayer(private val context: Context) {
             return
         }
         scope.launch {
-            val source = SourceResolver.resolve(
-                context,
-                spclient,
-                track.uri,
-                file?.fileId.orEmpty(),
-                file?.format ?: 0,
-                prefetched = if (file == null) manifestFor(track.uri) else null,
-            ) ?: return@launch
+            val source = SourceResolver.resolvePlayplay(context, track.uri, track.durationMs)
+                ?: SourceResolver.resolve(
+                    context,
+                    spclient,
+                    track.uri,
+                    file?.fileId.orEmpty(),
+                    file?.format ?: 0,
+                    prefetched = if (file == null) manifestFor(track.uri) else null,
+                ) ?: return@launch
             rememberSource(track.uri, source)
             rememberFile(track.uri, source.fileId)
             val still = engine
             if (still !== live || still.currentUri != askedFor || _state.value.trackUri != askedFor) {
+                return@launch
+            }
+            if (!still.canQueue(source)) {
+                log.i("queued next skipped after resolve, '${track.name}' is a different source type")
                 return@launch
             }
             still.queueNext(track.uri, source)
@@ -504,6 +513,8 @@ class KrespotPlayer(private val context: Context) {
             var player: AudioEngine? = null
             try {
                 val source = sourceFor(track.uri)
+                    ?: SourceResolver.resolvePlayplay(context, track.uri, track.durationMs)
+                        ?.also { rememberSource(track.uri, it) }
                     ?: SourceResolver.resolve(
                         context,
                         spclient,
