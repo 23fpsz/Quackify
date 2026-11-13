@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreExplicitTag
+import com.quackify.compose.components.EncoreFastScroll
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
@@ -611,6 +612,13 @@ fun EncoreAlbumScreen(
                 }
             }
         }
+
+        EncoreFastScroll(
+            listState = listState,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 2.dp),
+        )
 
         Box(
             modifier = Modifier
