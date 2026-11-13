@@ -988,12 +988,10 @@ private fun Modifier.npvArtworkGesture(
             totalDragY += delta.y
 
             if (axis == AXIS_UNDECIDED) {
-                val absX = totalDragX.absoluteValue
-                val absY = totalDragY.absoluteValue
-                if (absY > DRAG_AXIS_SLOP_PX && absY >= absX) {
+                if (totalDragY > DRAG_AXIS_SLOP_PX) {
                     val pageAtTop = !scrollEnabled || scrollState.value <= 0
-                    axis = if (totalDragY > 0f && pageAtTop) AXIS_VERTICAL else AXIS_YIELD
-                } else if (absX > DRAG_AXIS_SLOP_PX) {
+                    axis = if (pageAtTop) AXIS_VERTICAL else AXIS_YIELD
+                } else if (totalDragY < -DRAG_AXIS_SLOP_PX || totalDragX.absoluteValue > DRAG_AXIS_SLOP_PX) {
                     axis = AXIS_YIELD
                 }
             }
