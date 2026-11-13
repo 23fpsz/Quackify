@@ -122,6 +122,9 @@ internal class AudioEngine(
     val currentUri: String
         get() = runOnMain { player?.currentMediaItem?.mediaId }.orEmpty()
 
+    val hasQueuedNext: Boolean
+        get() = runOnMain { player?.let { it.mediaItemCount > it.currentMediaItemIndex + 1 } } ?: false
+
     @Volatile
     private var progressJob: Job? = null
 

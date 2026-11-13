@@ -122,7 +122,6 @@ class PlaybackBridge(private val context: Context) {
         if (!gaplessEnabled()) return null
         if (ended.isBlank() || ended.startsWith(AD_PREFIX)) return null
         val server = connect.cluster.value
-        if (server?.queued.orEmpty().isNotEmpty()) return null
         val context = chainContext.ifBlank { server?.contextUri.orEmpty() }
         val rows = chainFor()
         if (repeatTrackOn(server)) return commandFor(ended, context)
@@ -198,12 +197,11 @@ class PlaybackBridge(private val context: Context) {
     private fun queueGaplessNext(currentUri: String) {
         if (!gaplessEnabled()) return
         val next = peekNextTrack(currentUri) ?: return
-        if (!player.hasSourceFor(next.uri)) return
+        if (!next.uri.startsWith("spotify:track:")) return
+        if (!player.hasSourceFor(next.uri)) player.prefetch(next.uri, connect.spclientHost)
         player.queueNext(next, connect.spclientHost)
-        if (player.queuedNextUri == next.uri) {
-            gaplessQueuedUri = next.uri
-            log.i("gapless: '${next.uri.takeLast(12)}' prebuffered behind the current track")
-        }
+        gaplessQueuedUri = next.uri
+        log.i("gapless: '${next.uri.takeLast(12)}' handed to the engine behind the current track")
     }
     private var autoplayPending: Boolean = false
     private var autoplayArmedAt: Long = 0L
@@ -3516,7 +3514,9 @@ class PlaybackBridge(private val context: Context) {
         if (command == null) {
             when (event) {
                 is PlayerEvent.Started -> {
-                    if (event.uri.isNotBlank() && event.uri == gaplessQueuedUri) {
+                    if (event.uri.isNotBlank() && state.trackUri.isNotBlank() &&
+                        event.uri != state.trackUri && gaplessEnabled()
+                    ) {
                         log.i("gapless: the engine moved to '${event.uri.takeLast(12)}' on its own")
                         scope.launch { adoptEngineAdvance(event.uri) }
                         return
@@ -3529,7 +3529,7 @@ class PlaybackBridge(private val context: Context) {
                 is PlayerEvent.Seeked -> scope.launch { publishLocalFromEngine(event.positionMs) }
                 is PlayerEvent.Ended -> {
                     val ended = event.uri.ifBlank { player.state.value.trackUri }
-                    if (gaplessQueuedUri.isNotBlank() && gaplessQueuedUri == player.queuedNextUri) {
+                    if (gaplessEnabled() && player.hasQueuedNext) {
                         log.i("player ended '$ended', the queued track takes over without a restart")
                         return
                     }
@@ -3555,7 +3555,9 @@ class PlaybackBridge(private val context: Context) {
         val position = if (duration > 0L) raw.coerceAtMost(duration) else raw
         when (event) {
             is PlayerEvent.Started -> {
-                if (event.uri.isNotBlank() && event.uri == gaplessQueuedUri) {
+                if (event.uri.isNotBlank() && state.trackUri.isNotBlank() &&
+                    event.uri != state.trackUri && gaplessEnabled()
+                ) {
                     log.i("gapless: the engine moved to '${event.uri.takeLast(12)}' on its own")
                     scope.launch { adoptEngineAdvance(event.uri) }
                     return
@@ -3641,7 +3643,7 @@ class PlaybackBridge(private val context: Context) {
                     val ended = event.uri.ifBlank {
                         command.currentTrack?.uri.orEmpty().ifBlank { player.state.value.trackUri }
                     }
-                    if (gaplessQueuedUri.isNotBlank() && gaplessQueuedUri == player.queuedNextUri) {
+                    if (gaplessEnabled() && player.hasQueuedNext) {
                         log.i("player ended '$ended', the queued track takes over without a restart")
                         return@launch
                     }
