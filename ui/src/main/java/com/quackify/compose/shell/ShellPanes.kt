@@ -172,7 +172,7 @@ internal fun ShellLoadingState(loading: Boolean, onRetry: () -> Unit) {
         DetailPageSkeleton(
             modifier = Modifier
                 .fillMaxSize()
-                .background(EncoreColors.Background)
+                .background(EncoreTheme.colors.background)
                 .statusBarsPadding()
         )
         return
@@ -180,7 +180,7 @@ internal fun ShellLoadingState(loading: Boolean, onRetry: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(EncoreColors.Background)
+            .background(EncoreTheme.colors.background)
             .statusBarsPadding(),
         contentAlignment = Alignment.Center
     ) {
@@ -188,7 +188,7 @@ internal fun ShellLoadingState(loading: Boolean, onRetry: () -> Unit) {
             Text(
                 text = "Couldn't load",
                 style = EncoreTheme.typography.titleMedium,
-                color = EncoreColors.TextPrimary
+                color = EncoreTheme.colors.textPrimary
             )
             Spacer(modifier = Modifier.height(8.dp))
             TextButton(onClick = onRetry) {
@@ -548,7 +548,7 @@ internal fun ShellArtistPane(
         EncoreArtistScreen(
             artistName = artistName,
             monthlyListeners = artistMonthlyListeners?.takeIf { it.isNotBlank() }.orEmpty(),
-            heroColor = artistDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreColors.Card,
+            heroColor = artistDetail?.colorHex?.let { parseHexColor(it) } ?: EncoreTheme.colors.card,
             headerImageUrl = artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() }
                 ?: artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
                 ?: artistAvatarUrl,
@@ -907,7 +907,7 @@ internal fun ShellShowPane(
             publisher = show.publisher,
             description = show.description,
             imageUrl = show.imageUrl.takeIf { it.isNotBlank() },
-            headerColor = parseHexColor(show.colorHex) ?: EncoreColors.Card,
+            headerColor = parseHexColor(show.colorHex) ?: EncoreTheme.colors.card,
             rating = show.rating,
             ratingCount = show.ratingCount,
             isFollowing = show.saved,
@@ -949,7 +949,7 @@ internal fun ShellEpisodePane(
             description = episode.description,
             imageUrl = episode.imageUrl.takeIf { it.isNotBlank() },
             wideImageUrl = episode.wideImageUrl.takeIf { it.isNotBlank() },
-            headerColor = parseHexColor(episode.colorHex) ?: EncoreColors.Card,
+            headerColor = parseHexColor(episode.colorHex) ?: EncoreTheme.colors.card,
             metaLabel = episode.releaseDate,
             durationMs = episode.durationMs,
             positionMs = episode.positionMs,
@@ -1071,7 +1071,7 @@ internal fun ShellAddTracksPane(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(EncoreColors.Background)
+            .background(EncoreTheme.colors.background)
             .statusBarsPadding()
     ) {
         Row(
@@ -1084,7 +1084,7 @@ internal fun ShellAddTracksPane(
                 iconRes = R.drawable.encore_icon_arrow_left_24,
                 contentDescription = "Back",
                 onClick = onBack,
-                tint = EncoreColors.TextPrimary
+                tint = EncoreTheme.colors.textPrimary
             )
             Spacer(modifier = Modifier.width(8.dp))
             Column {
@@ -1094,7 +1094,7 @@ internal fun ShellAddTracksPane(
                 )
                 Text(
                     text = "To $targetTitle",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
                 )
             }
         }
@@ -1128,7 +1128,7 @@ internal fun ShellAddTracksPane(
             ) {
                 Text(
                     text = "Nothing here yet",
-                    color = EncoreColors.TextSecondary
+                    color = EncoreTheme.colors.textSecondary
                 )
             }
             else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -1180,7 +1180,7 @@ private fun AddTrackRow(
                 text = item.title,
                 style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold,
-                    color = EncoreColors.TextPrimary
+                    color = EncoreTheme.colors.textPrimary
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1188,7 +1188,7 @@ private fun AddTrackRow(
             if (item.artist.isNotBlank()) {
                 Text(
                     text = item.artist,
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

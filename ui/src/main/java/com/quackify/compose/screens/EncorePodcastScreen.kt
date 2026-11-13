@@ -150,11 +150,11 @@ fun EncorePodcastScreen(
     val circleBtnAlpha = ((1f - collapseFraction) * 0.35f).coerceIn(0f, 0.35f)
 
     val followBorderColor by animateColorAsState(
-        targetValue = if (isFollowing) EncoreColors.Green else EncoreColors.TextSecondary,
+        targetValue = if (isFollowing) EncoreColors.Green else EncoreTheme.colors.textSecondary,
         label = "podcastFollowBorder"
     )
     val followTextColor by animateColorAsState(
-        targetValue = if (isFollowing) EncoreColors.Green else EncoreColors.TextPrimary,
+        targetValue = if (isFollowing) EncoreColors.Green else EncoreTheme.colors.textPrimary,
         label = "podcastFollowText"
     )
 
@@ -285,7 +285,7 @@ fun EncorePodcastScreen(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_podcasts_24),
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = EncoreTheme.colors.textPrimary,
                                 modifier = Modifier.size(48.dp)
                             )
                         }
@@ -331,7 +331,7 @@ fun EncorePodcastScreen(
                         Text(
                             text = rankBadge,
                             style = EncoreTheme.typography.marginal.copy(
-                                color = EncoreColors.TextSecondary,
+                                color = EncoreTheme.colors.textSecondary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -339,7 +339,7 @@ fun EncorePodcastScreen(
                         Text(
                             text = " • ",
                             style = EncoreTheme.typography.marginal.copy(
-                                color = EncoreColors.TextSecondary,
+                                color = EncoreTheme.colors.textSecondary,
                                 fontSize = 12.sp
                             )
                         )
@@ -348,7 +348,7 @@ fun EncorePodcastScreen(
                     Text(
                         text = "★ $rating",
                         style = EncoreTheme.typography.marginal.copy(
-                            color = EncoreColors.TextSecondary,
+                            color = EncoreTheme.colors.textSecondary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -357,7 +357,7 @@ fun EncorePodcastScreen(
                     Text(
                         text = " • ",
                         style = EncoreTheme.typography.marginal.copy(
-                            color = EncoreColors.TextSecondary,
+                            color = EncoreTheme.colors.textSecondary,
                             fontSize = 12.sp
                         )
                     )
@@ -365,7 +365,7 @@ fun EncorePodcastScreen(
                     Text(
                         text = category,
                         style = EncoreTheme.typography.marginal.copy(
-                            color = EncoreColors.TextSecondary,
+                            color = EncoreTheme.colors.textSecondary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -390,7 +390,7 @@ fun EncorePodcastScreen(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_play_24),
                             contentDescription = "Play teaser",
-                            tint = Color.White,
+                            tint = EncoreTheme.colors.textPrimary,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -425,7 +425,7 @@ fun EncorePodcastScreen(
                                 id = if (hasNotifications) R.drawable.encore_icon_notifications_active_24 else R.drawable.encore_icon_notification_new_24
                             ),
                             contentDescription = "Notifications",
-                            tint = if (hasNotifications) EncoreColors.Green else EncoreColors.TextSecondary,
+                            tint = if (hasNotifications) EncoreColors.Green else EncoreTheme.colors.textSecondary,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -440,7 +440,7 @@ fun EncorePodcastScreen(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_settings_24),
                             contentDescription = "Show settings",
-                            tint = EncoreColors.TextSecondary,
+                            tint = EncoreTheme.colors.textSecondary,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -477,7 +477,7 @@ fun EncorePodcastScreen(
                             Text(
                                 text = title,
                                 style = EncoreTheme.typography.bodyMedium.copy(
-                                    color = if (isSelected) Color.White else EncoreColors.TextSecondary,
+                                    color = if (isSelected) Color.White else EncoreTheme.colors.textSecondary,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                     fontSize = 15.sp
                                 )
@@ -535,7 +535,7 @@ fun EncorePodcastScreen(
                                             Text(
                                                 text = "All episodes • Newest",
                                                 style = EncoreTheme.typography.bodySmallBold.copy(
-                                                    color = Color.White,
+                                                    color = EncoreTheme.colors.textPrimary,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.SemiBold
                                                 )
@@ -544,7 +544,7 @@ fun EncorePodcastScreen(
                                             Icon(
                                                 painter = painterResource(id = R.drawable.encore_icon_chevron_down_24),
                                                 contentDescription = "Filter",
-                                                tint = Color.White,
+                                                tint = EncoreTheme.colors.textPrimary,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -585,7 +585,7 @@ fun EncorePodcastScreen(
                                         text = "About",
                                         style = EncoreTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White,
+                                            color = EncoreTheme.colors.textPrimary,
                                             fontSize = 18.sp
                                         )
                                     )
@@ -593,7 +593,7 @@ fun EncorePodcastScreen(
                                     Text(
                                         text = aboutDescription,
                                         style = EncoreTheme.typography.bodySmall.copy(
-                                            color = EncoreColors.TextSecondary,
+                                            color = EncoreTheme.colors.textSecondary,
                                             lineHeight = 20.sp,
                                             fontSize = 14.sp
                                         )
@@ -606,7 +606,7 @@ fun EncorePodcastScreen(
                                         text = "Ratings & Reviews",
                                         style = EncoreTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White,
+                                            color = EncoreTheme.colors.textPrimary,
                                             fontSize = 16.sp
                                         )
                                     )
@@ -618,7 +618,7 @@ fun EncorePodcastScreen(
                                     Text(
                                         text = ratingCategoryText,
                                         style = EncoreTheme.typography.bodyMedium.copy(
-                                            color = EncoreColors.TextSecondary,
+                                            color = EncoreTheme.colors.textSecondary,
                                             fontSize = 13.sp
                                         )
                                     )
@@ -642,7 +642,7 @@ fun EncorePodcastScreen(
                                     text = "More Like This",
                                     style = EncoreTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White,
+                                        color = EncoreTheme.colors.textPrimary,
                                         fontSize = 18.sp
                                     )
                                 )
@@ -683,7 +683,7 @@ fun EncorePodcastScreen(
                                         Text(
                                             text = "Podcast • $host",
                                             style = EncoreTheme.typography.bodySmall.copy(
-                                                color = EncoreColors.TextSecondary
+                                                color = EncoreTheme.colors.textSecondary
                                             )
                                         )
                                     }
@@ -718,7 +718,7 @@ fun EncorePodcastScreen(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_arrow_left_24),
                     contentDescription = "Back",
-                    tint = Color.White,
+                    tint = EncoreTheme.colors.textPrimary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -734,7 +734,7 @@ fun EncorePodcastScreen(
                         text = showTitle,
                         style = EncoreTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = EncoreTheme.colors.textPrimary,
                             fontSize = 17.sp
                         ),
                         maxLines = 1,
@@ -756,7 +756,7 @@ fun EncorePodcastScreen(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_more_android_24),
                     contentDescription = "Show options",
-                    tint = Color.White,
+                    tint = EncoreTheme.colors.textPrimary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -838,7 +838,7 @@ private fun PodcastEpisodeRow(
         Text(
             text = episode.description,
             style = EncoreTheme.typography.bodySmall.copy(
-                color = EncoreColors.TextSecondary,
+                color = EncoreTheme.colors.textSecondary,
                 fontSize = 13.sp,
                 lineHeight = 17.sp
             ),
@@ -869,7 +869,7 @@ private fun PodcastEpisodeRow(
             Text(
                 text = metaText,
                 style = EncoreTheme.typography.marginal.copy(
-                    color = EncoreColors.TextSecondary,
+                    color = EncoreTheme.colors.textSecondary,
                     fontSize = 12.sp
                 )
             )
@@ -898,7 +898,7 @@ private fun PodcastEpisodeRow(
                             id = if (isEpisodeAdded) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24
                         ),
                         contentDescription = "Add episode",
-                        tint = if (isEpisodeAdded) EncoreColors.Green else EncoreColors.TextSecondary,
+                        tint = if (isEpisodeAdded) EncoreColors.Green else EncoreTheme.colors.textSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -915,7 +915,7 @@ private fun PodcastEpisodeRow(
                             id = if (isEpisodeDownloaded) R.drawable.encore_icon_downloaded_24 else R.drawable.encore_icon_download_24
                         ),
                         contentDescription = "Download episode",
-                        tint = if (isEpisodeDownloaded) EncoreColors.Green else EncoreColors.TextSecondary,
+                        tint = if (isEpisodeDownloaded) EncoreColors.Green else EncoreTheme.colors.textSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -930,7 +930,7 @@ private fun PodcastEpisodeRow(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_share_android_24),
                         contentDescription = "Share episode",
-                        tint = EncoreColors.TextSecondary,
+                        tint = EncoreTheme.colors.textSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -945,7 +945,7 @@ private fun PodcastEpisodeRow(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_more_android_24),
                         contentDescription = "Episode options",
-                        tint = EncoreColors.TextSecondary,
+                        tint = EncoreTheme.colors.textSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -955,7 +955,7 @@ private fun PodcastEpisodeRow(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(Color.White)
+                    .background(EncoreTheme.colors.canvas)
                     .clickable(onClick = onClick),
                 contentAlignment = Alignment.Center
             ) {

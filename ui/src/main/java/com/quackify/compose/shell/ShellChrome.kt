@@ -96,21 +96,21 @@ internal fun ShellBottomBar(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(EncoreColors.CardElevated)
+                    .background(EncoreTheme.colors.cardElevated)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_cloud_off_24),
                     contentDescription = null,
-                    tint = EncoreColors.TextPrimary,
+                    tint = EncoreTheme.colors.textPrimary,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "You're offline. Check your internet connection.",
                     style = EncoreTheme.typography.bodySmall.copy(
-                        color = EncoreColors.TextPrimary,
+                        color = EncoreTheme.colors.textPrimary,
                         fontWeight = FontWeight.Medium
                     ),
                     maxLines = 1
@@ -194,14 +194,14 @@ private fun EncoreBottomNavItem(
                 if (isSelected) item.activeIconRes else item.iconRes
             ),
             contentDescription = item.title,
-            tint = if (isSelected) EncoreColors.TextPrimary else EncoreColors.TextSecondary,
+            tint = if (isSelected) EncoreTheme.colors.textPrimary else EncoreTheme.colors.textSecondary,
             modifier = Modifier.size(24.dp)
         )
         Text(
             text = item.title,
             style = EncoreTheme.typography.tagLabel.copy(fontSize = 10.sp),
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) EncoreColors.TextPrimary else EncoreColors.TextSecondary
+            color = if (isSelected) EncoreTheme.colors.textPrimary else EncoreTheme.colors.textSecondary
         )
     }
 }

@@ -62,14 +62,14 @@ internal fun FolderSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = EncoreTheme.colors.card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
+                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -95,7 +95,7 @@ internal fun FolderSheet(
             if (draft.mode == FolderMode.PICKER) {
                 Text(
                     text = draft.title,
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -120,7 +120,7 @@ internal fun FolderSheet(
                             Text(
                                 text = "No folders yet. Create one from the + button.",
                                 style = EncoreTheme.typography.bodyMedium.copy(
-                                    color = EncoreColors.TextSecondary
+                                    color = EncoreTheme.colors.textSecondary
                                 ),
                                 modifier = Modifier.padding(vertical = 16.dp)
                             )
@@ -148,7 +148,7 @@ internal fun FolderSheet(
                     .clip(RoundedCornerShape(24.dp))
                     .background(
                         if (name.isBlank()) {
-                            EncoreColors.TextSecondary.copy(alpha = 0.25f)
+                            EncoreTheme.colors.textSecondary.copy(alpha = 0.25f)
                         } else {
                             EncoreColors.Green
                         }
@@ -161,7 +161,7 @@ internal fun FolderSheet(
                     text = if (draft.mode == FolderMode.CREATE) "Create" else "Save",
                     style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = if (name.isBlank()) EncoreColors.TextSecondary else Color.Black
+                        color = if (name.isBlank()) EncoreTheme.colors.textSecondary else Color.Black
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,7 +180,7 @@ internal fun FolderSheet(
                             if (confirmingDelete) {
                                 Color(0xFFB3261E)
                             } else {
-                                EncoreColors.TextSecondary.copy(alpha = 0.18f)
+                                EncoreTheme.colors.textSecondary.copy(alpha = 0.18f)
                             }
                         )
                         .clickable {
@@ -197,7 +197,7 @@ internal fun FolderSheet(
                         },
                         style = EncoreTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = if (confirmingDelete) Color.White else EncoreColors.TextPrimary
+                            color = if (confirmingDelete) Color.White else EncoreTheme.colors.textPrimary
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -224,12 +224,12 @@ private fun PickerRow(title: String, subtitle: String, onClick: () -> Unit) {
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             ),
-            color = EncoreColors.TextPrimary
+            color = EncoreTheme.colors.textPrimary
         )
         if (subtitle.isNotBlank()) {
             Text(
                 text = subtitle,
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
             )
         }
     }

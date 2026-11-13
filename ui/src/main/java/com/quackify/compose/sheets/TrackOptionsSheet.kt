@@ -143,7 +143,7 @@ fun TrackOptionsSheet(
                 style = EncoreTheme.typography.titleLarge.copy(
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
-                    color = EncoreColors.TextPrimary
+                    color = EncoreTheme.colors.textPrimary
                 ),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -157,7 +157,7 @@ fun TrackOptionsSheet(
                 text = track.artist,
                 style = EncoreTheme.typography.bodyMedium.copy(
                     fontSize = 14.sp,
-                    color = EncoreColors.TextSecondary
+                    color = EncoreTheme.colors.textSecondary
                 ),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -187,7 +187,7 @@ fun TrackOptionsSheet(
                             id = if (isLiked) R.drawable.encore_icon_heart_active_24 else R.drawable.encore_icon_heart_24
                         ),
                         contentDescription = if (isLiked) "Remove from Liked Songs" else "Add to Liked Songs",
-                        tint = if (isLiked) EncoreColors.Green else EncoreColors.TextPrimary,
+                        tint = if (isLiked) EncoreColors.Green else EncoreTheme.colors.textPrimary,
                         modifier = Modifier
                             .size(28.dp)
                             .scale(heartScale)
@@ -197,7 +197,7 @@ fun TrackOptionsSheet(
                         text = if (isLiked) "Liked" else "Like",
                         style = EncoreTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
-                            color = if (isLiked) EncoreColors.Green else EncoreColors.TextSecondary
+                            color = if (isLiked) EncoreColors.Green else EncoreTheme.colors.textSecondary
                         )
                     )
                 }
@@ -214,7 +214,7 @@ fun TrackOptionsSheet(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_add_to_playlist_24),
                         contentDescription = "Add to playlist",
-                        tint = EncoreColors.TextPrimary,
+                        tint = EncoreTheme.colors.textPrimary,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -222,7 +222,7 @@ fun TrackOptionsSheet(
                         text = "Add to playlist",
                         style = EncoreTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
-                            color = EncoreColors.TextSecondary
+                            color = EncoreTheme.colors.textSecondary
                         )
                     )
                 }
@@ -239,7 +239,7 @@ fun TrackOptionsSheet(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_add_to_queue_24),
                         contentDescription = "Add to queue",
-                        tint = if (canAddToQueue) EncoreColors.TextPrimary else EncoreColors.TextPrimary.copy(alpha = 0.4f),
+                        tint = if (canAddToQueue) EncoreTheme.colors.textPrimary else EncoreTheme.colors.textPrimary.copy(alpha = 0.4f),
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -247,7 +247,7 @@ fun TrackOptionsSheet(
                         text = "Add to queue",
                         style = EncoreTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
-                            color = if (canAddToQueue) EncoreColors.TextSecondary else EncoreColors.TextSecondary.copy(alpha = 0.4f)
+                            color = if (canAddToQueue) EncoreTheme.colors.textSecondary else EncoreTheme.colors.textSecondary.copy(alpha = 0.4f)
                         )
                     )
                 }
@@ -358,7 +358,7 @@ fun TrackOptionsSheet(
                     } else {
                         R.drawable.encore_icon_video_outline_24
                     },
-                    iconTint = if (isCanvasEnabled) EncoreColors.Green else EncoreColors.TextPrimary,
+                    iconTint = if (isCanvasEnabled) EncoreColors.Green else EncoreTheme.colors.textPrimary,
                     onClick = {
                         onDismiss()
                         onCanvasToggle()
@@ -375,7 +375,7 @@ fun TrackOptionsSheet(
                             text = "${canvasResolution}p",
                             style = EncoreTheme.typography.bodyMedium.copy(
                                 fontSize = 14.sp,
-                                color = EncoreColors.TextSecondary
+                                color = EncoreTheme.colors.textSecondary
                             )
                         )
                     },
@@ -406,8 +406,8 @@ fun ContextMenuRowItem(
     iconRes: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    iconTint: Color = EncoreColors.TextPrimary,
-    textColor: Color = EncoreColors.TextPrimary,
+    iconTint: Color = EncoreTheme.colors.textPrimary,
+    textColor: Color = EncoreTheme.colors.textPrimary,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(

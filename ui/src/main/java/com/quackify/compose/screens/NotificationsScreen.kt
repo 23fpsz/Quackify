@@ -88,7 +88,7 @@ fun NotificationsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreColors.Background)
+            .background(EncoreTheme.colors.background)
             .statusBarsPadding()
     ) {
         Row(
@@ -101,7 +101,7 @@ fun NotificationsScreen(
                 iconRes = R.drawable.encore_icon_arrow_left_24,
                 contentDescription = "Back",
                 onClick = onBackClick,
-                tint = EncoreColors.TextPrimary
+                tint = EncoreTheme.colors.textPrimary
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -144,7 +144,7 @@ fun NotificationsScreen(
                     Icon(
                         painter = painterResource(id = R.drawable.encore_icon_cloud_off_24),
                         contentDescription = null,
-                        tint = EncoreColors.TextSecondary,
+                        tint = EncoreTheme.colors.textSecondary,
                         modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -155,7 +155,7 @@ fun NotificationsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Check your internet connection and try again.",
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -180,7 +180,7 @@ fun NotificationsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "New releases from the artists and podcasts you follow will show up here.",
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(16.dp))
@@ -228,7 +228,7 @@ fun NotificationsScreen(
                                         else R.drawable.encore_icon_podcasts_24
                                     ),
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = EncoreTheme.colors.textPrimary,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -244,12 +244,12 @@ fun NotificationsScreen(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = item.subtitle,
-                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary)
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = relativeTime(item.timestamp),
-                                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                                style = EncoreTheme.typography.marginal.copy(color = EncoreTheme.colors.textSecondary)
                             )
                         }
 

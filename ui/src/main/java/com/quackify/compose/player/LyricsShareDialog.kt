@@ -377,7 +377,7 @@ private fun ShareCardPreview(
                         modifier = Modifier
                             .size(20.dp)
                             .clip(CircleShape)
-                            .background(EncoreColors.PureBlack),
+                            .background(EncoreTheme.colors.canvas),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -465,7 +465,7 @@ private fun ShareFormatControls(
             text = "Select up to 5 lines ($selectedCount/5)",
             style = EncoreTheme.typography.marginal.copy(
                 fontWeight = FontWeight.Medium,
-                color = EncoreColors.TextSecondary
+                color = EncoreTheme.colors.textSecondary
             )
         )
     }

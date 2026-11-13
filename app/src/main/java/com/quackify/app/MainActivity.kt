@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -737,6 +738,12 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 controller.show(WindowInsetsCompat.Type.systemBars())
                             }
+                        }
+                        val systemDark = isSystemInDarkTheme()
+                        LaunchedEffect(systemDark) {
+                            val controller = WindowCompat.getInsetsController(window, window.decorView)
+                            controller.isAppearanceLightStatusBars = !systemDark
+                            controller.isAppearanceLightNavigationBars = !systemDark
                         }
                         LaunchedEffect(settingsSwitches.musicVideos, settingsSwitches.otherVideos) {
                             bridge.setVideoPolicy(settingsSwitches.musicVideos, settingsSwitches.otherVideos)

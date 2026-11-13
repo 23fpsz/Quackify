@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.theme.EncoreColors
+import com.quackify.compose.theme.EncoreTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -146,7 +147,7 @@ fun EditPlaylistSheet(
                 Text(
                     text = "Cancel",
                     style = TextStyle(
-                        color = Color.White,
+                        color = EncoreTheme.colors.textPrimary,
                         fontSize = 14.5.sp,
                         fontWeight = FontWeight.Bold
                     ),
@@ -156,7 +157,7 @@ fun EditPlaylistSheet(
                 Text(
                     text = title,
                     style = TextStyle(
-                        color = Color.White,
+                        color = EncoreTheme.colors.textPrimary,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     ),
@@ -205,7 +206,7 @@ fun EditPlaylistSheet(
                         when {
                             decoding -> CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
-                                color = EncoreColors.TextSecondary,
+                                color = EncoreTheme.colors.textSecondary,
                                 strokeWidth = 2.dp
                             )
                             previewBitmap != null -> Image(
@@ -223,7 +224,7 @@ fun EditPlaylistSheet(
                             else -> Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_playlist_24),
                                 contentDescription = null,
-                                tint = EncoreColors.TextSecondary,
+                                tint = EncoreTheme.colors.textSecondary,
                                 modifier = Modifier.size(36.dp)
                             )
                         }
@@ -242,7 +243,7 @@ fun EditPlaylistSheet(
                         Icon(
                             painter = painterResource(id = R.drawable.encore_icon_edit_24),
                             contentDescription = "Edit photo",
-                            tint = Color.White,
+                            tint = EncoreTheme.colors.textPrimary,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -266,7 +267,7 @@ fun EditPlaylistSheet(
                             onValueChange = { if (it.length <= NAME_LIMIT) name = it },
                             singleLine = true,
                             textStyle = TextStyle(
-                                color = Color.White,
+                                color = EncoreTheme.colors.textPrimary,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold
                             ),
@@ -276,7 +277,7 @@ fun EditPlaylistSheet(
                                 if (name.isEmpty()) {
                                     Text(
                                         text = "Add playlist name",
-                                        color = EncoreColors.TextSecondary,
+                                        color = EncoreTheme.colors.textSecondary,
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Normal
                                     )
@@ -300,7 +301,7 @@ fun EditPlaylistSheet(
                             singleLine = false,
                             maxLines = 3,
                             textStyle = TextStyle(
-                                color = Color.White,
+                                color = EncoreTheme.colors.textPrimary,
                                 fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Normal
                             ),
@@ -310,7 +311,7 @@ fun EditPlaylistSheet(
                                 if (description.isEmpty()) {
                                     Text(
                                         text = "Add description",
-                                        color = EncoreColors.TextSecondary,
+                                        color = EncoreTheme.colors.textSecondary,
                                         fontSize = 13.5.sp,
                                         fontWeight = FontWeight.Normal
                                     )
@@ -337,7 +338,7 @@ fun EditPlaylistSheet(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_delete_24),
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = EncoreTheme.colors.textPrimary,
                     modifier = Modifier.size(24.dp)
                 )
 
@@ -346,7 +347,7 @@ fun EditPlaylistSheet(
                 Text(
                     text = "Delete playlist",
                     style = TextStyle(
-                        color = Color.White,
+                        color = EncoreTheme.colors.textPrimary,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )

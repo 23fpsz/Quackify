@@ -63,14 +63,14 @@ fun ProfileDrawerSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = EncoreTheme.colors.card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
+                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -115,7 +115,7 @@ fun ProfileDrawerSheet(
                     Text(
                         text = "Switch account",
                         style = EncoreTheme.typography.bodySmall.copy(
-                            color = EncoreColors.TextSecondary
+                            color = EncoreTheme.colors.textSecondary
                         )
                     )
                 }
@@ -123,7 +123,7 @@ fun ProfileDrawerSheet(
                 Icon(
                     painter = painterResource(id = R.drawable.encore_icon_chevron_right_24),
                     contentDescription = null,
-                    tint = EncoreColors.TextSecondary,
+                    tint = EncoreTheme.colors.textSecondary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -215,7 +215,7 @@ private fun ProfileDrawerItem(
         Icon(
             painter = painterResource(id = iconRes),
             contentDescription = title,
-            tint = EncoreColors.TextPrimary,
+            tint = EncoreTheme.colors.textPrimary,
             modifier = Modifier.size(24.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))

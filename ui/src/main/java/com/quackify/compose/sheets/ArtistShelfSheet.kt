@@ -100,14 +100,14 @@ fun ArtistShelfSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = EncoreTheme.colors.card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
+                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -135,7 +135,7 @@ fun ArtistShelfSheet(
                         Text(
                             text = "$total items",
                             style = EncoreTheme.typography.bodySmall.copy(
-                                color = EncoreColors.TextSecondary
+                                color = EncoreTheme.colors.textSecondary
                             )
                         )
                     }
@@ -178,7 +178,7 @@ fun ArtistShelfSheet(
                                 Text(
                                     text = row.subtitle,
                                     style = EncoreTheme.typography.marginal.copy(
-                                        color = EncoreColors.TextSecondary
+                                        color = EncoreTheme.colors.textSecondary
                                     ),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -199,11 +199,11 @@ fun ArtistShelfSheet(
                                 Text(
                                     text = "Could not load this list",
                                     style = EncoreTheme.typography.bodySmall.copy(
-                                        color = EncoreColors.TextSecondary
+                                        color = EncoreTheme.colors.textSecondary
                                     )
                                 )
                             } else {
-                                InlineLoadingDots(color = EncoreColors.TextSecondary)
+                                InlineLoadingDots(color = EncoreTheme.colors.textSecondary)
                             }
                         }
                     }

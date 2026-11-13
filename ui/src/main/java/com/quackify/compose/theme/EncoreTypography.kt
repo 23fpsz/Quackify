@@ -1,6 +1,7 @@
 package com.quackify.compose.theme
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -36,82 +37,84 @@ val EncoreMixTitleFontFamily = FontFamily(
  */
 @Immutable
 data class EncoreTypography(
+    val ink: Color = EncoreColors.TextPrimary,
+    val inkSecondary: Color = EncoreColors.TextSecondary,
     val headlineLarge: TextStyle = TextStyle(
         fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 48.sp,
         lineHeight = 54.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     ),
     val headlineMedium: TextStyle = TextStyle(
         fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 40.sp,
         lineHeight = 46.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     ),
     val titleLarge: TextStyle = TextStyle(
         fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 32.sp,
         lineHeight = 38.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     ),
     val titleMedium: TextStyle = TextStyle(
         fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 24.sp,
         lineHeight = 30.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     ),
     val titleSmall: TextStyle = TextStyle(
         fontFamily = EncoreMixTitleFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 20.sp,
         lineHeight = 26.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     ),
     val bodyMedium: TextStyle = TextStyle(
         fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 22.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     ),
     val bodyMediumBold: TextStyle = TextStyle(
         fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 16.sp,
         lineHeight = 22.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     ),
     val bodySmall: TextStyle = TextStyle(
         fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
         lineHeight = 18.sp,
-        color = EncoreColors.TextSecondary
+        color = inkSecondary
     ),
     val bodySmallBold: TextStyle = TextStyle(
         fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 13.sp,
         lineHeight = 18.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     ),
     val marginal: TextStyle = TextStyle(
         fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 11.sp,
         lineHeight = 14.sp,
-        color = EncoreColors.TextSecondary
+        color = inkSecondary
     ),
     val marginalBold: TextStyle = TextStyle(
         fontFamily = EncoreMixFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 11.sp,
         lineHeight = 14.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     ),
     val tagLabel: TextStyle = TextStyle(
         fontFamily = EncoreMixFontFamily,
@@ -119,6 +122,6 @@ data class EncoreTypography(
         fontSize = 10.sp,
         lineHeight = 12.sp,
         letterSpacing = 0.5.sp,
-        color = EncoreColors.TextPrimary
+        color = ink
     )
 )

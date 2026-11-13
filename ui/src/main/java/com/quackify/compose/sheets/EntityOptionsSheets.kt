@@ -95,7 +95,7 @@ fun AlbumOptionsSheet(
                 style = EncoreTheme.typography.titleLarge.copy(
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
-                    color = EncoreColors.TextPrimary
+                    color = EncoreTheme.colors.textPrimary
                 ),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -109,7 +109,7 @@ fun AlbumOptionsSheet(
                 text = "Album • $artist",
                 style = EncoreTheme.typography.bodyMedium.copy(
                     fontSize = 14.sp,
-                    color = EncoreColors.TextSecondary
+                    color = EncoreTheme.colors.textSecondary
                 ),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -252,7 +252,7 @@ fun ArtistOptionsSheet(
                 style = EncoreTheme.typography.titleLarge.copy(
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = EncoreColors.TextPrimary
+                    color = EncoreTheme.colors.textPrimary
                 ),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -266,7 +266,7 @@ fun ArtistOptionsSheet(
                 text = "Artist",
                 style = EncoreTheme.typography.bodyMedium.copy(
                     fontSize = 14.sp,
-                    color = EncoreColors.TextSecondary
+                    color = EncoreTheme.colors.textSecondary
                 ),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
@@ -281,7 +281,7 @@ fun ArtistOptionsSheet(
             ContextMenuRowItem(
                 title = if (isFollowing) "Following" else "Follow",
                 iconRes = if (isFollowing) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24,
-                iconTint = if (isFollowing) EncoreColors.Green else EncoreColors.TextPrimary,
+                iconTint = if (isFollowing) EncoreColors.Green else EncoreTheme.colors.textPrimary,
                 onClick = {
                     onDismiss()
                     onFollowToggle()

@@ -127,7 +127,7 @@ fun EncorePlayButton(
                     .padding(2.dp)
                     .size(13.dp)
                     .clip(CircleShape)
-                    .background(Color.White),
+                    .background(EncoreTheme.colors.canvas),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -149,7 +149,7 @@ fun EncoreIconButton(
     contentDescription: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = EncoreColors.TextSecondary,
+    tint: Color = EncoreTheme.colors.textSecondary,
     size: Dp = 40.dp,
     iconSize: Dp = 24.dp,
     isActive: Boolean = false,
@@ -168,7 +168,7 @@ fun EncoreIconButton(
         label = "iconBtnScale"
     )
     val effectiveTint = when {
-        !enabled -> EncoreColors.TextDisabled
+        !enabled -> EncoreTheme.colors.textDisabled
         isActive -> activeTint
         else -> tint
     }
@@ -189,7 +189,7 @@ fun EncoreIconButton(
         if (isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(iconSize * 0.8f),
-                color = EncoreColors.TextDisabled,
+                color = EncoreTheme.colors.textDisabled,
                 strokeWidth = 2.dp,
                 strokeCap = StrokeCap.Round
             )
@@ -220,11 +220,11 @@ fun EncoreChip(
     modifier: Modifier = Modifier
 ) {
     val bgAnim by animateColorAsState(
-        targetValue = if (isSelected) EncoreColors.Green else EncoreColors.Card,
+        targetValue = if (isSelected) EncoreColors.Green else EncoreTheme.colors.card,
         label = "chipBg"
     )
     val textAnim by animateColorAsState(
-        targetValue = if (isSelected) EncoreColors.PureBlack else EncoreColors.TextPrimary,
+        targetValue = if (isSelected) EncoreColors.PureBlack else EncoreTheme.colors.textPrimary,
         label = "chipText"
     )
 
@@ -354,7 +354,7 @@ fun EncoreExplicitTag(
     size: Dp = 14.dp,
     cornerRadius: Dp = 2.dp,
     fontSize: TextUnit = 9.sp,
-    background: Color = EncoreColors.TextSecondary,
+    background: Color = EncoreTheme.colors.textSecondary,
     tint: Color = EncoreColors.PureBlack
 ) {
     Box(
@@ -415,7 +415,7 @@ fun EncoreTrackRow(
                 } else {
                     Text(
                         text = trackNumber.toString(),
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary)
                     )
                 }
             }
@@ -459,7 +459,7 @@ fun EncoreTrackRow(
                 text = title,
                 style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isPlaying) EncoreColors.Green else EncoreColors.TextPrimary
+                    color = if (isPlaying) EncoreColors.Green else EncoreTheme.colors.textPrimary
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -473,7 +473,7 @@ fun EncoreTrackRow(
                     Icon(
                         painter = painterResource(R.drawable.encore_icon_video_24),
                         contentDescription = "Music video",
-                        tint = EncoreColors.TextSecondary,
+                        tint = EncoreTheme.colors.textSecondary,
                         modifier = Modifier
                             .padding(end = 4.dp)
                             .size(14.dp)
@@ -557,9 +557,9 @@ fun EncoreSmartShuffleButton(
         R.drawable.encore_icon_shuffle_24
     }
     val tint = when {
-        !enabled -> EncoreColors.TextDisabled
+        !enabled -> EncoreTheme.colors.textDisabled
         isActive -> EncoreColors.Green
-        else -> EncoreColors.TextSecondary
+        else -> EncoreTheme.colors.textSecondary
     }
 
     Box(
@@ -630,9 +630,9 @@ fun EncoreRepeatButton(
         R.drawable.encore_icon_repeat_24
     }
     val tint = when {
-        !enabled -> EncoreColors.TextDisabled
+        !enabled -> EncoreTheme.colors.textDisabled
         isActive -> EncoreColors.Green
-        else -> EncoreColors.TextSecondary
+        else -> EncoreTheme.colors.textSecondary
     }
 
     Box(
@@ -753,7 +753,7 @@ fun EncoreHeartButton(
                     id = if (liked) R.drawable.encore_icon_heart_active_24 else R.drawable.encore_icon_heart_24
                 ),
                 contentDescription = if (liked) "Remove from Your Library" else "Save to Your Library",
-                tint = if (liked) EncoreColors.Green else EncoreColors.TextSecondary,
+                tint = if (liked) EncoreColors.Green else EncoreTheme.colors.textSecondary,
                 modifier = Modifier.size(iconSize)
             )
         }
@@ -770,7 +770,7 @@ fun EncoreProfileAvatar(
     modifier: Modifier = Modifier,
     avatarUrl: String? = null,
     size: Dp = 36.dp,
-    backgroundColor: Color = EncoreColors.CardElevated
+    backgroundColor: Color = EncoreTheme.colors.cardElevated
 ) {
     Box(
         modifier = modifier

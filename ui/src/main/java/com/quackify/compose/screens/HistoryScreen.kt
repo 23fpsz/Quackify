@@ -95,7 +95,7 @@ fun HistoryScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(EncoreColors.Background)
+            .background(EncoreTheme.colors.background)
             .statusBarsPadding()
     ) {
         Row(
@@ -108,7 +108,7 @@ fun HistoryScreen(
                 iconRes = R.drawable.encore_icon_arrow_left_24,
                 contentDescription = "Back",
                 onClick = onBackClick,
-                tint = EncoreColors.TextPrimary
+                tint = EncoreTheme.colors.textPrimary
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -135,7 +135,7 @@ fun HistoryScreen(
                 Text(
                     text = "Tracks you play will show up here.",
                     style = EncoreTheme.typography.bodyMedium.copy(
-                        color = EncoreColors.TextSecondary,
+                        color = EncoreTheme.colors.textSecondary,
                         textAlign = TextAlign.Center
                     )
                 )
@@ -324,7 +324,7 @@ private fun HistoryArtistGroup(
                     style = EncoreTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
-                        color = EncoreColors.TextPrimary
+                        color = EncoreTheme.colors.textPrimary
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -333,7 +333,7 @@ private fun HistoryArtistGroup(
                     text = "${group.tracks.size} song" +
                         if (group.tracks.size == 1) "" else "s",
                     style = EncoreTheme.typography.bodySmall.copy(
-                        color = EncoreColors.TextSecondary
+                        color = EncoreTheme.colors.textSecondary
                     ),
                     maxLines = 1
                 )
@@ -345,7 +345,7 @@ private fun HistoryArtistGroup(
                 ),
                 contentDescription = if (isExpanded) "Collapse ${group.artist}"
                 else "Expand ${group.artist}",
-                tint = EncoreColors.TextSecondary,
+                tint = EncoreTheme.colors.textSecondary,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -440,12 +440,12 @@ private fun HistoryStatCard(
 ) {
     Column(
         modifier = modifier
-            .background(EncoreColors.Card, RoundedCornerShape(EncoreCornerRadii.Larger2))
+            .background(EncoreTheme.colors.card, RoundedCornerShape(EncoreCornerRadii.Larger2))
             .padding(horizontal = 12.dp, vertical = 12.dp)
     ) {
         Text(
             text = label,
-            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+            style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -454,7 +454,7 @@ private fun HistoryStatCard(
             text = value,
             style = EncoreTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.SemiBold,
-                color = EncoreColors.TextPrimary
+                color = EncoreTheme.colors.textPrimary
             ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -462,7 +462,7 @@ private fun HistoryStatCard(
         if (sub != null) {
             Text(
                 text = sub,
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreTheme.colors.textSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

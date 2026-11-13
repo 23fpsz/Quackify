@@ -70,14 +70,14 @@ fun ProfileFollowSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
         sheetState = sheetState,
-        containerColor = EncoreColors.Card,
+        containerColor = EncoreTheme.colors.card,
         dragHandle = {
             Box(
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .size(width = 36.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(EncoreColors.TextSecondary.copy(alpha = 0.5f))
+                    .background(EncoreTheme.colors.textSecondary.copy(alpha = 0.5f))
             )
         },
         modifier = modifier
@@ -146,7 +146,7 @@ fun ProfileFollowSheet(
                     }
                     people.isEmpty() -> Text(
                         text = if (selectedTab == 0) "No followers yet" else "Not following anyone",
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreTheme.colors.textSecondary),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 24.dp)
@@ -174,7 +174,7 @@ fun ProfileFollowSheet(
                                     avatarUrl = person.imageUrl.takeIf { it.isNotBlank() },
                                     size = 48.dp,
                                     backgroundColor = parseHexColor(person.colorHex)
-                                        ?: EncoreColors.CardElevated
+                                        ?: EncoreTheme.colors.cardElevated
                                 )
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -188,7 +188,7 @@ fun ProfileFollowSheet(
                                         Text(
                                             text = "${formatCount(person.followersCount)} followers",
                                             style = EncoreTheme.typography.marginal.copy(
-                                                color = EncoreColors.TextSecondary
+                                                color = EncoreTheme.colors.textSecondary
                                             )
                                         )
                                     }
@@ -197,7 +197,7 @@ fun ProfileFollowSheet(
                                     Icon(
                                         painter = painterResource(id = R.drawable.encore_icon_chevron_right_24),
                                         contentDescription = null,
-                                        tint = EncoreColors.TextSecondary,
+                                        tint = EncoreTheme.colors.textSecondary,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
