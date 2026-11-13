@@ -15,6 +15,9 @@ import java.util.Calendar
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -850,6 +853,16 @@ class MainActivity : ComponentActivity() {
                             if (!playback.videoActive && videoFullscreen) {
                                 videoFullscreen = false
                                 requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                            }
+                        }
+
+                        LaunchedEffect(videoFullscreen) {
+                            val controller = WindowCompat.getInsetsController(window, window.decorView)
+                            if (videoFullscreen) {
+                                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                                controller.hide(WindowInsetsCompat.Type.systemBars())
+                            } else {
+                                controller.show(WindowInsetsCompat.Type.systemBars())
                             }
                         }
                         LaunchedEffect(settingsSwitches.musicVideos, settingsSwitches.otherVideos) {

@@ -73,6 +73,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -1131,6 +1132,9 @@ private fun NowPlayingArtworkCard(
     fadeFraction: Float = 0f,
     canvasZoom: Float = 1f,
     videoActive: Boolean = false,
+    videoFullBleed: Boolean = false,
+    videoOverlayVisible: Boolean? = null,
+    onVideoOverlayTap: (() -> Unit)? = null,
     videoQualities: List<Int> = emptyList(),
     onVideoQuality: (Int) -> Unit = {},
     onVideoSurface: (android.view.Surface?) -> Unit = {},
@@ -1162,20 +1166,28 @@ private fun NowPlayingArtworkCard(
     ) {
         when {
             videoActive -> {
-                var overlayVisible by remember { mutableStateOf(false) }
-                LaunchedEffect(overlayVisible) {
-                    if (overlayVisible) {
-                        delay(3000)
-                        overlayVisible = false
+                var internalOverlay by remember { mutableStateOf(false) }
+                val overlayVisible = videoOverlayVisible ?: internalOverlay
+                if (videoOverlayVisible == null) {
+                    LaunchedEffect(internalOverlay) {
+                        if (internalOverlay) {
+                            delay(3000)
+                            internalOverlay = false
+                        }
                     }
                 }
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.8f)
-                        .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(16.dp))
+                        .then(
+                            if (videoFullBleed) Modifier.fillMaxSize()
+                            else Modifier.fillMaxWidth(0.8f).aspectRatio(16f / 9f)
+                        )
+                        .clip(if (videoFullBleed) RectangleShape else RoundedCornerShape(16.dp))
                         .pointerInput(Unit) {
-                            detectTapGestures { overlayVisible = !overlayVisible }
+                            detectTapGestures {
+                                if (videoOverlayVisible != null) onVideoOverlayTap?.invoke()
+                                else internalOverlay = !internalOverlay
+                            }
                         }
                 ) {
                     MusicVideoSurface(
@@ -1184,8 +1196,8 @@ private fun NowPlayingArtworkCard(
                     )
                     AnimatedVisibility(
                         visible = overlayVisible,
-                        enter = fadeIn(tween(durationMillis = 180)),
-                        exit = fadeOut(tween(durationMillis = 180))
+                        enter = fadeIn(tween(durationMillis = 250)),
+                        exit = fadeOut(tween(durationMillis = 250))
                     ) {
                         Box(
                             modifier = Modifier
@@ -1289,6 +1301,13 @@ private fun VideoFullscreenLayout(
     chapters: List<ChapterMarker>,
     onExit: () -> Unit,
 ) {
+    var overlayVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(overlayVisible) {
+        if (overlayVisible) {
+            delay(3000)
+            overlayVisible = false
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1303,24 +1322,32 @@ private fun VideoFullscreenLayout(
             isCanvasEnabled = false,
             fullBleed = true,
             videoActive = true,
+            videoFullBleed = true,
+            videoOverlayVisible = overlayVisible,
             videoQualities = videoQualities,
             onVideoQuality = onVideoQuality,
             onVideoSurface = onVideoSurface,
             onToggleVideoFullscreen = onExit,
+            onVideoOverlayTap = { overlayVisible = !overlayVisible },
             modifier = Modifier.fillMaxSize()
         )
-        NowPlayingSeekBarSection(
-            progress = progress,
-            durationMs = durationMs,
-            currentPositionMs = currentPositionMs,
-            onSeek = onSeek,
-            isLoading = isLoading,
-            canSeek = canSeek,
-            markers = chapterFractions(chapters, durationMs),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp)
-        )
+        AnimatedVisibility(
+            visible = overlayVisible,
+            enter = fadeIn(tween(durationMillis = 250)),
+            exit = fadeOut(tween(durationMillis = 250)),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            NowPlayingSeekBarSection(
+                progress = progress,
+                durationMs = durationMs,
+                currentPositionMs = currentPositionMs,
+                onSeek = onSeek,
+                isLoading = isLoading,
+                canSeek = canSeek,
+                markers = chapterFractions(chapters, durationMs),
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
+        }
     }
 }
 
