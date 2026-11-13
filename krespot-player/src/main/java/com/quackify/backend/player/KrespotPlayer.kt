@@ -202,9 +202,9 @@ class KrespotPlayer(private val context: Context) {
 
     /**
      * Hands the engine the next track of the queue so ExoPlayer prebuffers it
-     * while the current one plays and the transition carries no silence. The
-     * source usually comes warm from deepWarm; otherwise it resolves here and
-     * only queues if the engine is still on the track that asked for it.
+     * while the current one plays and the transition carries no silence.
+     * Only warm sources are queued: a cold resolve could miss the handoff
+     * window, and a normal advance is always the safe fallback.
      */
     fun queueNext(track: CommandTrack, spclient: String) {
         if (track.isDirect) return
@@ -213,34 +213,19 @@ class KrespotPlayer(private val context: Context) {
         val askedFor = _state.value.trackUri
         if (askedFor.isBlank() || live.currentUri != askedFor) return
         if (queuedNextUri == track.uri) return
+        val source = sourceFor(track.uri) ?: return
         val file = track.best() ?: track.files.firstOrNull()
-        val cached = sourceFor(track.uri)
-        if (cached != null) {
-            live.queueNext(track.uri, cached)
-            queuedNextUri = track.uri
-            queuedGainDb = file?.gainDb ?: 0.0
-            log.i("queued next '${track.name}' from the warm source")
-            return
-        }
-        scope.launch {
-            val source = SourceResolver.resolve(
-                context,
-                spclient,
-                track.uri,
-                file?.fileId.orEmpty(),
-                file?.format ?: 0,
-                prefetched = if (file == null) manifestFor(track.uri) else null,
-            ) ?: return@launch
-            rememberSource(track.uri, source)
-            rememberFile(track.uri, source.fileId)
-            val still = engine
-            if (still !== live || still.currentUri != askedFor) return@launch
-            still.queueNext(track.uri, source)
-            queuedNextUri = track.uri
-            queuedGainDb = file?.gainDb ?: 0.0
-            log.i("queued next '${track.name}' after resolving")
-        }
+        live.queueNext(track.uri, source)
+        queuedNextUri = track.uri
+        queuedGainDb = file?.gainDb ?: 0.0
+        log.i("queued next '${track.name}' from the warm source")
     }
+
+    fun clearQueuedNext() {
+        queuedNextUri = ""
+    }
+
+    fun hasSourceFor(trackUri: String): Boolean = sourceFor(trackUri) != null
     fun prefetch(trackUri: String, spclient: String) {
         if (trackUri.isBlank() || spclient.isBlank()) return
         if (manifests.containsKey(trackUri)) return
@@ -808,7 +793,6 @@ class KrespotPlayer(private val context: Context) {
                     val base = if (moved) current.copy(trackUri = event.uri, positionMs = 0L) else current
                     if (event.uri == queuedNextUri) {
                         engine?.retune(queuedGainDb)
-                        queuedNextUri = ""
                     }
                     if (current.paused) {
                         base.copy(buffering = false, durationMs = durationMs)
