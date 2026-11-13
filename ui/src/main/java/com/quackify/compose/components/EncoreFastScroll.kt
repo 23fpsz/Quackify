@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -46,7 +45,7 @@ fun EncoreFastScroll(
     listState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         val scope = rememberCoroutineScope()
         var trackHeightPx by remember { mutableFloatStateOf(1f) }
         var dragFraction by remember { mutableFloatStateOf(0f) }
@@ -107,7 +106,7 @@ fun EncoreFastScroll(
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = maxWidth * 0.02f)
+                .padding(end = 3.dp)
                 .width(24.dp)
                 .height(TRACK_HEIGHT.dp)
                 .onSizeChanged { trackHeightPx = it.height.coerceAtLeast(1).toFloat() }
