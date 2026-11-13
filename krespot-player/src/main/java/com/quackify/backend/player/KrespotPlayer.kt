@@ -66,8 +66,8 @@ private const val KEY_RESUME_AT = "resumeAt"
 private const val RESUME_WRITE_MS = 5_000L
 
 sealed interface PlayerEvent {
-    data object Started : PlayerEvent
-    data object Ended : PlayerEvent
+    data class Started(val uri: String = "") : PlayerEvent
+    data class Ended(val uri: String = "") : PlayerEvent
     data class Progress(val positionMs: Long, val durationMs: Long) : PlayerEvent
     data class Seeked(val positionMs: Long) : PlayerEvent
     data class Failed(val message: String) : PlayerEvent
@@ -463,7 +463,7 @@ class KrespotPlayer(private val context: Context) {
                     }
                 }
                 val startAt = if (pendingSeekMs >= 0L) pendingSeekMs.also { pendingSeekMs = -1L } else fromMs
-                val ready = player.prepare(source, startAt, autoplay = !pendingPause, file?.gainDb ?: 0.0)
+                val ready = player.prepare(source, track.uri, startAt, autoplay = !pendingPause, file?.gainDb ?: 0.0)
                 if (!ready || id != generation) {
                     player.stop()
                     return@launch
@@ -753,12 +753,12 @@ class KrespotPlayer(private val context: Context) {
             when (event) {
                 is PlayerEvent.Progress -> current.copy(positionMs = event.positionMs, durationMs = event.durationMs)
                 is PlayerEvent.Seeked -> current.copy(positionMs = event.positionMs)
-                PlayerEvent.Started -> if (current.paused) {
+                is PlayerEvent.Started -> if (current.paused) {
                     current.copy(buffering = false, durationMs = durationMs)
                 } else {
                     current.copy(playing = true, paused = false, buffering = false, durationMs = durationMs)
                 }
-                PlayerEvent.Ended -> current.copy(playing = false, buffering = false, positionMs = durationMs)
+                is PlayerEvent.Ended -> current.copy(playing = false, buffering = false, positionMs = durationMs)
                 is PlayerEvent.Failed -> current.copy(playing = false, buffering = false, trackUri = "")
             }
         }

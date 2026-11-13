@@ -3340,9 +3340,9 @@ class PlaybackBridge(private val context: Context) {
         val command = connect.playback
         if (command == null) {
             when (event) {
-                PlayerEvent.Started -> scope.launch { publishLocalFromEngine() }
+                is PlayerEvent.Started -> scope.launch { publishLocalFromEngine() }
                 is PlayerEvent.Seeked -> scope.launch { publishLocalFromEngine(event.positionMs) }
-                PlayerEvent.Ended -> {
+                is PlayerEvent.Ended -> {
                     val ended = player.state.value.trackUri
                     log.i("player ended '$ended' with no command, advancing on this phone")
                     scope.launch { advance(ended) }
@@ -3364,7 +3364,7 @@ class PlaybackBridge(private val context: Context) {
         val duration = if (ad) AD_THRESHOLD_MS else player.durationMs
         val position = if (duration > 0L) raw.coerceAtMost(duration) else raw
         when (event) {
-            PlayerEvent.Started -> {
+            is PlayerEvent.Started -> {
                 log.i("player started pos=$position dur=${player.durationMs}ms ad=$ad")
                 scope.launch {
                     val snapshot = Snapshot.of(
@@ -3407,7 +3407,7 @@ class PlaybackBridge(private val context: Context) {
                 }
             }
 
-            PlayerEvent.Ended -> {
+            is PlayerEvent.Ended -> {
                 log.i("player ended at $raw clamped=$position dur=$duration ad=$ad")
                 scope.launch {
                     if (ad) {

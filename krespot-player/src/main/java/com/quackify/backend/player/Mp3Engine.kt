@@ -147,7 +147,7 @@ internal class Mp3Engine(
         val audio = AudioSink(sampleRate, channels)
         sink = audio
         audio.start()
-        emit(PlayerEvent.Started)
+        emit(PlayerEvent.Started())
 
         val info = MediaCodec.BufferInfo()
         var inputDone = false
@@ -202,7 +202,7 @@ internal class Mp3Engine(
 
         if (!stopped && outputDone) {
             log.i("ad ended at ${positionMs}ms of ${durationMs}ms")
-            emit(PlayerEvent.Ended)
+            emit(PlayerEvent.Ended())
         }
     }
 

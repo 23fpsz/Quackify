@@ -111,8 +111,16 @@ internal class AudioEngine(
     private var announced = false
 
     @Volatile
+    private var lastItemUri = ""
+
+    private val itemDurations = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    @Volatile
     var durationMs: Long = 0L
         private set
+
+    val currentUri: String
+        get() = runOnMain { player?.currentMediaItem?.mediaId }.orEmpty()
 
     @Volatile
     private var progressJob: Job? = null
@@ -138,13 +146,20 @@ internal class AudioEngine(
     val isBuffering: Boolean
         get() = runOnMain { player?.playbackState == Player.STATE_BUFFERING } ?: false
 
-    suspend fun prepare(source: AudioSource, fromMs: Long, autoplay: Boolean, gainDb: Double): Boolean =
+    fun durationFor(uri: String): Long = itemDurations[uri] ?: 0L
+
+    suspend fun prepare(
+        source: AudioSource,
+        uri: String,
+        fromMs: Long,
+        autoplay: Boolean,
+        gainDb: Double,
+    ): Boolean =
         withContext(Dispatchers.Main) {
             release()
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
             val encrypted = source.seektable.pssh.isNotBlank()
             val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
-            val mediaItem: MediaItem
             if (encrypted) {
                 val callback = AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) }
                 var cachedManager: DrmSessionManager? = null
@@ -156,27 +171,20 @@ internal class AudioEngine(
                         .build(callback)
                         .also { cachedManager = it }
                 })
-                mediaItem = MediaItem.Builder()
-                    .setUri(Uri.parse(source.url))
-                    .setDrmConfiguration(
-                        MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
-                            .setForceSessionsForAudioAndVideoTracks(true)
-                            .build(),
-                    )
-                    .build()
                 log.i("audio drm session asked for '${source.fileId.take(12)}'")
             } else {
                 log.i("clear content, no drm session asked")
-                mediaItem = MediaItem.fromUri(Uri.parse(source.url))
             }
             gainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
             durationMs = totalMs
             announced = false
+            lastItemUri = uri
+            if (uri.isNotBlank()) itemDurations[uri] = totalMs
             val created = ExoPlayer.Builder(context)
                 .setMediaSourceFactory(factory)
                 .build()
             created.addListener(listener)
-            created.setMediaSource(factory.createMediaSource(mediaItem))
+            created.setMediaSource(factory.createMediaSource(itemFor(uri, source)))
             player = created
             created.prepare()
             created.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
@@ -185,6 +193,47 @@ internal class AudioEngine(
             log.i("audio engine ready '${source.fileId.take(12)}' ${totalMs}ms at ${fromMs}ms autoplay=$autoplay")
             true
         }
+
+    fun queueNext(uri: String, source: AudioSource) {
+        runOnMain {
+            val p = player ?: return@runOnMain
+            if (p.mediaItemCount > 1) p.removeMediaItems(1, p.mediaItemCount)
+            p.addMediaItem(itemFor(uri, source))
+        }
+        log.i("audio queued next '$uri' '${source.fileId.take(12)}' ${if (source.seektable.pssh.isNotBlank()) "drm" else "clear"}")
+    }
+
+    fun skipTo(uri: String): Boolean {
+        val moved = runOnMain {
+            val p = player ?: return@runOnMain false
+            for (index in 0 until p.mediaItemCount) {
+                if (p.getMediaItemAt(index).mediaId == uri) {
+                    p.seekTo(index, 0L)
+                    return@runOnMain true
+                }
+            }
+            false
+        } ?: false
+        if (moved) log.i("audio skipped to '$uri'")
+        return moved
+    }
+
+    private fun itemFor(uri: String, source: AudioSource): MediaItem {
+        val encrypted = source.seektable.pssh.isNotBlank()
+        return MediaItem.Builder()
+            .setMediaId(uri)
+            .setUri(Uri.parse(source.url))
+            .apply {
+                if (encrypted) {
+                    setDrmConfiguration(
+                        MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
+                            .setForceSessionsForAudioAndVideoTracks(true)
+                            .build(),
+                    )
+                }
+            }
+            .build()
+    }
 
     fun play() {
         started = true
@@ -253,16 +302,30 @@ internal class AudioEngine(
     }
 
     private val listener = object : Player.Listener {
+        override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
+            val newUri = item?.mediaId.orEmpty()
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && lastItemUri.isNotBlank()) {
+                onEvent(PlayerEvent.Ended(lastItemUri))
+            }
+            if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
+                announced = false
+                lastPositionMs = 0L
+                lastItemUri = newUri
+                itemDurations[newUri]?.let { durationMs = it }
+            }
+        }
+
         override fun onPlaybackStateChanged(state: Int) {
             when (state) {
                 Player.STATE_READY -> if (!announced) {
                     announced = true
-                    onEvent(PlayerEvent.Started)
+                    onEvent(PlayerEvent.Started(lastItemUri))
                     if (started) startProgress()
                 }
                 Player.STATE_ENDED -> {
                     lastPositionMs = durationMs
-                    onEvent(PlayerEvent.Ended)
+                    onEvent(PlayerEvent.Ended(lastItemUri))
+                    lastItemUri = ""
                 }
                 else -> Unit
             }
