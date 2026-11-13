@@ -33,6 +33,8 @@ import org.json.JSONObject
 
 private val log = Logs.of(Logs.Module.SOURCE)
 
+private val deniedFormats = mutableSetOf<Int>()
+
 private const val RESOLVE_HOST = "guc3-spclient.spotify.com"
 private const val RESOLVE_PREFIX = "/storage-resolve/v2/files/audio/interactive/{format}/"
 private const val RESOLVE_QUERY = "?version=10000000&product=9&platform=39&alt=json"
@@ -241,13 +243,21 @@ internal object SourceResolver {
                     "(free accounts only get drm manifests), falling back")
             return null
         }
-        val ordered = AudioMeta.PLAYABLE_FORMATS.flatMap { format ->
-            files.filter { it.format == format }.sortedByDescending { it.bitrate }
-        }
+        val ordered = AudioMeta.PLAYABLE_FORMATS
+            .filter { it !in deniedFormats }
+            .flatMap { format ->
+                files.filter { it.format == format }.sortedByDescending { it.bitrate }
+            }
         var source: AudioSource? = null
         for (candidate in ordered) {
             if (formatName(candidate.format) == null) continue
-            val key = PlayPlayKeys.key(context, candidate.fileId) ?: continue
+            val key = PlayPlayKeys.key(context, candidate.fileId)
+            if (key == null) {
+                if (PlayPlayKeys.isRateLimited) break
+                deniedFormats += candidate.format
+                log.i("playplay format ${candidate.format} denied, skipping it from now on")
+                continue
+            }
             val (table, url) = coroutineScope {
                 val table = async { seektable(candidate.fileId) }
                 val url = async { cdnUrlNamed(context, candidate.fileId, candidate.format.toString()) }
