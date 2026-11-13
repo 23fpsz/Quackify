@@ -1,104 +1,109 @@
 package com.quackify.app
 
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.ComponentName
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.quackify.app.search.decorateSearchTracks
-import com.quackify.backend.core.auth.EncoreAuth
-import com.quackify.backend.model.CollectionDetail
-import com.quackify.backend.model.AlbumDetail
-import com.quackify.backend.model.ArtistDetail
-import com.quackify.backend.model.Credits
-import com.quackify.backend.model.PlaylistChoice
+import com.quackify.backend.api.Browse
+import com.quackify.backend.api.HomeFeed
 import com.quackify.backend.api.Library
+import com.quackify.backend.api.Podcasts
+import com.quackify.backend.api.Profile
+import com.quackify.backend.api.Search
+import com.quackify.backend.api.Settings
+import com.quackify.backend.api.WhatsNew
+import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
 import com.quackify.backend.core.net.Pathfinder
-import com.quackify.compose.library.LibraryItem
-import com.quackify.compose.library.LibraryItemType
-import com.quackify.compose.shell.PlaylistEditDraft
-import com.quackify.compose.playlist.TrackItem
-import com.quackify.compose.screens.PopularTrack
-import com.quackify.compose.screens.AppUpdate
-import com.quackify.compose.screens.ArtistRelease
-import com.quackify.compose.home.toTrackItem
-import com.quackify.compose.home.toArtistRelease
-import com.quackify.backend.model.ShelfKind
-import androidx.compose.runtime.collectAsState
-import com.quackify.backend.api.Search
-import com.quackify.backend.api.WhatsNew
-import com.quackify.backend.api.HomeFeed
-import com.quackify.backend.api.Profile
+import com.quackify.backend.core.webview.SilentTokenRefresh
+import com.quackify.backend.library.Krespot
+import com.quackify.backend.library.PlaylistSource
+import com.quackify.backend.model.AlbumDetail
+import com.quackify.backend.model.ArtistDetail
+import com.quackify.backend.model.BrowseCard
+import com.quackify.backend.model.BrowsePage
+import com.quackify.backend.model.CollectionDetail
+import com.quackify.backend.model.Credits
+import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.HomeSection
+import com.quackify.backend.model.PlaylistChoice
 import com.quackify.backend.model.ProfileContext
 import com.quackify.backend.model.ProfileTopContent
 import com.quackify.backend.model.ProfileUser
+import com.quackify.backend.model.SearchHit
+import com.quackify.backend.model.SearchKind
+import com.quackify.backend.model.SearchResults
+import com.quackify.backend.model.ShelfKind
+import com.quackify.backend.model.ShowDetail
+import com.quackify.backend.model.TrackLyrics
 import com.quackify.backend.model.UserProfile
+import com.quackify.compose.components.UpdateDialog
+import com.quackify.compose.components.UpdateInstallPhase
+import com.quackify.compose.format.formatCount
+import com.quackify.compose.format.parseHexColor
+import com.quackify.compose.home.toArtistRelease
 import com.quackify.compose.home.toFavoriteArtistsShelf
 import com.quackify.compose.home.toQuickAccess
 import com.quackify.compose.home.toQuickAccessFallback
 import com.quackify.compose.home.toRecentlyPlayedShelf
 import com.quackify.compose.home.toShelves
-import com.quackify.compose.screens.HistoryStats
-import com.quackify.compose.screens.ProfileContextCard
-import java.util.Calendar
-import com.quackify.compose.screens.SettingsSwitches
-import com.quackify.compose.screens.SettingsLocks
-import com.quackify.backend.api.Settings
-import com.quackify.compose.screens.EncoreNotification
-import com.quackify.compose.search.SearchHistoryItem
-import com.quackify.compose.screens.CategoryShelf
-import com.quackify.compose.screens.CategoryRecommendationItem
-import com.quackify.compose.format.parseHexColor
-import androidx.compose.ui.graphics.Color
-import com.quackify.backend.api.Browse
-import com.quackify.backend.api.Podcasts
-import com.quackify.backend.model.BrowseCard
-import com.quackify.backend.model.BrowsePage
-import com.quackify.backend.model.EpisodeDetail
-import com.quackify.backend.model.ShowDetail
-import com.quackify.backend.model.SearchHit
-import com.quackify.backend.model.SearchKind
-import com.quackify.backend.model.SearchResults
-import com.quackify.backend.model.TrackLyrics
+import com.quackify.compose.home.toTrackItem
+import com.quackify.compose.library.LibraryItem
+import com.quackify.compose.library.LibraryItemType
 import com.quackify.compose.player.TimeSyncedLyric
-import com.quackify.compose.format.formatCount
+import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.screens.AppUpdate
+import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.screens.CategoryRecommendationItem
+import com.quackify.compose.screens.CategoryShelf
+import com.quackify.compose.screens.EncoreNotification
+import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.LoginScreen
 import com.quackify.compose.screens.PathfinderCaptureScreen
+import com.quackify.compose.screens.PopularTrack
+import com.quackify.compose.screens.ProfileContextCard
+import com.quackify.compose.screens.SettingsLocks
+import com.quackify.compose.screens.SettingsSwitches
+import com.quackify.compose.search.SearchHistoryItem
 import com.quackify.compose.shell.EncoreAppShell
+import com.quackify.compose.shell.PlaylistEditDraft
 import com.quackify.compose.shell.ShellDeepLink
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.util.rememberIsOffline
-import com.quackify.backend.core.webview.SilentTokenRefresh
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.quackify.backend.core.log.Logs
-import com.quackify.backend.library.Krespot
-import com.quackify.backend.library.PlaylistSource
+import java.util.Calendar
 
 private val log = Logs.of(Logs.Module.MAIN)
 
@@ -115,6 +120,17 @@ class MainActivity : ComponentActivity() {
     private var updateChecking by mutableStateOf(false)
     private var updateChecked by mutableStateOf(false)
     private var updateFetch by mutableStateOf(0)
+    private var updatePrompt by mutableStateOf<AppUpdate?>(null)
+    private var updateAutoTick by mutableStateOf(0)
+    private var updateTimerTick by mutableStateOf(0)
+    private var updateManualPending = false
+    private var lastUpdateCheckAt = 0L
+    private var updatePhase by mutableStateOf(UpdateInstallPhase.Idle)
+    private var updateDownloadedMb by mutableStateOf(0f)
+    private var updateTotalMb by mutableStateOf(0f)
+    private var updateSpeedMbps by mutableStateOf(0f)
+    private var installTick by mutableStateOf(0)
+    private var videoFullscreen by mutableStateOf(false)
 
     /** Bumped every time the playback notification's body is tapped; the
      * shell watches it and slides the Now Playing view over whatever is
@@ -740,6 +756,89 @@ class MainActivity : ComponentActivity() {
                             updateChecked = true
                         }
 
+                        LaunchedEffect(Unit) {
+                            withContext(Dispatchers.IO) { UpdateInstaller.cleanup(context) }
+                        }
+
+                        LaunchedEffect(Unit) {
+                            while (isActive) {
+                                delay(30 * 60 * 1000L)
+                                updateTimerTick++
+                            }
+                        }
+
+                        LaunchedEffect(updateAutoTick, updateTimerTick, updateFetch) {
+                            if (updateAutoTick == 0 && updateTimerTick == 0 && updateFetch == 0) return@LaunchedEffect
+                            val manual = updateManualPending
+                            updateManualPending = false
+                            val now = System.currentTimeMillis()
+                            if (!manual && now - lastUpdateCheckAt < 30 * 60_000L) return@LaunchedEffect
+                            lastUpdateCheckAt = now
+                            updateChecking = true
+                            val found = withContext(Dispatchers.IO) {
+                                runCatching { UpdateChecker.check(context) }.getOrNull()
+                            }
+                            updateChecking = false
+                            updateChecked = true
+                            appUpdate = found
+                            if (found == null) {
+                                if (manual) {
+                                    Toast.makeText(context, "No new updates yet", Toast.LENGTH_SHORT).show()
+                                }
+                                return@LaunchedEffect
+                            }
+                            if (!manual && clientPrefs.getLong("updateSnoozeUntil", 0L) > now) return@LaunchedEffect
+                            updatePhase = UpdateInstallPhase.Idle
+                            updatePrompt = found
+                        }
+
+                        LaunchedEffect(installTick) {
+                            if (installTick == 0) return@LaunchedEffect
+                            val target = updatePrompt ?: return@LaunchedEffect
+                            updatePhase = UpdateInstallPhase.Downloading
+                            updateDownloadedMb = 0f
+                            updateTotalMb = 0f
+                            updateSpeedMbps = 0f
+                            val file = withContext(Dispatchers.IO) {
+                                UpdateInstaller.download(context, target) { done, total, speed ->
+                                    updateDownloadedMb = done / 1_000_000f
+                                    updateTotalMb = total / 1_000_000f
+                                    updateSpeedMbps = speed / 1_000_000f
+                                }
+                            }
+                            if (file == null) {
+                                updatePhase = UpdateInstallPhase.Idle
+                                Toast.makeText(context, "Download failed", Toast.LENGTH_SHORT).show()
+                                return@LaunchedEffect
+                            }
+                            updatePhase = UpdateInstallPhase.Installing
+                            runCatching { UpdateInstaller.install(context, file) }
+                                .onFailure {
+                                    updatePhase = UpdateInstallPhase.Idle
+                                    Toast.makeText(context, "Install failed", Toast.LENGTH_SHORT).show()
+                                }
+                        }
+
+                        if (updatePrompt != null) {
+                            UpdateDialog(
+                                update = updatePrompt!!,
+                                currentVersion = UpdateChecker.currentVersion(context).orEmpty(),
+                                phase = updatePhase,
+                                downloadedMb = updateDownloadedMb,
+                                totalMb = updateTotalMb,
+                                speedMbps = updateSpeedMbps,
+                                onLater = {
+                                    clientPrefs.edit().putLong(
+                                        "updateSnoozeUntil",
+                                        System.currentTimeMillis() + 6 * 60 * 60 * 1000L
+                                    ).apply()
+                                    updatePrompt = null
+                                },
+                                onInstall = { installTick++ },
+                                onDismiss = { updatePrompt = null }
+                            )
+                        }
+
                         LaunchedEffect(loggedIn, pendingLink) {
                             val link = pendingLink ?: return@LaunchedEffect
                             if (link.kind != "track" && link.kind != "station") return@LaunchedEffect
@@ -749,6 +848,23 @@ class MainActivity : ComponentActivity() {
 
                         val bridge = remember { PlaybackHost.ensure(context) }
                         val playback = bridge.state
+
+                        LaunchedEffect(playback.videoActive) {
+                            if (!playback.videoActive && videoFullscreen) {
+                                videoFullscreen = false
+                                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                            }
+                        }
+
+                        LaunchedEffect(videoFullscreen) {
+                            val controller = WindowCompat.getInsetsController(window, window.decorView)
+                            if (videoFullscreen) {
+                                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                                controller.hide(WindowInsetsCompat.Type.systemBars())
+                            } else {
+                                controller.show(WindowInsetsCompat.Type.systemBars())
+                            }
+                        }
                         LaunchedEffect(settingsSwitches.musicVideos, settingsSwitches.otherVideos) {
                             bridge.setVideoPolicy(settingsSwitches.musicVideos, settingsSwitches.otherVideos)
                         }
@@ -943,7 +1059,11 @@ class MainActivity : ComponentActivity() {
                                 appUpdate = appUpdate,
                                 updateChecking = updateChecking,
                                 updateChecked = updateChecked,
-                                onCheckUpdates = { updateFetch++ },
+                                onCheckUpdates = {
+                                    updateManualPending = true
+                                    updateFetch++
+                                },
+                                onHomeEntered = { updateAutoTick++ },
                                 userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
                                 userAvatarUrl = account?.imageUrl.orEmpty(),
                             playbackState = bridge.state,
@@ -1441,6 +1561,15 @@ class MainActivity : ComponentActivity() {
                             browsePage = browsePage,
                             categoryShelves = categoryShelves,
                             fullArtworkPlayer = fullArtworkPlayer,
+                            videoFullscreen = videoFullscreen,
+                            onToggleVideoFullscreen = { on ->
+                                videoFullscreen = on
+                                requestedOrientation = if (on) {
+                                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                } else {
+                                    ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                }
+                            },
                             onToggleFullArtwork = { on ->
                                 fullArtworkPlayer = on
                                 clientPrefs.edit().putBoolean("fullArtworkPlayer", on).apply()
@@ -1740,9 +1869,9 @@ private suspend fun decorateSearchTracks(
     )
 }
 
-private const val PLAYLIST_PREFETCH_ROWS = 8
-
 private const val FAVORITE_ARTIST_LIMIT = 10
+
+private const val PLAYLIST_PREFETCH_ROWS = 8
 
 private data class ArtistStanding(
     val plays: Int,

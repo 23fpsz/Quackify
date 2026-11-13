@@ -73,6 +73,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -247,6 +248,8 @@ fun EncoreNowPlayingScreen(
     videoQualities: List<Int> = emptyList(),
     videoSwitching: Boolean = false,
     onSwitchVideo: (Boolean) -> Unit = {},
+    videoFullscreen: Boolean = false,
+    onToggleVideoFullscreen: (Boolean) -> Unit = {},
     onVideoQuality: (Int) -> Unit = {},
     onVideoSurface: (android.view.Surface?) -> Unit = {},
     isEpisode: Boolean = false,
@@ -275,6 +278,24 @@ fun EncoreNowPlayingScreen(
     var isLyricsShareOpen by remember { mutableStateOf(false) }
 
     BackHandler(enabled = isLyricsFullscreen) { isLyricsFullscreen = false }
+
+    if (videoFullscreen && videoActive) {
+        BackHandler { onToggleVideoFullscreen(false) }
+        VideoFullscreenLayout(
+            videoQualities = videoQualities,
+            onVideoQuality = onVideoQuality,
+            onVideoSurface = onVideoSurface,
+            progress = progress,
+            durationMs = durationMs,
+            currentPositionMs = currentPositionMs,
+            onSeek = onSeek,
+            isLoading = isLoading,
+            canSeek = canSeek,
+            chapters = chapters,
+            onExit = { onToggleVideoFullscreen(false) }
+        )
+        return
+    }
 
     val canvasActive = isCanvasAllowed && isCanvasEnabled && canvasFilePath != null
 
@@ -459,6 +480,7 @@ fun EncoreNowPlayingScreen(
                             videoQualities = videoQualities,
                             onVideoQuality = onVideoQuality,
                             onVideoSurface = onVideoSurface,
+                            onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                             modifier = Modifier
                                 .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
                         )
@@ -629,6 +651,7 @@ fun EncoreNowPlayingScreen(
                                         videoQualities = videoQualities,
                                         onVideoQuality = onVideoQuality,
                                         onVideoSurface = onVideoSurface,
+                                        onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .then(
@@ -704,6 +727,7 @@ fun EncoreNowPlayingScreen(
                                     videoQualities = videoQualities,
                                     onVideoQuality = onVideoQuality,
                                     onVideoSurface = onVideoSurface,
+                                    onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .then(
@@ -1108,9 +1132,13 @@ private fun NowPlayingArtworkCard(
     fadeFraction: Float = 0f,
     canvasZoom: Float = 1f,
     videoActive: Boolean = false,
+    videoFullBleed: Boolean = false,
+    videoOverlayVisible: Boolean? = null,
+    onVideoOverlayTap: (() -> Unit)? = null,
     videoQualities: List<Int> = emptyList(),
     onVideoQuality: (Int) -> Unit = {},
     onVideoSurface: (android.view.Surface?) -> Unit = {},
+    onToggleVideoFullscreen: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val corner = if (fullBleed) 0.dp else EncoreCornerRadii.Larger2
@@ -1138,20 +1166,28 @@ private fun NowPlayingArtworkCard(
     ) {
         when {
             videoActive -> {
-                var overlayVisible by remember { mutableStateOf(false) }
-                LaunchedEffect(overlayVisible) {
-                    if (overlayVisible) {
-                        delay(3000)
-                        overlayVisible = false
+                var internalOverlay by remember { mutableStateOf(false) }
+                val overlayVisible = videoOverlayVisible ?: internalOverlay
+                if (videoOverlayVisible == null) {
+                    LaunchedEffect(internalOverlay) {
+                        if (internalOverlay) {
+                            delay(3000)
+                            internalOverlay = false
+                        }
                     }
                 }
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.8f)
-                        .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(16.dp))
+                        .then(
+                            if (videoFullBleed) Modifier.fillMaxSize()
+                            else Modifier.fillMaxWidth(0.8f).aspectRatio(16f / 9f)
+                        )
+                        .clip(if (videoFullBleed) RectangleShape else RoundedCornerShape(16.dp))
                         .pointerInput(Unit) {
-                            detectTapGestures { overlayVisible = !overlayVisible }
+                            detectTapGestures {
+                                if (videoOverlayVisible != null) onVideoOverlayTap?.invoke()
+                                else internalOverlay = !internalOverlay
+                            }
                         }
                 ) {
                     MusicVideoSurface(
@@ -1160,8 +1196,8 @@ private fun NowPlayingArtworkCard(
                     )
                     AnimatedVisibility(
                         visible = overlayVisible,
-                        enter = fadeIn(tween(durationMillis = 180)),
-                        exit = fadeOut(tween(durationMillis = 180))
+                        enter = fadeIn(tween(durationMillis = 250)),
+                        exit = fadeOut(tween(durationMillis = 250))
                     ) {
                         Box(
                             modifier = Modifier
@@ -1169,44 +1205,62 @@ private fun NowPlayingArtworkCard(
                                 .background(Color.Black.copy(alpha = 0.25f))
                         ) {
                             var menuOpen by remember { mutableStateOf(false) }
-                            Box(
+                            Row(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    .padding(10.dp)
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
                                         .background(Color.Black.copy(alpha = 0.45f))
-                                        .clickable { menuOpen = true }
+                                        .clickable { onToggleVideoFullscreen() }
                                         .padding(7.dp)
                                 ) {
                                     Icon(
-                                        painter = painterResource(R.drawable.encore_icon_settings_24),
-                                        contentDescription = "Video quality",
+                                        painter = painterResource(R.drawable.encore_icon_fullscreen_24),
+                                        contentDescription = "Toggle fullscreen video",
                                         tint = Color.White,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
-                                EncoreMenu(
-                                    expanded = menuOpen,
-                                    onDismiss = { menuOpen = false },
-                                ) {
-                                    EncoreMenuItem(
-                                        label = "Auto",
-                                        onClick = {
-                                            onVideoQuality(0)
-                                            menuOpen = false
-                                        }
-                                    )
-                                    videoQualities.forEach { height ->
+                                Box {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(50))
+                                            .background(Color.Black.copy(alpha = 0.45f))
+                                            .clickable { menuOpen = true }
+                                            .padding(7.dp)
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.encore_icon_settings_24),
+                                            contentDescription = "Video quality",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    EncoreMenu(
+                                        expanded = menuOpen,
+                                        onDismiss = { menuOpen = false },
+                                    ) {
                                         EncoreMenuItem(
-                                            label = "${height}p",
+                                            label = "Auto",
                                             onClick = {
-                                                onVideoQuality(height)
+                                                onVideoQuality(0)
                                                 menuOpen = false
                                             }
                                         )
+                                        videoQualities.forEach { height ->
+                                            EncoreMenuItem(
+                                                label = "${height}p",
+                                                onClick = {
+                                                    onVideoQuality(height)
+                                                    menuOpen = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1231,6 +1285,70 @@ private fun NowPlayingArtworkCard(
                     modifier = Modifier.fillMaxSize()
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun VideoFullscreenLayout(
+    videoQualities: List<Int>,
+    onVideoQuality: (Int) -> Unit,
+    onVideoSurface: (android.view.Surface?) -> Unit,
+    progress: Float,
+    durationMs: Long,
+    currentPositionMs: Long,
+    onSeek: (Float) -> Unit,
+    isLoading: Boolean,
+    canSeek: Boolean,
+    chapters: List<ChapterMarker>,
+    onExit: () -> Unit,
+) {
+    var overlayVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(overlayVisible) {
+        if (overlayVisible) {
+            delay(3000)
+            overlayVisible = false
+        }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        NowPlayingArtworkCard(
+            title = "",
+            coverUrl = null,
+            dominantColor = Color.Black,
+            backgroundColor = Color.Black,
+            canvasFilePath = null,
+            isCanvasEnabled = false,
+            fullBleed = true,
+            videoActive = true,
+            videoFullBleed = true,
+            videoOverlayVisible = overlayVisible,
+            videoQualities = videoQualities,
+            onVideoQuality = onVideoQuality,
+            onVideoSurface = onVideoSurface,
+            onToggleVideoFullscreen = onExit,
+            onVideoOverlayTap = { overlayVisible = !overlayVisible },
+            modifier = Modifier.fillMaxSize()
+        )
+        AnimatedVisibility(
+            visible = overlayVisible,
+            enter = fadeIn(tween(durationMillis = 250)),
+            exit = fadeOut(tween(durationMillis = 250)),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            NowPlayingSeekBarSection(
+                progress = progress,
+                durationMs = durationMs,
+                currentPositionMs = currentPositionMs,
+                onSeek = onSeek,
+                isLoading = isLoading,
+                canSeek = canSeek,
+                markers = chapterFractions(chapters, durationMs),
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
         }
     }
 }

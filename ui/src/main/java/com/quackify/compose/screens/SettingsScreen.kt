@@ -329,61 +329,66 @@ fun SettingsScreen(
                     value = version,
                 )
                 val context = LocalContext.current
-                when {
-                    update != null -> {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(EncoreColors.Card)
-                                .clickable {
-                                    runCatching {
-                                        context.startActivity(
-                                            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(update.url))
-                                        )
-                                    }
+                if (update != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(EncoreColors.Card)
+                            .clickable {
+                                runCatching {
+                                    context.startActivity(
+                                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(update.url))
+                                    )
                                 }
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Update available",
-                                    style = EncoreTheme.typography.bodyMediumBold
-                                )
-                                Text(
-                                    text = update.version,
-                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-                                )
                             }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Download",
-                                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green)
+                                text = "Update available",
+                                style = EncoreTheme.typography.bodyMediumBold
+                            )
+                            Text(
+                                text = update.version,
+                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                             )
                         }
+                        Text(
+                            text = "Download",
+                            style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green)
+                        )
                     }
-                    updateChecking -> SettingsInfoRow(title = "Latest version", value = "Checking\u2026")
-                    updateChecked -> SettingsInfoRow(title = "Latest version", value = "Up to date")
                 }
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(EncoreColors.Card)
-                        .clickable { onCheckUpdates() }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Column {
+                        Text(
+                            text = "Latest version",
+                            style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                        )
+                        Text(
+                            text = when {
+                                updateChecking -> "Checking\u2026"
+                                updateChecked -> "Up to date"
+                                else -> "\u2014"
+                            },
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                        )
+                    }
                     Text(
-                        text = "Check for updates",
-                        style = EncoreTheme.typography.bodyMediumBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "\u2192",
-                        style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.TextSecondary)
+                        text = "Check",
+                        style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(EncoreColors.Card)
+                            .clickable { onCheckUpdates() }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

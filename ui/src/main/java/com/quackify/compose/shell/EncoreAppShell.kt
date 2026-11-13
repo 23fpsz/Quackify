@@ -138,11 +138,14 @@ fun EncoreAppShell(
     settingsLoading: Boolean = false,
     onToggleSetting: ((String, Boolean) -> Unit)? = null,
     onToggleFullArtwork: (Boolean) -> Unit = {},
+    videoFullscreen: Boolean = false,
+    onToggleVideoFullscreen: ((Boolean) -> Unit)? = null,
     onAppIconChange: ((String) -> Unit)? = null,
     appUpdate: AppUpdate? = null,
     updateChecking: Boolean = false,
     updateChecked: Boolean = false,
     onCheckUpdates: (() -> Unit)? = null,
+    onHomeEntered: () -> Unit = {},
     browsePage: BrowsePage? = null,
     categoryShelves: List<CategoryShelf>? = null,
     onOpenCategory: ((String) -> Unit)? = null,
@@ -308,6 +311,10 @@ fun EncoreAppShell(
     var currentScreen by navController.nav::currentScreen
     var selectedNavIndex by navController.nav::selectedNavIndex
     var isPlayerExpanded by navController.nav::isPlayerExpanded
+
+    LaunchedEffect(currentScreen) {
+        if (currentScreen == ShellScreen.HOME) onHomeEntered()
+    }
 
     LaunchedEffect(expandPlayerSignal) {
         if (expandPlayerSignal > 0) isPlayerExpanded = true
@@ -1122,6 +1129,8 @@ fun EncoreAppShell(
             videoQualities = playbackState?.videoQualities.orEmpty(),
             videoSwitching = playbackState?.videoSwitching ?: false,
             onSwitchVideo = { to -> playerListener?.onSwitchVideo(to) },
+            videoFullscreen = videoFullscreen,
+            onToggleVideoFullscreen = { on -> onToggleVideoFullscreen?.invoke(on) },
             onVideoQuality = { height -> playerListener?.onVideoQuality(height) },
             onVideoSurface = { surface -> playerListener?.onVideoSurface(surface) },
             isEpisode = playbackState?.trackUri.orEmpty().startsWith("spotify:episode:"),
