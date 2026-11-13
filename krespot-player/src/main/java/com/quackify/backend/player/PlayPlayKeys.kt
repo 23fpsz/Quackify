@@ -19,12 +19,19 @@ internal object PlayPlayKeys {
 
     private val cache = HashMap<String, ByteArray>()
 
+    @Volatile
+    private var rateLimitedUntil = 0L
+
+    val isRateLimited: Boolean
+        get() = System.currentTimeMillis() < rateLimitedUntil
+
     suspend fun key(context: Context, fileId: String): ByteArray? {
         if (!fileId.matches(Regex("[0-9a-fA-F]{40}"))) {
             log.w("playplay invalid file id '${fileId.take(12)}'")
             return null
         }
         mutex.withLock { cache[fileId] }?.let { return it }
+        if (System.currentTimeMillis() < rateLimitedUntil) return null
         val blob = Net.postBlob(
             "$KEY_URL$fileId",
             PlayPlayLicenseRequest.encode(),
@@ -35,8 +42,15 @@ internal object PlayPlayKeys {
                 "User-Agent" to Net.DESKTOP_UA,
             ),
             tag = "playplay",
-        )?.takeIf { it.ok }
-        if (blob == null) {
+        )
+        if (blob != null && blob.code == 429) {
+            val retryAfter = blob.headers["retry-after"]?.trim()?.toLongOrNull()
+            val wait = (retryAfter?.coerceIn(5L, 600L) ?: 60L) * 1000L
+            rateLimitedUntil = System.currentTimeMillis() + wait
+            log.w("playplay key rate limited, cooling down for ${wait / 1000}s")
+            return null
+        }
+        if (blob?.ok != true) {
             log.w("playplay key failed '${fileId.take(12)}'")
             return null
         }

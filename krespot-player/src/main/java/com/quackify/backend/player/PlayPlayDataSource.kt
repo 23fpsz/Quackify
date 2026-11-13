@@ -8,7 +8,6 @@ import androidx.media3.datasource.DataSource
 import com.quackify.backend.core.log.Logs
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.math.BigInteger
@@ -22,9 +21,10 @@ private val log = Logs.of(Logs.Module.SOURCE)
 
 /**
  * Serves a PlayPlay encrypted OGG/FLAC file to ExoPlayer as if it were clear.
- * The encrypted file is AES-128-CTR from byte 0 with the fixed audio IV; the
- * first 0xA7 decrypted bytes of an OGG file are not container data, so every
- * player position p maps to encrypted file byte p + 0xA7 (FLAC has no skip).
+ * Mirrors the echo extension contract: the decrypted file starts with a
+ * 0xA7 byte record header before the actual OGG data, so player position p
+ * maps to decrypted file byte p + 0xA7 (FLAC has no skip). The AES-128-CTR
+ * keystream is indexed by absolute file position.
  */
 internal class PlayPlayDataSource(
     private val url: String,
@@ -41,6 +41,10 @@ internal class PlayPlayDataSource(
 
     private var stream: InputStream? = null
 
+    private var lead = ByteArray(0)
+
+    private var leadPos = 0
+
     private var remaining = 0L
 
     private var opened = false
@@ -52,14 +56,15 @@ internal class PlayPlayDataSource(
         val shifted = position + byteSkip
         val alignedPos = shifted - (shifted % 16)
         val blockOffset = (shifted % 16).toInt()
-        val rangeEnd = if (length >= 0) shifted + length - 1 else null
+        val rangeEnd = if (length >= 0) alignedPos + blockOffset + length - 1 else null
         val range = if (rangeEnd != null) "bytes=$alignedPos-$rangeEnd" else "bytes=$alignedPos-"
-        val request = Request.Builder()
-            .url(url)
-            .header("Range", range)
-            .header("Accept-Encoding", "identity")
-            .build()
-        val call = client.newCall(request).execute()
+        val call = client.newCall(
+            Request.Builder()
+                .url(url)
+                .header("Range", range)
+                .header("Accept-Encoding", "identity")
+                .build()
+        ).execute()
         if (!call.isSuccessful || (call.code != 206 && !(call.code == 200 && alignedPos == 0L))) {
             val code = call.code
             call.close()
@@ -90,6 +95,20 @@ internal class PlayPlayDataSource(
                 skipped += n
             }
         }
+        lead = ByteArray(0)
+        leadPos = 0
+        if (position == 0L) {
+            val probe = ByteArray(32)
+            var filled = 0
+            while (filled < probe.size) {
+                val n = cipherStream.read(probe, filled, probe.size - filled)
+                if (n == -1) break
+                filled += n
+            }
+            lead = probe.copyOf(filled)
+            log.i("playplay open pos=$position served head " +
+                    lead.joinToString("") { "%02x".format(it) })
+        }
         response = call
         stream = cipherStream
         remaining = length
@@ -104,6 +123,15 @@ internal class PlayPlayDataSource(
 
     override fun read(buffer: ByteArray, offset: Int, readLength: Int): Int {
         if (remaining == 0L) return C.RESULT_END_OF_INPUT
+        if (leadPos < lead.size) {
+            var take = minOf(readLength, lead.size - leadPos)
+            if (remaining > 0) take = minOf(take, remaining.toInt())
+            System.arraycopy(lead, leadPos, buffer, offset, take)
+            leadPos += take
+            if (remaining > 0) remaining -= take
+            bytesTransferred(take)
+            return take
+        }
         val source = stream ?: throw IOException("playplay source not open")
         val read = source.read(buffer, offset, readLength)
         if (read == -1) {
@@ -122,6 +150,8 @@ internal class PlayPlayDataSource(
         runCatching { response?.close() }
         stream = null
         response = null
+        lead = ByteArray(0)
+        leadPos = 0
         remaining = 0L
         if (opened) {
             opened = false

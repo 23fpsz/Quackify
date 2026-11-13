@@ -127,12 +127,9 @@ import com.quackify.compose.util.rememberDominantColor
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
 private const val DRAG_AXIS_SLOP_PX = 8f
-private const val SKIP_THRESHOLD_PX = 160f
-private const val SKIP_TRAVEL_PX = 800f
 private const val SNAP_BACK_FLING_VELOCITY = -100f
 private const val DISMISS_FLING_VELOCITY = 1000f
 private const val AXIS_UNDECIDED = 0
-private const val AXIS_HORIZONTAL = 1
 private const val AXIS_VERTICAL = 2
 private const val AXIS_YIELD = 3
 
@@ -394,8 +391,6 @@ fun EncoreNowPlayingScreen(
         scrollState = scrollState,
         scrollEnabled = !effectiveIsLoading,
         dismissThresholdPx = dismissThresholdPx,
-        onSkipNext = onSkipNextClick,
-        onSkipPrevious = onSkipPreviousClick,
         onDismiss = dismissPlayer,
         onSnapBack = snapBackPlayer
     )
@@ -966,20 +961,16 @@ private fun Modifier.npvArtworkGesture(
     scrollState: ScrollState,
     scrollEnabled: Boolean,
     dismissThresholdPx: Float,
-    onSkipNext: () -> Unit,
-    onSkipPrevious: () -> Unit,
     onDismiss: () -> Unit,
     onSnapBack: () -> Unit
 ): Modifier = pointerInput(dismissThresholdPx, scrollEnabled) {
     var axis = AXIS_UNDECIDED
-    var totalDragX = 0f
     var totalDragY = 0f
     val velocityTracker = VelocityTracker()
 
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         axis = AXIS_UNDECIDED
-        totalDragX = 0f
         totalDragY = 0f
         velocityTracker.resetTracking()
         velocityTracker.addPosition(down.uptimeMillis, down.position)
@@ -990,25 +981,18 @@ private fun Modifier.npvArtworkGesture(
             if (!change.pressed) break
 
             val delta = change.positionChange()
-            totalDragX += delta.x
             totalDragY += delta.y
 
             if (axis == AXIS_UNDECIDED) {
-                val absX = totalDragX.absoluteValue
-                val absY = totalDragY.absoluteValue
-                if (absX > DRAG_AXIS_SLOP_PX && absX > absY) {
-                    axis = AXIS_HORIZONTAL
-                } else if (absY > DRAG_AXIS_SLOP_PX) {
+                if (delta.y.absoluteValue > DRAG_AXIS_SLOP_PX) {
                     val pageAtTop = !scrollEnabled || scrollState.value <= 0
-                    axis = if (totalDragY > 0f && pageAtTop) AXIS_VERTICAL else AXIS_YIELD
+                    axis = if (delta.y > 0f && pageAtTop) AXIS_VERTICAL else AXIS_YIELD
+                } else if (delta.x.absoluteValue > DRAG_AXIS_SLOP_PX) {
+                    axis = AXIS_YIELD
                 }
             }
 
             when (axis) {
-                AXIS_HORIZONTAL -> {
-                    change.consume()
-                    velocityTracker.addPosition(change.uptimeMillis, change.position)
-                }
                 AXIS_VERTICAL -> {
                     change.consume()
                     velocityTracker.addPosition(change.uptimeMillis, change.position)
@@ -1023,11 +1007,6 @@ private fun Modifier.npvArtworkGesture(
         val velocity = velocityTracker.calculateVelocity()
         coroutineScope.launch {
             when (axis) {
-                AXIS_HORIZONTAL -> when {
-                    totalDragX < -SKIP_THRESHOLD_PX -> onSkipNext()
-                    totalDragX > SKIP_THRESHOLD_PX -> onSkipPrevious()
-                    else -> Unit
-                }
                 AXIS_VERTICAL -> {
                     when {
                         velocity.y < SNAP_BACK_FLING_VELOCITY -> onSnapBack()

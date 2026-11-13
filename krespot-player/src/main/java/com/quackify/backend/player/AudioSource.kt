@@ -21,6 +21,7 @@
 package com.quackify.backend.player
 
 import android.content.Context
+import com.quackify.backend.core.store.AppPrefs
 import com.quackify.backend.core.store.SecureStore
 import com.quackify.backend.connect.command.AudioFile
 import com.quackify.backend.core.auth.EncoreAuth
@@ -32,6 +33,26 @@ import kotlinx.coroutines.coroutineScope
 import org.json.JSONObject
 
 private val log = Logs.of(Logs.Module.SOURCE)
+
+private val deniedFormats = mutableSetOf<Int>()
+
+private var deniedLoaded = false
+
+private const val PP_STORE = "quackify.playplay"
+
+private const val PP_DENIED_KEY = "denied_formats"
+
+private fun loadDenied(context: Context) {
+    if (deniedLoaded) return
+    deniedLoaded = true
+    AppPrefs.getString(context, PP_STORE, PP_DENIED_KEY, null)
+        ?.split(',')
+        ?.forEach { it.toIntOrNull()?.let { f -> deniedFormats += f } }
+}
+
+private fun saveDenied(context: Context) {
+    AppPrefs.putString(context, PP_STORE, PP_DENIED_KEY, deniedFormats.joinToString(","))
+}
 
 private const val RESOLVE_HOST = "guc3-spclient.spotify.com"
 private const val RESOLVE_PREFIX = "/storage-resolve/v2/files/audio/interactive/{format}/"
@@ -236,33 +257,55 @@ internal object SourceResolver {
         durationMs: Long,
     ): AudioSource? {
         val files = AudioMeta.audioFiles(context, uri)
-        val best = AudioMeta.best(files) ?: return null
-        val format = formatName(best.format) ?: return null
-        val key = PlayPlayKeys.key(context, best.fileId) ?: return null
-        val (table, url) = coroutineScope {
-            val table = async { seektable(best.fileId) }
-            val url = async { cdnUrlNamed(context, best.fileId, format) }
-            table.await() to url.await()
+        loadDenied(context)
+        if (files.isEmpty()) {
+            log.i("no direct file ids for '${uri.takeLast(12)}' " +
+                    "(free accounts only get drm manifests), falling back")
+            return null
         }
-        if (url == null) return null
-        val finalTable = table ?: syntheticTable(durationMs)
-        log.i("playplay source ${best.fileId.take(12)} fmt=${best.format} " +
-                (table?.let { "segs=${it.count}" } ?: "synthetic table"))
-        return AudioSource(
-            fileId = best.fileId,
-            format = best.format,
-            bitrate = best.bitrate,
-            quality = qualityName(best.format),
-            url = url,
-            seektable = finalTable,
-            playplayKey = key,
-            playplayFlac = best.format == AudioMeta.FLAC_FLAC ||
-                best.format == AudioMeta.FLAC_FLAC_24BIT,
-        )
+        val ordered = AudioMeta.PLAYABLE_FORMATS
+            .filter { it !in deniedFormats }
+            .flatMap { format ->
+                files.filter { it.format == format }.sortedByDescending { it.bitrate }
+            }
+        var source: AudioSource? = null
+        for (candidate in ordered) {
+            if (formatName(candidate.format) == null) continue
+            val key = PlayPlayKeys.key(context, candidate.fileId)
+            if (key == null) {
+                if (PlayPlayKeys.isRateLimited) break
+                deniedFormats += candidate.format
+                saveDenied(context)
+                log.i("playplay format ${candidate.format} denied, skipping it from now on")
+                continue
+            }
+            val (table, url) = coroutineScope {
+                val table = async { seektable(candidate.fileId) }
+                val url = async { cdnUrlNamed(context, candidate.fileId, candidate.format.toString()) }
+                table.await() to url.await()
+            }
+            if (url == null) continue
+            val finalTable = table ?: syntheticTable(durationMs)
+            log.i("playplay source ${candidate.fileId.take(12)} fmt=${candidate.format} " +
+                    (table?.let { "segs=${it.count}" } ?: "synthetic table"))
+            source = AudioSource(
+                fileId = candidate.fileId,
+                format = candidate.format,
+                bitrate = candidate.bitrate,
+                quality = qualityName(candidate.format),
+                url = url,
+                seektable = finalTable,
+                playplayKey = key,
+                playplayFlac = candidate.format == AudioMeta.FLAC_FLAC ||
+                    candidate.format == AudioMeta.FLAC_FLAC_24BIT,
+            )
+            break
+        }
+        return source
     }
 
     private suspend fun cdnUrlNamed(context: Context, fileId: String, format: String): String? {
-        val url = "https://$RESOLVE_HOST${RESOLVE_PREFIX.replace("{format}", format)}$fileId$RESOLVE_QUERY"
+        val url = "https://spclient.wg.spotify.com${RESOLVE_PREFIX.replace("{format}", format)}$fileId$RESOLVE_QUERY"
         val response = Net.get(url, PlayerHeaders.of(context), tag = "resolve")
         val urls = response?.takeIf { it.ok }?.json()?.optJSONArray("cdnurl")
         val first = urls?.optString(0).orEmpty()
