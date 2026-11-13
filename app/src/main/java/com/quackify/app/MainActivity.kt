@@ -3,7 +3,9 @@ package com.quackify.app
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.ComponentName
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -118,6 +120,7 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         Pathfinder.silentRefresh = { context, reason -> SilentTokenRefresh.refresh(context, reason) }
+        syncLauncherIcon(applicationContext)
         val appContext = applicationContext
         Net.onUnauthorized = { sent, reason ->
             val current = EncoreAuth.token(appContext)
@@ -1526,6 +1529,9 @@ class MainActivity : ComponentActivity() {
                                 fullArtworkPlayer = on
                                 clientPrefs.edit().putBoolean("fullArtworkPlayer", on).apply()
                             },
+                            onAppIconChange = { option ->
+                                applyLauncherIcon(context, option)
+                            },
                             onOpenCategory = { category ->
                                 categoryUri = "spotify:genre:" + category.lowercase().replace(" ", "-")
                                 categoryShelves = null
@@ -1882,4 +1888,34 @@ private suspend fun resolveProfileContexts(
             else -> null
         }
     }
+private val LAUNCHER_ALIASES = linkedMapOf(
+    "default" to ".LauncherDefault",
+    "normal" to ".LauncherNormal",
+    "buffed" to ".LauncherBuffed",
+    "custom" to ".LauncherCustom",
+)
+
+private fun launcherIconPref(context: Context): String =
+    com.quackify.backend.core.store.AppPrefs.prefs(context, "quackify.client")
+        .getString("appIcon", "default").orEmpty().ifBlank { "default" }
+
+private fun applyLauncherIcon(context: Context, option: String) {
+    val pm = context.packageManager
+    val target = LAUNCHER_ALIASES[option] ?: return
+    LAUNCHER_ALIASES.forEach { (key, cls) ->
+        val component = ComponentName(context, context.packageName + cls)
+        val want = if (key == option) {
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        } else {
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        }
+        if (pm.getComponentEnabledSetting(component) != want) {
+            pm.setComponentEnabledSetting(component, want, PackageManager.DONT_KILL_APP)
+        }
+    }
+    log.i("launcher icon -> $option")
+}
+
+private fun syncLauncherIcon(context: Context) {
+    applyLauncherIcon(context, launcherIconPref(context))
 }

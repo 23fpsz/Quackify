@@ -1,5 +1,6 @@
 package com.quackify.compose.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -88,6 +90,7 @@ fun SettingsScreen(
     onToggleShowFollows: (Boolean) -> Unit = {},
     onToggleShowPlaylists: (Boolean) -> Unit = {},
     onToggleFullArtwork: (Boolean) -> Unit = {},
+    onAppIconChange: (String) -> Unit = {},
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
@@ -113,6 +116,9 @@ fun SettingsScreen(
     }
     var gapless by remember {
         mutableStateOf(clientPrefs.getBoolean("gaplessPlayback", false))
+    }
+    var appIcon by remember {
+        mutableStateOf(clientPrefs.getString("appIcon", "default").orEmpty().ifBlank { "default" })
     }
 
 
@@ -247,6 +253,57 @@ fun SettingsScreen(
                         onToggleFullArtwork(on)
                     }
                 )
+            }
+
+            item {
+                SettingsSectionHeader(title = "App icon")
+                Text(
+                    text = "Pick the launcher icon. It can take a moment for your home screen to update, and the app may restart once.",
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SettingsIconOption(
+                        label = "Default",
+                        iconRes = R.mipmap.ic_launcher_default,
+                        selected = appIcon == "default",
+                        onClick = {
+                            appIcon = "default"
+                            clientPrefs.edit().putString("appIcon", "default").apply()
+                            onAppIconChange("default")
+                        }
+                    )
+                    SettingsIconOption(
+                        label = "Normal",
+                        iconRes = R.mipmap.ic_launcher_normal,
+                        selected = appIcon == "normal",
+                        onClick = {
+                            appIcon = "normal"
+                            clientPrefs.edit().putString("appIcon", "normal").apply()
+                            onAppIconChange("normal")
+                        }
+                    )
+                    SettingsIconOption(
+                        label = "Buffed",
+                        iconRes = R.drawable.ic_launcher_buffed,
+                        selected = appIcon == "buffed",
+                        onClick = {
+                            appIcon = "buffed"
+                            clientPrefs.edit().putString("appIcon", "buffed").apply()
+                            onAppIconChange("buffed")
+                        }
+                    )
+                    SettingsIconOption(
+                        label = "Custom",
+                        iconRes = R.drawable.ic_launcher_custom,
+                        selected = appIcon == "custom",
+                        onClick = {
+                            appIcon = "custom"
+                            clientPrefs.edit().putString("appIcon", "custom").apply()
+                            onAppIconChange("custom")
+                        }
+                    )
+                }
             }
 
             item {
@@ -462,6 +519,42 @@ private fun SettingsBadge(text: String, info: String) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsIconOption(
+    label: String,
+    iconRes: Int,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .border(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = if (selected) EncoreColors.Green else EncoreColors.Divider,
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .clickable(onClick = onClick)
+        ) {
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = label,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = EncoreTheme.typography.marginal.copy(
+                color = if (selected) EncoreColors.Green else EncoreColors.TextSecondary
+            )
+        )
     }
 }
 

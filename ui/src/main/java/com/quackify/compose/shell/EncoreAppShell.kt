@@ -135,6 +135,7 @@ fun EncoreAppShell(
     settingsLoading: Boolean = false,
     onToggleSetting: ((String, Boolean) -> Unit)? = null,
     onToggleFullArtwork: (Boolean) -> Unit = {},
+    onAppIconChange: ((String) -> Unit)? = null,
     browsePage: BrowsePage? = null,
     categoryShelves: List<CategoryShelf>? = null,
     onOpenCategory: ((String) -> Unit)? = null,
@@ -776,7 +777,8 @@ fun EncoreAppShell(
                 country = settingsCountry,
                 loading = settingsLoading,
                 onToggleSetting = onToggleSetting,
-                onToggleFullArtwork = onToggleFullArtwork
+                onToggleFullArtwork = onToggleFullArtwork,
+                onAppIconChange = { onAppIconChange?.invoke(it) }
             )
             ShellScreen.NOTIFICATIONS -> ShellNotificationsPane(
                 onBackClick = handleBack,
