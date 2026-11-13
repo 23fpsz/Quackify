@@ -184,6 +184,7 @@ internal class ShellUiFlags {
     var isDeviceSheetOpen by mutableStateOf(false)
     var isQueueSheetOpen by mutableStateOf(false)
     var isSleepTimerOpen by mutableStateOf(false)
+    var isCanvasResolutionSheetOpen by mutableStateOf(false)
     var isArtistAboutOpen by mutableStateOf(false)
     var isDiscographyOpen by mutableStateOf(false)
     var isCreditsOpen by mutableStateOf(false)
