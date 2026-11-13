@@ -682,10 +682,11 @@ fun EncoreNowPlayingScreen(
                                 )
                             }
 
+                            Spacer(modifier = Modifier.weight(1f))
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .weight(1f)
                                     .padding(horizontal = 24.dp)
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
                                 contentAlignment = Alignment.Center
@@ -709,8 +710,10 @@ fun EncoreNowPlayingScreen(
                                             if (videoActive) Modifier.height(videoAreaHeight)
                                             else Modifier.aspectRatio(1.0f)
                                         )
-                                        )
+                                )
                             }
+
+                            Spacer(modifier = Modifier.weight(1f))
                         }
 
                         Column(
