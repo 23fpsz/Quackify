@@ -126,10 +126,10 @@ import com.quackify.compose.util.rememberDominantColor
 
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
-private const val DRAG_AXIS_SLOP_PX = 8f
+private const val DRAG_AXIS_SLOP_PX = 6f
 private const val SNAP_BACK_FLING_VELOCITY = -100f
-private const val DISMISS_FLING_VELOCITY = 700f
-private const val DISMISS_THRESHOLD_DP = 140f
+private const val DISMISS_FLING_VELOCITY = 350f
+private const val DISMISS_THRESHOLD_DP = 96f
 private const val AXIS_UNDECIDED = 0
 private const val AXIS_VERTICAL = 2
 private const val AXIS_YIELD = 3
