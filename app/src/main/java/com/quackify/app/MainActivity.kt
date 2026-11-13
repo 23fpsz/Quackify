@@ -175,7 +175,7 @@ class MainActivity : ComponentActivity() {
     private var addTracksLoading by mutableStateOf(false)
     private var addTracksFetch by mutableStateOf(0)
     private var sawOffline by mutableStateOf(false)
-    private var canvasEnabled by mutableStateOf(clientPrefs.getBoolean("canvasNpvEnabled", true))
+    private var canvasEnabled by mutableStateOf(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -191,6 +191,7 @@ class MainActivity : ComponentActivity() {
         playStats = PlayStats.snapshot(applicationContext)
         recentSearches = RecentSearches.all(applicationContext)
         savedAccountsList = EncoreAuth.savedAccounts(applicationContext)
+        canvasEnabled = clientPrefs.getBoolean("canvasNpvEnabled", true)
         syncLauncherIcon(applicationContext)
         canvasResolution = clientPrefs.getInt("canvasResolution", 1080)
         fullArtworkPlayer = clientPrefs.getBoolean("fullArtworkPlayer", true)
