@@ -84,6 +84,7 @@ import com.quackify.compose.format.formatCount
 import com.quackify.compose.screens.LoginScreen
 import com.quackify.compose.screens.PathfinderCaptureScreen
 import com.quackify.compose.shell.EncoreAppShell
+import com.quackify.compose.shell.ActivityFeedState
 import com.quackify.compose.shell.ShellDeepLink
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.util.rememberIsOffline
@@ -414,6 +415,14 @@ class MainActivity : ComponentActivity() {
                             }
                             whatsNewLoading = false
                         }
+                        val activity = remember { ActivityFeedController(context.applicationContext, scope) }
+                        LaunchedEffect(activity.fetchTick) {
+                            if (activity.fetchTick > 0) activity.load()
+                        }
+                        LaunchedEffect(Unit) {
+                            activity.refreshUnread()
+                        }
+
                         var profileDetail by remember { mutableStateOf<UserProfile?>(null) }
                         var profileTop by remember { mutableStateOf<ProfileTopContent?>(null) }
                         var profileContexts by remember { mutableStateOf<List<ProfileContextCard>>(emptyList()) }
@@ -1530,6 +1539,17 @@ class MainActivity : ComponentActivity() {
                             notificationsLoading = whatsNewLoading,
                             notificationsFailed = whatsNewFailed,
                             onRefreshWhatsNew = { whatsNewFetch++ },
+                            activityState = ActivityFeedState(
+                                feed = activity.feed,
+                                loading = activity.loading,
+                                failed = activity.failed,
+                                self = activity.self,
+                                unread = activity.unread,
+                                onOpen = activity::open,
+                                onRetry = activity::open,
+                                onLeave = activity::leave,
+                                onDrawerOpened = activity::refreshUnread,
+                            ),
                             historyToday = historyToday,
                             historyYesterday = historyYesterday,
                             historyEarlier = historyEarlier,
