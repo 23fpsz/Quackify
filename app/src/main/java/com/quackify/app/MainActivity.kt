@@ -42,6 +42,7 @@ import com.quackify.backend.core.net.Pathfinder
 import com.quackify.backend.core.webview.SilentTokenRefresh
 import com.quackify.backend.library.Krespot
 import com.quackify.backend.library.PlaylistSource
+import com.quackify.backend.library.TrackSource
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.BrowseCard
@@ -206,6 +207,7 @@ class MainActivity : ComponentActivity() {
     private var whatsNew by mutableStateOf<List<EncoreNotification>>(emptyList())
     private var profileDetail by mutableStateOf<UserProfile?>(null)
     private var profileTop by mutableStateOf<ProfileTopContent?>(null)
+    private var profileTopUnavailable by mutableStateOf(false)
     private var profileContexts by mutableStateOf<List<ProfileContextCard>>(emptyList())
     private var profileFollowers by mutableStateOf<List<ProfileUser>>(emptyList())
     private var profileFollowing by mutableStateOf<List<ProfileUser>>(emptyList())
@@ -434,10 +436,18 @@ class MainActivity : ComponentActivity() {
                                     val recentJob = async { runCatching { Profile.recentlyPlayed(context) }.getOrNull() }
                                     topJob.await() to recentJob.await()
                                 } else {
-                                    null to null
+                                    // Their public top content, not ours: when the query
+                                    // has nothing to say (private profile / no listening
+                                    // data) the screen explains that instead of falling
+                                    // back to the signed-in user's taste.
+                                    val topJob = async {
+                                        runCatching { Profile.topContent(context, target) }.getOrNull()
+                                    }
+                                    topJob.await() to null
                                 }
                                 profileDetail = profile
                                 profileTop = top
+                                profileTopUnavailable = !isSelf && top == null
                                 profileContexts = if (isSelf) {
                                     resolveProfileContexts(context, profile, recent)
                                 } else {
@@ -453,6 +463,7 @@ class MainActivity : ComponentActivity() {
                                 profileFailed = profile == null && top == null
                                 log.i("profile loaded self=$isSelf failed=${profile == null} " +
                                         "topArtists=${top?.topArtists?.size ?: 0} " +
+                                        "topUnavailable=${profileTopUnavailable} " +
                                         "contexts=${profileContexts.size}"
                                 )
                             }
@@ -768,10 +779,35 @@ class MainActivity : ComponentActivity() {
                             }
                             playHistory = recordNowPlaying(
                                 now.trackUri, now.title, now.artist, now.artistUri,
-                                cover.orEmpty(), now.contextUri, now.contextLabel, now.explicit,
-                                playlistNames,
+                                now.albumUri, cover.orEmpty(), now.contextUri, now.contextLabel,
+                                now.explicit, playlistNames,
                             )
                             playStats = PlayStats.snapshot(context)
+                        }
+
+                        // Older history rows were recorded without album info, so "Go to
+                        // album" from the history menu had nothing to open. Backfill the
+                        // album uri/name (and cover when missing); every uri is attempted
+                        // once so a dead network does not loop this effect.
+                        val historyAlbumAttempts = remember { mutableSetOf<String>() }
+                        LaunchedEffect(playHistory) {
+                            val missing = playHistory
+                                .map { it.item }
+                                .filter {
+                                    it.albumUri.isBlank() &&
+                                        it.uri.startsWith("spotify:track:") &&
+                                        it.uri !in historyAlbumAttempts
+                                }
+                                .map { it.uri }
+                                .distinct()
+                                .take(50)
+                            if (missing.isEmpty()) return@LaunchedEffect
+                            historyAlbumAttempts += missing
+                            val rows = runCatching {
+                                TrackSource.decorate(context, missing)
+                            }.getOrNull().orEmpty()
+                            if (rows.isEmpty()) return@LaunchedEffect
+                            playHistory = PlayHistory.applyAlbums(context, rows)
                         }
 
                         LaunchedEffect(playback.isPlaying) {
@@ -1062,6 +1098,7 @@ class MainActivity : ComponentActivity() {
         title: String,
         artist: String,
         artistUri: String,
+        albumUri: String,
         coverUrl: String,
         contextUri: String,
         contextLabel: String,
@@ -1088,6 +1125,7 @@ class MainActivity : ComponentActivity() {
                 uri = trackUri,
                 imageUrl = coverUrl,
                 artistUri = artistUri,
+                albumUri = albumUri,
                 isExplicit = explicit,
             ),
             System.currentTimeMillis(),
@@ -1626,6 +1664,7 @@ class MainActivity : ComponentActivity() {
         },
         profile = profileDetail,
         profileTop = profileTop,
+        profileTopUnavailable = profileTopUnavailable,
         profileContexts = profileContexts,
         profileLoading = profileLoading,
         profileFailed = profileFailed,
@@ -1634,6 +1673,7 @@ class MainActivity : ComponentActivity() {
                 profileUserId = ""
                 profileDetail = null
                 profileTop = null
+                profileTopUnavailable = false
                 profileContexts = emptyList()
             }
             profileFetch++
@@ -1641,6 +1681,7 @@ class MainActivity : ComponentActivity() {
         onRetryProfile = {
             profileDetail = null
             profileTop = null
+            profileTopUnavailable = false
             profileContexts = emptyList()
             profileFetch++
         },
@@ -1649,6 +1690,7 @@ class MainActivity : ComponentActivity() {
                 profileUserId = uri
                 profileDetail = null
                 profileTop = null
+                profileTopUnavailable = false
                 profileContexts = emptyList()
             }
             profileFetch++

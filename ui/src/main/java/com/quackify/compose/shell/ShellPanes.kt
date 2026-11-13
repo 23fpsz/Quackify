@@ -300,6 +300,7 @@ internal fun ShellActivityPane(
 internal fun ShellProfilePane(
     profile: UserProfile?,
     topContent: ProfileTopContent?,
+    topContentUnavailable: Boolean,
     contexts: List<ProfileContextCard>,
     loading: Boolean,
     loadFailed: Boolean,
@@ -319,6 +320,7 @@ internal fun ShellProfilePane(
     EncoreProfileScreen(
         profile = profile,
         topContent = topContent,
+        topContentUnavailable = topContentUnavailable,
         contexts = contexts,
         loading = loading,
         loadFailed = loadFailed,
@@ -739,7 +741,14 @@ internal fun ShellPlaylistPane(
                 ?: playlistDetail?.imageUrl?.takeIf { it.isNotBlank() }
                 ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl,
             contributors = playlistMembers,
-            onContributorsClick = { onOpenContributors?.invoke() },
+            // The contributors sheet loads its members from the playlist-permission
+            // API, so it only makes sense for real Spotify playlists — local ones
+            // keep a static author row instead of a dead tap.
+            onContributorsClick = if (activePlaylistUri.startsWith("spotify:playlist:")) {
+                { onOpenContributors?.invoke() }
+            } else {
+                null
+            },
             onBackClick = handleBack,
             onPlayPauseClick = {
                 if (playerListener != null) {

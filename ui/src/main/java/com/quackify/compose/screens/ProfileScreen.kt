@@ -95,6 +95,8 @@ fun EncoreProfileScreen(
     contextsTitle: String = "Recently played",
     fallbackName: String = "",
     avatarUrl: String = "",
+    /** Viewing someone else whose top artists/tracks are private or empty. */
+    topContentUnavailable: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -199,6 +201,18 @@ fun EncoreProfileScreen(
                             onMoreClick = { onTrackOptionsClick(track) },
                             isExplicit = track.explicit,
                             imageUrl = track.imageUrl.takeIf { it.isNotBlank() }
+                        )
+                    }
+                }
+                if (topContentUnavailable && topArtists.isEmpty() && topTracks.isEmpty()) {
+                    item {
+                        ProfileSectionTitle(title = "Top artists this month")
+                    }
+                    item {
+                        Text(
+                            text = "Their top artists and tracks are private, or they haven't listened to anything recently.",
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
                 }

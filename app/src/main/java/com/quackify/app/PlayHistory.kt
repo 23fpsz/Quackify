@@ -1,8 +1,8 @@
-
 package com.quackify.app
 
 import android.content.Context
 import com.quackify.backend.core.store.AppPrefs
+import com.quackify.backend.model.TrackRow
 import com.quackify.compose.playlist.TrackItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -43,6 +43,7 @@ object PlayHistory {
                     imageUrl = node.optString("image")
                         .takeIf { it.isNotBlank() },
                     albumUri = node.optString("albumUri"),
+                    albumName = node.optString("albumName"),
                     artistUri = node.optString("artistUri"),
                     isExplicit = node.optBoolean("explicit", false),
                     durationMs = node.optLong("durationMs", 0L),
@@ -96,6 +97,28 @@ object PlayHistory {
     }
 
     /**
+     * Backfills album uri/name (and a missing cover) on recorded rows using
+     * decorated track metadata, persists the result and returns the updated
+     * history. Rows that already know their album are left untouched.
+     */
+    fun applyAlbums(context: Context, rows: Map<String, TrackRow>): List<PlayedTrack> {
+        if (rows.isEmpty()) return all(context)
+        val current = all(context)
+        val updated = current.map { played ->
+            val row = rows[played.item.uri] ?: return@map played
+            played.copy(
+                item = played.item.copy(
+                    albumUri = played.item.albumUri.ifBlank { row.albumUri },
+                    albumName = played.item.albumName.ifBlank { row.album },
+                    imageUrl = played.item.imageUrl ?: row.imageUrl.takeIf { it.isNotBlank() },
+                )
+            )
+        }
+        write(context, updated)
+        return updated
+    }
+
+    /**
      * Two entries describe the same song when they share the track URI, or
      * when their title and artist match — re-releases and regional variants
      * of a song carry different URIs but identical metadata.
@@ -120,6 +143,7 @@ object PlayHistory {
                     .put("artist", played.item.artist)
                     .put("image", played.item.imageUrl.orEmpty())
                     .put("albumUri", played.item.albumUri)
+                    .put("albumName", played.item.albumName)
                     .put("artistUri", played.item.artistUri)
                     .put("explicit", played.item.isExplicit)
                     .put("durationMs", played.item.durationMs)
