@@ -283,26 +283,6 @@ fun SettingsScreen(
                             onAppIconChange("normal")
                         }
                     )
-                    SettingsIconOption(
-                        label = "Buffed",
-                        iconRes = R.mipmap.ic_launcher_buffed,
-                        selected = appIcon == "buffed",
-                        onClick = {
-                            appIcon = "buffed"
-                            clientPrefs.edit().putString("appIcon", "buffed").apply()
-                            onAppIconChange("buffed")
-                        }
-                    )
-                    SettingsIconOption(
-                        label = "Custom",
-                        iconRes = R.mipmap.ic_launcher_custom,
-                        selected = appIcon == "custom",
-                        onClick = {
-                            appIcon = "custom"
-                            clientPrefs.edit().putString("appIcon", "custom").apply()
-                            onAppIconChange("custom")
-                        }
-                    )
                 }
             }
 

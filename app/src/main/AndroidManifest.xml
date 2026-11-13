@@ -58,32 +58,6 @@
             </intent-filter>
         </activity-alias>
 
-        <activity-alias
-            android:name=".LauncherBuffed"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_buffed"
-            android:label="${appName}"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".LauncherCustom"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_custom"
-            android:label="${appName}"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
         <service
             android:name=".PlaybackService"
             android:exported="false"

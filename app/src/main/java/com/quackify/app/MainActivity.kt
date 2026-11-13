@@ -1768,13 +1768,13 @@ private suspend fun resolveProfileContexts(
 private val LAUNCHER_ALIASES = linkedMapOf(
     "default" to ".LauncherDefault",
     "normal" to ".LauncherNormal",
-    "buffed" to ".LauncherBuffed",
-    "custom" to ".LauncherCustom",
 )
 
-private fun launcherIconPref(context: Context): String =
-    com.quackify.backend.core.store.AppPrefs.prefs(context, "quackify.client")
+private fun launcherIconPref(context: Context): String {
+    val saved = com.quackify.backend.core.store.AppPrefs.prefs(context, "quackify.client")
         .getString("appIcon", "default").orEmpty().ifBlank { "default" }
+    return if (saved in LAUNCHER_ALIASES) saved else "default"
+}
 
 private fun applyLauncherIcon(context: Context, option: String) {
     val pm = context.packageManager
