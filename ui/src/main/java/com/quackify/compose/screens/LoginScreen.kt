@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -95,7 +94,6 @@ fun LoginScreen(
         return
     }
     var splash by remember { mutableStateOf(false) }
-    var viewerOpen by remember { mutableStateOf(false) }
     var canGoBack by remember { mutableStateOf(false) }
     val navSignal = remember { Channel<Unit>(Channel.CONFLATED) }
     val webAlpha by animateFloatAsState(
@@ -211,32 +209,6 @@ fun LoginScreen(
             factory = { host.container },
         )
 
-        if (!viewerOpen) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = 14.dp, bottom = 14.dp)
-                    .alpha(0.5f)
-                    .clip(RoundedCornerShape(50))
-                    .background(EncoreColors.Background)
-                    .clickable {
-                        log.i("log viewer opened from login")
-                        viewerOpen = true
-                    }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "LOGS",
-                    style = EncoreTheme.typography.marginal.copy(
-                        color = EncoreColors.TextSecondary,
-                        letterSpacing = 1.2.sp,
-                    ),
-                )
-            }
-        }
-
         AnimatedVisibility(
             visible = splash,
             enter = fadeIn(
@@ -253,11 +225,6 @@ fun LoginScreen(
             ),
         ) {
             SplashScreen()
-        }
-
-        if (viewerOpen) {
-            BackHandler { viewerOpen = false }
-            LogViewerScreen(onBackClick = { viewerOpen = false })
         }
     }
 }

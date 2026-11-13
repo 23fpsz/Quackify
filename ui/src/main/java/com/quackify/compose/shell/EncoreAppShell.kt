@@ -732,14 +732,7 @@ fun EncoreAppShell(
                 country = settingsCountry,
                 loading = settingsLoading,
                 onToggleSetting = onToggleSetting,
-                onToggleFullArtwork = onToggleFullArtwork,
-                onOpenLogViewer = {
-                    pushCurrentState()
-                    currentScreen = ShellScreen.LOGS
-                }
-            )
-            ShellScreen.LOGS -> ShellLogsPane(
-                onBackClick = handleBack
+                onToggleFullArtwork = onToggleFullArtwork
             )
             ShellScreen.NOTIFICATIONS -> ShellNotificationsPane(
                 onBackClick = handleBack,

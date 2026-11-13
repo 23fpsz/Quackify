@@ -9,7 +9,6 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
-        android:name=".QuackifyApp"
         android:allowBackup="true"
         android:hardwareAccelerated="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

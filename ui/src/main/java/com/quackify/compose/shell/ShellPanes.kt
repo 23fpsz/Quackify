@@ -76,7 +76,6 @@ import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.ArtistRelease
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.HistoryScreen
-import com.quackify.compose.screens.LogViewerScreen
 import com.quackify.compose.screens.NotificationsScreen
 import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.SettingsLocks
@@ -205,7 +204,6 @@ internal fun ShellSettingsPane(
     loading: Boolean,
     onToggleSetting: ((String, Boolean) -> Unit)?,
     onToggleFullArtwork: (Boolean) -> Unit = {},
-    onOpenLogViewer: () -> Unit = {}
 ) {
     SettingsScreen(
         onBackClick = onBackClick,
@@ -220,17 +218,7 @@ internal fun ShellSettingsPane(
         onToggleOtherVideos = { onToggleSetting?.invoke("otherVideoDisabled", !it) },
         onToggleShowFollows = { onToggleSetting?.invoke("showFollows", !it) },
         onToggleShowPlaylists = { onToggleSetting?.invoke("showPublishedPlaylists", !it) },
-        onToggleFullArtwork = onToggleFullArtwork,
-        onOpenLogViewer = onOpenLogViewer
-    )
-}
-
-@Composable
-internal fun ShellLogsPane(
-    onBackClick: () -> Unit
-) {
-    LogViewerScreen(
-        onBackClick = onBackClick
+        onToggleFullArtwork = onToggleFullArtwork
     )
 }
 

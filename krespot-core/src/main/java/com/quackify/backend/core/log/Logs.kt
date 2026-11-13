@@ -1,24 +1,11 @@
 package com.quackify.backend.core.log
 
-import android.os.SystemClock
 import android.util.Log
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 
 object Logs {
 
     const val TAG = "Quackify"
-
-    /** How many log lines the in-app viewer keeps before the oldest fall off. */
-    const val MAX_LINES = 3000
-
-    /** SharedPreferences file + key used to persist [capturing] across restarts. */
-    const val PREFS_NAME = "quackify.client"
-    const val CAPTURE_PREF_KEY = "logCaptureEnabled"
 
     enum class Module(val label: String) {
         AUTH("auth"),
@@ -88,53 +75,10 @@ object Logs {
         OFF(5),
     }
 
-    /** One captured log line, logcat style. */
-    data class Entry(
-        /** Monotonic counter, stable key for lazy lists. */
-        val seq: Long,
-        val wallClockMs: Long,
-        val uptimeMs: Long,
-        val module: Module,
-        val level: Level,
-        val message: String,
-        val error: String?,
-    ) {
-        val levelLetter: String
-            get() = when (level) {
-                Level.VERBOSE -> "V"
-                Level.DEBUG -> "D"
-                Level.INFO -> "I"
-                Level.WARN -> "W"
-                Level.ERROR -> "E"
-                Level.OFF -> "O"
-            }
-    }
-
     @Volatile
     var floor: Level = Level.VERBOSE
 
-    /**
-     * Master switch for the *in-app* log capture (the LogViewer ring
-     * buffer). Off by default: a fresh install keeps the viewer empty until
-     * the user turns the "Logging" toggle in the log viewer on, so continuous
-     * capture cannot cost any performance unasked. Logcat output is NOT
-     * gated by this switch — it always flows so Android Studio can show
-     * what is going on even while capture is off. The app persists this in
-     * [PREFS_NAME]/[CAPTURE_PREF_KEY].
-     */
-    @Volatile
-    var capturing: Boolean = false
-
     private val modules = ConcurrentHashMap<Module, Level>()
-
-    private val buffer = ArrayDeque<Entry>(MAX_LINES)
-    private val gate = Any()
-    private var nextSeq = 0L
-
-    private val _revision = MutableStateFlow(0L)
-
-    /** Bumped on every change so the viewer can recompose. */
-    val revision: StateFlow<Long> = _revision
 
     init {
         modules[Module.MAIN] = Level.INFO
@@ -148,30 +92,7 @@ object Logs {
 
     fun of(module: Module): Logger = Logger(module)
 
-    /** Lines currently kept, oldest first. */
-    fun snapshot(): List<Entry> = synchronized(gate) { buffer.toList() }
-
-    /** Number of lines currently kept. */
-    fun size(): Int = synchronized(gate) { buffer.size }
-
-    /** Drops every captured line. */
-    fun clear() {
-        synchronized(gate) { buffer.clear() }
-        _revision.value = _revision.value + 1L
-    }
-
-    /** Renders one entry the way logcat would print it. */
-    fun format(entry: Entry): String {
-        val stamp = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US).format(Date(entry.wallClockMs))
-        val line = "$stamp ${entry.levelLetter}/Quackify: [${entry.module.label}] ${entry.message}"
-        return if (entry.error.isNullOrBlank()) line else "$line\n${entry.error}"
-    }
-
-    /** Renders every kept entry, one per line block. */
-    fun dump(): String = snapshot().joinToString("\n") { format(it) }
-
     internal fun write(module: Module, level: Level, message: String, error: Throwable?) {
-        if (capturing) record(module, level, message, error)
         val line = "[${module.label}] $message"
         when (level) {
             Level.VERBOSE -> Log.v(TAG, line, error)
@@ -181,33 +102,6 @@ object Logs {
             Level.ERROR -> Log.e(TAG, line, error)
             Level.OFF -> Unit
         }
-    }
-
-    private fun record(module: Module, level: Level, message: String, error: Throwable?) {
-        val compact = if (error == null) null else describe(error)
-        synchronized(gate) {
-            if (buffer.size >= MAX_LINES) buffer.removeFirst()
-            buffer.addLast(
-                Entry(
-                    seq = nextSeq++,
-                    wallClockMs = System.currentTimeMillis(),
-                    uptimeMs = SystemClock.uptimeMillis(),
-                    module = module,
-                    level = level,
-                    message = message,
-                    error = compact,
-                )
-            )
-        }
-        _revision.value = _revision.value + 1L
-    }
-
-    private fun describe(error: Throwable): String {
-        val head = "${error.javaClass.simpleName}: ${error.message.orEmpty()}"
-        val frames = error.stackTrace.take(6).joinToString("\n") { "    at $it" }
-        val cause = error.cause
-        val tail = if (cause != null) "\nCaused by: ${describe(cause)}" else ""
-        return listOf(head, frames).joinToString("\n") + tail
     }
 }
 

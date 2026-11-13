@@ -54,7 +54,6 @@ object DeviceInfo {
         line(out, "minSdk", "24")
         line(out, "debuggable", ((app.applicationInfo?.flags ?: 0) and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0).toString())
         line(out, "dataDir", app.filesDir.parentFile?.absolutePath ?: "unknown")
-        line(out, "logBuffer", "${Logs.size()}/${Logs.MAX_LINES} lines")
         line(out, "pid", Process.myPid().toString())
         line(out, "threads", Thread.activeCount().toString())
         if (pack != null) {

@@ -236,11 +236,6 @@ internal class ShellNavController(
         onOpenHistory?.invoke()
     }
 
-    fun openLogs() {
-        pushCurrentState()
-        currentScreen = ShellScreen.LOGS
-    }
-
     fun openProfileDrawer() {
         flags.isProfileDrawerOpen = true
     }

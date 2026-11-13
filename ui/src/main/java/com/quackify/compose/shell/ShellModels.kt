@@ -28,7 +28,6 @@ enum class ShellScreen {
     ARTIST,
     CATEGORY,
     SETTINGS,
-    LOGS,
     NOTIFICATIONS,
     HISTORY,
     FOLDER,
