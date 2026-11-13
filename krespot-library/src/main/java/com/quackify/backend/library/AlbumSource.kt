@@ -21,6 +21,8 @@ private val log = Logs.of(Logs.Module.ALBUM)
 object AlbumSource {
 
     private const val OP_ALBUM = "getAlbum"
+    private const val OP_ALBUM_TRACKS = "queryAlbumTracks"
+    private const val TRACKS_LIMIT = 300
     private const val OP_ALBUM_MERCH = "queryAlbumMerch"
     private const val OP_CREDITS = "queryTrackCreditsGroupedModal"
 
@@ -78,13 +80,22 @@ object AlbumSource {
     suspend fun albumMore(context: Context, uri: String, offset: Int): TrackPage? {
         val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
-        val album = albumPage(context, token, uri, offset, PAGE) ?: return null
-        val tracks = album.optJSONObject("tracksV2")
+        val variables = JSONObject()
+            .put("uri", uri)
+            .put("offset", offset)
+            .put("limit", TRACKS_LIMIT)
+            .toString()
+        val tracks = Pathfinder.queryPost(context, token, OP_ALBUM_TRACKS, variables)
+            ?.optJSONObject("data")
+            ?.optJSONObject("albumUnion")
+            ?.optJSONObject("tracksV2")
+            ?: return null
+        val rows = albumRows(tracks)
         return TrackPage(
-            rows = albumRows(tracks),
-            total = tracks?.optInt("totalCount", 0) ?: 0,
+            rows = rows,
+            total = tracks.optInt("totalCount", offset + rows.size),
             offset = offset,
-            fetched = tracks?.optJSONArray("items")?.length() ?: 0,
+            fetched = rows.size,
         )
     }
 

@@ -68,6 +68,8 @@ object Pathfinder {
             "f5c4e6d668f5716464a231c1cc8b22c1cbf6ad68b09929fd7de813a30581298b",
         "getAlbum" to
             "0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f",
+        "queryAlbumTracks" to
+            "0b6ce3511e1b02e4a40fa95440f992acbe85080eb308af9194322d708fc1914f",
         "queryAlbumMerch" to
             "3ef44ed6f17be67299538fe77faffab4075aeaf9e1085f10fc835592266711b5",
         "queryTrackCreditsGroupedModal" to
