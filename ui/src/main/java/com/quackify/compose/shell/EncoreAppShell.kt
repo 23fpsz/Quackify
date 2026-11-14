@@ -3,6 +3,12 @@ package com.quackify.compose.shell
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,14 +60,31 @@ import com.quackify.compose.screens.ProfileContextCard
 import com.quackify.compose.screens.SettingsLocks
 import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.search.SearchHistoryItem
+import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.rememberBottomPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun ShellScreenSlot(content: @Composable () -> Unit) {
-    content()
+internal fun ShellScreenSlot(
+    screen: ShellScreen,
+    content: @Composable (ShellScreen) -> Unit
+) {
+    AnimatedContent(
+        targetState = screen,
+        transitionSpec = {
+            (
+                fadeIn(tween(EncoreAnimation.ScreenEnterDuration, easing = EncoreAnimation.BoxInterpolator)) +
+                    slideInVertically(
+                        tween(EncoreAnimation.ScreenEnterDuration, easing = EncoreAnimation.BoxInterpolator)
+                    ) { it / 32 }
+                ) togetherWith fadeOut(tween(EncoreAnimation.ScreenExitDuration))
+        },
+        label = "ShellScreenTransition"
+    ) { target ->
+        content(target)
+    }
 }
 
 @Composable
@@ -742,8 +765,8 @@ fun EncoreAppShell(
             onCreatePlaylist = onCreatePlaylist,
             playlistDescription = playlistDetail?.description.orEmpty(),
         )
-        ShellScreenSlot {
-            when (currentScreen) {
+        ShellScreenSlot(currentScreen) { screen ->
+            when (screen) {
                 ShellScreen.HOME -> ShellHomeRoute(
                     env = hosts.route(),
                     quickAccessItems = homeQuickAccessItems,
