@@ -334,6 +334,13 @@ private class CanvasFadeFrame(context: Context) : FrameLayout(context) {
     private var gradientHeight = 0
 }
 
+private const val FadeCurveStops = 16
+
+private fun smootherStep(t: Float): Float {
+    val x = t.coerceIn(0f, 1f)
+    return x * x * x * (x * (x * 6f - 15f) + 10f)
+}
+
 private fun fadeShader(heightPx: Int, fraction: Float): LinearGradient {
     val endY = heightPx.toFloat()
     return LinearGradient(
