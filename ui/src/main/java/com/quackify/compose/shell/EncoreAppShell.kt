@@ -548,6 +548,7 @@ fun EncoreAppShell(
                 navBackStack.isNotEmpty() ||
                 currentScreen != ShellScreen.HOME
     ) {
+
         if (isPlayerExpanded) {
             isPlayerExpanded = false
         } else if (flags.isProfileDrawerOpen) {
@@ -602,7 +603,8 @@ fun EncoreAppShell(
             .fillMaxSize()
             .background(EncoreColors.PureBlack)
     ) {
-        val routeEnv = ShellRouteEnv(
+
+        val hosts = ShellHosts(
             active = active,
             flags = flags,
             local = local,
@@ -637,11 +639,112 @@ fun EncoreAppShell(
             handleLibraryLongPress = handleLibraryLongPress,
             handleFolderClick = handleFolderClick,
             shareEntity = shareEntity,
+            progressState = progressState,
+            currentScreen = currentScreen,
+            isPlayerExpanded = isPlayerExpanded,
+            setIsPlayerExpanded = { isPlayerExpanded = it },
+            setCurrentScreen = { currentScreen = it },
+            pushCurrentState = pushCurrentState,
+            navBackStack = navBackStack,
+            selectedNavIndex = selectedNavIndex,
+            setSelectedNavIndex = { selectedNavIndex = it },
+            navItems = navItems,
+            playerIdentity = playerIdentity,
+            isBuffering = isBuffering,
+            isLiked = isLiked,
+            currentCoverUrl = currentCoverUrl,
+            currentShuffleMode = currentShuffleMode,
+            currentRepeatMode = currentRepeatMode,
+            connectedDevice = connectedDevice,
+            resolvedAlbumUri = resolvedAlbumUri,
+            resolvedArtistUri = resolvedArtistUri,
+            nowPlayingMonthlyListeners = nowPlayingMonthlyListeners,
+            nowPlayingArtistBio = nowPlayingArtistBio,
+            nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
+            nowPlayingArtistFollowed = nowPlayingArtistFollowed,
+            nowPlayingLyrics = nowPlayingLyrics,
+            canvasFilePath = canvasFilePath,
+            isCanvasAllowed = isCanvasAllowed,
+            isCanvasEnabled = isCanvasEnabled,
+            fullArtworkPlayer = fullArtworkPlayer,
+            videoFullscreen = videoFullscreen,
+            playbackOrigin = playbackOrigin,
+            handleSkipNext = handleSkipNext,
+            handleSkipPrevious = handleSkipPrevious,
+            onCanvasToggle = onCanvasToggle,
+            onToggleVideoFullscreen = onToggleVideoFullscreen,
+            onArtistFollowToggle = onArtistFollowToggle,
+            onAddToPlaylist = onAddToPlaylist,
+            context = context,
+            handleQueueAdd = handleQueueAdd,
+            copyEntityLink = copyEntityLink,
+            savedAccounts = savedAccounts,
+            activeAccountId = activeAccountId,
+            playlistDetail = playlistDetail,
+            playlistSaved = playlistSaved,
+            albumDetail = albumDetail,
+            artistDetail = artistDetail,
+            artistFollowed = artistFollowed,
+            trackTasteExcluded = trackTasteExcluded,
+            setTrackTasteExcluded = { trackTasteExcluded = it },
+            tasteExclusionCache = tasteExclusionCache,
+            canvasResolution = canvasResolution,
+            setLocalDevice = { localDevice = it },
+            onLoadProfile = onLoadProfile,
+            onOpenHistory = onOpenHistory,
+            onOpenActivity = onOpenActivity,
+            activityUnread = activityUnread,
+            onShowCredits = onShowCredits,
+            onEditPlaylist = onEditPlaylist,
+            onTogglePlaylistSaved = onTogglePlaylistSaved,
+            onDeletePlaylist = onDeletePlaylist,
+            onSwitchAccount = onSwitchAccount,
+            onAddAccount = onAddAccount,
+            onRemoveAccount = onRemoveAccount,
+            onLogout = onLogout,
+            onArtistRadio = onArtistRadio,
+            onCanvasResolution = onCanvasResolution,
+            onPlaylistDefaultName = onPlaylistDefaultName,
+            onRemoveTrackFromPlaylist = onRemoveTrackFromPlaylist,
+            profileFollowers = profileFollowers,
+            profileFollowing = profileFollowing,
+            profileFollowLoading = profileFollowLoading,
+            playlistPermissions = playlistPermissions,
+            contributorsLoading = contributorsLoading,
+            contributorBusyIds = contributorBusyIds,
+            onLoadPlaylistContributors = onLoadPlaylistContributors,
+            onSearchUsers = onSearchUsers,
+            onAddPlaylistContributor = onAddPlaylistContributor,
+            onRemovePlaylistContributor = onRemovePlaylistContributor,
+            onRemovePlaylistMember = onRemovePlaylistMember,
+            trackCredits = trackCredits,
+            addToPlaylistChoices = addToPlaylistChoices,
+            albumTracks = albumTracks,
+            onPickPlaylist = onPickPlaylist,
+            onTogglePlaylist = onTogglePlaylist,
+            onLoadPlaylistFolder = onLoadPlaylistFolder,
+            onLoadTrackCount = onLoadTrackCount,
+            onCreatePlaylistWith = onCreatePlaylistWith,
+            playlistEditDraft = playlistEditDraft,
+            onEditPlaylistDetails = onEditPlaylistDetails,
+            onDismissEditPlaylist = onDismissEditPlaylist,
+            libraryFolderChoices = libraryFolderChoices,
+            editablePlaylistUris = editablePlaylistUris,
+            folderItems = folderItems,
+            onRemoveLibraryItem = onRemoveLibraryItem,
+            onMoveToFolder = onMoveToFolder,
+            onCreateFolder = onCreateFolder,
+            onRenameFolder = onRenameFolder,
+            onDeleteFolder = onDeleteFolder,
+            onQueueAdd = handleQueueAdd,
+            onLoadPlaylist = onLoadPlaylist,
+            onCreatePlaylist = onCreatePlaylist,
+            playlistDescription = playlistDetail?.description.orEmpty(),
         )
         ShellScreenSlot {
             when (currentScreen) {
                 ShellScreen.HOME -> ShellHomeRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     quickAccessItems = homeQuickAccessItems,
                     recommendations = homeRecommendations,
                     shelves = homeShelves,
@@ -655,7 +758,7 @@ fun EncoreAppShell(
                     onOpenHistory = onOpenHistory,
                 )
                 ShellScreen.SEARCH -> ShellSearchRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     searchResults = searchResults,
                     searchData = searchData,
                     searchRecent = searchRecent,
@@ -678,12 +781,12 @@ fun EncoreAppShell(
                     onOpenCategory = onOpenCategory,
                 )
                 ShellScreen.LIBRARY -> ShellLibraryRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     libraryItems = libraryItems,
                     libraryLoading = libraryLoading,
                 )
                 ShellScreen.PLAYLIST -> ShellPlaylistRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     playlistDetail = playlistDetail,
                     playlistTracks = playlistTracks,
                     playlistLoading = playlistLoading,
@@ -707,7 +810,7 @@ fun EncoreAppShell(
                     onAddTracksOpen = onAddTracksOpen,
                 )
                 ShellScreen.ALBUM -> ShellAlbumRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     albumDetail = albumDetail,
                     albumTracks = albumTracks,
                     albumLoading = albumLoading,
@@ -719,7 +822,7 @@ fun EncoreAppShell(
                     onAlbumTrackLikeToggle = onAlbumTrackLikeToggle,
                 )
                 ShellScreen.ARTIST -> ShellArtistRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     artistDetail = artistDetail,
                     artistTracks = artistTracks,
                     artistReleases = artistReleases,
@@ -732,14 +835,14 @@ fun EncoreAppShell(
                     onArtistTrackLikeToggle = onArtistTrackLikeToggle,
                 )
                 ShellScreen.CATEGORY -> ShellCategoryRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     categoryShelves = categoryShelves,
                     homeQuickAccessItems = homeQuickAccessItems,
                     homeRecommendations = homeRecommendations,
                     libraryItems = libraryItems,
                 )
                 ShellScreen.SETTINGS -> ShellSettingsRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     switches = settingsSwitches,
                     locks = settingsLocks,
                     product = settingsProduct,
@@ -755,7 +858,7 @@ fun EncoreAppShell(
                     onLogout = onLogout,
                 )
                 ShellScreen.NOTIFICATIONS -> ShellNotificationsRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     notifications = notifications,
                     loading = notificationsLoading,
                     loadFailed = notificationsFailed,
@@ -764,7 +867,7 @@ fun EncoreAppShell(
                     onOpenEpisode = onOpenEpisode,
                 )
                 ShellScreen.ACTIVITY -> ShellActivityRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     notifications = activityFeed,
                     loading = activityLoading,
                     loadFailed = activityFailed,
@@ -773,7 +876,7 @@ fun EncoreAppShell(
                     onLeave = onLeaveActivity,
                 )
                 ShellScreen.HISTORY -> ShellHistoryRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     todayTracks = historyToday,
                     yesterdayTracks = historyYesterday,
                     earlierTracks = historyEarlier,
@@ -781,7 +884,7 @@ fun EncoreAppShell(
                     loading = historyLoading,
                 )
                 ShellScreen.ADD_TRACKS -> ShellAddTracksRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     songs = addTracksSongs,
                     episodes = addTracksEpisodes,
                     recent = addTracksRecent,
@@ -790,33 +893,33 @@ fun EncoreAppShell(
                     onAddTrack = onAddTrack,
                 )
                 ShellScreen.BROWSE -> ShellBrowseRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     page = browsePage,
                     onOpenBrowse = onOpenBrowse,
                     onOpenShow = onOpenShow,
                     onLoadMore = onLoadMoreBrowse,
                 )
                 ShellScreen.SHOW -> ShellShowRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     show = showDetail,
                     loading = showLoading,
                     onOpenShow = onOpenShow,
                     onLoadMore = onLoadMoreEpisodes,
                 )
                 ShellScreen.EPISODE -> ShellEpisodeRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     episode = episodeDetail,
                     loading = episodeLoading,
                     onOpenEpisode = onOpenEpisode,
                 )
                 ShellScreen.FOLDER -> ShellFolderRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     items = folderItems,
                     loading = folderLoading,
                     onLoadPlaylist = onLoadPlaylist,
                 )
                 ShellScreen.PROFILE -> ShellProfileRoute(
-                    env = routeEnv,
+                    env = hosts.route(),
                     profile = profile,
                     topContent = profileTop,
                     topContentUnavailable = profileTopUnavailable,
@@ -829,582 +932,10 @@ fun EncoreAppShell(
         }
         }
 
-        val nowPlayingDominantColor by rememberDominantColor(
-            imageUrl = currentCoverUrl,
-            fallbackSeed = currentTrackTitle + currentArtist,
-            defaultColor = Color(0xFF432371)
-        )
 
-        val remoteConnected = playbackState?.controllingRemote == true && !playbackState.activeDeviceName.isNullOrBlank()
-        val effectiveConnectedDevice = if (remoteConnected) playbackState?.activeDeviceName else null
-        val activeDevice = playbackState?.devices?.firstOrNull { it.active || it.id == playbackState.activeDeviceId }
-            ?: playbackState?.devices?.firstOrNull { it.name == effectiveConnectedDevice }
-        val activeDeviceKind = activeDevice?.kind
-
-        if (!flags.isPlaylistEditMode && currentScreen != ShellScreen.ADD_TRACKS) {
-            ShellBottomBar(
-                title = playerIdentity.title,
-                artist = playerIdentity.artist,
-                isPlaying = isPlaying,
-                isBuffering = isBuffering,
-                progress = currentProgress,
-                isLiked = isLiked,
-                coverUrl = currentCoverUrl,
-                coverColor = nowPlayingDominantColor,
-                connectedDevice = effectiveConnectedDevice,
-                connectedDeviceKind = activeDeviceKind,
-                navItems = navItems,
-                currentNavIndex = selectedNavIndex,
-                onNavSelect = { index ->
-                    selectedNavIndex = index
-                    when (index) {
-                        0 -> if (currentScreen != ShellScreen.HOME) { navBackStack.clear(); currentScreen = ShellScreen.HOME }
-                        1 -> if (currentScreen != ShellScreen.SEARCH) {
-                            navBackStack.clear(); currentScreen = ShellScreen.SEARCH
-                        } else {
-                            runCatching { searchFieldFocusRequester.requestFocus() }
-                        }
-                        2 -> if (currentScreen != ShellScreen.LIBRARY) { navBackStack.clear(); currentScreen = ShellScreen.LIBRARY }
-                    }
-                },
-                onSearchDoubleTap = {
-                    runCatching { searchFieldFocusRequester.requestFocus() }
-                },
-                onPlayPause = handlePlayPause,
-                onLike = {
-                    val playingUri = playbackState?.trackUri.orEmpty()
-                    if (!isLiked) {
-                        if (playerListener != null) playerListener.onLikeToggle() else localIsLiked = true
-                    }
-                    val playingTrack = TrackItem(
-                        title = currentTrackTitle,
-                        artist = currentArtist,
-                        uri = playingUri,
-                        imageUrl = currentCoverUrl.takeIf { it.isNotBlank() },
-                        saved = true
-                    )
-                    local.addTrackTarget = playingTrack
-                    onAddToPlaylist?.invoke(playingTrack)
-                    flags.isAddToPlaylistOpen = true
-                },
-                onDeviceClick = { flags.isDeviceSheetOpen = true },
-                onBarClick = { isPlayerExpanded = true },
-                onSkipNext = handleSkipNext,
-                onSkipPrevious = handleSkipPrevious,
-                hasTrack = playerIdentity.trackLoaded,
-                showMiniPlayer = playbackState?.trackUri.isNullOrBlank() || currentTrackTitle.isNotBlank(),
-                modifier = Modifier.align(Alignment.BottomCenter)
-            )
-        }
-
-        val bridgeContextLabel = playbackState?.queueContextLabel?.takeIf { it.isNotBlank() }
-            ?: playbackState?.contextLabel?.takeIf { it.isNotBlank() }
-            ?: ""
-        val (contextHeader, contextSub) = nowPlayingContext(
-            trackLoaded = playerIdentity.trackLoaded,
-            origin = playbackOrigin,
-            contextUri = playbackState?.contextUri,
-            contextLabel = bridgeContextLabel,
-        )
-        val remoteCtl = playbackState?.controllingRemote == true
-        val effectiveCanShuffle = if (remoteCtl) playbackState?.remoteCanShuffle ?: true else playbackState?.canShuffle ?: true
-        val effectiveCanRepeat = if (remoteCtl) playbackState?.remoteCanRepeat ?: true else playbackState?.canRepeat ?: true
-        val effectiveCanSkipPrevious = if (remoteCtl) playbackState?.remoteCanSkipPrev ?: true else true
-        val effectiveCanSeek = if (remoteCtl) playbackState?.remoteCanSeek ?: true else true
-
-        ShellNowPlaying(
-            visible = isPlayerExpanded,
-            title = playerIdentity.title,
-            artist = playerIdentity.artist,
-            contextHeader = contextHeader,
-            contextSub = contextSub,
-            isPlaying = isPlaying,
-            isBuffering = isBuffering,
-            progress = currentProgress,
-            durationMs = durationMs,
-            positionMs = currentPositionMs,
-            dominantColor = nowPlayingDominantColor,
-            isLiked = isLiked,
-            isExplicit = playbackState?.explicit ?: false,
-            monthlyListeners = nowPlayingMonthlyListeners,
-            artistBio = nowPlayingArtistBio,
-            artistImageUrl = nowPlayingArtistImageUrl,
-            isArtistFollowing = nowPlayingArtistFollowed == true,
-            onArtistFollowToggle = { follow ->
-                if (resolvedArtistUri.startsWith("spotify:artist:")) {
-                    onArtistFollowToggle?.invoke(resolvedArtistUri, follow)
-                }
-            },
-            lyrics = nowPlayingLyrics,
-            canvasFilePath = canvasFilePath,
-            isCanvasAllowed = isCanvasAllowed,
-            isCanvasEnabled = isCanvasEnabled,
-            fullArtwork = fullArtworkPlayer,
-            onCanvasToggle = { on -> onCanvasToggle?.invoke(on) },
-            musicVideoAvailable = playbackState?.musicVideoAvailable ?: false,
-            videoActive = playbackState?.videoActive ?: false,
-            videoQualities = playbackState?.videoQualities.orEmpty(),
-            videoSwitching = playbackState?.videoSwitching ?: false,
-            onSwitchVideo = { to -> playerListener?.onSwitchVideo(to) },
-            videoFullscreen = videoFullscreen,
-            onToggleVideoFullscreen = { on -> onToggleVideoFullscreen?.invoke(on) },
-            onVideoQuality = { height -> playerListener?.onVideoQuality(height) },
-            onVideoSurface = { surface -> playerListener?.onVideoSurface(surface) },
-            isEpisode = playbackState?.trackUri.orEmpty().startsWith("spotify:episode:"),
-            playbackSpeed = playbackState?.playbackSpeed ?: 1f,
-            chapters = playbackState?.chapters.orEmpty(),
-            onPlaybackSpeed = { speed -> playerListener?.onPlaybackSpeed(speed) },
-            onSkipSeek = { delta -> playerListener?.onSkipSeek(delta) },
-            isEnhancedTrack = playbackState?.isEnhanced ?: false,
-            shuffleMode = currentShuffleMode,
-            repeatMode = currentRepeatMode,
-            canShuffle = effectiveCanShuffle,
-            canSmartShuffle = playbackState?.canSmartShuffle ?: false,
-            canRepeat = effectiveCanRepeat,
-            canSkipPrevious = effectiveCanSkipPrevious,
-            canSeek = effectiveCanSeek,
-            connectedDevice = connectedDevice,
-            coverUrl = currentCoverUrl,
-            onCollapse = { isPlayerExpanded = false },
-            onPlayPause = handlePlayPause,
-            onSkipNext = handleSkipNext,
-            onSkipPrevious = handleSkipPrevious,
-            onLike = {
-                val playingTrack = TrackItem(
-                    title = currentTrackTitle,
-                    artist = currentArtist,
-                    uri = playbackState?.trackUri.orEmpty(),
-                    imageUrl = currentCoverUrl.takeIf { it.isNotBlank() },
-                    saved = isLiked
-                )
-                local.addTrackTarget = playingTrack
-                onAddToPlaylist?.invoke(playingTrack)
-                flags.isAddToPlaylistOpen = true
-            },
-            onShuffle = { if (playerListener != null) playerListener.onShuffleToggle() else localShuffleMode = localShuffleMode.next() },
-            onRepeat = { if (playerListener != null) playerListener.onRepeatToggle() else localRepeatMode = localRepeatMode.next() },
-            onSeek = { p -> if (playerListener != null) playerListener.onSeek((p * durationMs).toLong()) else { local.progress = p; local.positionMs = (p * durationMs).toLong() } },
-            onMore = {
-                local.trackForOptions = TrackItem(
-                    title = currentTrackTitle,
-                    artist = currentArtist,
-                    isExplicit = playbackState?.explicit ?: false,
-                    uri = playbackState?.trackUri.orEmpty(),
-                    imageUrl = currentCoverUrl.takeIf { it.isNotBlank() },
-                    saved = isLiked,
-                    albumUri = resolvedAlbumUri,
-                    artistUri = resolvedArtistUri,
-                )
-                flags.isTrackOptionsFromPlayer = true
-                flags.isTrackOptionsOpen = true
-            },
-            onQueue = { flags.isQueueSheetOpen = true },
-            onDevice = { flags.isDeviceSheetOpen = true },
-            onShare = { playbackState?.trackUri?.takeIf { it.isNotBlank() }?.let { uri -> shareEntity(uri) } },
-            onTitleClick = {
-                isPlayerExpanded = false
-                openAlbum(currentTrackTitle, currentArtist, resolvedAlbumUri)
-            },
-            onArtistClick = {
-                isPlayerExpanded = false
-                openArtist(currentArtist, resolvedArtistUri)
-            }
-        )
-        val isPlaylistUri = active.playlistUri.startsWith("spotify:playlist:")
-        val playlistEntity = if (active.playlistUri.isBlank() && active.playlistTitle.isBlank()) null
-        else EntityOptions(
-            title = playlistDetail?.title?.takeIf { it.isNotBlank() } ?: active.playlistTitle,
-            subtitle = if (isPlaylistUri)
-                "Playlist • " + (playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: userDisplayName)
-            else "",
-            imageUrl = active.playlistCoverUrl ?: playlistDetail?.imageUrl?.takeIf { it.isNotBlank() },
-            uri = active.playlistUri,
-        )
-
-        ShellSheets(
-            flags = SheetFlags(
-                profileDrawer = flags.isProfileDrawerOpen,
-                accounts = flags.isAccountsSheetOpen,
-                trackOptions = flags.isTrackOptionsOpen,
-                playlistOptions = flags.isPlaylistOptionsOpen,
-                albumOptions = flags.isAlbumOptionsOpen,
-                artistOptions = flags.isArtistOptionsOpen,
-                sort = flags.isSortSheetOpen,
-                create = flags.isCreateSheetOpen,
-                device = flags.isDeviceSheetOpen,
-                queue = flags.isQueueSheetOpen,
-                sleepTimer = flags.isSleepTimerOpen,
-                canvasResolutionSheet = flags.isCanvasResolutionSheetOpen
-            ),
-            selectedTrack = local.trackForOptions,
-            devices = playbackState?.devices.orEmpty(),
-            connectedDevice = connectedDevice,
-            queueFromContext = playbackState?.queueFromContext.orEmpty(),
-            canAddToQueue = local.trackForOptions?.uri
-                ?.takeIf { it.isNotBlank() }
-                ?.let { uri ->
-                    uri != playbackState?.trackUri &&
-                        playbackState?.queue.orEmpty().none { it.uri == uri }
-                } ?: false,
-            currentTrackTitle = currentTrackTitle,
-            currentTrackArtist = currentArtist,
-            currentTrackUri = playbackState?.trackUri.orEmpty(),
-            currentTrackCoverUrl = currentCoverUrl.takeIf { it.isNotBlank() },
-            playlistEntity = playlistEntity,
-            playlistEditable = isPlaylistUri && playlistDetail?.editable == true,
-            playlistSaved = if (isPlaylistUri) playlistSaved else null,
-            albumTitle = active.albumTitle,
-            albumArtist = active.albumArtist,
-            albumCoverUrl = active.albumCoverUrl,
-            albumUri = active.albumUri.ifBlank { albumDetail?.uri.orEmpty() },
-            artistName = active.artistName,
-            artistAvatarUrl = active.artistAvatarUrl
-                ?: artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
-                ?: artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() },
-            artistUri = active.artistUri,
-            artistFollowing = artistFollowed == true,
-            onArtistFollowToggle = {
-                if (active.artistUri.startsWith("spotify:artist:")) {
-                    onArtistFollowToggle?.invoke(active.artistUri, !(artistFollowed == true))
-                }
-            },
-            onArtistRadio = {
-                flags.isArtistOptionsOpen = false
-                val artistUriNow = active.artistUri
-                if (artistUriNow.startsWith("spotify:artist:")) {
-                    shellScope.launch {
-                        val radio = onArtistRadio?.invoke(artistUriNow)
-                        if (radio != null && radio.startsWith("spotify:playlist:")) {
-                            openPlaylist(active.artistName + " Radio", radio)
-                        }
-                    }
-                }
-            },
-            sortOption = local.sortOption,
-            sortDirection = local.sortDirection,
-            sleepTimer = local.sleepTimer,
-            userDisplayName = userDisplayName,
-            userAvatarUrl = userAvatarUrl,
-            userColorHex = userProfileColorHex,
-            savedAccounts = savedAccounts,
-            activeAccountId = activeAccountId,
-            isFolder = currentScreen == ShellScreen.FOLDER,
-            canvasAvailable = flags.isTrackOptionsFromPlayer && isCanvasAllowed && canvasFilePath != null,
-            isCanvasEnabled = isCanvasEnabled,
-            onCanvasToggle = { onCanvasToggle?.invoke(!isCanvasEnabled) },
-            canvasResolution = canvasResolution,
-            onCanvasResolution = { res -> onCanvasResolution?.invoke(res) },
-            onDismissProfile = { flags.isProfileDrawerOpen = false },
-            onDismissAccounts = { flags.isAccountsSheetOpen = false },
-            onSwitchAccount = { id -> onSwitchAccount?.invoke(id) },
-            onAddAccount = { onAddAccount?.invoke() },
-            onRemoveAccount = { id -> onRemoveAccount?.invoke(id) },
-            onOpenAccounts = { flags.isAccountsSheetOpen = true },
-            onDismissTrackOptions = { flags.isTrackOptionsOpen = false },
-            onDismissPlaylistOptions = { flags.isPlaylistOptionsOpen = false },
-            onDismissAlbumOptions = { flags.isAlbumOptionsOpen = false },
-            onDismissArtistOptions = { flags.isArtistOptionsOpen = false },
-            onDismissSort = { flags.isSortSheetOpen = false },
-            onDismissCreate = { flags.isCreateSheetOpen = false },
-            onDismissDevice = { flags.isDeviceSheetOpen = false },
-            onDismissQueue = { flags.isQueueSheetOpen = false },
-            onDismissSleepTimer = { flags.isSleepTimerOpen = false },
-            onCanvasResolutionClick = { flags.isCanvasResolutionSheetOpen = true },
-            onDismissCanvasResolution = { flags.isCanvasResolutionSheetOpen = false },
-            onAddToPlaylist = {
-                local.trackForOptions?.let { track ->
-                    flags.isAddToPlaylistOpen = true
-                    local.addTrackTarget = track
-                    onAddToPlaylist?.invoke(track)
-                }
-            },
-            onShowCredits = {
-                local.trackForOptions?.let { track ->
-                    flags.isCreditsOpen = true
-                    local.creditsTrack = track
-                    onShowCredits?.invoke(track.uri)
-                }
-            },
-            onEditPlaylist = {
-                if (isPlaylistUri && active.playlistUri.isNotEmpty()) onEditPlaylist?.invoke(active.playlistUri)
-            },
-            onTogglePlaylistSaved = {
-                if (isPlaylistUri && active.playlistUri.isNotEmpty()) {
-                    onTogglePlaylistSaved?.invoke(active.playlistUri, !(playlistSaved ?: false))
-                }
-            },
-            onDeletePlaylist = {
-                shellScope.launch {
-                    val ok = onDeletePlaylist?.invoke(active.playlistUri) ?: false
-                    if (ok) handleBack()
-                }
-            },
-            onCopyLink = { uri -> copyEntityLink(uri) },
-            onShare = { uri -> shareEntity(uri) },
-            onWhatsNew = { pushCurrentState(); currentScreen = ShellScreen.NOTIFICATIONS },
-            onNotifications = {
-                navController.openActivity()
-                onOpenActivity?.invoke()
-            },
-            notificationsUnread = activityUnread,
-            onProfile = {
-                pushCurrentState()
-                currentScreen = ShellScreen.PROFILE
-                onLoadProfile?.invoke()
-            },
-            onHistory = {
-                pushCurrentState()
-                currentScreen = ShellScreen.HISTORY
-                onOpenHistory?.invoke()
-            },
-            onSettings = handleOpenSettings,
-            onLogout = { onLogout?.invoke() },
-            onLikeToggle = { liked ->
-                val uri = local.trackForOptions?.uri.orEmpty()
-                when {
-                    uri.isNotBlank() && uri == playbackState?.trackUri && playerListener != null ->
-                        if (playbackState?.isLiked != liked) playerListener.onLikeToggle()
-                    uri.startsWith("spotify:track:") -> {
-                        local.trackForOptions = local.trackForOptions?.copy(saved = liked)
-                        local.trackOptionsSaved = liked
-                        shellScope.launch {
-                            val ok = Library.setSaved(context, listOf(uri), liked)
-                            if (!ok && uri == local.trackForOptions?.uri) {
-                                local.trackForOptions = local.trackForOptions?.copy(saved = !liked)
-                                local.trackOptionsSaved = !liked
-                            }
-                        }
-                    }
-                    playerListener != null -> playerListener.onLikeToggle()
-                    else -> local.isLiked = liked
-                }
-            },
-            onAddToQueue = { track -> handleQueueAdd(track.uri) },
-            onViewArtist = { artist, uri ->
-                flags.isTrackOptionsOpen = false
-                isPlayerExpanded = false
-                openArtist(artist, uri)
-            },
-            onViewAlbum = { album, uri ->
-                flags.isTrackOptionsOpen = false
-                isPlayerExpanded = false
-                openAlbum(album, local.trackForOptions?.artist ?: "", uri)
-            },
-            onSleepTimerClick = { flags.isSleepTimerOpen = true },
-            onGoToArtist = { artist ->
-                flags.isAlbumOptionsOpen = false
-                isPlayerExpanded = false
-                openArtist(artist, albumDetail?.artistUri.orEmpty())
-            },            onSortSelected = { selected, direction -> local.sortOption = selected; local.sortDirection = direction },
-            onCreatePlaylist = {
-                shellScope.launch {
-                    local.playlistCreateName = onPlaylistDefaultName?.invoke() ?: "My Playlist"
-                    flags.isCreatePlaylistOpen = true
-                }
-            },
-            onCreateFolder = { local.folderDraft = FolderDraft(mode = FolderMode.CREATE) },
-            onSelectDevice = { id -> localDevice = id; flags.isDeviceSheetOpen = false; playerListener?.onSelectDevice(id) },
-            onDeviceVisible = { visible -> playerListener?.onDeviceSheetVisible(visible) },
-            onVolumeChange = { id, level -> playerListener?.onVolumeChange(id, level) },
-            userQueue = playbackState?.queue.orEmpty(),
-            trackTasteExcluded = trackTasteExcluded,
-            trackSavedOverride = trackOptionsSaved,
-            onToggleTasteExclusion = toggle@{ exclude ->
-                val track = local.trackForOptions
-                val uri = track?.uri.orEmpty()
-                if (!uri.startsWith("spotify:track:")) return@toggle
-                val previous = trackTasteExcluded
-                trackTasteExcluded = exclude
-                tasteExclusionCache[uri] = exclude
-                shellScope.launch {
-                    val ok = Collection2.setExcludedFromTasteProfile(context, uri, exclude)
-                    if (uri == local.trackForOptions?.uri) {
-                        if (!ok) {
-                            trackTasteExcluded = previous
-                            if (previous != null) tasteExclusionCache[uri] = previous
-                        }
-                        Toast.makeText(
-                            context,
-                            when {
-                                ok && exclude -> "Excluded from your taste profile"
-                                ok -> "Included in your taste profile"
-                                else -> "Couldn't update your taste profile"
-                            },
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            },
-            queueSourceContext = playbackState?.queueContextLabel?.takeIf { it.isNotBlank() }
-                ?: playbackState?.contextLabel?.takeIf { it.isNotBlank() } ?: "",
-            onQueueTrackSelect = { track ->
-                if (playerListener != null) {
-                    if (track.uri.isNotEmpty()) {
-                        playerListener.onPlayUri(track.uri)
-                    } else {
-                        playerListener.onTrackSelect(track.title, track.artist)
-                    }
-                }
-            },
-            onRemoveFromQueue = { track ->
-                val queue = playbackState?.queue.orEmpty()
-                val context = playbackState?.queueFromContext.orEmpty()
-                val remaining = queue.filterNot { it.uri == track.uri }.map { it.uri }
-                if (remaining.size != queue.size) {
-                    playerListener?.onQueueSet(remaining + context.map { it.uri })
-                }
-            },
-            onClearQueue = {
-                val context = playbackState?.queueFromContext.orEmpty()
-                playerListener?.onQueueSet(context.map { it.uri })
-            },
-            onReorderQueue = { reordered ->
-                val queue = playbackState?.queue.orEmpty()
-                val context = playbackState?.queueFromContext.orEmpty()
-                val hidden = queue.filter { it.uri.isBlank() || it.title.isBlank() }.map { it.uri }
-                playerListener?.onQueueSet(reordered.map { it.uri } + hidden + context.map { it.uri })
-            },
-            onSleepTimerSelected = { option -> local.sleepTimer = option },
-            onRemoveTrackFromPlaylist = if (currentScreen == ShellScreen.PLAYLIST && isPlaylistUri && playlistDetail?.editable == true && active.playlistUri.isNotBlank()) {
-                {
-                    val trackUri = local.trackForOptions?.uri.orEmpty()
-                    val playlistUri = active.playlistUri
-                    flags.isTrackOptionsOpen = false
-                    if (trackUri.isNotBlank() && playlistUri.isNotBlank()) {
-                        onRemoveTrackFromPlaylist?.invoke(playlistUri, trackUri)
-                    }
-                }
-            } else null,
-            onSongRadio = {
-                val trackNow = local.trackForOptions
-                flags.isTrackOptionsOpen = false
-                isPlayerExpanded = false
-                if (trackNow != null && trackNow.uri.startsWith("spotify:track:")) {
-                    shellScope.launch {
-                        val radio = onArtistRadio?.invoke(trackNow.uri)
-                        if (radio != null && radio.startsWith("spotify:playlist:")) {
-                            openPlaylist(trackNow.title + " Radio", radio)
-                        }
-                    }
-                }
-            },
-            onAlbumRadio = {
-                flags.isAlbumOptionsOpen = false
-                isPlayerExpanded = false
-                val albumUriNow = active.albumUri.ifBlank { albumDetail?.uri.orEmpty() }
-                if (albumUriNow.startsWith("spotify:album:")) {
-                    shellScope.launch {
-                        val radio = onArtistRadio?.invoke(albumUriNow)
-                        if (radio != null && radio.startsWith("spotify:playlist:")) {
-                            openPlaylist(active.albumTitle + " Radio", radio)
-                        }
-                    }
-                }
-            },
-            onAddToPlaylistFromAlbum = {
-                flags.isAlbumOptionsOpen = false
-                local.addTrackTarget = TrackItem(
-                    title = active.albumTitle,
-                    artist = active.albumArtist,
-                    uri = active.albumUri.ifBlank { albumDetail?.uri.orEmpty() }
-                )
-                flags.isAddToPlaylistOpen = true
-            }
-        )
-
-        ShellOverlaySheets(
-            flags = flags,
-            context = context,
-            local = local,
-            active = active,
-            playbackState = playbackState,
-            isLiked = isLiked,
-            profileFollowers = profileFollowers,
-            profileFollowing = profileFollowing,
-            profileFollowLoading = profileFollowLoading,
-            playlistPermissions = playlistPermissions,
-            contributorsLoading = contributorsLoading,
-            contributorBusyIds = contributorBusyIds,
-            onLoadPlaylistContributors = onLoadPlaylistContributors,
-            onSearchUsers = onSearchUsers,
-            onAddPlaylistContributor = onAddPlaylistContributor,
-            onRemovePlaylistContributor = onRemovePlaylistContributor,
-            onRemovePlaylistMember = onRemovePlaylistMember,
-            artistDetail = artistDetail,
-            trackCredits = trackCredits,
-            addToPlaylistChoices = addToPlaylistChoices,
-            albumTracks = albumTracks,
-            onPickPlaylist = onPickPlaylist,
-            onTogglePlaylist = onTogglePlaylist,
-            onLoadPlaylistFolder = onLoadPlaylistFolder,
-            onLoadTrackCount = onLoadTrackCount,
-            onCreatePlaylistWith = onCreatePlaylistWith,
-            openArtist = openArtist,
-            openAlbum = openAlbum,
-            openUserProfile = openUserProfile,
-        )
-
-        EncoreCreateNameDialog(
-            isOpen = flags.isCreatePlaylistOpen,
-            title = "Give your playlist a name",
-            initialName = local.playlistCreateName,
-            confirmLabel = "Create",
-            cancelLabel = "Cancel",
-            onConfirm = { name ->
-                flags.isCreatePlaylistOpen = false
-                shellScope.launch {
-                    val uri = onCreatePlaylist?.invoke(name, "", null)
-                    if (!uri.isNullOrEmpty()) {
-                        pushCurrentState()
-                        active.playlistTitle = name
-                        active.playlistUri = uri
-                        currentScreen = ShellScreen.PLAYLIST
-                        if (onLoadPlaylist != null) onLoadPlaylist?.invoke(uri) else playerListener?.onLoadPlaylist(uri)
-                        if (active.folderUri.isNotBlank()) {
-                            onMoveToFolder?.invoke(uri, active.folderUri)
-                        }
-                    }
-                }
-            },
-            onDismiss = { flags.isCreatePlaylistOpen = false }
-        )
-
-        ShellPlaylistEditSheets(
-            editDraft = playlistEditDraft,
-            onEditSave = onEditPlaylistDetails,
-            onDismissEdit = onDismissEditPlaylist,
-            onDeletePlaylist = onDeletePlaylist,
-            onDeleteAsk = { title, message, onConfirm ->
-                local.deleteAsk = DeleteAsk(title, message, onConfirm)
-            }
-        )
-
-        ShellEntitySheets(
-            flags = flags,
-            local = local,
-            active = active,
-            navController = navController,
-            actions = actions,
-            context = context,
-            shellScope = shellScope,
-            libraryFolderChoices = libraryFolderChoices,
-            editablePlaylistUris = editablePlaylistUris,
-            playlistDescription = playlistDetail?.description.orEmpty(),
-            albumTracks = albumTracks,
-            folderItems = folderItems,
-            onEditPlaylist = onEditPlaylist,
-            onRemoveLibraryItem = onRemoveLibraryItem,
-            onDeletePlaylist = onDeletePlaylist,
-            onMoveToFolder = onMoveToFolder,
-            onCreateFolder = onCreateFolder,
-            onRenameFolder = onRenameFolder,
-            onDeleteFolder = onDeleteFolder,
-            onEditPlaylistDetails = onEditPlaylistDetails,
-            onCopyEntityLink = copyEntityLink,
-            onShareEntity = shareEntity,
-            onQueueAdd = handleQueueAdd,
-            playerListener = playerListener,
-        )
+        ShellPlayerLayer(env = hosts.player())
+        ShellSheetsHost(env = hosts.sheets())
+        ShellOverlaysHost(env = hosts.overlays())
 
         SpotifyToastHost(
             state = toast,
@@ -1413,166 +944,5 @@ fun EncoreAppShell(
                 .padding(bottom = rememberBottomPadding())
         )
 
-    }
-}
-
-/**
- * The conditional overlay sheets that ride on top of the shell (profile
- * follows, playlist contributors, artist about / discography, add-to-playlist
- * and credits). Extracted from EncoreAppShell so that composable stays under
- * the compiler's per-method size limit.
- */
-@Composable
-private fun ShellOverlaySheets(
-    flags: ShellUiFlags,
-    context: Context,
-    local: ShellLocalState,
-    active: ShellActiveEntity,
-    playbackState: ComposePlaybackState?,
-    isLiked: Boolean,
-    profileFollowers: List<ProfileUser>,
-    profileFollowing: List<ProfileUser>,
-    profileFollowLoading: Boolean,
-    playlistPermissions: PlaylistPermissions?,
-    contributorsLoading: Boolean,
-    contributorBusyIds: Set<String>,
-    onLoadPlaylistContributors: (() -> Unit)?,
-    onSearchUsers: (suspend (String) -> List<SearchHit>)?,
-    onAddPlaylistContributor: ((String) -> Unit)?,
-    onRemovePlaylistContributor: ((String) -> Unit)?,
-    onRemovePlaylistMember: ((String) -> Unit)?,
-    artistDetail: ArtistDetail?,
-    trackCredits: Credits?,
-    addToPlaylistChoices: List<PlaylistChoice>?,
-    albumTracks: List<TrackItem>?,
-    onPickPlaylist: ((PlaylistChoice, TrackItem) -> Unit)?,
-    onTogglePlaylist: ((PlaylistChoice, TrackItem, Boolean) -> Unit)?,
-    onLoadPlaylistFolder: (suspend (trackUri: String, folderUri: String) -> List<PlaylistChoice>)?,
-    onLoadTrackCount: (suspend (playlistUri: String) -> Int)?,
-    onCreatePlaylistWith: ((TrackItem) -> Unit)?,
-    openArtist: (String, String) -> Unit,
-    openAlbum: (String, String, String) -> Unit,
-    openUserProfile: (String, String) -> Unit,
-) {
-    if (flags.isProfileFollowOpen) {
-        ProfileFollowSheet(
-            isOpen = true,
-            onDismiss = { flags.isProfileFollowOpen = false },
-            followers = profileFollowers,
-            following = profileFollowing,
-            loading = profileFollowLoading,
-            onArtistClick = { artist, uri ->
-                flags.isProfileFollowOpen = false
-                openArtist(artist, uri)
-            }
-        )
-    }
-
-    if (flags.isContributorsOpen) {
-        PlaylistContributorsSheet(
-            isOpen = true,
-            onDismiss = { flags.isContributorsOpen = false },
-            permissions = playlistPermissions,
-            loading = contributorsLoading,
-            onRetry = { onLoadPlaylistContributors?.invoke() },
-            busyUserIds = contributorBusyIds,
-            onSearchUsers = onSearchUsers,
-            onAddContributor = { userId -> onAddPlaylistContributor?.invoke(userId) },
-            onRemoveAsContributor = { userId -> onRemovePlaylistContributor?.invoke(userId) },
-            onRemoveFromPlaylist = { userId -> onRemovePlaylistMember?.invoke(userId) },
-            onOpenProfile = { uri, name ->
-                flags.isContributorsOpen = false
-                openUserProfile(uri, name)
-            }
-        )
-    }
-
-    if (flags.isArtistAboutOpen) {
-        ArtistAboutSheet(
-            isOpen = flags.isArtistAboutOpen,
-            artistName = active.artistName,
-            imageUrl = artistDetail?.imageUrl?.takeIf { it.isNotBlank() }
-                ?: artistDetail?.headerImageUrl?.takeIf { it.isNotBlank() },
-            monthlyListeners = artistDetail?.monthlyListeners?.takeIf { it > 0L }
-                ?.let { formatCount(it) + " monthly listeners" }.orEmpty(),
-            followers = artistDetail?.followers?.takeIf { it > 0L }
-                ?.let { formatCount(it) + " followers" }.orEmpty(),
-            worldRank = artistDetail?.worldRank ?: 0,
-            biography = artistDetail?.biography.orEmpty(),
-            topCities = artistDetail?.topCities.orEmpty(),
-            externalLinks = artistDetail?.externalLinks.orEmpty(),
-            gallery = artistDetail?.gallery.orEmpty(),
-            onDismiss = { flags.isArtistAboutOpen = false },
-            onLinkClick = { link -> Share.openUrl(context, link) }
-        )
-    }
-
-    if (flags.isDiscographyOpen) {
-        DiscographySheet(
-            isOpen = flags.isDiscographyOpen,
-            artistUri = active.artistUri,
-            artistName = active.artistName,
-            onDismiss = { flags.isDiscographyOpen = false },
-            onOpenRelease = { uri, title -> openAlbum(title, active.artistName, uri) }
-        )
-    }
-
-    if (flags.isAddToPlaylistOpen) {
-        val target = local.addTrackTarget
-        val targetIsLiked = if (target?.uri == playbackState?.trackUri) isLiked else (target?.saved == true)
-        AddToPlaylistSheet(
-            isOpen = true,
-            trackTitle = target?.title.orEmpty(),
-            isTargetLiked = targetIsLiked,
-            choices = addToPlaylistChoices.orEmpty(),
-            isLoading = addToPlaylistChoices == null,
-            onPick = { choice ->
-                val target = local.addTrackTarget
-                if (target != null) {
-                    if (target.uri.startsWith("spotify:album:")) {
-                        val rows = albumTracks.orEmpty()
-                        rows.forEach { row -> onPickPlaylist?.invoke(choice, row) }
-                    } else {
-                        onPickPlaylist?.invoke(choice, target)
-                    }
-                }
-            },
-            onToggle = { choice, isAdding ->
-                val target = local.addTrackTarget
-                if (target != null) {
-                    if (target.uri.startsWith("spotify:album:")) {
-                        val rows = albumTracks.orEmpty()
-                        rows.forEach { row ->
-                            onTogglePlaylist?.invoke(choice, row, isAdding)
-                                ?: if (isAdding) onPickPlaylist?.invoke(choice, row) else Unit
-                        }
-                    } else {
-                        onTogglePlaylist?.invoke(choice, target, isAdding)
-                            ?: if (isAdding) onPickPlaylist?.invoke(choice, target) else Unit
-                    }
-                }
-            },
-            onLoadFolder = onLoadPlaylistFolder?.let { loader ->
-                { folderUri -> loader(local.addTrackTarget?.uri.orEmpty(), folderUri) }
-            },
-            onLoadTrackCount = onLoadTrackCount,
-            onCreateNew = {
-                local.addTrackTarget?.let { track -> onCreatePlaylistWith?.invoke(track) }
-                flags.isAddToPlaylistOpen = false
-            },
-            onDismiss = { flags.isAddToPlaylistOpen = false }
-        )
-    }
-
-    if (flags.isCreditsOpen) {
-        CreditsSheet(
-            isOpen = true,
-            title = local.creditsTrack?.title.orEmpty(),
-            subtitle = local.creditsTrack?.artist.orEmpty(),
-            imageUrl = local.creditsTrack?.imageUrl,
-            credits = trackCredits,
-            onDismiss = { flags.isCreditsOpen = false },
-            onArtistClick = { uri, name -> openArtist(name, uri) }
-        )
     }
 }
