@@ -116,7 +116,6 @@ private val log = Logs.of(Logs.Module.MAIN)
 class MainActivity : ComponentActivity() {
 
     internal var canvasResolution by mutableStateOf(1080)
-    private var fullArtworkPlayer by mutableStateOf(true)
     private val clientPrefs by lazy {
         com.quackify.backend.core.store.AppPrefs.prefs(applicationContext, CLIENT_PREFS)
     }
@@ -261,7 +260,6 @@ class MainActivity : ComponentActivity() {
         canvasEnabled = clientPrefs.getBoolean("canvasNpvEnabled", true)
         syncLauncherIcon(applicationContext)
         canvasResolution = clientPrefs.getInt("canvasResolution", 1080)
-        fullArtworkPlayer = clientPrefs.getBoolean("fullArtworkPlayer", true)
         val appContext = applicationContext
         Net.onUnauthorized = { sent, reason ->
             val current = EncoreAuth.token(appContext)
@@ -1746,7 +1744,6 @@ class MainActivity : ComponentActivity() {
         searchSavedOverrides = searchSavedOverrides.toMap(),
         browsePage = browsePage,
         categoryShelves = categoryShelves,
-        fullArtworkPlayer = fullArtworkPlayer,
         videoFullscreen = videoFullscreen,
         onToggleVideoFullscreen = { on ->
             videoFullscreen = on
@@ -1755,10 +1752,6 @@ class MainActivity : ComponentActivity() {
             } else {
                 ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
-        },
-        onToggleFullArtwork = { on ->
-            fullArtworkPlayer = on
-            clientPrefs.edit().putBoolean("fullArtworkPlayer", on).apply()
         },
         onAppIconChange = { option ->
             applyLauncherIcon(context, option)
