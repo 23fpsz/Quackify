@@ -124,6 +124,10 @@ object Pathfinder {
             "b907ad6b088d5bf7680fa81198996d58398c2d55dfcdf59fcc959e0be98a418a",
         "moveItemsInPlaylist" to
             "b907ad6b088d5bf7680fa81198996d58398c2d55dfcdf59fcc959e0be98a418a",
+        "accountAttributes" to
+            "be4ce359daee01463ddb8e77536220e108e3d28105e12199f244d7a5954e9d14",
+        "changeAttributes" to
+            "c51f514c143b5a4ff830bb2e85c3bef7441814ae4e3392a671f476c903c487ac",
         "profileAttributes" to
             "08ffb4730af3746e04a8301396f20875dbbce10c75243803091a9274eacc8ac0",
         "userTopContent" to
