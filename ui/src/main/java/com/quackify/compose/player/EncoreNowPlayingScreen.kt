@@ -316,7 +316,7 @@ fun EncoreNowPlayingScreen(
     val effectiveLyricsVisible = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
 
     val lyricLineHeight by animateDpAsState(
-        targetValue = if (effectiveLyricsVisible) 36.dp else 0.dp,
+        targetValue = if (effectiveLyricsVisible) 44.dp else 0.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -502,7 +502,7 @@ fun EncoreNowPlayingScreen(
                         NowPlayingSyncedLyricLine(
                             lyricText = activeLyricLine,
                             visible = effectiveLyricsVisible,
-                            height = if (effectiveLyricsVisible) 36.dp else 0.dp,
+                            height = if (effectiveLyricsVisible) 44.dp else 0.dp,
                             onOpenLyrics = { isLyricsFullscreen = true }
                         )
 
@@ -1397,9 +1397,9 @@ private fun MusicVideoSwitchPill(
 }
 
 /**
- * 1-line real-time synchronized lyrics element.
+ * Real-time synchronized lyrics element, up to 2 lines with ellipsis.
  * Reference: revised_template_overlay.xml (@id/lyrics_element)
- * Constant 40dp height container ensures track title and controls below NEVER shift position!
+ * Constant 44dp height container ensures track title and controls below NEVER shift position!
  */
 @Composable
 private fun NowPlayingSyncedLyricLine(
@@ -1435,10 +1435,11 @@ private fun NowPlayingSyncedLyricLine(
                     text = lyricLine,
                     style = EncoreTheme.typography.titleMedium.copy(
                         fontSize = 15.sp,
+                        lineHeight = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     ),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .fillMaxWidth()
