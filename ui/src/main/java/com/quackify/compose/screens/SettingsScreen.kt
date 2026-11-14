@@ -1,5 +1,6 @@
 package com.quackify.compose.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -143,6 +144,10 @@ fun SettingsScreen(
     }
     var widgetOptions by remember { mutableStateOf(WidgetOptionsStore.load(context)) }
     var category by remember { mutableStateOf<Int?>(null) }
+
+    BackHandler(enabled = category != null) {
+        category = null
+    }
 
 
     Column(
