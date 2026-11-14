@@ -73,7 +73,7 @@ internal class AudioDrmCallback(
         }
         val body = response?.takeIf { it.ok }
         if (body == null) {
-            LicenseGate.hold(response?.retryAfterSeconds ?: 0L)
+            if (response?.code != 403) LicenseGate.hold(response?.retryAfterSeconds ?: 0L)
             throw IOException("audio licence ${response?.code ?: "failed"}")
         }
         LicenseGate.clear()
@@ -93,47 +93,35 @@ internal class AudioDrmCallback(
     }
 
     private fun licencePolicy(bytes: ByteArray): String = runCatching {
-        var type = 0
+        var canPlay = -1
         var canPersist = -1
         var canRenew = -1
         var licenseDuration = -1L
         var playbackDuration = -1L
-        var license: ByteArray? = null
-        var reader = Reader(bytes)
-        while (!reader.done()) {
-            val (field, wire) = reader.tag()
+        var policy: ByteArray? = null
+        val root = Reader(bytes)
+        while (!root.done()) {
+            val (field, wire) = root.tag()
             when {
-                field == 2 && wire == 0 -> type = reader.varint().toInt()
-                field == 3 && wire == 2 -> license = reader.bytes()
-                else -> reader.skip(wire)
+                field == 2 && wire == 2 -> policy = root.bytes()
+                else -> root.skip(wire)
             }
         }
-        license?.let {
-            reader = Reader(it)
-            var policy: ByteArray? = null
+        policy?.let { raw ->
+            val reader = Reader(raw)
             while (!reader.done()) {
                 val (field, wire) = reader.tag()
                 when {
-                    field == 3 && wire == 2 -> policy = reader.bytes()
+                    field == 1 && wire == 0 -> canPlay = reader.varint().toInt()
+                    field == 2 && wire == 0 -> canPersist = reader.varint().toInt()
+                    field == 3 && wire == 0 -> canRenew = reader.varint().toInt()
+                    field == 5 && wire == 0 -> playbackDuration = reader.varint()
+                    field == 6 && wire == 0 -> licenseDuration = reader.varint()
                     else -> reader.skip(wire)
                 }
             }
-            policy?.let { p ->
-                reader = Reader(p)
-                while (!reader.done()) {
-                    val (field, wire) = reader.tag()
-                    when {
-                        field == 2 && wire == 0 -> canPersist = reader.varint().toInt()
-                        field == 3 && wire == 0 -> canRenew = reader.varint().toInt()
-                        field == 5 && wire == 0 -> playbackDuration = reader.varint()
-                        field == 6 && wire == 0 -> licenseDuration = reader.varint()
-                        else -> reader.skip(wire)
-                    }
-                }
-            }
         }
-        "type=${if (type == 1) "offline" else "streaming"} " +
-            "persist=$canPersist renew=$canRenew " +
+        "play=$canPlay persist=$canPersist renew=$canRenew " +
             "licenseDur=${licenseDuration}s playbackDur=${playbackDuration}s"
     }.getOrElse { "policy unreadable" }
 }
@@ -151,10 +139,6 @@ internal class AudioEngine(
 
     @Volatile
     private var started = false
-
-    @Volatile
-    var playplay = false
-        private set
 
     @Volatile
     private var announced = false
@@ -210,15 +194,8 @@ internal class AudioEngine(
         withContext(Dispatchers.Main) {
             release()
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
-            val ppKey = source.playplayKey
-            val encrypted = !source.isPlayplay && source.seektable.pssh.isNotBlank()
-            val factory = if (ppKey != null) {
-                DefaultMediaSourceFactory(
-                    PlayPlayDataSource.Factory(source.url, ppKey, source.playplayFlac)
-                )
-            } else {
-                DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
-            }
+            val encrypted = source.seektable.pssh.isNotBlank()
+            val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
             if (encrypted) {
                 val callback = AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) }
                 var cachedManager: DrmSessionManager? = null
@@ -235,7 +212,6 @@ internal class AudioEngine(
             } else {
                 log.i("clear content, no drm session asked")
             }
-            playplay = source.isPlayplay
             gainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
             durationMs = totalMs
             announced = false
@@ -255,8 +231,6 @@ internal class AudioEngine(
             true
         }
 
-    fun canQueue(source: AudioSource): Boolean = playplay == source.isPlayplay
-
     fun queueNext(uri: String, source: AudioSource) {
         runOnMain {
             val p = player ?: return@runOnMain
@@ -265,11 +239,7 @@ internal class AudioEngine(
             p.addMediaItem(itemFor(uri, source))
         }
         log.i("audio queued next '$uri' '${source.fileId.take(12)}' " +
-                when {
-                    source.isPlayplay -> "playplay"
-                    source.seektable.pssh.isNotBlank() -> "drm"
-                    else -> "clear"
-                }
+                if (source.seektable.pssh.isNotBlank()) "drm" else "clear"
         )
     }
 
@@ -289,7 +259,7 @@ internal class AudioEngine(
     }
 
     private fun itemFor(uri: String, source: AudioSource): MediaItem {
-        val encrypted = !source.isPlayplay && source.seektable.pssh.isNotBlank()
+        val encrypted = source.seektable.pssh.isNotBlank()
         return MediaItem.Builder()
             .setMediaId(uri)
             .setUri(Uri.parse(source.url))
@@ -421,7 +391,7 @@ internal class AudioEngine(
 
         override fun onPlayerError(error: PlaybackException) {
             log.e("audio playback failed ${error.errorCodeName}: ${error.message}")
-            onEvent(PlayerEvent.Failed(error.message ?: "audio error"))
+            onEvent(PlayerEvent.Failed("${error.errorCodeName}: ${error.message ?: "audio error"}"))
         }
     }
 
