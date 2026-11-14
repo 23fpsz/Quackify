@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,20 +29,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.playlist.EditableTrackItem
 import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.playlist.dragHandle
+import com.quackify.compose.playlist.rememberReorderableLazyListState
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
@@ -66,9 +75,32 @@ fun EncoreQueueSheet(
     onTrackSelect: (TrackItem) -> Unit,
     onRemoveFromQueue: (TrackItem) -> Unit = {},
     onClearQueue: () -> Unit = {},
+    onReorderQueue: (List<TrackItem>) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val listState = rememberLazyListState()
+    val haptics = LocalHapticFeedback.current
+    val queueRows = remember(userQueue) { userQueue.toQueueRows() }
+    val currentOnReorder by rememberUpdatedState(onReorderQueue)
+    val reorderState = rememberReorderableLazyListState(
+        listState = listState,
+        onMove = { fromIndex, toIndex ->
+            val visible = listState.layoutInfo.visibleItemsInfo
+            val fromId = visible.firstOrNull { it.index == fromIndex }?.key
+            val toId = visible.firstOrNull { it.index == toIndex }?.key
+            val from = queueRows.indexOfFirst { it.id == fromId }
+            val to = queueRows.indexOfFirst { it.id == toId }
+            if (from >= 0 && to >= 0 && from != to) {
+                queueRows.add(to, queueRows.removeAt(from))
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            }
+        },
+        onDragEnd = {
+            val tracks = queueRows.map { it.track }
+            if (tracks != userQueue) currentOnReorder(tracks)
+        }
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -120,6 +152,7 @@ fun EncoreQueueSheet(
             }
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -172,7 +205,7 @@ fun EncoreQueueSheet(
                     Spacer(modifier = Modifier.height(EncoreSpacers.Base))
                 }
 
-                if (userQueue.isNotEmpty()) {
+                if (queueRows.isNotEmpty()) {
                     item {
                         Text(
                             text = "Next in queue",
@@ -181,12 +214,25 @@ fun EncoreQueueSheet(
                         )
                     }
 
-                    itemsIndexed(userQueue) { _, track ->
+                    itemsIndexed(queueRows, key = { _, row -> row.id }) { _, row ->
+                        val track = row.track
+                        val isDragging = reorderState.draggingItemKey == row.id
                         QueueTrackRow(
                             track = track,
                             showDragHandle = true,
                             onSelect = { onTrackSelect(track) },
-                            onRemove = { onRemoveFromQueue(track) }
+                            onRemove = { onRemoveFromQueue(track) },
+                            handleModifier = Modifier.dragHandle(state = reorderState, key = row.id),
+                            modifier = if (isDragging) {
+                                Modifier
+                                    .zIndex(10f)
+                                    .graphicsLayer {
+                                        translationY = reorderState.draggedDistance.value
+                                        shadowElevation = 16f
+                                    }
+                            } else {
+                                Modifier.animateItem()
+                            }
                         )
                     }
 
@@ -227,6 +273,7 @@ private fun QueueTrackRow(
     showDragHandle: Boolean,
     onSelect: () -> Unit,
     onRemove: (() -> Unit)? = null,
+    handleModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -288,14 +335,30 @@ private fun QueueTrackRow(
         }
 
         if (showDragHandle) {
-            Icon(
-                painter = painterResource(id = R.drawable.encore_icon_sort_24),
-                contentDescription = "Reorder",
-                tint = EncoreColors.TextSecondary,
-                modifier = Modifier.size(20.dp)
-            )
+            Box(
+                modifier = handleModifier.size(40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_sort_24),
+                    contentDescription = "Reorder",
+                    tint = EncoreColors.TextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
+}
+
+private fun List<TrackItem>.toQueueRows(): MutableList<EditableTrackItem> {
+    val seen = HashMap<String, Int>()
+    val rows = map { track ->
+        val base = track.uri.ifBlank { track.title }
+        val occurrence = seen.getOrDefault(base, 0)
+        seen[base] = occurrence + 1
+        EditableTrackItem("${base}_$occurrence", track)
+    }
+    return mutableStateListOf<EditableTrackItem>().apply { addAll(rows) }
 }
 
 @Preview
