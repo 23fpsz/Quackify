@@ -674,13 +674,12 @@ fun EncoreArtistScreen(
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
 
             if (gallery.isNotEmpty()) {
                 item {
-                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = "Gallery",
                         style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
