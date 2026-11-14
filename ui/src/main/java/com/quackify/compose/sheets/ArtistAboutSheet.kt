@@ -110,7 +110,9 @@ fun ArtistAboutSheet(
             Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 if (monthlyListeners.isNotBlank()) {
@@ -220,11 +222,13 @@ private fun AboutStat(value: String, label: String) {
     Column {
         Text(
             text = value,
-            style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+            style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            softWrap = false
         )
         Text(
             text = label,
-            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+            softWrap = false
         )
     }
 }
