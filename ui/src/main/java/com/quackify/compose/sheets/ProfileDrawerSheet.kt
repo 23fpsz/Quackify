@@ -135,7 +135,7 @@ fun ProfileDrawerSheet(
 
             if (onNotificationsClick != null) {
                 ProfileDrawerItem(
-                    title = "Notifikasi",
+                    title = "Notification",
                     iconRes = R.drawable.encore_icon_notifications_active_24,
                     onClick = {
                         onDismiss()

@@ -55,8 +55,6 @@ data class NavItem(
     val activeIconRes: Int = iconRes
 )
 
-/** Everything the shell needs to draw the "Notifikasi" feed, passed as one
- * object so the app's shell call site stays under the JVM method limit. */
 data class ActivityFeedState(
     val feed: List<ActivityNotification> = emptyList(),
     val loading: Boolean = false,

@@ -34,8 +34,6 @@ import org.json.JSONObject
 
 private val log = Logs.of(Logs.Module.NOTIFICATIONS)
 
-/** The social notification feed ("Notifikasi") backed by the gander service,
- * plus the profileAttributes persisted query that describes the current user. */
 object Notifications {
 
     private const val GANDER = "https://spclient.wg.spotify.com/gander/v2"

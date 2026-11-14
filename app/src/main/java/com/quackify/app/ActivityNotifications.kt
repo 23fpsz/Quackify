@@ -1,13 +1,3 @@
-/*
- * SpotiDuck-Compose — "Notifikasi" activity feed state holder.
- *
- * Owns the gander notification feed of the signed-in user: loads it on demand
- * when the profile drawer's Notifikasi entry is tapped, tracks the unread dot,
- * and resets the server-side read cursor when the user leaves the screen.
- * Held outside MainActivity so the shell composable stays small enough for
- * the compiler's method size limit.
- */
-
 package com.quackify.app
 
 import android.content.Context

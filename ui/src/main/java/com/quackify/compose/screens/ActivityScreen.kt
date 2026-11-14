@@ -51,10 +51,6 @@ import com.quackify.compose.theme.rememberBottomPadding
 /** Spotify's unread marker blue used by the gander notification feed. */
 private val UnreadBlue = Color(0xFF3D91F4)
 
-/**
- * The "Notifikasi" activity feed: follows, playlist saves and collaborator
- * changes, opened from the profile drawer.
- */
 @Composable
 fun ActivityScreen(
     onBackClick: () -> Unit,
@@ -92,7 +88,7 @@ fun ActivityScreen(
                 tint = EncoreColors.TextPrimary
             )
             Text(
-                text = "Notifikasi",
+                text = "Notification",
                 style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp),
                 modifier = Modifier
                     .weight(1f)
