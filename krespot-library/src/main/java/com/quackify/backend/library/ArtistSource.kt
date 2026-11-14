@@ -254,6 +254,25 @@ object ArtistSource {
         return first.takeIf { it.startsWith("spotify:") }
     }
 
+    suspend fun popularTrackUris(context: Context, uri: String): List<String> {
+        val token = EncoreAuth.token(context)
+        if (token.isBlank()) return emptyList()
+        val id = uri.removePrefix("spotify:artist:")
+        if (id.isBlank()) return emptyList()
+        val url = "$SPCLIENT/playlist/v2/list/popular-release-segments-main-roles/$id" +
+            "?decorate=revision%2Clength%2Cattributes%2Ctimestamp%2Cowner%2Ccapabilities"
+        val response = Net.get(url, spHeaders(context), "artist/popular") ?: return emptyList()
+        if (!response.ok) return emptyList()
+        val items = response.json()?.optJSONObject("contents")?.optJSONArray("items") ?: return emptyList()
+        val out = ArrayList<String>(items.length())
+        for (i in 0 until items.length()) {
+            val trackUri = items.optJSONObject(i)?.optString("uri").orEmpty()
+            if (trackUri.startsWith("spotify:track:")) out += trackUri
+        }
+        log.i("popular segments $uri -> ${out.size} track(s)")
+        return out
+    }
+
     private suspend fun spHeaders(context: Context): Map<String, String> = buildMap {
         put("Authorization", "Bearer ${EncoreAuth.token(context)}")
         put("Accept", "application/json")

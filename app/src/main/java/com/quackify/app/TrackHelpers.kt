@@ -42,6 +42,7 @@ import com.quackify.backend.core.net.Pathfinder
 import com.quackify.backend.core.webview.SilentTokenRefresh
 import com.quackify.backend.library.Krespot
 import com.quackify.backend.library.PlaylistSource
+import com.quackify.backend.library.TrackSource
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.BrowseCard
@@ -61,6 +62,7 @@ import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.ShelfKind
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.TrackLyrics
+import com.quackify.backend.model.TrackRow
 import com.quackify.backend.model.UserProfile
 import com.quackify.compose.components.UpdateDialog
 import com.quackify.compose.components.UpdateInstallPhase
@@ -375,14 +377,35 @@ internal suspend fun loadArtistDetail(context: Context, uri: String): ArtistLoad
     val inLibrary = Library.saved(context, listOf(uri))
     return ArtistLoad(
         detail = detail,
-        tracks = detail?.topTracks?.map { row ->
-            val countFormatted = if (row.plays > 0L) {
-                java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(row.plays)
-            } else ""
-            PopularTrack(row.toTrackItem(), countFormatted)
-        }.orEmpty(),
+        tracks = popularTracks(context, uri, detail?.topTracks.orEmpty()),
         releases = releaseRows.map { it.toArtistRelease() },
         listeners = detail?.monthlyListeners?.takeIf { it > 0L }?.let { formatCount(it) },
         followed = if (inLibrary.isEmpty()) detail?.saved == true else uri in inLibrary,
     )
+}
+
+private fun TrackRow.toPopularTrack(): PopularTrack {
+    val countFormatted = if (plays > 0L) {
+        java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(plays)
+    } else ""
+    return PopularTrack(toTrackItem(), countFormatted)
+}
+
+private suspend fun popularTracks(
+    context: Context,
+    artistUri: String,
+    top: List<TrackRow>,
+): List<PopularTrack> {
+    val topByUri = top.associateBy { it.uri }
+    val order = runCatching { Krespot.artists.popularTrackUris(context, artistUri) }
+        .getOrDefault(emptyList())
+    if (order.isEmpty()) return top.map { it.toPopularTrack() }
+    val missing = order.filterNot { topByUri.containsKey(it) }
+    val decorated = if (missing.isEmpty()) emptyMap() else {
+        runCatching { TrackSource.decorate(context, missing) }.getOrDefault(emptyMap())
+    }
+    val rows = order.mapNotNull { uri -> topByUri[uri] ?: decorated[uri] }
+        .filter { it.title.isNotBlank() }
+    if (rows.size < top.size) return top.map { it.toPopularTrack() }
+    return rows.map { it.toPopularTrack() }
 }

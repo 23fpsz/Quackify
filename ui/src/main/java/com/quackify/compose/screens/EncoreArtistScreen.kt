@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +60,7 @@ import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.matchesCurrent
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.backend.model.CityStat
+import com.quackify.backend.model.ShelfItem
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.ShimmerBlock
 import com.quackify.compose.components.ShimmerHost
@@ -88,6 +90,8 @@ data class PopularTrack(
     val streamCount: String
 )
 
+private const val POPULAR_PREVIEW_COUNT = 5
+
 /**
  * - Edge-to-edge Hero image banner with dynamic gradient
  * - Verified Artist badge with monthly listeners count
@@ -109,6 +113,14 @@ fun EncoreArtistScreen(
     albums: List<ArtistRelease> = emptyList(),
     /** The overview's singles group (EPs included); falls back to splitting [releases]. */
     singles: List<ArtistRelease> = emptyList(),
+    /** Related artists shelf ("Fans also like") from the overview. */
+    relatedArtists: List<ShelfItem> = emptyList(),
+    /** Albums the artist appears on, from the overview. */
+    appearsOn: List<ShelfItem> = emptyList(),
+    /** Playlists featuring the artist, from the overview. */
+    featuring: List<ShelfItem> = emptyList(),
+    /** Playlists the artist is discovered on, from the overview. */
+    discoveredOn: List<ShelfItem> = emptyList(),
     currentTrackTitle: String,
     currentTrackUri: String,
     isPlaying: Boolean,
@@ -120,6 +132,8 @@ fun EncoreArtistScreen(
     onTrackAddToQueue: ((TrackItem) -> Unit)? = null,
     onArtistOptionsClick: () -> Unit = {},
     onReleaseClick: (ArtistRelease) -> Unit = {},
+    onArtistClick: (String, String) -> Unit = { _, _ -> },
+    onShelfClick: (String, String) -> Unit = { _, _ -> },
     onAboutClick: () -> Unit = {},
     onDiscographyClick: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -149,6 +163,8 @@ fun EncoreArtistScreen(
     val singleSection = singles.ifEmpty {
         releases.filter { it.type.equals("Single", ignoreCase = true) || it.type.equals("EP", ignoreCase = true) }
     }
+    var popularExpanded by remember { mutableStateOf(false) }
+    val visiblePopular = if (popularExpanded) popularTracks else popularTracks.take(POPULAR_PREVIEW_COUNT)
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val toolbarHeight = 54.dp
@@ -213,28 +229,31 @@ fun EncoreArtistScreen(
                     alpha = (1f - (scrollOffset / (heroHeightPx * 0.85f))).coerceIn(0f, 1f)
                 }
         ) {
-            if (headerImageUrl != null) {
-                EncoreArtworkImage(
-                    imageUrl = headerImageUrl,
-                    contentDescription = artistName,
-                    modifier = Modifier.fillMaxSize(),
-                    cornerRadius = 0.dp
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(smoothHeroColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isLoading) {
-                        ShimmerHost {
-                            ShimmerBlock(
-                                modifier = Modifier.fillMaxSize(),
-                                shape = RectangleShape,
-                                base = smoothHeroColor,
-                                highlight = smoothHeroColor.copy(alpha = 0.65f)
-                            )
+            val heroOnScreen = listState.firstVisibleItemIndex == 0
+            key(heroOnScreen) {
+                if (headerImageUrl != null) {
+                    EncoreArtworkImage(
+                        imageUrl = headerImageUrl,
+                        contentDescription = artistName,
+                        modifier = Modifier.fillMaxSize(),
+                        cornerRadius = 0.dp
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(smoothHeroColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isLoading) {
+                            ShimmerHost {
+                                ShimmerBlock(
+                                    modifier = Modifier.fillMaxSize(),
+                                    shape = RectangleShape,
+                                    base = smoothHeroColor,
+                                    highlight = smoothHeroColor.copy(alpha = 0.65f)
+                                )
+                            }
                         }
                     }
                 }
@@ -440,7 +459,7 @@ fun EncoreArtistScreen(
                 item { ArtistLoadingRows() }
             }
 
-            itemsIndexed(popularTracks) { index, popTrack ->
+            itemsIndexed(visiblePopular) { index, popTrack ->
                 val track = popTrack.track
                 val isCurrentTrack =
                     matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
@@ -541,6 +560,22 @@ fun EncoreArtistScreen(
                 }
             }
 
+            if (popularTracks.size > POPULAR_PREVIEW_COUNT) {
+                item {
+                    Text(
+                        text = if (popularExpanded) "Show less" else "See more",
+                        style = EncoreTheme.typography.bodyMedium.copy(
+                            color = EncoreColors.TextSecondary,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { popularExpanded = !popularExpanded }
+                            .padding(horizontal = EncoreSpacers.Base, vertical = 12.dp)
+                    )
+                }
+            }
+
             if (loadFailed && !isLoading) {
                 item {
                     ArtistLoadError(
@@ -598,6 +633,26 @@ fun EncoreArtistScreen(
                     )
                 }
                 item { ArtistReleaseCarousel(singleSection, onReleaseClick) }
+            }
+
+            if (relatedArtists.isNotEmpty()) {
+                item { ArtistShelfTitle("Fans also like") }
+                item { ArtistCircleRow(relatedArtists, onArtistClick) }
+            }
+
+            if (appearsOn.isNotEmpty()) {
+                item { ArtistShelfTitle("Appears On") }
+                item { ArtistShelfCardRow(appearsOn, onShelfClick) }
+            }
+
+            if (featuring.isNotEmpty()) {
+                item { ArtistShelfTitle("Featuring") }
+                item { ArtistShelfCardRow(featuring, onShelfClick) }
+            }
+
+            if (discoveredOn.isNotEmpty()) {
+                item { ArtistShelfTitle("Discovered On") }
+                item { ArtistShelfCardRow(discoveredOn, onShelfClick) }
             }
 
             val aboutStatLine = listOfNotNull(
@@ -864,6 +919,109 @@ private fun ArtistReleaseCarousel(
     ) {
         items(releases, key = { it.title + it.year }) { release ->
             ArtistReleaseCard(release, onReleaseClick)
+        }
+    }
+}
+
+@Composable
+private fun ArtistShelfTitle(text: String) {
+    Spacer(modifier = Modifier.height(24.dp))
+    Text(
+        text = text,
+        style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White),
+        modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
+    )
+}
+
+@Composable
+private fun ArtistShelfCardRow(
+    rows: List<ShelfItem>,
+    onClick: (String, String) -> Unit
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = EncoreSpacers.Base),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(rows) { row ->
+            Column(
+                modifier = Modifier
+                    .width(140.dp)
+                    .clickable { onClick(row.title, row.uri) }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(140.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF242424))
+                ) {
+                    EncoreArtworkImage(
+                        imageUrl = row.imageUrl,
+                        contentDescription = row.title,
+                        modifier = Modifier.fillMaxSize(),
+                        cornerRadius = 4.dp
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = row.title,
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (row.subtitle.isNotBlank()) {
+                    Text(
+                        text = row.subtitle,
+                        style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtistCircleRow(
+    artists: List<ShelfItem>,
+    onClick: (String, String) -> Unit
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = EncoreSpacers.Base),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(artists) { artist ->
+            Column(
+                modifier = Modifier
+                    .width(108.dp)
+                    .clickable { onClick(artist.title, artist.uri) },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(108.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF242424))
+                ) {
+                    EncoreArtworkImage(
+                        imageUrl = artist.imageUrl,
+                        contentDescription = artist.title,
+                        modifier = Modifier.fillMaxSize(),
+                        shape = CircleShape
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = artist.title,
+                    style = EncoreTheme.typography.bodySmall.copy(color = Color.White),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
