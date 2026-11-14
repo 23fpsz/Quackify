@@ -226,7 +226,7 @@ class KrespotConnect(private val context: Context) {
             }
 
             frame.uri == DealerUri.CLUSTER -> frame.payloads.forEach { payload ->
-                val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(payload, deviceId) }
+                val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(payload, deviceId, _cluster.value) }
                 if (parsed == null) {
                     log.w("cluster frame did not parse, ${payload.length}B " +
                             "head=${payload.take(140)}"
@@ -287,7 +287,7 @@ class KrespotConnect(private val context: Context) {
         val body = observer?.takeIf { it.ok }?.body.orEmpty()
             .ifBlank { member?.takeIf { it.ok }?.body.orEmpty() }
         if (body.isNotBlank()) {
-            val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(body, deviceId) }
+            val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(body, deviceId, _cluster.value) }
             if (parsed != null) {
                 _cluster.value = parsed
                 TrackUid.learn(parsed)
@@ -394,7 +394,7 @@ class KrespotConnect(private val context: Context) {
         }
         memberPutAt = SystemClock.elapsedRealtime()
         val parsed = withContext(Dispatchers.Default) {
-            ClusterParser.parse(response.body, deviceId)
+            ClusterParser.parse(response.body, deviceId, _cluster.value)
         }
         if (parsed != null) {
             _cluster.value = parsed
