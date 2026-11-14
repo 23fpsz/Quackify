@@ -49,6 +49,8 @@ internal fun ShellSheets(
     queueFromContext: List<TrackItem>,
     /** null while the taste-profile contains check is loading. */
     trackTasteExcluded: Boolean? = null,
+    /** null while the library saved-state check is loading. */
+    trackSavedOverride: Boolean? = null,
     onToggleTasteExclusion: (Boolean) -> Unit = {},
     queueSourceContext: String,
     currentTrackTitle: String,
@@ -163,6 +165,7 @@ internal fun ShellSheets(
         isOpen = flags.trackOptions,
         onDismiss = onDismissTrackOptions,
         onLikeToggle = onLikeToggle,
+        savedOverride = trackSavedOverride,
         onAddToPlaylist = onAddToPlaylist,
         onAddToQueue = { selectedTrack?.let(onAddToQueue) },
         canAddToQueue = canAddToQueue,
