@@ -1243,8 +1243,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private suspend fun beginAddAccountFlow(): List<EncoreAuth.Account> {
+        // Snapshot the current account first so cancelling the flow can
+        // restore it, then empty the WebView cookie jar: the live sp_dc
+        // otherwise makes the login page auto-redirect into the player,
+        // which the poll resolves as the already-saved (duplicate) account
+        // and refuses, bouncing the user back without a login form.
         EncoreAuth.userId(applicationContext, force = true)
         EncoreAuth.storeCurrentAccount(applicationContext)
+        EncoreAuth.clearCookies()
         return EncoreAuth.savedAccounts(applicationContext)
     }
 
