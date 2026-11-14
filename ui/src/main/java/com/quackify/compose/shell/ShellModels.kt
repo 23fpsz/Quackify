@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -84,15 +85,34 @@ data class BackStackItem(
     val searchQuery: String = ""
 )
 
+@Stable
+class PlaybackProgress {
+    var positionMs by mutableLongStateOf(0L)
+    var durationMs by mutableLongStateOf(0L)
+    val progress: Float
+        get() = if (durationMs > 0L) {
+            (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+
+    fun set(positionMs: Long, durationMs: Long) {
+        this.positionMs = positionMs.coerceIn(0L, durationMs.takeIf { it > 0L } ?: positionMs)
+        if (durationMs > 0L) this.durationMs = durationMs
+    }
+
+    fun reset() {
+        positionMs = 0L
+        durationMs = 0L
+    }
+}
+
 data class ComposePlaybackState(
     val title: String = "",
     val artist: String = "",
     val coverUrl: String = "",
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
-    val progress: Float = 0.0f,
-    val positionMs: Long = 0L,
-    val durationMs: Long = 0L,
     val isLiked: Boolean = false,
     val isShuffle: Boolean = false,
     val isRepeat: Boolean = false,

@@ -177,14 +177,23 @@ class PlaybackService : Service() {
 
     private fun watch(bridge: PlaybackBridge) {
         watcher = scope.launch {
-            snapshotFlow { bridge.state }.collect { state -> apply(state) }
+            launch {
+                snapshotFlow { bridge.state }.collect { state ->
+                    apply(state, bridge.progressSnapshot)
+                }
+            }
+            launch {
+                snapshotFlow { bridge.progressSnapshot }.collect { progress ->
+                    apply(bridge.state, progress)
+                }
+            }
         }
     }
 
-    private fun apply(state: ComposePlaybackState) {
+    private fun apply(state: ComposePlaybackState, progress: PlaybackProgressSnapshot) {
         val hasTrack = state.trackUri.isNotBlank() || state.title.isNotBlank()
         val session = session ?: return
-        updatePlaybackState(session, state, hasTrack)
+        updatePlaybackState(session, state, progress, hasTrack)
         val identity = "${state.trackUri}|${state.title}|${state.artist}|" +
             "${state.coverUrl}|${state.isPlaying}|" +
             "${state.contextLabel}|${art != null}|" +
@@ -192,7 +201,7 @@ class PlaybackService : Service() {
         if (identity == lastIdentity) return
         lastIdentity = identity
         if (hasTrack) {
-            setMetadata(session, state)
+            setMetadata(session, state, progress)
             maybeLoadArt(state.coverUrl)
         }
         notify(buildNotification(state))
@@ -203,7 +212,12 @@ class PlaybackService : Service() {
      * state; the system extrapolates the seekbar between updates, so this is
      * cheap to call at the bridge's ~1Hz without touching the notification.
      */
-    private fun updatePlaybackState(session: MediaSessionCompat, state: ComposePlaybackState, hasTrack: Boolean) {
+    private fun updatePlaybackState(
+        session: MediaSessionCompat,
+        state: ComposePlaybackState,
+        progress: PlaybackProgressSnapshot,
+        hasTrack: Boolean,
+    ) {
         if (!hasTrack) {
             session.setPlaybackState(
                 PlaybackStateCompat.Builder()
@@ -247,18 +261,22 @@ class PlaybackService : Service() {
         }
         playback.setState(
             if (playing) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED,
-            state.positionMs,
+            progress.positionMs,
             if (playing) 1.0f else 0.0f,
         )
         session.setPlaybackState(playback.build())
     }
 
-    private fun setMetadata(session: MediaSessionCompat, state: ComposePlaybackState) {
+    private fun setMetadata(
+        session: MediaSessionCompat,
+        state: ComposePlaybackState,
+        progress: PlaybackProgressSnapshot,
+    ) {
         val art = art
         val metadata = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, state.title.ifBlank { "Unknown track" })
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, state.artist.ifBlank { "Unknown artist" })
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, state.durationMs)
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, progress.durationMs)
         if (art != null) {
             metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, art)
             metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, art)
@@ -285,9 +303,10 @@ class PlaybackService : Service() {
             }
             art = bitmap
             val state = PlaybackHost.bridge?.state ?: return@launch
+            val progress = PlaybackHost.bridge?.progressSnapshot ?: return@launch
             val session = session
             if (session != null) {
-                setMetadata(session, state)
+                setMetadata(session, state, progress)
             }
             lastIdentity = ""
             notify(buildNotification(state))
