@@ -1,6 +1,7 @@
 package com.quackify.app.widget
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.updateAll
 import com.quackify.app.PlaybackHost
@@ -20,13 +21,52 @@ object WidgetSync {
     private const val ACTIVE_INTERVAL_MS = 400L
     private const val IDLE_INTERVAL_MS = 3000L
     private const val ERROR_BACKOFF_MS = 1000L
+    private const val OPTIMISTIC_TTL_MS = 4000L
 
     private val log = Logs.of(Logs.Module.HOST)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    private class Override(val snapshot: WidgetSnapshot, val at: Long)
+
     @Volatile
     private var loop: Job? = null
+
+    @Volatile
+    private var optimistic: Override? = null
+
+    @Synchronized
+    fun expectOptimistic(expected: WidgetSnapshot) {
+        optimistic = Override(expected, SystemClock.elapsedRealtime())
+    }
+
+    @Synchronized
+    fun resolve(live: WidgetSnapshot?, context: Context): WidgetSnapshot {
+        reconcile(live)
+        return optimistic?.snapshot ?: live ?: WidgetSnapshotStore.load(context)
+    }
+
+    @Synchronized
+    private fun overrideActive(): Boolean = optimistic != null
+
+    private fun reconcile(live: WidgetSnapshot?) {
+        val current = optimistic ?: return
+        if (SystemClock.elapsedRealtime() - current.at >= OPTIMISTIC_TTL_MS) {
+            optimistic = null
+            return
+        }
+        if (live != null && live.trackUri.isNotBlank() && current.snapshot.trackUri.isNotBlank() &&
+            live.trackUri != current.snapshot.trackUri
+        ) {
+            optimistic = null
+            return
+        }
+        if (live != null && live.isPlaying == current.snapshot.isPlaying &&
+            live.isLiked == current.snapshot.isLiked
+        ) {
+            optimistic = null
+        }
+    }
 
     fun start(context: Context) {
         synchronized(this) {
@@ -40,12 +80,12 @@ object WidgetSync {
                         val live = bridge
                             ?.let { WidgetSnapshot.from(it.state, it.progress) }
                             ?.takeIf { it.hasTrack }
-                        val snapshot = live ?: WidgetSnapshotStore.load(app)
+                        val snapshot = resolve(live, app)
                         val options = WidgetOptionsStore.load(app)
                         val key = "${snapshot.fingerprint()}|$options"
                         if (key != lastKey) {
                             lastKey = key
-                            if (live != null) {
+                            if (live != null && !overrideActive()) {
                                 WidgetSnapshotStore.save(app, snapshot)
                             }
                             snapshot.coverUrl.takeIf { it.isNotBlank() }?.let { url ->
@@ -69,11 +109,12 @@ object WidgetSync {
     fun refreshSoon(context: Context) {
         val app = context.applicationContext
         scope.launch {
-            delay(200L)
             refresh(app)
-            delay(500L)
+            delay(300L)
             refresh(app)
-            delay(900L)
+            delay(700L)
+            refresh(app)
+            delay(1500L)
             refresh(app)
         }
     }

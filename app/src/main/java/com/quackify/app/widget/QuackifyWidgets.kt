@@ -80,7 +80,7 @@ abstract class QuackifyWidget(private val variant: WidgetVariant) : GlanceAppWid
         val live = bridge
             ?.let { WidgetSnapshot.from(it.state, it.progress) }
             ?.takeIf { it.hasTrack }
-        val snapshot = live ?: WidgetSnapshotStore.load(appContext)
+        val snapshot = WidgetSync.resolve(live, appContext)
         val options = WidgetOptionsStore.load(appContext)
         val artUrl = resolveRemoteImageUrl(snapshot.coverUrl)
         val art = artUrl?.let { url -> runCatching { WidgetArt.cached(url) }.getOrNull() }

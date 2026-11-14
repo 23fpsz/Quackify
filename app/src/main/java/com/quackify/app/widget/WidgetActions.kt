@@ -10,15 +10,21 @@ class WidgetPlaybackAction : ActionCallback {
 
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val action = parameters[ACTION_KEY] ?: return
-        val bridge = PlaybackHost.ensure(context)
+        val app = context.applicationContext
+        val bridge = PlaybackHost.ensure(app)
+        val live = WidgetSnapshot.from(bridge.state, bridge.progress).takeIf { it.hasTrack }
+        val current = WidgetSync.resolve(live, app)
         when (action) {
-            ACTION_TOGGLE -> bridge.listener.onPlayPause()
+            ACTION_TOGGLE -> {
+                WidgetSync.expectOptimistic(current.copy(isPlaying = !current.isPlaying))
+                bridge.listener.onPlayPause()
+            }
             ACTION_NEXT -> bridge.listener.onSkipNext()
             ACTION_PREVIOUS -> bridge.listener.onSkipPrevious()
             ACTION_LIKE -> bridge.listener.onLikeToggle()
         }
-        WidgetSync.start(context)
-        WidgetSync.refreshSoon(context)
+        WidgetSync.start(app)
+        WidgetSync.refreshSoon(app)
     }
 
     companion object {
