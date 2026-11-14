@@ -354,15 +354,15 @@ fun EncoreNowPlayingScreen(
         animationSpec = mediaTransition,
         label = "mediaPadding"
     )
-    val animatedVideoCorner by animateDpAsState(
-        targetValue = if (videoActive) 0.dp else 16.dp,
-        animationSpec = mediaTransition,
-        label = "videoCorner"
-    )
     val topSpacerWeight by animateFloatAsState(
         targetValue = if (videoActive) 0f else 1f,
         animationSpec = tween(350, easing = EncoreAnimation.DecelerateInterpolator),
         label = "topSpacerWeight"
+    )
+    val bottomSpacerWeight by animateFloatAsState(
+        targetValue = if (videoActive) 0f else 1f,
+        animationSpec = tween(350, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "bottomSpacerWeight"
     )
 
     LaunchedEffect(Unit) {
@@ -686,7 +686,6 @@ fun EncoreNowPlayingScreen(
                                         isCanvasEnabled = canvasActive,
                                         videoActive = videoActive,
                                         videoFullBleed = videoActive,
-                                        videoCorner = animatedVideoCorner,
                                         videoQualities = videoQualities,
                                         onVideoQuality = onVideoQuality,
                                         onVideoSurface = onVideoSurface,
@@ -698,7 +697,7 @@ fun EncoreNowPlayingScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.weight(1f))
+                            Spacer(modifier = Modifier.weight(bottomSpacerWeight.coerceAtLeast(0.01f)))
 
                         Column(
                             modifier = Modifier
@@ -1081,7 +1080,6 @@ private fun NowPlayingArtworkCard(
     gestureModifier: Modifier = Modifier,
     videoActive: Boolean = false,
     videoFullBleed: Boolean = false,
-    videoCorner: Dp = 16.dp,
     videoOverlayVisible: Boolean? = null,
     onVideoOverlayTap: (() -> Unit)? = null,
     videoQualities: List<Int> = emptyList(),
@@ -1091,7 +1089,7 @@ private fun NowPlayingArtworkCard(
     modifier: Modifier = Modifier
 ) {
     val corner = when {
-        videoActive || videoFullBleed -> videoCorner
+        videoActive || videoFullBleed -> 0.dp
         else -> EncoreCornerRadii.Larger2
     }
     val canvasActive = isCanvasEnabled && canvasFilePath != null
@@ -1266,7 +1264,6 @@ private fun VideoFullscreenLayout(
             isCanvasEnabled = false,
             videoActive = true,
             videoFullBleed = true,
-            videoCorner = 0.dp,
             videoOverlayVisible = overlayVisible,
             videoQualities = videoQualities,
             onVideoQuality = onVideoQuality,
