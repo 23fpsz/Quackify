@@ -5,6 +5,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.updateAll
 import com.quackify.app.PlaybackHost
 import com.quackify.backend.core.log.Logs
+import com.quackify.compose.widget.WidgetOptionsStore
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
