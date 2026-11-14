@@ -1514,6 +1514,12 @@ fun EncoreAppShell(
                 val context = playbackState?.queueFromContext.orEmpty()
                 playerListener?.onQueueSet(context.map { it.uri })
             },
+            onReorderQueue = { reordered ->
+                val queue = playbackState?.queue.orEmpty()
+                val context = playbackState?.queueFromContext.orEmpty()
+                val hidden = queue.filter { it.uri.isBlank() || it.title.isBlank() }.map { it.uri }
+                playerListener?.onQueueSet(reordered.map { it.uri } + hidden + context.map { it.uri })
+            },
             onSleepTimerSelected = { option -> local.sleepTimer = option },
             onRemoveTrackFromPlaylist = if (currentScreen == ShellScreen.PLAYLIST && isPlaylistUri && playlistDetail?.editable == true && active.playlistUri.isNotBlank()) {
                 {

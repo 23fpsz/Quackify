@@ -130,6 +130,7 @@ internal fun ShellSheets(
     onQueueTrackSelect: (TrackItem) -> Unit,
     onRemoveFromQueue: (TrackItem) -> Unit,
     onClearQueue: () -> Unit,
+    onReorderQueue: (List<TrackItem>) -> Unit,
     onSleepTimerSelected: (SleepTimerOption) -> Unit,
     onRemoveTrackFromPlaylist: (() -> Unit)? = null,
     onSongRadio: (() -> Unit)? = null,
@@ -273,7 +274,8 @@ internal fun ShellSheets(
             onDismissRequest = onDismissQueue,
             onTrackSelect = onQueueTrackSelect,
             onRemoveFromQueue = onRemoveFromQueue,
-            onClearQueue = onClearQueue
+            onClearQueue = onClearQueue,
+            onReorderQueue = onReorderQueue
         )
     }
 

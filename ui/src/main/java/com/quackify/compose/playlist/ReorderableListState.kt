@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
@@ -51,7 +50,7 @@ class ReorderableLazyListState(
     init {
         scope.launch {
             for (delta in scrollChannel) {
-                listState.scrollBy(delta)
+                listState.dispatchRawDelta(delta)
             }
         }
     }
