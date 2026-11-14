@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,11 +8,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -21,6 +25,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,9 +45,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -1073,7 +1085,16 @@ private enum class AddTracksFilter(val label: String) {
     SONGS("Songs"),
     EPISODES("Episodes"),
     RECENT("Recently played"),
-    LIKED("Liked songs")
+    LIKED("From your Liked Songs")
+}
+
+private enum class AssistedSearchCategory(val label: String) {
+    SONGS("Songs"),
+    ALBUMS("Albums"),
+    PLAYLISTS("Playlists"),
+    ARTISTS("Artists"),
+    EPISODES("Episodes"),
+    PODCASTS("Podcasts")
 }
 
 @Composable
@@ -1085,97 +1106,770 @@ internal fun ShellAddTracksPane(
     liked: List<TrackItem>,
     loading: Boolean,
     onBack: () -> Unit,
-    onAdd: suspend (String) -> Boolean
+    onAdd: suspend (String) -> Boolean,
+    searchData: SearchResults? = null,
+    searchLoading: Boolean = false,
+    onSearchQueryChange: ((String) -> Unit)? = null,
+    onOpenAlbum: ((uri: String, title: String, artist: String) -> Unit)? = null,
+    onOpenArtist: ((uri: String, name: String) -> Unit)? = null,
+    onOpenPlaylist: ((uri: String, title: String) -> Unit)? = null,
+    onOpenShow: ((uri: String) -> Unit)? = null,
+    onOpenEpisode: ((uri: String) -> Unit)? = null,
 ) {
+    var isSearchMode by remember { mutableStateOf(false) }
+    var searchQueryText by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(AddTracksFilter.SONGS) }
+    var searchCategory by remember { mutableStateOf<AssistedSearchCategory?>(null) }
     val added = remember { mutableStateListOf<String>() }
     val scope = rememberCoroutineScope()
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
-    val items = when (filter) {
+    BackHandler(enabled = isSearchMode) {
+        isSearchMode = false
+        searchQueryText = ""
+        onSearchQueryChange?.invoke("")
+        keyboardController?.hide()
+    }
+
+    LaunchedEffect(isSearchMode) {
+        if (isSearchMode) {
+            searchFocusRequester.requestFocus()
+        }
+    }
+
+    val defaultItems = when (filter) {
         AddTracksFilter.SONGS -> songs
         AddTracksFilter.EPISODES -> episodes
         AddTracksFilter.RECENT -> recent
         AddTracksFilter.LIKED -> liked
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(EncoreColors.Background)
             .statusBarsPadding()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            EncoreIconButton(
-                iconRes = R.drawable.encore_icon_arrow_left_24,
-                contentDescription = "Back",
-                onClick = onBack,
-                tint = EncoreColors.TextPrimary
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(
-                    text = "Add tracks",
-                    style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
-                )
-                Text(
-                    text = "To $targetTitle",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            AddTracksFilter.entries.forEach { option ->
-                EncoreChip(
-                    text = option.label,
-                    isSelected = option == filter,
-                    onClick = { filter = option }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        when {
-            loading -> TrackListSkeleton(
-                rows = 9,
-                modifier = Modifier.fillMaxSize()
-            )
-            items.isEmpty() -> Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.fillMaxSize()) {
+            // TOOLBAR (56.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 4.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
+                EncoreIconButton(
+                    iconRes = R.drawable.encore_icon_arrow_left_24,
+                    contentDescription = "Back",
+                    onClick = {
+                        if (isSearchMode) {
+                            isSearchMode = false
+                            searchQueryText = ""
+                            onSearchQueryChange?.invoke("")
+                            keyboardController?.hide()
+                        } else {
+                            onBack()
+                        }
+                    },
+                    tint = EncoreColors.TextPrimary
+                )
                 Text(
-                    text = "Nothing here yet",
-                    color = EncoreColors.TextSecondary
+                    text = if (isSearchMode) "Find" else "Add to this playlist",
+                    style = EncoreTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = EncoreColors.TextPrimary
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 60.dp),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(items, key = { it.uri }) { item ->
-                    AddTrackRow(
-                        item = item,
-                        added = item.uri in added,
-                        onAdd = {
-                            scope.launch {
-                                if (onAdd(item.uri)) added.add(item.uri)
+
+            if (!isSearchMode) {
+                // DEFAULT ASSISTED CURATION MODE
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AddTracksFilter.entries.forEach { option ->
+                        EncoreChip(
+                            text = option.label,
+                            isSelected = option == filter,
+                            onClick = { filter = option }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                when {
+                    loading -> TrackListSkeleton(
+                        rows = 9,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    defaultItems.isEmpty() -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Nothing here yet",
+                            color = EncoreColors.TextSecondary
+                        )
+                    }
+                    else -> LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 80.dp)
+                    ) {
+                        items(defaultItems, key = { it.uri }) { item ->
+                            AddTrackRow(
+                                item = item,
+                                added = item.uri in added,
+                                onAdd = {
+                                    scope.launch {
+                                        if (onAdd(item.uri)) added.add(item.uri)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                // SEARCH / FIND MODE
+                if (searchQueryText.isBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .imePadding()
+                            .navigationBarsPadding()
+                            .padding(bottom = 68.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        ) {
+                            Text(
+                                text = "Find titles you'll love",
+                                style = EncoreTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 22.sp,
+                                    color = EncoreColors.TextPrimary
+                                ),
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Search for anything.",
+                                style = EncoreTheme.typography.bodyMedium.copy(
+                                    color = EncoreColors.TextSecondary,
+                                    fontSize = 14.sp
+                                ),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    // Category filter chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AssistedSearchCategory.entries.forEach { category ->
+                            EncoreChip(
+                                text = category.label,
+                                isSelected = category == searchCategory,
+                                onClick = {
+                                    searchCategory = if (searchCategory == category) null else category
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    val queryClean = searchQueryText.trim()
+                    val cat = searchCategory
+                    if (cat == null) {
+                        // ALL / MIXED SEARCH RESULTS
+                        val remoteTracks = searchData?.tracks ?: emptyList()
+                        val remoteAlbums = searchData?.albums ?: emptyList()
+                        val remotePlaylists = searchData?.playlists ?: emptyList()
+                        val remoteArtists = searchData?.artists ?: emptyList()
+                        val remoteEpisodes = searchData?.others?.filter { it.kind == SearchKind.EPISODE } ?: emptyList()
+                        val remoteShows = searchData?.others?.filter { it.kind == SearchKind.SHOW } ?: emptyList()
+
+                        val localMatches = (songs + liked + recent)
+                            .distinctBy { it.uri }
+                            .filter {
+                                it.title.contains(queryClean, ignoreCase = true) ||
+                                it.artist.contains(queryClean, ignoreCase = true)
+                            }
+                            .filter { local -> remoteTracks.none { it.uri == local.uri } }
+
+                        val hasAny = remoteTracks.isNotEmpty() || remoteAlbums.isNotEmpty() ||
+                            remotePlaylists.isNotEmpty() || remoteArtists.isNotEmpty() ||
+                            remoteEpisodes.isNotEmpty() || remoteShows.isNotEmpty() || localMatches.isNotEmpty()
+
+                        if (searchLoading && !hasAny) {
+                            TrackListSkeleton(rows = 8, modifier = Modifier.fillMaxSize())
+                        } else if (!hasAny) {
+                            SearchEmptyState(query = searchQueryText)
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .imePadding(),
+                                contentPadding = PaddingValues(bottom = 76.dp)
+                            ) {
+                                // Interleaved mixed results matching Spotify
+                                items(remoteTracks, key = { it.uri }) { hit ->
+                                    AssistedSearchTrackHitRow(
+                                        hit = hit,
+                                        added = hit.uri in added,
+                                        onAdd = {
+                                            scope.launch {
+                                                if (onAdd(hit.uri)) added.add(hit.uri)
+                                            }
+                                        }
+                                    )
+                                }
+                                items(localMatches, key = { it.uri }) { item ->
+                                    AddTrackRow(
+                                        item = item,
+                                        added = item.uri in added,
+                                        onAdd = {
+                                            scope.launch {
+                                                if (onAdd(item.uri)) added.add(item.uri)
+                                            }
+                                        }
+                                    )
+                                }
+                                items(remoteAlbums, key = { it.uri }) { hit ->
+                                    AssistedSearchNavRow(
+                                        title = hit.title,
+                                        subtitle = if (hit.subtitle.isNotBlank()) "Album • ${hit.subtitle}" else "Album",
+                                        imageUrl = hit.imageUrl,
+                                        isCircular = false,
+                                        onClick = { onOpenAlbum?.invoke(hit.uri, hit.title, hit.subtitle) }
+                                    )
+                                }
+                                items(remotePlaylists, key = { it.uri }) { hit ->
+                                    AssistedSearchNavRow(
+                                        title = hit.title,
+                                        subtitle = if (hit.subtitle.isNotBlank()) "Playlist • ${hit.subtitle}" else "Playlist",
+                                        imageUrl = hit.imageUrl,
+                                        isCircular = false,
+                                        onClick = { onOpenPlaylist?.invoke(hit.uri, hit.title) }
+                                    )
+                                }
+                                items(remoteArtists, key = { it.uri }) { hit ->
+                                    AssistedSearchNavRow(
+                                        title = hit.title,
+                                        subtitle = "Artist",
+                                        imageUrl = hit.imageUrl,
+                                        isCircular = true,
+                                        onClick = { onOpenArtist?.invoke(hit.uri, hit.title) }
+                                    )
+                                }
+                                items(remoteEpisodes, key = { it.uri }) { hit ->
+                                    AssistedSearchTrackHitRow(
+                                        hit = hit,
+                                        added = hit.uri in added,
+                                        onAdd = {
+                                            scope.launch {
+                                                if (onAdd(hit.uri)) added.add(hit.uri)
+                                            }
+                                        }
+                                    )
+                                }
+                                items(remoteShows, key = { it.uri }) { hit ->
+                                    AssistedSearchNavRow(
+                                        title = hit.title,
+                                        subtitle = if (hit.subtitle.isNotBlank()) "Podcast • ${hit.subtitle}" else "Podcast",
+                                        imageUrl = hit.imageUrl,
+                                        isCircular = false,
+                                        onClick = { onOpenShow?.invoke(hit.uri) }
+                                    )
+                                }
                             }
                         }
-                    )
+                    } else when (cat) {
+                        AssistedSearchCategory.SONGS -> {
+                            val remoteHits = searchData?.tracks ?: emptyList()
+                            val localMatches = (songs + liked + recent)
+                                .distinctBy { it.uri }
+                                .filter {
+                                    it.title.contains(queryClean, ignoreCase = true) ||
+                                    it.artist.contains(queryClean, ignoreCase = true)
+                                }
+                                .filter { local -> remoteHits.none { it.uri == local.uri } }
+
+                            if (searchLoading && remoteHits.isEmpty() && localMatches.isEmpty()) {
+                                TrackListSkeleton(rows = 8, modifier = Modifier.fillMaxSize())
+                            } else if (remoteHits.isEmpty() && localMatches.isEmpty()) {
+                                SearchEmptyState(query = searchQueryText)
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .imePadding(),
+                                    contentPadding = PaddingValues(bottom = 76.dp)
+                                ) {
+                                    items(remoteHits, key = { it.uri }) { hit ->
+                                        AssistedSearchTrackHitRow(
+                                            hit = hit,
+                                            added = hit.uri in added,
+                                            onAdd = {
+                                                scope.launch {
+                                                    if (onAdd(hit.uri)) added.add(hit.uri)
+                                                }
+                                            }
+                                        )
+                                    }
+                                    items(localMatches, key = { it.uri }) { item ->
+                                        AddTrackRow(
+                                            item = item,
+                                            added = item.uri in added,
+                                            onAdd = {
+                                                scope.launch {
+                                                    if (onAdd(item.uri)) added.add(item.uri)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        AssistedSearchCategory.ALBUMS -> {
+                            val albums = searchData?.albums ?: emptyList()
+                            if (searchLoading && albums.isEmpty()) {
+                                TrackListSkeleton(rows = 8, modifier = Modifier.fillMaxSize())
+                            } else if (albums.isEmpty()) {
+                                SearchEmptyState(query = searchQueryText)
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .imePadding(),
+                                    contentPadding = PaddingValues(bottom = 76.dp)
+                                ) {
+                                    items(albums, key = { it.uri }) { hit ->
+                                        AssistedSearchNavRow(
+                                            title = hit.title,
+                                            subtitle = if (hit.subtitle.isNotBlank()) "Album • ${hit.subtitle}" else "Album",
+                                            imageUrl = hit.imageUrl,
+                                            isCircular = false,
+                                            onClick = { onOpenAlbum?.invoke(hit.uri, hit.title, hit.subtitle) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        AssistedSearchCategory.PLAYLISTS -> {
+                            val playlists = searchData?.playlists ?: emptyList()
+                            if (searchLoading && playlists.isEmpty()) {
+                                TrackListSkeleton(rows = 8, modifier = Modifier.fillMaxSize())
+                            } else if (playlists.isEmpty()) {
+                                SearchEmptyState(query = searchQueryText)
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .imePadding(),
+                                    contentPadding = PaddingValues(bottom = 76.dp)
+                                ) {
+                                    items(playlists, key = { it.uri }) { hit ->
+                                        AssistedSearchNavRow(
+                                            title = hit.title,
+                                            subtitle = if (hit.subtitle.isNotBlank()) "Playlist • ${hit.subtitle}" else "Playlist",
+                                            imageUrl = hit.imageUrl,
+                                            isCircular = false,
+                                            onClick = { onOpenPlaylist?.invoke(hit.uri, hit.title) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        AssistedSearchCategory.ARTISTS -> {
+                            val artists = searchData?.artists ?: emptyList()
+                            if (searchLoading && artists.isEmpty()) {
+                                TrackListSkeleton(rows = 8, modifier = Modifier.fillMaxSize())
+                            } else if (artists.isEmpty()) {
+                                SearchEmptyState(query = searchQueryText)
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .imePadding(),
+                                    contentPadding = PaddingValues(bottom = 76.dp)
+                                ) {
+                                    items(artists, key = { it.uri }) { hit ->
+                                        AssistedSearchNavRow(
+                                            title = hit.title,
+                                            subtitle = "Artist",
+                                            imageUrl = hit.imageUrl,
+                                            isCircular = true,
+                                            onClick = { onOpenArtist?.invoke(hit.uri, hit.title) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        AssistedSearchCategory.EPISODES -> {
+                            val remoteEpisodes = searchData?.others?.filter { it.kind == SearchKind.EPISODE } ?: emptyList()
+                            val localEpisodes = episodes.filter {
+                                it.title.contains(queryClean, ignoreCase = true) ||
+                                it.artist.contains(queryClean, ignoreCase = true)
+                            }.filter { local -> remoteEpisodes.none { it.uri == local.uri } }
+
+                            if (searchLoading && remoteEpisodes.isEmpty() && localEpisodes.isEmpty()) {
+                                TrackListSkeleton(rows = 8, modifier = Modifier.fillMaxSize())
+                            } else if (remoteEpisodes.isEmpty() && localEpisodes.isEmpty()) {
+                                SearchEmptyState(query = searchQueryText)
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .imePadding(),
+                                    contentPadding = PaddingValues(bottom = 76.dp)
+                                ) {
+                                    items(remoteEpisodes, key = { it.uri }) { hit ->
+                                        AssistedSearchTrackHitRow(
+                                            hit = hit,
+                                            added = hit.uri in added,
+                                            onAdd = {
+                                                scope.launch {
+                                                    if (onAdd(hit.uri)) added.add(hit.uri)
+                                                }
+                                            }
+                                        )
+                                    }
+                                    items(localEpisodes, key = { it.uri }) { item ->
+                                        AddTrackRow(
+                                            item = item,
+                                            added = item.uri in added,
+                                            onAdd = {
+                                                scope.launch {
+                                                    if (onAdd(item.uri)) added.add(item.uri)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        AssistedSearchCategory.PODCASTS -> {
+                            val podcasts = searchData?.others?.filter { it.kind == SearchKind.SHOW } ?: emptyList()
+                            if (searchLoading && podcasts.isEmpty()) {
+                                TrackListSkeleton(rows = 8, modifier = Modifier.fillMaxSize())
+                            } else if (podcasts.isEmpty()) {
+                                SearchEmptyState(query = searchQueryText)
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .imePadding(),
+                                    contentPadding = PaddingValues(bottom = 76.dp)
+                                ) {
+                                    items(podcasts, key = { it.uri }) { hit ->
+                                        AssistedSearchNavRow(
+                                            title = hit.title,
+                                            subtitle = if (hit.subtitle.isNotBlank()) "Podcast • ${hit.subtitle}" else "Podcast",
+                                            imageUrl = hit.imageUrl,
+                                            isCircular = false,
+                                            onClick = { onOpenShow?.invoke(hit.uri) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-                item { Spacer(modifier = Modifier.height(24.dp)) }
             }
         }
+
+        // FLOATING SEARCH PILL
+        if (!isSearchMode) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 12.dp)
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF282828))
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                    .clickable { isSearchMode = true }
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_search_24),
+                        contentDescription = "Search",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "What would you like to add?",
+                        style = EncoreTheme.typography.bodyMedium.copy(
+                            color = EncoreColors.TextSecondary,
+                            fontSize = 14.sp
+                        )
+                    )
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 12.dp)
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF282828))
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_search_24),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (searchQueryText.isEmpty()) {
+                            Text(
+                                text = "Search",
+                                style = EncoreTheme.typography.bodyMedium.copy(
+                                    color = EncoreColors.TextSecondary,
+                                    fontSize = 15.sp
+                                )
+                            )
+                        }
+                        BasicTextField(
+                            value = searchQueryText,
+                            onValueChange = {
+                                searchQueryText = it
+                                onSearchQueryChange?.invoke(it)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchFocusRequester),
+                            textStyle = EncoreTheme.typography.bodyMedium.copy(
+                                color = Color.White,
+                                fontSize = 15.sp
+                            ),
+                            cursorBrush = SolidColor(EncoreColors.Green),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                keyboardController?.hide()
+                            })
+                        )
+                    }
+                    if (searchQueryText.isNotEmpty()) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.encore_icon_x_24),
+                            contentDescription = "Clear search",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable {
+                                    searchQueryText = ""
+                                    onSearchQueryChange?.invoke("")
+                                }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchEmptyState(query: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+            .navigationBarsPadding()
+            .padding(bottom = 68.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        ) {
+            Text(
+                text = "Couldn't find \"$query\"",
+                style = EncoreTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = EncoreColors.TextPrimary
+                ),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Try searching again using a different spelling or keyword.",
+                style = EncoreTheme.typography.bodyMedium.copy(
+                    color = EncoreColors.TextSecondary,
+                    fontSize = 14.sp
+                ),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun AssistedSearchTrackHitRow(
+    hit: SearchHit,
+    added: Boolean,
+    onAdd: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(4.dp))
+        ) {
+            EncoreArtworkImage(
+                imageUrl = hit.imageUrl,
+                contentDescription = hit.title,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = 4.dp
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = hit.title,
+                style = EncoreTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = EncoreColors.TextPrimary
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            val sub = if (hit.subtitle.isNotBlank()) "Song • ${hit.subtitle}" else "Song"
+            Text(
+                text = sub,
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .border(
+                    1.dp,
+                    if (added) EncoreColors.Green else Color.White.copy(alpha = 0.35f),
+                    CircleShape
+                )
+                .clickable { if (!added) onAdd() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = if (added) R.drawable.encore_icon_check_24 else R.drawable.encore_icon_plus_24),
+                contentDescription = if (added) "Added" else "Add",
+                tint = if (added) EncoreColors.Green else Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AssistedSearchNavRow(
+    title: String,
+    subtitle: String,
+    imageUrl: String,
+    isCircular: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(if (isCircular) CircleShape else RoundedCornerShape(4.dp))
+        ) {
+            EncoreArtworkImage(
+                imageUrl = imageUrl,
+                contentDescription = title,
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = if (isCircular) 24.dp else 4.dp
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = EncoreTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = EncoreColors.TextPrimary
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Icon(
+            painter = painterResource(id = R.drawable.encore_icon_chevron_right_24),
+            contentDescription = null,
+            tint = EncoreColors.TextSecondary,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -1203,6 +1897,19 @@ private fun AddTrackRow(
                 modifier = Modifier.fillMaxSize(),
                 cornerRadius = 4.dp
             )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.25f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_play_16),
+                    contentDescription = "Preview",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -1228,7 +1935,11 @@ private fun AddTrackRow(
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
-                .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                .border(
+                    1.dp,
+                    if (added) EncoreColors.Green else Color.White.copy(alpha = 0.35f),
+                    CircleShape
+                )
                 .clickable { if (!added) onAdd() },
             contentAlignment = Alignment.Center
         ) {

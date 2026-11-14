@@ -609,7 +609,11 @@ internal fun ShellAddTracksRoute(
     liked: List<TrackItem>,
     loading: Boolean,
     onAddTrack: (suspend (String) -> Boolean)?,
+    searchData: SearchResults? = null,
+    searchLoading: Boolean = false,
+    onSearchQueryChange: ((String) -> Unit)? = null,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     ShellAddTracksPane(
         targetTitle = env.active.playlistTitle,
         songs = songs,
@@ -618,7 +622,15 @@ internal fun ShellAddTracksRoute(
         liked = liked,
         loading = loading,
         onBack = env.handleBack,
-        onAdd = { uri -> onAddTrack?.invoke(uri) ?: false }
+        onAdd = { uri -> onAddTrack?.invoke(uri) ?: false },
+        searchData = searchData,
+        searchLoading = searchLoading,
+        onSearchQueryChange = onSearchQueryChange,
+        onOpenAlbum = { uri, title, artist -> env.navController.openAlbum(context, title, artist, uri) },
+        onOpenArtist = { uri, name -> env.navController.openArtist(context, name, uri) },
+        onOpenPlaylist = { uri, title -> env.navController.openPlaylist(context, title, uri) },
+        onOpenShow = { uri -> env.navController.openShow(uri) },
+        onOpenEpisode = { uri -> env.navController.openEpisode(uri) },
     )
 }
 

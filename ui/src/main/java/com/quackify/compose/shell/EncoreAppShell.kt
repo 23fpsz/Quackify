@@ -926,6 +926,9 @@ fun EncoreAppShell(
                     liked = addTracksLiked,
                     loading = addTracksLoading,
                     onAddTrack = onAddTrack,
+                    searchData = searchData,
+                    searchLoading = searchLoading,
+                    onSearchQueryChange = onSearchQueryChange,
                 )
 
                 ShellScreen.BROWSE -> ShellBrowseRoute(
