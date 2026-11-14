@@ -135,20 +135,17 @@ internal fun playerIdentityOf(
 internal fun nowPlayingContext(
     trackLoaded: Boolean,
     origin: PlaybackOrigin?,
-    screen: ShellScreen,
-    playlistTitle: String,
-    albumTitle: String,
-    artistName: String,
-    searchQuery: String,
-    queueLabel: String = "",
+    contextUri: String?,
+    contextLabel: String,
 ): Pair<String, String> {
     fun searchSub(query: String): String {
         val q = query.trim()
         return if (q.isBlank()) "Search" else "$q in Search"
     }
     fun playlistContext(label: String): Pair<String, String> =
-        if (label.isBlank()) "Playing from Queue" to queueLabel.ifBlank { "Next up" }
+        if (label.isBlank()) "Playing from Queue" to "Next up"
         else "Playing from playlist" to label
+    val uri = contextUri.orEmpty()
     return when {
         !trackLoaded -> "Nothing playing" to "Pick a song to get started"
         origin != null -> when (origin.screen) {
@@ -158,11 +155,9 @@ internal fun nowPlayingContext(
             ShellScreen.HOME -> "Playing from home" to origin.label
             else -> playlistContext(origin.label)
         }
-        screen == ShellScreen.SEARCH -> "Playing from search" to searchSub(searchQuery)
-        screen == ShellScreen.PLAYLIST -> playlistContext(playlistTitle)
-        screen == ShellScreen.ALBUM -> "Playing from album" to albumTitle
-        screen == ShellScreen.ARTIST -> "Playing from artist" to artistName
-        else -> playlistContext(playlistTitle)
+        uri.startsWith("spotify:album:") -> "Playing from album" to contextLabel
+        uri.startsWith("spotify:artist:") -> "Playing from artist" to contextLabel
+        else -> playlistContext(contextLabel)
     }
 }
 
