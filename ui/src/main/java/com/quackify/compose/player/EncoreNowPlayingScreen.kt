@@ -661,7 +661,7 @@ fun EncoreNowPlayingScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.weight(topSpacerWeight))
+                            Spacer(modifier = Modifier.weight(topSpacerWeight.coerceAtLeast(0.01f)))
 
                             Box(
                                 modifier = Modifier
