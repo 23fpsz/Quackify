@@ -53,6 +53,7 @@ fun ProfileDrawerSheet(
     onLogoutClick: (() -> Unit)? = null,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
+    userColorHex: String = "",
     modifier: Modifier = Modifier
 ) {
     if (!isOpen) return
@@ -98,7 +99,8 @@ fun ProfileDrawerSheet(
                         onDismiss()
                         onAccountsClick()
                     },
-                    size = 54.dp
+                    size = 54.dp,
+                    colorHex = userColorHex
                 )
 
                 Spacer(modifier = Modifier.width(16.dp))

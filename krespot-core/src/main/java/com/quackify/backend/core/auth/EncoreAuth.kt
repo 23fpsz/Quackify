@@ -42,6 +42,7 @@ object EncoreAuth {
         val imageUrl: String = "",
         val product: String = "",
         val country: String = "",
+        val colorHex: String = "",
     )
 
     private const val KEY_SESSION = "session"
@@ -51,6 +52,7 @@ object EncoreAuth {
     private const val KEY_IMAGE = "account_image"
     private const val KEY_PRODUCT = "account_product"
     private const val KEY_COUNTRY = "account_country"
+    private const val KEY_COLOR = "account_color"
     private const val KEY_SAVED_AT = "session_saved_at"
     private const val KEY_TOKEN = "access_token"
     private const val KEY_TOKEN_AT = "access_token_at"
@@ -99,6 +101,7 @@ object EncoreAuth {
                 imageUrl = p.getString("multi.$id.image", "").orEmpty(),
                 product = p.getString("multi.$id.product", "").orEmpty(),
                 country = p.getString("multi.$id.country", "").orEmpty(),
+                colorHex = p.getString("multi.$id.color", "").orEmpty(),
             )
         }
     }
@@ -124,6 +127,7 @@ object EncoreAuth {
             .putString("multi.${account.id}.image", account.imageUrl)
             .putString("multi.${account.id}.product", account.product)
             .putString("multi.${account.id}.country", account.country)
+            .putString("multi.${account.id}.color", account.colorHex)
             .putString(KEY_MULTI_ACTIVE, account.id)
             .apply()
         upsertIndex(context, account.id)
@@ -164,6 +168,7 @@ object EncoreAuth {
             .putString(KEY_IMAGE, p.getString("multi.$id.image", "").orEmpty())
             .putString(KEY_PRODUCT, p.getString("multi.$id.product", "").orEmpty())
             .putString(KEY_COUNTRY, p.getString("multi.$id.country", "").orEmpty())
+            .putString(KEY_COLOR, p.getString("multi.$id.color", "").orEmpty())
             .putLong(KEY_SAVED_AT, System.currentTimeMillis())
             .putString(KEY_MULTI_ACTIVE, id)
             .remove(KEY_TOKEN)
@@ -201,6 +206,7 @@ object EncoreAuth {
             .remove("multi.$id.image")
             .remove("multi.$id.product")
             .remove("multi.$id.country")
+            .remove("multi.$id.color")
             .apply()
         val ids = runCatching {
             JSONArray(p.getString(KEY_MULTI_INDEX, "[]"))
@@ -408,6 +414,7 @@ object EncoreAuth {
             imageUrl = p.getString(KEY_IMAGE, "").orEmpty(),
             product = p.getString(KEY_PRODUCT, "").orEmpty(),
             country = p.getString(KEY_COUNTRY, "").orEmpty(),
+            colorHex = p.getString(KEY_COLOR, "").orEmpty(),
         )
     }
 
@@ -526,10 +533,23 @@ object EncoreAuth {
             .putString(KEY_IMAGE, account.imageUrl)
             .putString(KEY_PRODUCT, account.product)
             .putString(KEY_COUNTRY, account.country)
+            .putString(KEY_COLOR, account.colorHex)
             .putLong(KEY_SAVED_AT, System.currentTimeMillis())
             .apply()
         resolvedUserId = ""
         applySession(context)
+    }
+
+    /**
+     * Persists the profile accent color of the active account so avatar
+     * placeholders can be tinted before the profile endpoint is ever hit.
+     */
+    fun saveProfileColor(context: Context, colorHex: String) {
+        if (colorHex.isBlank()) return
+        val id = activeAccountId(context)
+        val editor = prefs(context).edit().putString(KEY_COLOR, colorHex)
+        if (id.isNotBlank()) editor.putString("multi.$id.color", colorHex)
+        editor.apply()
     }
 
     fun applySession(context: Context) {
@@ -564,6 +584,7 @@ object EncoreAuth {
             .remove(KEY_IMAGE)
             .remove(KEY_PRODUCT)
             .remove(KEY_COUNTRY)
+            .remove(KEY_COLOR)
             .remove(KEY_SAVED_AT)
             .remove(KEY_TOKEN)
             .remove(KEY_TOKEN_AT)

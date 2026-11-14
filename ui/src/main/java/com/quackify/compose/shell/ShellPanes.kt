@@ -446,6 +446,7 @@ internal fun ShellSearchPane(
     browseCategories: List<BrowseCard>?,
     userDisplayName: String,
     userAvatarUrl: String,
+    userColorHex: String = "",
     currentTrackTitle: String,
     currentTrackUri: String,
     isPlaying: Boolean,
@@ -519,6 +520,7 @@ internal fun ShellSearchPane(
         },
         userDisplayName = userDisplayName,
         userAvatarUrl = userAvatarUrl,
+        userColorHex = userColorHex,
         currentTrackTitle = currentTrackTitle,
         currentTrackUri = currentTrackUri,
         isPlaying = isPlaying
@@ -610,6 +612,7 @@ internal fun ShellHomePane(
     notifications: List<EncoreNotification>,
     userDisplayName: String,
     userAvatarUrl: String,
+    userColorHex: String = "",
     onFacetSelected: (String) -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenHistory: () -> Unit,
@@ -658,7 +661,8 @@ internal fun ShellHomePane(
         whatsNewCount = notifications.count { it.isNew },
         onArtistClick = onArtistClick,
         userDisplayName = userDisplayName,
-        userAvatarUrl = userAvatarUrl
+        userAvatarUrl = userAvatarUrl,
+        userColorHex = userColorHex
     )
 }
 
@@ -992,6 +996,7 @@ internal fun ShellFolderPane(
     title: String,
     userDisplayName: String,
     userAvatarUrl: String,
+    userColorHex: String = "",
     onItemClick: (String, String) -> Unit,
     onItemLongPress: (LibraryItem) -> Unit,
     onFolderClick: (LibraryItem) -> Unit,
@@ -1013,6 +1018,7 @@ internal fun ShellFolderPane(
         title = title,
         userDisplayName = userDisplayName,
         userAvatarUrl = userAvatarUrl,
+        userColorHex = userColorHex,
         onProfileClick = onProfileClick,
         onPlusClick = onPlusClick,
         onSortClick = onSortClick,

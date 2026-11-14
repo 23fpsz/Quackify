@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
+import com.quackify.compose.format.parseHexColor
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
@@ -768,6 +769,8 @@ fun EncoreHeartButton(
 
 /**
  * Displays user avatar image when [avatarUrl] is provided, or a colored circle with the user's initial.
+ * When [colorHex] carries the profile accent color it tints the placeholder so
+ * every surface (top bar, drawer, sheets) matches the profile page.
  */
 @Composable
 fun EncoreProfileAvatar(
@@ -776,13 +779,15 @@ fun EncoreProfileAvatar(
     modifier: Modifier = Modifier,
     avatarUrl: String? = null,
     size: Dp = 36.dp,
-    backgroundColor: Color = EncoreColors.CardElevated
+    backgroundColor: Color = EncoreColors.CardElevated,
+    colorHex: String = ""
 ) {
+    val placeholderColor = parseHexColor(colorHex) ?: backgroundColor
     Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(backgroundColor)
+            .background(placeholderColor)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -791,7 +796,7 @@ fun EncoreProfileAvatar(
                 imageUrl = avatarUrl,
                 contentDescription = userDisplayName,
                 shape = CircleShape,
-                fallbackColor = backgroundColor,
+                fallbackColor = placeholderColor,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
