@@ -147,6 +147,7 @@ data class ComposePlaybackState(
     val videoSwitching: Boolean = false,
     val playbackSpeed: Float = 1f,
     val chapters: List<ChapterMarker> = emptyList(),
+    val sleepTimer: SleepTimerOption? = null,
 )
 
 data class ChapterMarker(
@@ -184,6 +185,7 @@ interface ComposePlayerListener {
     fun onPlaybackSpeed(speed: Float) {}
     fun onSkipSeek(deltaMs: Long) {}
     fun onPlayEpisode(uri: String, contextUri: String, hasVideo: Boolean) {}
+    fun onSleepTimer(option: SleepTimerOption) {}
 }
 
 internal enum class FolderMode { CREATE, RENAME, PICKER }

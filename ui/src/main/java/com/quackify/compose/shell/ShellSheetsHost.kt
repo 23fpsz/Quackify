@@ -11,6 +11,7 @@ import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.sheets.EntityOptions
+import com.quackify.compose.sheets.SleepTimerOption
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -164,7 +165,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         },
         sortOption = local.sortOption,
         sortDirection = local.sortDirection,
-        sleepTimer = local.sleepTimer,
+        sleepTimer = if (env.playerListener != null) playbackState?.sleepTimer else local.sleepTimer,
         userDisplayName = env.userDisplayName,
         userAvatarUrl = env.userAvatarUrl,
         userColorHex = env.userColorHex,
@@ -347,7 +348,10 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             val hidden = queue.filter { it.uri.isBlank() || it.title.isBlank() }.map { it.uri }
             env.playerListener?.onQueueSet(reordered.map { it.uri } + hidden + context.map { it.uri })
         },
-        onSleepTimerSelected = { option -> local.sleepTimer = option },
+        onSleepTimerSelected = { option ->
+            local.sleepTimer = if (option == SleepTimerOption.OFF) null else option
+            env.playerListener?.onSleepTimer(option)
+        },
         onRemoveTrackFromPlaylist = if (env.currentScreen == ShellScreen.PLAYLIST && active.playlistUri.startsWith("spotify:playlist:") && env.playlistDetail?.editable == true && active.playlistUri.isNotBlank()) {
             {
                 val trackUri = local.trackForOptions?.uri.orEmpty()
