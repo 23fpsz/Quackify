@@ -83,7 +83,7 @@ abstract class QuackifyWidget(private val variant: WidgetVariant) : GlanceAppWid
         val snapshot = live ?: WidgetSnapshotStore.load(appContext)
         val options = WidgetOptionsStore.load(appContext)
         val artUrl = resolveRemoteImageUrl(snapshot.coverUrl)
-        val art = artUrl?.let { WidgetArt.cached(it) }
+        val art = artUrl?.let { url -> runCatching { WidgetArt.cached(url) }.getOrNull() }
         if (art == null && artUrl != null) {
             WidgetArt.prefetch(appContext, artUrl) { WidgetSync.refreshSoon(appContext) }
         }
@@ -105,7 +105,9 @@ abstract class QuackifyWidget(private val variant: WidgetVariant) : GlanceAppWid
                 WidgetColors.surfaceDark
             } else {
                 withContext(Dispatchers.Default) {
-                    Color(WidgetArt.tintFor(artUrl, art, WidgetColors.surfaceDark.toArgb()))
+                    runCatching {
+                        Color(WidgetArt.tintFor(artUrl, art, WidgetColors.surfaceDark.toArgb()))
+                    }.getOrDefault(WidgetColors.surfaceDark)
                 }
             }
         }

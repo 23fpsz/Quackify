@@ -17,6 +17,7 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import com.quackify.backend.core.log.Logs
+import com.quackify.app.widget.WidgetSync
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.shell.ComposePlaybackState
 import java.net.HttpURLConnection
@@ -68,6 +69,7 @@ class PlaybackService : Service() {
         channel()
         val bridge = PlaybackHost.ensure(this)
         PlaybackHost.markForeground()
+        WidgetSync.start(this)
         setUpSession(bridge)
         val foreground = runCatching {
             startForeground(NOTIFICATION_ID, buildNotification(bridge.state))
@@ -97,6 +99,7 @@ class PlaybackService : Service() {
         }
         PlaybackHost.ensure(this)
         PlaybackHost.markForeground()
+        WidgetSync.start(this)
         return START_STICKY
     }
 
