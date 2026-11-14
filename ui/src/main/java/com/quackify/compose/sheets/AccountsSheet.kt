@@ -111,7 +111,8 @@ fun AccountsSheet(
                                 onSwitchAccount(account.id)
                             }
                         },
-                        size = 44.dp
+                        size = 44.dp,
+                        colorHex = account.colorHex
                     )
 
                     Spacer(modifier = Modifier.width(14.dp))

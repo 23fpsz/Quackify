@@ -195,6 +195,7 @@ fun EncoreSearchScreen(
     browseCategories: List<CategoryCard> = emptyList(),
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
+    userColorHex: String = "",
     currentTrackTitle: String = "",
     currentTrackUri: String = "",
     isPlaying: Boolean = false,
@@ -442,7 +443,8 @@ fun EncoreSearchScreen(
                     EncoreProfileAvatar(
                         userDisplayName = userDisplayName,
                         avatarUrl = userAvatarUrl.ifBlank { null },
-                        onClick = onProfileClick
+                        onClick = onProfileClick,
+                        colorHex = userColorHex
                     )
 
                     Spacer(modifier = Modifier.width(12.dp))

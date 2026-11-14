@@ -75,6 +75,7 @@ internal fun ShellSheets(
     sleepTimer: SleepTimerOption?,
     userDisplayName: String,
     userAvatarUrl: String,
+    userColorHex: String = "",
     savedAccounts: List<EncoreAuth.Account>,
     activeAccountId: String,
     isFolder: Boolean = false,
@@ -147,7 +148,8 @@ internal fun ShellSheets(
         notificationsUnread = notificationsUnread,
         onLogoutClick = onLogout,
         userDisplayName = userDisplayName,
-        userAvatarUrl = userAvatarUrl
+        userAvatarUrl = userAvatarUrl,
+        userColorHex = userColorHex
     )
 
     AccountsSheet(

@@ -161,6 +161,7 @@ class MainActivity : ComponentActivity() {
     private var whatsNewFetch by mutableStateOf(0)
     private var savedAccountsList by mutableStateOf<List<EncoreAuth.Account>>(emptyList())
     private var addingAccount by mutableStateOf(false)
+    private var userProfileColorHex by mutableStateOf("")
     private var profileLoading by mutableStateOf(false)
     private var profileFailed by mutableStateOf(false)
     private var profileFetch by mutableStateOf(0)
@@ -254,6 +255,7 @@ class MainActivity : ComponentActivity() {
         playStats = PlayStats.snapshot(applicationContext)
         recentSearches = RecentSearches.all(applicationContext)
         savedAccountsList = EncoreAuth.savedAccounts(applicationContext)
+        userProfileColorHex = EncoreAuth.account(applicationContext)?.colorHex.orEmpty()
         canvasEnabled = clientPrefs.getBoolean("canvasNpvEnabled", true)
         syncLauncherIcon(applicationContext)
         canvasResolution = clientPrefs.getInt("canvasResolution", 1080)
@@ -446,6 +448,10 @@ class MainActivity : ComponentActivity() {
                                     topJob.await() to null
                                 }
                                 profileDetail = profile
+                                if (isSelf && !profile?.colorHex.isNullOrBlank()) {
+                                    userProfileColorHex = profile!!.colorHex
+                                    EncoreAuth.saveProfileColor(context, profile!!.colorHex)
+                                }
                                 profileTop = top
                                 profileTopUnavailable = !isSelf && top == null
                                 profileContexts = if (isSelf) {
@@ -1393,6 +1399,7 @@ class MainActivity : ComponentActivity() {
             onHomeEntered = updates::onHomeEntered,
             userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
             userAvatarUrl = account?.imageUrl.orEmpty(),
+            userProfileColorHex = userProfileColorHex,
         playbackState = bridge.state,
         playerListener = bridge.listener,
         expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,

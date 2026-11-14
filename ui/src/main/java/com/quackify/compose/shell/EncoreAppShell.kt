@@ -288,7 +288,8 @@ fun EncoreAppShell(
     profileFollowLoading: Boolean = false,
     onLoadProfileFollows: (() -> Unit)? = null,
     userDisplayName: String = "Duck User",
-    userAvatarUrl: String = ""
+    userAvatarUrl: String = "",
+    userProfileColorHex: String = ""
 ) {
     val flags = remember { ShellUiFlags() }
     val active = remember { ShellActiveEntity() }
@@ -607,6 +608,7 @@ fun EncoreAppShell(
                 notifications = notifications,
                 userDisplayName = userDisplayName,
                 userAvatarUrl = userAvatarUrl,
+                userColorHex = userProfileColorHex,
                 onFacetSelected = onHomeFacetSelected,
                 onOpenNotifications = {
                     pushCurrentState()
@@ -642,6 +644,7 @@ fun EncoreAppShell(
                 browseCategories = browseCategories,
                 userDisplayName = userDisplayName,
                 userAvatarUrl = userAvatarUrl,
+                userColorHex = userProfileColorHex,
                 currentTrackTitle = currentTrackTitle,
                 currentTrackUri = playbackState?.trackUri.orEmpty(),
                 isPlaying = isPlaying,
@@ -696,6 +699,7 @@ fun EncoreAppShell(
                     loading = libraryLoading,
                     userDisplayName = userDisplayName,
                     userAvatarUrl = userAvatarUrl,
+                    userColorHex = userProfileColorHex,
                     onProfileClick = openProfileDrawer,
                     onPlusClick = { flags.isCreateSheetOpen = true },
                     onSortClick = { flags.isSortSheetOpen = true },
@@ -998,6 +1002,7 @@ fun EncoreAppShell(
                 title = active.folderTitle.ifBlank { "Your Library" },
                 userDisplayName = userDisplayName,
                 userAvatarUrl = userAvatarUrl,
+                userColorHex = userProfileColorHex,
                 onItemClick = { itemTitle, itemUri ->
                     val foundItem = folderItems?.find { it.uri == itemUri || it.title == itemTitle }
                     active.playlistCoverUrl = foundItem?.imageUrl
@@ -1336,6 +1341,7 @@ fun EncoreAppShell(
             sleepTimer = local.sleepTimer,
             userDisplayName = userDisplayName,
             userAvatarUrl = userAvatarUrl,
+            userColorHex = userProfileColorHex,
             savedAccounts = savedAccounts,
             activeAccountId = activeAccountId,
             isFolder = currentScreen == ShellScreen.FOLDER,

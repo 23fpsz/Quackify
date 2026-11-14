@@ -107,6 +107,7 @@ fun EncoreHomeScreen(
     onArtistClick: (String, String) -> Unit = { _, _ -> },
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
+    userColorHex: String = "",
     whatsNewCount: Int = 0,
     shelves: List<HomeShelf>? = null,
     loading: Boolean = false,
@@ -182,6 +183,7 @@ fun EncoreHomeScreen(
                         userDisplayName = userDisplayName,
                         avatarUrl = userAvatarUrl.ifBlank { null },
                         onClick = onProfileClick,
+                        colorHex = userColorHex,
                         modifier = Modifier.padding(start = 16.dp)
                     )
 
