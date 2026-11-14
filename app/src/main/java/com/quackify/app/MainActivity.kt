@@ -115,7 +115,7 @@ private val log = Logs.of(Logs.Module.MAIN)
 
 class MainActivity : ComponentActivity() {
 
-    private var canvasResolution by mutableStateOf(1080)
+    internal var canvasResolution by mutableStateOf(1080)
     private var fullArtworkPlayer by mutableStateOf(true)
     private val clientPrefs by lazy {
         com.quackify.backend.core.store.AppPrefs.prefs(applicationContext, CLIENT_PREFS)
@@ -133,9 +133,9 @@ class MainActivity : ComponentActivity() {
 
     private var homeGreeting by mutableStateOf("")
     private var homeFacet by mutableStateOf("")
-    private var loading by mutableStateOf(true)
-    private var playHistory by mutableStateOf<List<PlayedTrack>>(emptyList())
-    private var playStats by mutableStateOf(PlayStatsSnapshot())
+    internal var loading by mutableStateOf(true)
+    internal var playHistory by mutableStateOf<List<PlayedTrack>>(emptyList())
+    internal var playStats by mutableStateOf(PlayStatsSnapshot())
     private var searchTerm by mutableStateOf("")
     private var searchLoading by mutableStateOf(false)
     private var searchFailed by mutableStateOf(false)
@@ -193,7 +193,7 @@ class MainActivity : ComponentActivity() {
     private var sawOffline by mutableStateOf(false)
     private var canvasEnabled by mutableStateOf(true)
 
-    private var feed by mutableStateOf<List<HomeSection>>(emptyList())
+    internal var feed by mutableStateOf<List<HomeSection>>(emptyList())
     private var homeChips by mutableStateOf<List<HomeChip>>(emptyList())
     private var searchData by mutableStateOf<SearchResults?>(null)
     private var searchHits by mutableStateOf<List<SearchHit>>(emptyList())
@@ -204,8 +204,8 @@ class MainActivity : ComponentActivity() {
     private var browsePage by mutableStateOf<BrowsePage?>(null)
     private var categoryShelves by mutableStateOf<List<CategoryShelf>?>(null)
     private var browseCategories by mutableStateOf<List<BrowseCard>>(emptyList())
-    private val homeArtistImages = mutableStateMapOf<String, String>()
-    private val artistCache = mutableMapOf<String, ArtistDetail>()
+    internal val homeArtistImages = mutableStateMapOf<String, String>()
+    internal val artistCache = mutableMapOf<String, ArtistDetail>()
     private var folderItems by mutableStateOf<List<LibraryItem>?>(null)
     private var libraryItems by mutableStateOf<List<LibraryItem>?>(null)
     private var whatsNew by mutableStateOf<List<EncoreNotification>>(emptyList())
@@ -234,10 +234,10 @@ class MainActivity : ComponentActivity() {
     private var artistReleases by mutableStateOf<List<ArtistRelease>?>(null)
     private var artistListeners by mutableStateOf<String?>(null)
     private var artistFollowed by mutableStateOf<Boolean?>(null)
-    private var nowPlayingArtist by mutableStateOf<ArtistDetail?>(null)
-    private var nowPlayingArtistFollowed by mutableStateOf<Boolean?>(null)
-    private var nowPlayingLyrics by mutableStateOf<TrackLyrics?>(null)
-    private var canvasFile by mutableStateOf<String?>(null)
+    internal var nowPlayingArtist by mutableStateOf<ArtistDetail?>(null)
+    internal var nowPlayingArtistFollowed by mutableStateOf<Boolean?>(null)
+    internal var nowPlayingLyrics by mutableStateOf<TrackLyrics?>(null)
+    internal var canvasFile by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -1167,7 +1167,7 @@ class MainActivity : ComponentActivity() {
         return results?.let { decorateSearchTracks(applicationContext, it) } to hits
     }
 
-    private fun buildHistoryStats(stats: PlayStatsSnapshot, history: List<PlayedTrack>): HistoryStats {
+    internal fun buildHistoryStats(stats: PlayStatsSnapshot, history: List<PlayedTrack>): HistoryStats {
         val replayed = history.filter { it.plays > 1 }.maxByOrNull { it.plays }
         return HistoryStats(
             totalPlayedMs = stats.totalMs,
@@ -1305,114 +1305,17 @@ class MainActivity : ComponentActivity() {
     ) {
         val scope = rememberCoroutineScope()
         val playback = bridge.state
-    val quick = remember(feed, playHistory, loading) {
-        val fromFeed = feed.toQuickAccess()
-        when {
-            fromFeed.isNotEmpty() -> fromFeed
-            loading -> emptyList()
-            else -> {
-                log.i("feed has no shorts section, deriving the shortcut grid from history")
-                playHistory.map { it.item }.toQuickAccessFallback()
-            }
+        val contributors = rememberPlaylistContributorController(context, playlistUri)
+        val activity = remember { ActivityFeedController(context.applicationContext, scope) }
+        LaunchedEffect(activity.fetchTick) {
+            if (activity.fetchTick > 0) activity.load()
         }
-    }
-    LaunchedEffect(quick) {
-        log.i("home quick access tiles=${quick.size}")
-    }
-    val shelves = remember(feed) { feed.toShelves() }
-    val historyShelves = remember(playHistory, homeArtistImages.size) {
-        listOfNotNull(
-            playHistory.map { it.item }.toRecentlyPlayedShelf(),
-            favoriteArtistsOf(playHistory).toFavoriteArtistsShelf(homeArtistImages),
-        )
-    }
-    LaunchedEffect(shelves) {
-        log.i("home shelves=${shelves.size} " +
-                "grids=${shelves.count { it.grid }} " +
-                "cards=${shelves.sumOf { it.cards.size }} " +
-                "titles=${shelves.take(8).joinToString(" | ") { it.title.ifBlank { "-" } }}"
-        )
-    }
-    val contributors = rememberPlaylistContributorController(context, playlistUri)
-    val activity = remember { ActivityFeedController(context.applicationContext, scope) }
-    LaunchedEffect(activity.fetchTick) {
-        if (activity.fetchTick > 0) activity.load()
-    }
-    LaunchedEffect(Unit) {
-        activity.refreshUnread()
-    }
-
-    val nowPlayingArtistUri = remember(playback.trackUri, playback.artistUri, playback.queue, playback.queueFromContext) {
-        playback.artistUri.ifBlank {
-            (playback.queue + playback.queueFromContext)
-                .firstOrNull { it.uri == playback.trackUri }?.artistUri.orEmpty()
+        LaunchedEffect(Unit) {
+            activity.refreshUnread()
         }
-    }
-    LaunchedEffect(nowPlayingArtistUri) {
-        if (nowPlayingArtistUri.isBlank()) {
-            nowPlayingArtist = null
-            nowPlayingArtistFollowed = null
-            return@LaunchedEffect
-        }
-        val cached = artistCache[nowPlayingArtistUri]
-        if (cached != null) {
-            nowPlayingArtist = cached
-        } else {
-            nowPlayingArtist = Krespot.artists.artist(context, nowPlayingArtistUri)
-                ?.also {
-                    if (artistCache.size >= 24) artistCache.clear()
-                    artistCache[it.uri] = it
-                }
-        }
-        val inLibrary = Library.saved(context, listOf(nowPlayingArtistUri))
-        nowPlayingArtistFollowed = if (inLibrary.isEmpty()) {
-            nowPlayingArtist?.saved == true
-        } else {
-            nowPlayingArtistUri in inLibrary
-        }
-    }
-    LaunchedEffect(playback.trackUri) {
-        val uri = playback.trackUri
-        if (!uri.startsWith("spotify:track:")) {
-            nowPlayingLyrics = null
-            return@LaunchedEffect
-        }
-        nowPlayingLyrics = Krespot.lyrics.lyrics(context, uri)
-    }
-    val canvasAllowed = settingsSwitches.canvas
-    LaunchedEffect(playback.trackUri, canvasAllowed, canvasResolution) {
-        canvasFile = null
-        if (!canvasAllowed) return@LaunchedEffect
-        val uri = playback.trackUri
-        if (!uri.startsWith("spotify:track:")) return@LaunchedEffect
-        val file = CanvasKit.download(context, uri, canvasResolution)
-        if (uri == playback.trackUri) canvasFile = file
-    }
-    val startOfToday = remember {
-        Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-    }
-    val startOfYesterday = remember { startOfToday - 24L * 60 * 60 * 1000 }
-    val historyRows = playHistory
-    val historyToday = remember(playHistory, startOfToday) {
-        historyRows.filter { it.playedAtMs >= startOfToday }.map { it.item }
-    }
-    val historyYesterday = remember(playHistory, startOfToday, startOfYesterday) {
-        historyRows
-            .filter { it.playedAtMs >= startOfYesterday && it.playedAtMs < startOfToday }
-            .map { it.item }
-    }
-    val historyEarlier = remember(playHistory, startOfYesterday) {
-        historyRows.filter { it.playedAtMs in 1 until startOfYesterday }.map { it.item }
-    }
-    val historyStats = remember(playStats, playHistory) {
-        buildHistoryStats(playStats, playHistory)
-    }
-    EncoreAppShell(
+        val home = rememberHomeFeedData()
+        val nowPlaying = rememberNowPlayingData(canvasAllowed = settingsSwitches.canvas)
+        EncoreAppShell(
             deeplink = pendingLink?.let { ShellDeepLink(it.kind, it.uri, it.query) },
             onDeeplinkConsumed = { pendingLink = null },
             onDeeplinkSearch = { q -> if (searchTerm == q) searchFetch++ else searchTerm = q },
@@ -1425,10 +1328,11 @@ class MainActivity : ComponentActivity() {
             userAvatarUrl = account?.imageUrl.orEmpty(),
             userProfileColorHex = userProfileColorHex,
         playbackState = bridge.state,
+        progressState = bridge.progress,
         playerListener = bridge.listener,
         expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
-            homeQuickAccessItems = quick,
-        homeShelves = if (homeFacet.isBlank() && !loading) historyShelves + shelves else shelves,
+            homeQuickAccessItems = home.quick,
+        homeShelves = if (homeFacet.isBlank() && !loading) home.historyShelves + home.shelves else home.shelves,
         homeChips = homeChips,
         homeFacet = homeFacet,
         homeGreeting = homeGreeting,
@@ -1508,7 +1412,7 @@ class MainActivity : ComponentActivity() {
             }.orEmpty()
         },
         canvasFilePath = canvasFile,
-        isCanvasAllowed = canvasAllowed,
+        isCanvasAllowed = nowPlaying.canvasAllowed,
         isCanvasEnabled = canvasEnabled,
         onCanvasToggle = { on ->
             canvasEnabled = on
@@ -1663,7 +1567,7 @@ class MainActivity : ComponentActivity() {
                 val ok = setArtistFollow(uri, follow)
                 if (!ok) return@launch
                 if (uri == artistUri) artistFollowed = follow
-                if (uri == nowPlayingArtistUri) nowPlayingArtistFollowed = follow
+                if (uri == nowPlaying.artistUri) nowPlayingArtistFollowed = follow
             }
         },
         onArtistTrackLikeToggle = { track ->
@@ -1912,10 +1816,10 @@ class MainActivity : ComponentActivity() {
             onLeave = activity::leave,
             onDrawerOpened = activity::refreshUnread,
         ),
-        historyToday = historyToday,
-        historyYesterday = historyYesterday,
-        historyEarlier = historyEarlier,
-        historyStats = historyStats,
+        historyToday = home.historyToday,
+        historyYesterday = home.historyYesterday,
+        historyEarlier = home.historyEarlier,
+        historyStats = home.historyStats,
         historyLoading = false,
         onLogout = {
             log.i("logout tapped")

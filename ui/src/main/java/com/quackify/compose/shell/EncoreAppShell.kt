@@ -104,6 +104,7 @@ internal fun ShellOverlaySlot(content: @Composable () -> Unit) {
 fun EncoreAppShell(
     modifier: Modifier = Modifier,
     playbackState: ComposePlaybackState? = null,
+    progressState: PlaybackProgress? = null,
     playerListener: ComposePlayerListener? = null,
     expandPlayerSignal: Int = 0,
     isComposeUiEnabled: Boolean = true,
@@ -306,25 +307,27 @@ fun EncoreAppShell(
     val onLeaveActivity = activityState?.onLeave
     val onProfileDrawerOpened = activityState?.onDrawerOpened
     val searchQueryNow = searchQuery
-    val navController = ShellNavController(
-        nav = navState,
-        active = active,
-        flags = flags,
-        searchQuery = { searchQueryNow },
-        onSearchQueryChange = onSearchQueryChange,
-        playerListener = playerListener,
-        onLoadPlaylist = onLoadPlaylist,
-        onLoadAlbum = onLoadAlbum,
-        onLoadArtist = onLoadArtist,
-        onOpenShow = onOpenShow,
-        onOpenEpisode = onOpenEpisode,
-        onOpenUserProfile = onOpenUserProfile,
-        onAddTracksClosed = { onRetryPlaylist?.invoke() },
-        libraryItems = libraryItems,
-        searchData = searchData,
-        nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
-        currentArtist = { playbackState?.artist ?: local.artist },
-    )
+    val navController = remember(searchQueryNow, onSearchQueryChange, playerListener, onLoadPlaylist, onLoadAlbum, onLoadArtist, onOpenShow, onOpenEpisode, onOpenUserProfile, onRetryPlaylist, libraryItems, searchData, nowPlayingArtistImageUrl) {
+        ShellNavController(
+            nav = navState,
+            active = active,
+            flags = flags,
+            searchQuery = { searchQueryNow },
+            onSearchQueryChange = onSearchQueryChange,
+            playerListener = playerListener,
+            onLoadPlaylist = onLoadPlaylist,
+            onLoadAlbum = onLoadAlbum,
+            onLoadArtist = onLoadArtist,
+            onOpenShow = onOpenShow,
+            onOpenEpisode = onOpenEpisode,
+            onOpenUserProfile = onOpenUserProfile,
+            onAddTracksClosed = { onRetryPlaylist?.invoke() },
+            libraryItems = libraryItems,
+            searchData = searchData,
+            nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
+            currentArtist = { playbackState?.artist ?: local.artist },
+        )
+    }
     var currentScreen by navController.nav::currentScreen
     var selectedNavIndex by navController.nav::selectedNavIndex
     var isPlayerExpanded by navController.nav::isPlayerExpanded
@@ -427,9 +430,6 @@ fun EncoreAppShell(
     var localIsPlaying by local::isPlaying
     var localTrackTitle by local::trackTitle
     var localArtist by local::artist
-    var localProgress by local::progress
-    var localPositionMs by local::positionMs
-    val localDurationMs = 0L
     var localIsLiked by local::isLiked
     var localShuffleMode by local::shuffleMode
     var localRepeatMode by local::repeatMode
@@ -439,9 +439,9 @@ fun EncoreAppShell(
     val currentArtist = playbackState?.artist ?: localArtist
     val isPlaying = playbackState?.isPlaying ?: localIsPlaying
     val isBuffering = playbackState?.isBuffering ?: false
-    val currentProgress = playbackState?.progress ?: localProgress
-    val currentPositionMs = playbackState?.positionMs ?: localPositionMs
-    val durationMs = if ((playbackState?.durationMs ?: 0L) > 0L) playbackState!!.durationMs else localDurationMs
+    val currentProgress = progressState?.progress ?: local.progress
+    val currentPositionMs = progressState?.positionMs ?: local.positionMs
+    val durationMs = progressState?.durationMs ?: 0L
     val isLiked = playbackState?.isLiked ?: localIsLiked
     val currentShuffleMode = playbackState?.shuffleMode ?: localShuffleMode
     val currentRepeatMode = playbackState?.repeatMode ?: localRepeatMode
@@ -602,492 +602,230 @@ fun EncoreAppShell(
             .fillMaxSize()
             .background(EncoreColors.PureBlack)
     ) {
-        val playlistLoadFailed = !playlistLoading && playlistTracks == null
+        val routeEnv = ShellRouteEnv(
+            active = active,
+            flags = flags,
+            local = local,
+            navController = navController,
+            actions = actions,
+            shellScope = shellScope,
+            playbackState = playbackState,
+            playerListener = playerListener,
+            currentTrackTitle = currentTrackTitle,
+            currentArtist = currentArtist,
+            isPlaying = isPlaying,
+            currentSortOption = currentSortOption,
+            currentSortDirection = currentSortDirection,
+            searchFieldFocusRequester = searchFieldFocusRequester,
+            userDisplayName = userDisplayName,
+            userAvatarUrl = userAvatarUrl,
+            userColorHex = userProfileColorHex,
+            handleBack = handleBack,
+            handlePlayPause = handlePlayPause,
+            handleTrackPlay = handleTrackPlay,
+            handleTrackOptions = handleTrackOptions,
+            handleTrackAddToQueue = handleTrackAddToQueue,
+            handleOpenSettings = handleOpenSettings,
+            handlePodcastOpen = handlePodcastOpen,
+            openArtist = openArtist,
+            openAlbum = openAlbum,
+            openPlaylist = openPlaylist,
+            openShow = openShow,
+            openEpisode = openEpisode,
+            openUserProfile = openUserProfile,
+            openProfileDrawer = openProfileDrawer,
+            handleLibraryLongPress = handleLibraryLongPress,
+            handleFolderClick = handleFolderClick,
+            shareEntity = shareEntity,
+        )
         ShellScreenSlot {
-        when (currentScreen) {
-            ShellScreen.HOME -> ShellHomePane(
-                quickAccessItems = homeQuickAccessItems,
-                recommendations = homeRecommendations,
-                shelves = homeShelves,
-                chips = homeChips,
-                selectedFacet = homeFacet,
-                greeting = homeGreeting,
-                loading = homeLoading,
-                libraryItems = libraryItems,
-                notifications = notifications,
-                userDisplayName = userDisplayName,
-                userAvatarUrl = userAvatarUrl,
-                userColorHex = userProfileColorHex,
-                onFacetSelected = onHomeFacetSelected,
-                onOpenNotifications = {
-                    pushCurrentState()
-                    currentScreen = ShellScreen.NOTIFICATIONS
-                },
-                onOpenHistory = {
-                    pushCurrentState()
-                    currentScreen = ShellScreen.HISTORY
-                    onOpenHistory?.invoke()
-                },
-                onOpenSettings = handleOpenSettings,
-                onOpenProfile = openProfileDrawer,
-                onArtistClick = openArtist,
-                onCoverResolved = { cover ->
-                    active.playlistCoverUrl = cover
-                    active.albumCoverUrl = cover
-                },
-                onPlayTrackShortcut = { uri, title -> actions.playUriShortcut(uri, title) },
-                onOpenAlbum = openAlbum,
-                onOpenShow = openShow,
-                onOpenEpisode = openEpisode,
-                onOpenPlaylist = openPlaylist,
-            )
-            ShellScreen.SEARCH -> ShellSearchPane(
-                searchResults = searchResults,
-                searchData = searchData,
-                searchRecent = searchRecent,
-                searchSuggestions = searchSuggestions,
-                searchSuggestionHits = searchSuggestionHits,
-                searchLoading = searchLoading,
-                searchFailed = searchFailed,
-                searchSavedOverrides = searchSavedOverrides,
-                browseCategories = browseCategories,
-                userDisplayName = userDisplayName,
-                userAvatarUrl = userAvatarUrl,
-                userColorHex = userProfileColorHex,
-                currentTrackTitle = currentTrackTitle,
-                currentTrackUri = playbackState?.trackUri.orEmpty(),
-                isPlaying = isPlaying,
-                searchFieldFocusRequester = searchFieldFocusRequester,
-                initialQuery = searchQuery,
-                playerListener = playerListener,
-                onSearchQueryChange = onSearchQueryChange,
-                onSearchSubmit = onSearchSubmit,
-                onRetrySearch = { onRetrySearch?.invoke() },
-                onClearRecentSearches = { onClearRecentSearches?.invoke() },
-                onRemoveRecentSearch = { item -> onRemoveRecentSearch?.invoke(item) },
-                onRecordRecentSearch = { hit -> onRecordRecentSearch?.invoke(hit) },
-                onToggleSaved = { uri, currentlySaved -> onToggleSaved?.invoke(uri, currentlySaved) },
-                onLoadSearchSection = onLoadSearchSection,
-                onCategoryClick = { category ->
-                    pushCurrentState()
-                    active.categoryTitle = category.title
-                    active.categoryColor = category.color
-                    if (category.uri.startsWith("spotify:page:")) {
-                        currentScreen = ShellScreen.BROWSE
-                        onOpenBrowse?.invoke(category.uri)
-                    } else {
-                        currentScreen = ShellScreen.CATEGORY
-                        onOpenCategory?.invoke(category.title)
-                    }
-                },
-                onAlbumClick = openAlbum,
-                onArtistClick = openArtist,
-                onPodcastClick = handlePodcastOpen,
-                onOpenEpisode = openEpisode,
-                onOpenShow = openShow,
-                onOpenPlaylist = openPlaylist,
-                onUserClick = openUserProfile,
-                onTrackSelect = handleTrackPlay,
-                onTrackOptionsClick = handleTrackOptions,
-                onTrackAddToQueue = handleTrackAddToQueue,
-                onProfileClick = openProfileDrawer,
-            )
-            ShellScreen.LIBRARY -> {
-                EncoreLibraryScreen(
-                    onItemClick = { itemTitle, itemUri ->
-                        val foundItem = libraryItems?.find { it.uri == itemUri || it.title == itemTitle }
-                        active.playlistCoverUrl = foundItem?.imageUrl
-                        openPlaylist(itemTitle, itemUri)
-                    },
-                    onItemLongPress = handleLibraryLongPress,
-                    onFolderClick = handleFolderClick,
-                    onAlbumClick = openAlbum,
-                    onPodcastClick = handlePodcastOpen,
-                    onArtistClick = openArtist,
-                    items = libraryItems,
-                    loading = libraryLoading,
-                    userDisplayName = userDisplayName,
-                    userAvatarUrl = userAvatarUrl,
-                    userColorHex = userProfileColorHex,
-                    onProfileClick = openProfileDrawer,
-                    onPlusClick = { flags.isCreateSheetOpen = true },
-                    onSortClick = { flags.isSortSheetOpen = true },
-                    currentSort = currentSortOption,
-                    sortDirection = currentSortDirection
+            when (currentScreen) {
+                ShellScreen.HOME -> ShellHomeRoute(
+                    env = routeEnv,
+                    quickAccessItems = homeQuickAccessItems,
+                    recommendations = homeRecommendations,
+                    shelves = homeShelves,
+                    chips = homeChips,
+                    selectedFacet = homeFacet,
+                    greeting = homeGreeting,
+                    loading = homeLoading,
+                    libraryItems = libraryItems,
+                    notifications = notifications,
+                    onHomeFacetSelected = onHomeFacetSelected,
+                    onOpenHistory = onOpenHistory,
                 )
-            }
-            ShellScreen.PLAYLIST -> ShellPlaylistPane(
-                activePlaylistTitle = active.playlistTitle,
-                activePlaylistUri = active.playlistUri,
-                activePlaylistCoverUrl = active.playlistCoverUrl,
-                playlistDetail = playlistDetail,
-                playlistTracks = playlistTracks,
-                playlistLoading = playlistLoading,
-                playlistHasMore = playlistHasMore,
-                playlistLoadingMore = playlistLoadingMore,
-                onLoadMorePlaylistTracks = onLoadMorePlaylistTracks,
-                playlistLoadFailed = playlistLoadFailed,
-                onRetryPlaylist = onRetryPlaylist,
-                currentTrackTitle = currentTrackTitle,
-                currentTrackUri = playbackState?.trackUri.orEmpty(),
-                isPlaying = isPlaying,
-                userDisplayName = userDisplayName,
-                playerListener = playerListener,
-                playlistSaved = playlistSaved,
-                playlistRecommendations = playlistRecommendations,
-                recommendationsLoading = recommendationsLoading,
-                onRefreshRecommendations = onRefreshRecommendations,
-                onAddRecommended = onAddRecommended,
-                onSavePlaylistOrder = onSavePlaylistOrder,
-                onEditPlaylistDetails = onEditPlaylistDetails,
-                onDeletePlaylist = { uri ->
-                    shellScope.launch {
-                        val ok = onDeletePlaylist?.invoke(uri) ?: false
-                        if (ok) handleBack()
-                    }
-                },
-                onTogglePlaylistSaved = onTogglePlaylistSaved,
-                playlistMembers = playlistPermissions?.members ?: playlistDetail?.members.orEmpty(),
-                onOpenContributors = {
-                    flags.isContributorsOpen = true
-                    onLoadPlaylistContributors?.invoke()
-                },
-                onTrackLikeToggle = { onPlaylistTrackLikeToggle?.invoke(it) },
-                onTrackAddToQueue = handleTrackAddToQueue,
-                handleBack = handleBack,
-                handleTrackOptions = handleTrackOptions,
-                shareEntity = shareEntity,
-                onLocalPlayPause = { local.isPlaying = !local.isPlaying },
-                onLocalTrack = { track -> actions.localPlay(track) },
-                onPlaylistOptions = { flags.isPlaylistOptionsOpen = true },
-                onEditModeChange = { isEditing -> flags.isPlaylistEditMode = isEditing },
-                onChangeTitle = { flags.isRenamePlaylistDialogOpen = true },
-                onAddTracksClick = {
-                    navController.openAddTracks()
-                    onAddTracksOpen?.invoke()
-                },
-                onEditCoverClick = {
-                    val uri = active.playlistUri
-                    if (uri.startsWith("spotify:playlist:") && playlistDetail?.editable == true) {
-                        onEditPlaylist?.invoke(uri)
-                    } else {
-                        flags.isPlaylistOptionsOpen = true
-                    }
-                },
-                onPlaybackOrigin = { playbackOrigin = it }
-            )
-            ShellScreen.ALBUM -> ShellAlbumPane(
-                activeAlbumTitle = active.albumTitle,
-                activeAlbumArtist = active.albumArtist,
-                activeAlbumUri = active.albumUri,
-                activeAlbumCoverUrl = active.albumCoverUrl,
-                activeAlbumYear = active.albumYear,
-                activeAlbumReleaseDate = active.albumReleaseDate,
-                activeAlbumColor = active.albumColor,
-                albumDetail = albumDetail,
-                albumTracks = albumTracks,
-                albumLoading = albumLoading,
-                albumFailed = albumFailed,
-                albumHasMore = albumHasMore,
-                albumLoadingMore = albumLoadingMore,
-                onLoadMoreAlbumTracks = onLoadMoreAlbumTracks,
-                onRetryAlbum = onRetryAlbum,
-                currentTrackTitle = currentTrackTitle,
-                currentTrackUri = playbackState?.trackUri.orEmpty(),
-                isPlaying = isPlaying,
-                playerListener = playerListener,
-                handleBack = handleBack,
-                handlePlayPause = handlePlayPause,
-                handleTrackOptions = handleTrackOptions,
-                onTrackLikeToggle = { onAlbumTrackLikeToggle?.invoke(it) },
-                onTrackAddToQueue = handleTrackAddToQueue,
-                openArtist = openArtist,
-                openAlbum = openAlbum,
-                onAlbumOptions = { flags.isAlbumOptionsOpen = true },
-                onPlaybackOrigin = { playbackOrigin = it }
-            )
-            ShellScreen.ARTIST -> ShellArtistPane(
-                artistName = active.artistName,
-                artistAvatarUrl = active.artistAvatarUrl,
-                artistUri = active.artistUri,
-                artistDetail = artistDetail,
-                artistTracks = artistTracks,
-                artistReleases = artistReleases,
-                artistMonthlyListeners = artistMonthlyListeners,
-                artistLoading = artistLoading,
-                artistFailed = artistFailed,
-                onRetryArtist = onRetryArtist,
-                artistFollowed = artistFollowed,
-                currentTrackTitle = currentTrackTitle,
-                currentTrackUri = playbackState?.trackUri.orEmpty(),
-                isPlaying = isPlaying,
-                onBackClick = handleBack,
-                onPlayPauseClick = handlePlayPause,
-                onTrackSelect = handleTrackPlay,
-                onTrackOptionsClick = handleTrackOptions,
-                onTrackLikeToggle = { onArtistTrackLikeToggle?.invoke(it) },
-                onTrackAddToQueue = handleTrackAddToQueue,
-                onFollowToggle = { uri, follow ->
-                    onArtistFollowToggle?.invoke(uri, follow)
-                },
-                onReleaseClick = { release ->
-                    openAlbum(release.title, active.artistName, release.uri)
-                },
-                onArtistClick = { name, uri -> openArtist(name, uri) },
-                onShelfClick = { title, uri ->
-                    if (uri.startsWith("spotify:album:")) {
-                        openAlbum(title, "", uri)
-                    } else {
-                        openPlaylist(title, uri)
-                    }
-                },
-                onAboutClick = { flags.isArtistAboutOpen = true },
-                onDiscographyClick = { flags.isDiscographyOpen = true },
-                onOptionsClick = { flags.isArtistOptionsOpen = true }
-            )
-            ShellScreen.CATEGORY -> {
-                EncoreCategoryScreen(
-                    categoryTitle = active.categoryTitle,
-                    categoryColor = active.categoryColor,
-                    onBackClick = handleBack,
-                    onPlaylistClick = { title, uri ->
-                        if (uri.startsWith("spotify:show:")) {
-                            openShow(uri)
-                            return@EncoreCategoryScreen
-                        }
-                        val foundItem = homeQuickAccessItems?.find { it.uri == uri || it.title == title }
-                        val foundRec = homeRecommendations?.find { it.uri == uri || it.title == title }
-                        val foundLib = libraryItems?.find { it.uri == uri || it.title == title }
-                        val cover = foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl
-                        active.playlistCoverUrl = cover
-                        openPlaylist(title, uri)
-                    },
-                    onAlbumClick = { title, artist, uri ->
-                        openAlbum(title, artist, uri)
-                    },
-                    onArtistClick = { artist, uri ->
-                        openArtist(artist, uri)
-                    },
-                    onSubcategoryClick = { subcategory ->
-                        pushCurrentState()
-                        active.categoryTitle = subcategory
-                        active.categoryColor = getCategoryColor(subcategory)
-                        currentScreen = ShellScreen.CATEGORY
-                    },
-                    onTrackSelect = handleTrackPlay,
-                    shelves = categoryShelves
+                ShellScreen.SEARCH -> ShellSearchRoute(
+                    env = routeEnv,
+                    searchResults = searchResults,
+                    searchData = searchData,
+                    searchRecent = searchRecent,
+                    searchSuggestions = searchSuggestions,
+                    searchSuggestionHits = searchSuggestionHits,
+                    searchLoading = searchLoading,
+                    searchFailed = searchFailed,
+                    searchSavedOverrides = searchSavedOverrides,
+                    browseCategories = browseCategories,
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onSearchSubmit = onSearchSubmit,
+                    onRetrySearch = onRetrySearch,
+                    onClearRecentSearches = onClearRecentSearches,
+                    onRemoveRecentSearch = onRemoveRecentSearch,
+                    onRecordRecentSearch = onRecordRecentSearch,
+                    onToggleSaved = onToggleSaved,
+                    onLoadSearchSection = onLoadSearchSection,
+                    onOpenBrowse = onOpenBrowse,
+                    onOpenCategory = onOpenCategory,
                 )
-            }
-            ShellScreen.SETTINGS -> ShellSettingsPane(
-                onBackClick = handleBack,
-                onLogout = { onLogout?.invoke() },
-                switches = settingsSwitches,
-                locks = settingsLocks,
-                product = settingsProduct,
-                country = settingsCountry,
-                loading = settingsLoading,
-                onToggleSetting = onToggleSetting,
-                onToggleFullArtwork = onToggleFullArtwork,
-                onAppIconChange = { onAppIconChange?.invoke(it) },
-                update = appUpdate,
-                updateChecking = updateChecking,
-                updateChecked = updateChecked,
-                onCheckUpdates = { onCheckUpdates?.invoke() }
-            )
-            ShellScreen.NOTIFICATIONS -> ShellNotificationsPane(
-                onBackClick = handleBack,
-                notifications = notifications,
-                loading = notificationsLoading,
-                loadFailed = notificationsFailed,
-                onRetry = { onRefreshWhatsNew?.invoke() },
-                onPlay = { item ->
-                    when {
-                        item.uri.startsWith("spotify:album:") -> openAlbum(item.title, "", item.uri)
-                        item.uri.startsWith("spotify:episode:") -> {
-                            pushCurrentState()
-                            active.episodeUri = item.uri
-                            currentScreen = ShellScreen.EPISODE
-                            onOpenEpisode?.invoke(item.uri)
-                        }
-                        item.uri.isNotEmpty() -> {
-                            pushCurrentState()
-                            active.playlistTitle = item.title
-                            active.playlistUri = item.uri
-                            currentScreen = ShellScreen.PLAYLIST
-                            if (onLoadPlaylist != null) onLoadPlaylist?.invoke(item.uri) else playerListener?.onLoadPlaylist(item.uri)
-                        }
-                    }
-                }
-            )
-            ShellScreen.ACTIVITY -> ShellActivityPane(
-                onBackClick = handleBack,
-                notifications = activityFeed,
-                loading = activityLoading,
-                loadFailed = activityFailed,
-                onRetry = { onRetryActivity?.invoke() },
-                self = activitySelf,
-                fallbackName = userDisplayName,
-                fallbackAvatarUrl = userAvatarUrl,
-                onOpenNotification = { item ->
-                    when {
-                        item.actionUri.startsWith("spotify:playlist:") ->
-                            openPlaylist(item.title, item.actionUri)
-                        item.actionUri.startsWith("spotify:user:") ->
-                            openUserProfile(item.actionUri, item.primaryActor.ifBlank { item.title })
-                        item.actionUri.startsWith("spotify:artist:") ->
-                            openArtist(item.primaryActor.ifBlank { item.title }, item.actionUri)
-                        item.actionUri.startsWith("spotify:album:") ->
-                            openAlbum(item.title, "", item.actionUri)
-                    }
-                },
-                onLeave = { onLeaveActivity?.invoke() }
-            )
-            ShellScreen.HISTORY -> ShellHistoryPane(
-                onBackClick = handleBack,
-                onTrackSelect = { track -> actions.onTrackPlay(track) },
-                onTrackOptionsClick = { track -> actions.openTrackOptions(track) },
-                onTrackAddToQueue = handleTrackAddToQueue,
-                todayTracks = historyToday,
-                yesterdayTracks = historyYesterday,
-                earlierTracks = historyEarlier,
-                stats = historyStats,
-                loading = historyLoading,
-                currentTrackTitle = currentTrackTitle,
-                isPlaying = isPlaying
-            )
-            ShellScreen.ADD_TRACKS -> ShellAddTracksPane(
-                targetTitle = active.playlistTitle,
-                songs = addTracksSongs,
-                episodes = addTracksEpisodes,
-                recent = addTracksRecent,
-                liked = addTracksLiked,
-                loading = addTracksLoading,
-                onBack = handleBack,
-                onAdd = { uri -> onAddTrack?.invoke(uri) ?: false }
-            )
-            ShellScreen.BROWSE -> ShellBrowsePane(
-                page = browsePage,
-                fallbackTitle = active.categoryTitle,
-                onBack = handleBack,
-                onOpenBrowse = { uri, title ->
-                    active.categoryTitle = title
-                    onOpenBrowse?.invoke(uri)
-                },
-                onOpenShow = { uri -> onOpenShow?.invoke(uri) },
-                onOpenAlbum = { title, uri -> openAlbum(title, "", uri) },
-                onOpenPlaylist = openPlaylist,
-                onLoadMore = { onLoadMoreBrowse?.invoke() }
-            )
-
-            ShellScreen.SHOW -> ShellShowPane(
-                show = showDetail,
-                loading = showLoading,
-                retryUri = active.showUri,
-                isPlaying = isPlaying,
-                currentTrackTitle = currentTrackTitle,
-                onBack = handleBack,
-                onRetry = { uri -> onOpenShow?.invoke(uri) },
-                onEpisodeClick = openEpisode,
-                onPlayEpisode = { episode ->
-                    playerListener?.onPlayEpisode(episode.uri, active.showUri, episode.video)
-                },
-                onPlayPause = handlePlayPause,
-                onLoadMore = { onLoadMoreEpisodes?.invoke() }
-            )
-
-            ShellScreen.EPISODE -> ShellEpisodePane(
-                episode = episodeDetail,
-                loading = episodeLoading,
-                retryUri = active.episodeUri,
-                isPlaying = isPlaying,
-                isCurrent = playbackState?.trackUri == active.episodeUri,
-                onBack = handleBack,
-                onRetry = { uri -> onOpenEpisode?.invoke(uri) },
-                onPlayPause = handlePlayPause,
-                onPlay = {
-                    val episode = episodeDetail
-                    if (episode != null) {
-                        playerListener?.onPlayEpisode(episode.uri, episode.showUri, episode.video)
-                    }
-                },
-                onShowClick = { uri -> openShow(uri) }
-            )
-
-            ShellScreen.FOLDER -> ShellFolderPane(
-                items = folderItems,
-                loading = folderLoading,
-                title = active.folderTitle.ifBlank { "Your Library" },
-                userDisplayName = userDisplayName,
-                userAvatarUrl = userAvatarUrl,
-                userColorHex = userProfileColorHex,
-                onItemClick = { itemTitle, itemUri ->
-                    val foundItem = folderItems?.find { it.uri == itemUri || it.title == itemTitle }
-                    active.playlistCoverUrl = foundItem?.imageUrl
-                    pushCurrentState()
-                    active.playlistTitle = itemTitle
-                    active.playlistUri = itemUri
-                    currentScreen = ShellScreen.PLAYLIST
-                    if (itemUri.isNotEmpty()) if (onLoadPlaylist != null) onLoadPlaylist?.invoke(itemUri) else playerListener?.onLoadPlaylist(itemUri)
-                },
-                onItemLongPress = handleLibraryLongPress,
-                onFolderClick = handleFolderClick,
-                onProfileClick = openProfileDrawer,
-                onPlusClick = { flags.isCreateSheetOpen = true },
-                onSortClick = { flags.isSortSheetOpen = true },
-                currentSort = currentSortOption,
-                sortDirection = currentSortDirection,
-                onBackClick = { handleBack() },
-                onFolderOptionsClick = {
-                    local.activeFolderOptionsNested = false
-                    activeFolderOptionsItem = LibraryItem(
-                        title = active.folderTitle,
-                        subtitle = "${folderItems?.size ?: 0} playlists",
-                        type = LibraryItemType.FOLDER,
-                        uri = active.folderUri
-                    )
-                },
-                onPlayClick = {
-                    val firstItem = folderItems?.firstOrNull()
-                    if (firstItem != null && firstItem.type == LibraryItemType.PLAYLIST) {
-                        openPlaylist(firstItem.title, firstItem.uri)
-                    }
-                }
-            )
-
-            ShellScreen.PROFILE -> ShellProfilePane(
-                profile = profile,
-                topContent = profileTop,
-                topContentUnavailable = profileTopUnavailable,
-                contexts = profileContexts,
-                loading = profileLoading,
-                loadFailed = profileFailed,
-                onRetry = { onRetryProfile?.invoke() },
-                onBack = handleBack,
-                currentTrackUri = playbackState?.trackUri.orEmpty(),
-                isPlaying = isPlaying,
-                onFollowStatsClick = {
-                    flags.isProfileFollowOpen = true
-                    onLoadProfileFollows?.invoke()
-                },
-                onArtistClick = openArtist,
-                onTrackSelect = { track -> actions.onTrackPlay(track.toTrackItem()) },
-                onTrackOptionsClick = { track -> handleTrackOptions(track.toTrackItem()) },
-                onTrackAddToQueue = { track -> handleTrackAddToQueue(track.toTrackItem()) },
-                onContextClick = { card ->
-                    when {
-                        card.uri.startsWith("spotify:artist:") -> openArtist(card.title, card.uri)
-                        card.uri.startsWith("spotify:album:") -> openAlbum(card.title, "", card.uri)
-                        card.uri.startsWith("spotify:playlist:") -> openPlaylist(card.title, card.uri)
-                    }
-                },
-                contextsTitle = if (profile?.isCurrentUser == false) "Public playlists" else "Recently played",
-                fallbackName = if (profile?.isCurrentUser == false) profile.name else userDisplayName,
-                avatarUrl = when {
-                    profile == null -> userAvatarUrl
-                    profile.isCurrentUser -> profile.avatarUrl.ifBlank { userAvatarUrl }
-                    else -> profile.avatarUrl
-                }
-            )
+                ShellScreen.LIBRARY -> ShellLibraryRoute(
+                    env = routeEnv,
+                    libraryItems = libraryItems,
+                    libraryLoading = libraryLoading,
+                )
+                ShellScreen.PLAYLIST -> ShellPlaylistRoute(
+                    env = routeEnv,
+                    playlistDetail = playlistDetail,
+                    playlistTracks = playlistTracks,
+                    playlistLoading = playlistLoading,
+                    playlistHasMore = playlistHasMore,
+                    playlistLoadingMore = playlistLoadingMore,
+                    onLoadMorePlaylistTracks = onLoadMorePlaylistTracks,
+                    onRetryPlaylist = onRetryPlaylist,
+                    playlistSaved = playlistSaved,
+                    playlistRecommendations = playlistRecommendations,
+                    recommendationsLoading = recommendationsLoading,
+                    onRefreshRecommendations = onRefreshRecommendations,
+                    onAddRecommended = onAddRecommended,
+                    onSavePlaylistOrder = onSavePlaylistOrder,
+                    onEditPlaylistDetails = onEditPlaylistDetails,
+                    onDeletePlaylist = onDeletePlaylist,
+                    onTogglePlaylistSaved = onTogglePlaylistSaved,
+                    playlistPermissions = playlistPermissions,
+                    onLoadPlaylistContributors = onLoadPlaylistContributors,
+                    onPlaylistTrackLikeToggle = onPlaylistTrackLikeToggle,
+                    onEditPlaylist = onEditPlaylist,
+                    onAddTracksOpen = onAddTracksOpen,
+                )
+                ShellScreen.ALBUM -> ShellAlbumRoute(
+                    env = routeEnv,
+                    albumDetail = albumDetail,
+                    albumTracks = albumTracks,
+                    albumLoading = albumLoading,
+                    albumFailed = albumFailed,
+                    albumHasMore = albumHasMore,
+                    albumLoadingMore = albumLoadingMore,
+                    onLoadMoreAlbumTracks = onLoadMoreAlbumTracks,
+                    onRetryAlbum = onRetryAlbum,
+                    onAlbumTrackLikeToggle = onAlbumTrackLikeToggle,
+                )
+                ShellScreen.ARTIST -> ShellArtistRoute(
+                    env = routeEnv,
+                    artistDetail = artistDetail,
+                    artistTracks = artistTracks,
+                    artistReleases = artistReleases,
+                    artistMonthlyListeners = artistMonthlyListeners,
+                    artistLoading = artistLoading,
+                    artistFailed = artistFailed,
+                    onRetryArtist = onRetryArtist,
+                    artistFollowed = artistFollowed,
+                    onArtistFollowToggle = onArtistFollowToggle,
+                    onArtistTrackLikeToggle = onArtistTrackLikeToggle,
+                )
+                ShellScreen.CATEGORY -> ShellCategoryRoute(
+                    env = routeEnv,
+                    categoryShelves = categoryShelves,
+                    homeQuickAccessItems = homeQuickAccessItems,
+                    homeRecommendations = homeRecommendations,
+                    libraryItems = libraryItems,
+                )
+                ShellScreen.SETTINGS -> ShellSettingsRoute(
+                    env = routeEnv,
+                    switches = settingsSwitches,
+                    locks = settingsLocks,
+                    product = settingsProduct,
+                    country = settingsCountry,
+                    loading = settingsLoading,
+                    onToggleSetting = onToggleSetting,
+                    onToggleFullArtwork = onToggleFullArtwork,
+                    onAppIconChange = onAppIconChange,
+                    update = appUpdate,
+                    updateChecking = updateChecking,
+                    updateChecked = updateChecked,
+                    onCheckUpdates = onCheckUpdates,
+                    onLogout = onLogout,
+                )
+                ShellScreen.NOTIFICATIONS -> ShellNotificationsRoute(
+                    env = routeEnv,
+                    notifications = notifications,
+                    loading = notificationsLoading,
+                    loadFailed = notificationsFailed,
+                    onRefresh = onRefreshWhatsNew,
+                    onLoadPlaylist = onLoadPlaylist,
+                    onOpenEpisode = onOpenEpisode,
+                )
+                ShellScreen.ACTIVITY -> ShellActivityRoute(
+                    env = routeEnv,
+                    notifications = activityFeed,
+                    loading = activityLoading,
+                    loadFailed = activityFailed,
+                    self = activitySelf,
+                    onRetry = onRetryActivity,
+                    onLeave = onLeaveActivity,
+                )
+                ShellScreen.HISTORY -> ShellHistoryRoute(
+                    env = routeEnv,
+                    todayTracks = historyToday,
+                    yesterdayTracks = historyYesterday,
+                    earlierTracks = historyEarlier,
+                    stats = historyStats,
+                    loading = historyLoading,
+                )
+                ShellScreen.ADD_TRACKS -> ShellAddTracksRoute(
+                    env = routeEnv,
+                    songs = addTracksSongs,
+                    episodes = addTracksEpisodes,
+                    recent = addTracksRecent,
+                    liked = addTracksLiked,
+                    loading = addTracksLoading,
+                    onAddTrack = onAddTrack,
+                )
+                ShellScreen.BROWSE -> ShellBrowseRoute(
+                    env = routeEnv,
+                    page = browsePage,
+                    onOpenBrowse = onOpenBrowse,
+                    onOpenShow = onOpenShow,
+                    onLoadMore = onLoadMoreBrowse,
+                )
+                ShellScreen.SHOW -> ShellShowRoute(
+                    env = routeEnv,
+                    show = showDetail,
+                    loading = showLoading,
+                    onOpenShow = onOpenShow,
+                    onLoadMore = onLoadMoreEpisodes,
+                )
+                ShellScreen.EPISODE -> ShellEpisodeRoute(
+                    env = routeEnv,
+                    episode = episodeDetail,
+                    loading = episodeLoading,
+                    onOpenEpisode = onOpenEpisode,
+                )
+                ShellScreen.FOLDER -> ShellFolderRoute(
+                    env = routeEnv,
+                    items = folderItems,
+                    loading = folderLoading,
+                    onLoadPlaylist = onLoadPlaylist,
+                )
+                ShellScreen.PROFILE -> ShellProfileRoute(
+                    env = routeEnv,
+                    profile = profile,
+                    topContent = profileTop,
+                    topContentUnavailable = profileTopUnavailable,
+                    contexts = profileContexts,
+                    loading = profileLoading,
+                    loadFailed = profileFailed,
+                    onRetry = onRetryProfile,
+                    onLoadProfileFollows = onLoadProfileFollows,
+                )
         }
         }
 
@@ -1245,7 +983,7 @@ fun EncoreAppShell(
             },
             onShuffle = { if (playerListener != null) playerListener.onShuffleToggle() else localShuffleMode = localShuffleMode.next() },
             onRepeat = { if (playerListener != null) playerListener.onRepeatToggle() else localRepeatMode = localRepeatMode.next() },
-            onSeek = { p -> if (playerListener != null) playerListener.onSeek((p * durationMs).toLong()) else { localProgress = p; localPositionMs = (p * durationMs).toLong() } },
+            onSeek = { p -> if (playerListener != null) playerListener.onSeek((p * durationMs).toLong()) else { local.progress = p; local.positionMs = (p * durationMs).toLong() } },
             onMore = {
                 local.trackForOptions = TrackItem(
                     title = currentTrackTitle,

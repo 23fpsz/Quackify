@@ -12,7 +12,6 @@ import com.quackify.app.bridge.artistUriOf
 import com.quackify.app.bridge.asCommandTrack
 import com.quackify.app.bridge.asTrackItem
 import com.quackify.app.bridge.playingUri
-import com.quackify.app.bridge.progressOf
 import com.quackify.app.bridge.targetFrom
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.components.RepeatMode
@@ -20,6 +19,7 @@ import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.shell.ChapterMarker
 import com.quackify.compose.shell.ComposePlaybackState
 import com.quackify.compose.shell.ComposePlayerListener
+import com.quackify.compose.shell.PlaybackProgress
 import com.quackify.backend.connect.KrespotConnect
 import com.quackify.backend.connect.cluster.ClusterState
 import com.quackify.backend.connect.cluster.ClusterTrack
@@ -59,6 +59,12 @@ import com.quackify.backend.library.TrackSource
 import com.quackify.backend.api.Library
 import android.os.SystemClock
 import org.json.JSONObject
+
+/** Mirrors the seek bar's coarse view of the engine: position and duration only. */
+data class PlaybackProgressSnapshot(
+    val positionMs: Long,
+    val durationMs: Long,
+)
 
 private val log = Logs.of(Logs.Module.BRIDGE)
 
@@ -389,6 +395,11 @@ class PlaybackBridge(private val context: Context) {
     var state by mutableStateOf(ComposePlaybackState())
         private set
 
+    val progress = PlaybackProgress()
+
+    val progressSnapshot: PlaybackProgressSnapshot
+        get() = PlaybackProgressSnapshot(progress.positionMs, progress.durationMs)
+
     var cluster: ClusterState? by mutableStateOf(null)
         private set
 
@@ -422,14 +433,10 @@ class PlaybackBridge(private val context: Context) {
                 log.w("seek $positionMs ignored, $why")
                 return
             }
-            val duration = player.durationMs.takeIf { it > 0L } ?: state.durationMs
+            val duration = player.durationMs.takeIf { it > 0L } ?: progress.durationMs
             val target = if (duration > 0L) positionMs.coerceIn(0L, duration) else positionMs
             log.i("seek $positionMs -> ${target}ms of ${duration}ms")
-            state = state.copy(
-                positionMs = target,
-                durationMs = duration,
-                progress = progressOf(target, duration),
-            )
+            progress.set(target, duration)
             player.seekTo(target)
             scope.launch { publishLocalFromEngine(target) }
         }
@@ -453,8 +460,8 @@ class PlaybackBridge(private val context: Context) {
         }
 
         override fun onSkipSeek(deltaMs: Long) {
-            val duration = player.durationMs.takeIf { it > 0L } ?: state.durationMs
-            val target = (state.positionMs + deltaMs).coerceIn(0L, duration)
+            val duration = player.durationMs.takeIf { it > 0L } ?: progress.durationMs
+            val target = (progress.positionMs + deltaMs).coerceIn(0L, duration)
             onSeek(target)
         }
 
@@ -774,11 +781,11 @@ class PlaybackBridge(private val context: Context) {
                     val engineUri = playing.trackUri
                     val engineOwns = player.hasSource && engineUri.isNotBlank()
                     val local = engineOwns && (waiting == null || engineUri == waiting.uri)
-                    val position = if (engineOwns) playing.positionMs else state.positionMs
+                    val position = if (engineOwns) playing.positionMs else progress.positionMs
                     val duration = if (engineOwns) {
-                        playing.durationMs.takeIf { it > 0L } ?: state.durationMs
+                        playing.durationMs.takeIf { it > 0L } ?: progress.durationMs
                     } else {
-                        state.durationMs
+                        progress.durationMs
                     }
                     val next = state.copy(
                         title = if (local && waiting != null) waiting.name else state.title,
@@ -791,17 +798,14 @@ class PlaybackBridge(private val context: Context) {
                         else state.albumUri,
                         isPlaying = if (engineOwns) playing.playing else state.isPlaying,
                         isBuffering = if (engineOwns) playing.buffering else false,
-                        positionMs = position,
-                        durationMs = duration,
-                        progress = progressOf(position, duration),
                     )
                     val identityChanged = next.trackUri != state.trackUri ||
                         next.title != state.title || next.artist != state.artist ||
                         next.coverUrl != state.coverUrl || next.artistUri != state.artistUri ||
                         next.albumUri != state.albumUri || next.isPlaying != state.isPlaying ||
-                        next.isBuffering != state.isBuffering ||
-                        next.durationMs != state.durationMs
-                    if (!identityChanged && kotlin.math.abs(next.positionMs - state.positionMs) < 400L) {
+                        next.isBuffering != state.isBuffering
+                    progress.set(position, duration)
+                    if (!identityChanged && state == next) {
                         threshold(playing)
                         return@collect
                     }
@@ -860,6 +864,7 @@ class PlaybackBridge(private val context: Context) {
         engineSeen = ""
         cluster = null
         state = ComposePlaybackState()
+        progress.reset()
         scope.cancel()
         hydrateTried.clear()
         machineLearned = ""
@@ -1009,7 +1014,7 @@ class PlaybackBridge(private val context: Context) {
                 return@launch
             }
             val index = cluster?.window()?.indexOfFirst { it.uri == audioUri }?.takeIf { it >= 0 } ?: -1
-            startLocal(row, state.contextUri, index, state.positionMs, playing = state.isPlaying)
+            startLocal(row, state.contextUri, index, progress.positionMs, playing = state.isPlaying)
         }
     }
 
@@ -1520,13 +1525,9 @@ class PlaybackBridge(private val context: Context) {
         }
         rememberRemoteIntent(!playing)
         val at = fresh.positionNow()
-        val duration = fresh.durationMs.takeIf { it > 0L } ?: state.durationMs
-        state = state.copy(
-            isPlaying = !playing,
-            positionMs = at,
-            durationMs = duration,
-            progress = progressOf(at, duration),
-        )
+        val duration = fresh.durationMs.takeIf { it > 0L } ?: progress.durationMs
+        state = state.copy(isPlaying = !playing)
+        progress.set(at, duration)
         delay(SKIP_SETTLE_MS)
         connect.refreshCluster()
     }
@@ -1576,13 +1577,9 @@ class PlaybackBridge(private val context: Context) {
             "skip_prev" -> skipTo(false)
             "seek_to" -> {
                 if (command.seekToMs < 0L || !player.hasSource) return
-                val duration = player.durationMs.takeIf { it > 0L } ?: state.durationMs
+                val duration = player.durationMs.takeIf { it > 0L } ?: progress.durationMs
                 val target = if (duration > 0L) command.seekToMs.coerceIn(0L, duration) else command.seekToMs
-                state = state.copy(
-                    positionMs = target,
-                    durationMs = duration,
-                    progress = progressOf(target, duration),
-                )
+                progress.set(target, duration)
                 player.seekTo(target)
                 publishLocalFromEngine(target)
             }
@@ -1818,7 +1815,7 @@ class PlaybackBridge(private val context: Context) {
         }
         val duration = adoptDuration.takeIf { it > 0L }
             ?: row.durationMs.takeIf { it > 0L }
-            ?: state.durationMs
+            ?: progress.durationMs
         state = state.copy(
             title = row.title,
             artist = row.artistName,
@@ -1828,9 +1825,6 @@ class PlaybackBridge(private val context: Context) {
             albumUri = row.albumUri.ifBlank { state.albumUri.takeIf { state.trackUri == row.uri }.orEmpty() },
             isPlaying = playing,
             isBuffering = playing,
-            positionMs = positionMs,
-            durationMs = duration,
-            progress = progressOf(positionMs, duration),
             contextUri = contextUri,
             controllingRemote = false,
             activeDeviceName = "Quackify",
@@ -1838,6 +1832,7 @@ class PlaybackBridge(private val context: Context) {
             connectedDevice = "Quackify",
             devices = state.devices.map { it.copy(active = it.id == deviceId) },
         )
+        progress.set(positionMs, duration)
         if (startEngine) {
             player.play(row.asCommandTrack(), connect.spclientHost, positionMs)
             if (!playing) player.pause()
@@ -1905,7 +1900,7 @@ class PlaybackBridge(private val context: Context) {
         val duration = player.durationForItem(uri).takeIf { it > 0L }
             ?: player.durationMs.takeIf { it > 0L }
             ?: row.durationMs
-        state = state.copy(positionMs = 0L, durationMs = duration, progress = progressOf(0L, duration))
+        progress.set(0L, duration)
         publishLocalFromEngine(0L, true)
         val snapshot = Snapshot.of(
             command,
@@ -1998,7 +1993,7 @@ class PlaybackBridge(private val context: Context) {
             albumTitle = "",
             albumUri = shown?.albumUri?.takeIf { it.isNotBlank() }.orEmpty(),
             durationMs = shown?.durationMs?.takeIf { it > 0L }
-                ?: state.durationMs.takeIf { it > 0L } ?: 0L,
+                ?: progress.durationMs.takeIf { it > 0L } ?: 0L,
             explicit = shown?.isExplicit ?: false,
             creativeId = "",
         )
@@ -2113,7 +2108,7 @@ class PlaybackBridge(private val context: Context) {
         TrackUid.learn(command)
         val loaded = player.state.value.trackUri
         val moved = command.seekToMs >= 0L
-        val position = if (moved) command.seekToMs else state.positionMs
+        val position = if (moved) command.seekToMs else progress.positionMs
         val nextArtistUri = if (track.uri != state.trackUri) artistUriOf(track.uri) else state.artistUri
         val nextAlbumUri = if (track.uri != state.trackUri) albumUriOf(track.uri) else state.albumUri
         state = state.copy(
@@ -2131,9 +2126,8 @@ class PlaybackBridge(private val context: Context) {
             activeDeviceId = deviceId,
             connectedDevice = "Quackify",
             devices = state.devices.map { it.copy(active = it.id == deviceId) },
-            positionMs = position,
-            progress = progressOf(position, state.durationMs),
         )
+        progress.set(position, progress.durationMs)
         val from = command.startAtMs
         if (loaded == track.uri) {
             val at = if (moved) from else player.positionMs
@@ -2266,9 +2260,8 @@ class PlaybackBridge(private val context: Context) {
                 trackUri = row.uri,
                 artistUri = row.artistUri,
                 albumUri = row.albumUri,
-                positionMs = 0L,
-                progress = 0f,
             )
+            progress.set(0L, progress.durationMs)
             return
         }
         log.i("skip: the server has no say here, starting '${row.title}' on this phone")
@@ -2561,7 +2554,7 @@ class PlaybackBridge(private val context: Context) {
         val track = held ?: return
         held = null
         log.w("held '${track.name}' never reached the engine, showing it anyway")
-        val duration = track.durationMs.takeIf { it > 0L } ?: state.durationMs
+        val duration = track.durationMs.takeIf { it > 0L } ?: progress.durationMs
         state = state.copy(
             title = track.name,
             artist = track.artists,
@@ -2569,10 +2562,8 @@ class PlaybackBridge(private val context: Context) {
             trackUri = track.uri,
             isPlaying = false,
             isBuffering = false,
-            positionMs = 0L,
-            durationMs = duration,
-            progress = 0f,
         )
+        progress.set(0L, duration)
     }
 
     private suspend fun settleCluster(uri: String, index: Int) {
@@ -2597,14 +2588,10 @@ class PlaybackBridge(private val context: Context) {
             log.w("seek $positionMs ignored, the cluster disallows seeking")
             return
         }
-        val duration = cluster.durationMs.takeIf { it > 0L } ?: state.durationMs
+        val duration = cluster.durationMs.takeIf { it > 0L } ?: progress.durationMs
         val target = if (duration > 0L) positionMs.coerceIn(0L, duration) else positionMs
         log.i("seek $positionMs -> ${target}ms on '${active.name}'")
-        state = state.copy(
-            positionMs = target,
-            durationMs = duration,
-            progress = progressOf(target, duration),
-        )
+        progress.set(target, duration)
         if (!connect.seekOn(active.id, target)) {
             log.w("seek: '${active.name}' refused it")
             return
@@ -2633,14 +2620,11 @@ class PlaybackBridge(private val context: Context) {
     private fun advanceRemote() {
         if (!state.controllingRemote || !state.isPlaying) return
         if (player.hasSource) return
-        val duration = state.durationMs
+        val duration = progress.durationMs
         if (duration <= 0L) return
-        val next = (state.positionMs + REMOTE_TICK_MS).coerceAtMost(duration)
-        if (next == state.positionMs) return
-        state = state.copy(
-            positionMs = next,
-            progress = progressOf(next, duration),
-        )
+        val next = (progress.positionMs + REMOTE_TICK_MS).coerceAtMost(duration)
+        if (next == progress.positionMs) return
+        progress.set(next, duration)
     }
 
     /**
@@ -2682,9 +2666,8 @@ class PlaybackBridge(private val context: Context) {
                 trackUri = uri,
                 isPlaying = if (player.hasSource) player.isPlaying else cluster.isPlaying,
                 isBuffering = false,
-                positionMs = cluster.positionMs,
-                durationMs = cluster.durationMs.takeIf { it > 0L } ?: state.durationMs,
             )
+            progress.set(cluster.positionMs, cluster.durationMs)
             return
         }
         hydrateTried += uri
@@ -2757,28 +2740,26 @@ class PlaybackBridge(private val context: Context) {
                 state = state.copy(isPlaying = player.isPlaying, isBuffering = false)
             }
             if (remoteNow) {
-                val duration = cluster.durationMs.takeIf { it > 0L } ?: state.durationMs
+                val duration = cluster.durationMs.takeIf { it > 0L } ?: progress.durationMs
                 val changed = cluster.track.uri != state.trackUri
                 val intent = remoteIntent()
                 val effPlaying = intent ?: cluster.isPlaying
                 val live = when {
-                    intent != null && intent != cluster.isPlaying -> state.positionMs
+                    intent != null && intent != cluster.isPlaying -> progress.positionMs
                     intent == false -> cluster.positionMs
                     else -> cluster.positionNow()
                 }
                 val resync = changed || state.isPlaying != effPlaying ||
-                        kotlin.math.abs(live - state.positionMs) > RESYNC_MS
-                val position = if (resync) live else state.positionMs
+                        kotlin.math.abs(live - progress.positionMs) > RESYNC_MS
+                val position = if (resync) live else progress.positionMs
                 state = state.copy(
                     title = if (changed) "" else state.title,
                     artist = if (changed) "" else state.artist,
                     coverUrl = if (changed) "" else state.coverUrl,
                     trackUri = cluster.track.uri,
                     isPlaying = effPlaying,
-                    positionMs = position,
-                    durationMs = duration,
-                    progress = progressOf(position, duration),
                 )
+                progress.set(position, duration)
             }
             return
         }
@@ -2858,8 +2839,8 @@ class PlaybackBridge(private val context: Context) {
             cluster.isPlaying
         }
         val position = when {
-            local -> state.positionMs
-            intent != null && intent != cluster.isPlaying -> state.positionMs
+            local -> progress.positionMs
+            intent != null && intent != cluster.isPlaying -> progress.positionMs
             followPlaying -> cluster.positionNow()
             else -> cluster.positionMs
         }
@@ -2875,13 +2856,11 @@ class PlaybackBridge(private val context: Context) {
                 .ifBlank { artistUriOf(cluster.track.uri) },
             isPlaying = if (local) player.isPlaying else (intent ?: followPlaying),
             isBuffering = if (local) player.state.value.buffering else false,
-            positionMs = position,
-            durationMs = duration,
-            progress = progressOf(position, duration),
             explicit = if (sameTrack) state.explicit else cluster.track.explicit,
             contextUri = cluster.contextUri,
             contextLabel = contextLabelOf(cluster),
         )
+        progress.set(position, duration)
         watchForVanishedActive(cluster)
         refreshVideoFlags()
     }
@@ -3427,9 +3406,9 @@ class PlaybackBridge(private val context: Context) {
         } else {
             cluster?.takeIf { it.track.uri == track.uri }?.positionMs
                 ?: command.currentState?.initialPositionMs
-                ?: state.positionMs
+                ?: progress.positionMs
         }
-        val duration = track.durationMs.takeIf { it > 0L } ?: state.durationMs
+        val duration = track.durationMs.takeIf { it > 0L } ?: progress.durationMs
         val nextArtistUri = if (track.uri != state.trackUri) artistUriOf(track.uri) else state.artistUri
         val nextAlbumUri = if (track.uri != state.trackUri) albumUriOf(track.uri) else state.albumUri
         state = state.copy(
@@ -3441,13 +3420,11 @@ class PlaybackBridge(private val context: Context) {
             albumUri = nextAlbumUri,
             isPlaying = if (local) player.isPlaying else !command.paused,
             isBuffering = if (local) player.state.value.buffering else false,
-            positionMs = position,
-            durationMs = duration,
-            progress = progressOf(position, duration),
             explicit = track.explicit,
             contextUri = track.contextUri.ifBlank { state.contextUri },
             contextLabel = command.contextDescription.trim(),
         )
+        progress.set(position, duration)
     }
 
     /**
