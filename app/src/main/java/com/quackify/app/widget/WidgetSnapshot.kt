@@ -3,6 +3,7 @@ package com.quackify.app.widget
 import android.content.Context
 import com.quackify.backend.core.store.AppPrefs
 import com.quackify.compose.shell.ComposePlaybackState
+import com.quackify.compose.shell.PlaybackProgress
 
 data class WidgetSnapshot(
     val title: String = "",
@@ -27,15 +28,15 @@ data class WidgetSnapshot(
         "$trackUri|$title|$artist|$coverUrl|$isPlaying|$isLiked|${durationMs}|${positionMs / 5000L}"
 
     companion object {
-        fun from(state: ComposePlaybackState): WidgetSnapshot = WidgetSnapshot(
+        fun from(state: ComposePlaybackState, progress: PlaybackProgress): WidgetSnapshot = WidgetSnapshot(
             title = state.title,
             artist = state.artist,
             coverUrl = state.coverUrl,
             trackUri = state.trackUri,
             isPlaying = state.isPlaying,
             isLiked = state.isLiked,
-            positionMs = state.positionMs,
-            durationMs = state.durationMs,
+            positionMs = progress.positionMs,
+            durationMs = progress.durationMs,
         )
     }
 }

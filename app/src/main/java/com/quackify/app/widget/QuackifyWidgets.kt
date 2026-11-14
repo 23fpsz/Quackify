@@ -64,7 +64,7 @@ internal object WidgetColors {
     val placeholderIcon = Color(0xFF8D8D8D)
 }
 
-internal enum class WidgetVariant(val cornerRadius: Dp, val padding: Dp) {
+enum class WidgetVariant(val cornerRadius: Dp, val padding: Dp) {
     COMPACT(cornerRadius = 16.dp, padding = 8.dp),
     MEDIUM(cornerRadius = 20.dp, padding = 12.dp),
     LARGE(cornerRadius = 24.dp, padding = 14.dp),
@@ -76,8 +76,9 @@ abstract class QuackifyWidget(private val variant: WidgetVariant) : GlanceAppWid
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val appContext = context.applicationContext
-        val live = PlaybackHost.bridge?.state
-            ?.let(WidgetSnapshot::from)
+        val bridge = PlaybackHost.bridge
+        val live = bridge
+            ?.let { WidgetSnapshot.from(it.state, it.progress) }
             ?.takeIf { it.hasTrack }
         val snapshot = live ?: WidgetSnapshotStore.load(appContext)
         val options = WidgetOptionsStore.load(appContext)

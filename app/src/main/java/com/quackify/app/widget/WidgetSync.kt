@@ -1,6 +1,7 @@
 package com.quackify.app.widget
 
 import android.content.Context
+import androidx.glance.appwidget.updateAll
 import com.quackify.app.PlaybackHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,7 @@ object WidgetSync {
                     delay(IDLE_INTERVAL_MS)
                     continue
                 }
-                val snapshot = WidgetSnapshot.from(bridge.state)
+                val snapshot = WidgetSnapshot.from(bridge.state, bridge.progress)
                 if (snapshot.fingerprint() != last?.fingerprint()) {
                     last = snapshot
                     WidgetSnapshotStore.save(app, snapshot)
