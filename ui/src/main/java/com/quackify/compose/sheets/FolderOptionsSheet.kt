@@ -36,6 +36,7 @@ import com.quackify.compose.theme.EncoreTheme
  * Matches Screenshot 3:
  * - Header: Folder Icon in square + Folder Title + "X playlists"
  * - Thin divider
+ * - Pin to top / Unpin from top
  * - Move to folder
  * - Rename folder
  * - Move to Your Library
@@ -48,6 +49,9 @@ fun FolderOptionsSheet(
     folderTitle: String,
     playlistSubtitle: String,
     isNested: Boolean,
+    isPinned: Boolean = false,
+    canPin: Boolean = false,
+    onPinToggle: () -> Unit = {},
     onMoveToFolder: () -> Unit,
     onRenameFolder: () -> Unit,
     onMoveToLibrary: () -> Unit,
@@ -129,6 +133,17 @@ fun FolderOptionsSheet(
                 thickness = 0.5.dp,
                 color = Color.White.copy(alpha = 0.12f)
             )
+
+            if (canPin) {
+                FolderActionItem(
+                    title = if (isPinned) "Unpin from top" else "Pin to top",
+                    iconRes = R.drawable.encore_icon_pin_24,
+                    onClick = {
+                        onDismiss()
+                        onPinToggle()
+                    }
+                )
+            }
 
             FolderActionItem(
                 title = "Move to folder",

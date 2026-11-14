@@ -37,7 +37,9 @@ data class EntityOptions(
     val title: String,
     val subtitle: String = "",
     val imageUrl: String? = null,
-    val uri: String = ""
+    val uri: String = "",
+    val pinned: Boolean = false,
+    val pinnable: Boolean = false,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,6 +52,9 @@ fun EntityOptionsSheet(
     onShare: () -> Unit = {},
     canEditPlaylist: Boolean = false,
     onEditPlaylist: () -> Unit = {},
+    canPin: Boolean = false,
+    isPinned: Boolean = false,
+    onPinToggle: () -> Unit = {},
     isSaved: Boolean? = null,
     onSaveToggle: () -> Unit = {},
     canMoveToFolder: Boolean = false,
@@ -137,6 +142,17 @@ fun EntityOptionsSheet(
                     onDismiss()
                     onAddToPlaylist()
                 }
+            }
+
+            if (canPin) {
+                EntityRow(
+                    title = if (isPinned) "Unpin from top" else "Pin to top",
+                    iconRes = R.drawable.encore_icon_pin_24,
+                    onClick = {
+                        onDismiss()
+                        onPinToggle()
+                    }
+                )
             }
 
             if (isSaved != null) {

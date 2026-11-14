@@ -698,6 +698,8 @@ class MainActivity : ComponentActivity() {
                     },
                     uri = item.uri,
                     imageUrl = item.imageUrl.takeIf { it.isNotBlank() },
+                    isPinned = item.pinned,
+                    isPinnable = item.pinnable,
                 )
             }
             editableUris = Krespot.playlists.editable(context, "").map { it.uri }.toSet()
@@ -725,6 +727,8 @@ class MainActivity : ComponentActivity() {
                                     },
                                     uri = item.uri,
                                     imageUrl = item.imageUrl.takeIf { it.isNotBlank() },
+                                    isPinned = item.pinned,
+                                    isPinnable = item.pinnable,
                                 )
                             }
                         }
@@ -1094,6 +1098,18 @@ class MainActivity : ComponentActivity() {
             Library.setSaved(applicationContext, listOf(uri), false)
         }
         log.i("remove '$uri' from library ok=$ok")
+    }
+
+    private suspend fun setLibraryItemPinned(uri: String, pinned: Boolean) {
+        val ok = Krespot.library.setPinned(applicationContext, uri, pinned)
+        log.i("pin '$uri' -> $pinned ok=$ok")
+        if (!ok) {
+            Toast.makeText(
+                applicationContext,
+                "Couldn't update the pin",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private suspend fun renameFolder(uri: String, name: String) {
@@ -1550,6 +1566,9 @@ class MainActivity : ComponentActivity() {
         },
         onRemoveLibraryItem = { uri ->
             scope.launch { removeFromLibrary(uri) }
+        },
+        onSetLibraryItemPinned = { uri, pinned ->
+            scope.launch { setLibraryItemPinned(uri, pinned) }
         },
         onCreateFolder = { name ->
             val uri = Krespot.folders.createFolder(context, name)

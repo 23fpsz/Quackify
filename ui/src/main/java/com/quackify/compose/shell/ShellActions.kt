@@ -106,6 +106,8 @@ internal class ShellActions(
                 subtitle = item.subtitle,
                 imageUrl = item.imageUrl,
                 uri = item.uri,
+                pinned = item.isPinned,
+                pinnable = item.isPinnable,
             )
         }
     }

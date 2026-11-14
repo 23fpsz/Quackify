@@ -75,6 +75,7 @@ data class LibraryItem(
     val subtitle: String,
     val type: LibraryItemType,
     val isPinned: Boolean = false,
+    val isPinnable: Boolean = false,
     val isDownloaded: Boolean = false,
     val uri: String = "",
     val imageUrl: String? = null,
@@ -170,6 +171,7 @@ fun EncoreLibraryScreen(
                 }
             }
         }
+        result = result.sortedBy { !it.isPinned }
         result
     }
 
@@ -558,6 +560,24 @@ fun EncoreLibraryScreen(
                                     fontSize = 28.sp,
                                     color = Color.White
                                 )
+                            }
+                            if (item.isPinned) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(6.dp)
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xCC000000)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.encore_icon_pin_24),
+                                        contentDescription = "Pinned",
+                                        tint = EncoreColors.Green,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
                             }
                         }
 

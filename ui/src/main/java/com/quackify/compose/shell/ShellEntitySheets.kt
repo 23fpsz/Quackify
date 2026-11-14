@@ -28,6 +28,7 @@ internal fun ShellEntitySheets(
     folderItems: List<LibraryItem>?,
     onEditPlaylist: ((String) -> Unit)?,
     onRemoveLibraryItem: ((String) -> Unit)?,
+    onSetLibraryItemPinned: ((String, Boolean) -> Unit)?,
     onDeletePlaylist: (suspend (String) -> Boolean)?,
     onMoveToFolder: ((String, String) -> Unit)?,
     onCreateFolder: (suspend (String) -> String?)?,
@@ -48,6 +49,9 @@ internal fun ShellEntitySheets(
             onDismiss = { local.libraryItemOptions = null },
             canEditPlaylist = editable,
             onEditPlaylist = { onEditPlaylist?.invoke(entity.uri) },
+            canPin = entity.pinnable,
+            isPinned = entity.pinned,
+            onPinToggle = { onSetLibraryItemPinned?.invoke(entity.uri, !entity.pinned) },
             isSaved = if (removable) true else null,
             onSaveToggle = { if (removable) onRemoveLibraryItem?.invoke(entity.uri) },
             canMoveToFolder = entity.uri.startsWith("spotify:playlist:"),
@@ -139,6 +143,9 @@ internal fun ShellEntitySheets(
             folderTitle = folderItem.title,
             playlistSubtitle = folderItem.subtitle.ifBlank { "0 playlists" },
             isNested = local.activeFolderOptionsNested,
+            isPinned = folderItem.isPinned,
+            canPin = folderItem.isPinnable,
+            onPinToggle = { onSetLibraryItemPinned?.invoke(folderItem.uri, !folderItem.isPinned) },
             onMoveToFolder = {
                 val targetUri = folderItem.uri
                 val targetTitle = folderItem.title
