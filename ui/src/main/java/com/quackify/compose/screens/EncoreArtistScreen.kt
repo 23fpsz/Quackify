@@ -63,6 +63,7 @@ import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.ShimmerBlock
 import com.quackify.compose.components.ShimmerHost
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.components.SwipeToQueueBox
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.playlist.TrackItem
@@ -116,6 +117,7 @@ fun EncoreArtistScreen(
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onTrackLikeToggle: (TrackItem) -> Unit = {},
+    onTrackAddToQueue: ((TrackItem) -> Unit)? = null,
     onArtistOptionsClick: () -> Unit = {},
     onReleaseClick: (ArtistRelease) -> Unit = {},
     onAboutClick: () -> Unit = {},
@@ -441,6 +443,9 @@ fun EncoreArtistScreen(
             itemsIndexed(popularTracks) { index, popTrack ->
                 val track = popTrack.track
                 val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
+                SwipeToQueueBox(
+                    onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(track) } }
+                ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -528,6 +533,7 @@ fun EncoreArtistScreen(
                         size = 32.dp,
                         iconSize = 18.dp
                     )
+                }
                 }
             }
 

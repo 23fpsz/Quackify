@@ -36,6 +36,7 @@ internal fun ShellEntitySheets(
     onEditPlaylistDetails: (suspend (String, String, String, ByteArray?, Boolean) -> Boolean)?,
     onCopyEntityLink: (String) -> Unit,
     onShareEntity: (String) -> Unit,
+    onQueueAdd: (String) -> Unit,
     playerListener: ComposePlayerListener?,
 ) {
     local.libraryItemOptions?.let { entity ->
@@ -76,15 +77,15 @@ internal fun ShellEntitySheets(
             onCopyLink = { onCopyEntityLink(entity.uri) },
             onAddToQueue = when {
                 entity.uri.startsWith("spotify:episode:") -> {
-                    { playerListener?.onQueueAdd(entity.uri) }
+                    { onQueueAdd(entity.uri) }
                 }
                 entity.uri.startsWith("spotify:album:") -> {
                     {
                         val rows = albumTracks.orEmpty()
                         if (rows.isEmpty()) {
-                            playerListener?.onQueueAdd(entity.uri)
+                            onQueueAdd(entity.uri)
                         } else {
-                            rows.forEach { row -> playerListener?.onQueueAdd(row.uri) }
+                            rows.forEach { row -> onQueueAdd(row.uri) }
                         }
                     }
                 }

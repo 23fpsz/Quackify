@@ -65,6 +65,7 @@ import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.components.SwipeToQueueBox
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.ShimmerBlock
 import com.quackify.compose.components.ShimmerHost
@@ -112,6 +113,7 @@ fun EncoreAlbumScreen(
     onTrackSelect: (TrackItem) -> Unit = {},
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onTrackLikeToggle: (TrackItem) -> Unit = {},
+    onTrackAddToQueue: ((TrackItem) -> Unit)? = null,
     onAlbumOptionsClick: () -> Unit = {},
     onArtistClick: (String) -> Unit = {},
     onAlbumClick: (ArtistRelease) -> Unit = {},
@@ -489,7 +491,8 @@ fun EncoreAlbumScreen(
                             isPlaying = isCurrentTrack && isPlaying,
                             onClick = { onTrackSelect(track) },
                             onMoreClick = { onTrackOptionsClick(track) },
-                            onLikeToggle = { onTrackLikeToggle(track) }
+                            onLikeToggle = { onTrackLikeToggle(track) },
+                            onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(track) } }
                         )
                     }
                 }
@@ -518,7 +521,8 @@ fun EncoreAlbumScreen(
                         isPlaying = isCurrentTrack && isPlaying,
                         onClick = { onTrackSelect(track) },
                         onMoreClick = { onTrackOptionsClick(track) },
-                        onLikeToggle = { onTrackLikeToggle(track) }
+                        onLikeToggle = { onTrackLikeToggle(track) },
+                        onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(track) } }
                     )
                 }
             }
@@ -751,10 +755,15 @@ private fun AlbumTrackRow(
     onClick: () -> Unit,
     onMoreClick: () -> Unit,
     onLikeToggle: () -> Unit = {},
+    onAddToQueue: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    SwipeToQueueBox(
+        onAddToQueue = onAddToQueue,
         modifier = modifier
+    ) {
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
             .clickable(onClick = onClick)
@@ -829,6 +838,7 @@ private fun AlbumTrackRow(
             size = 36.dp,
             iconSize = 20.dp
         )
+    }
     }
 }
 
