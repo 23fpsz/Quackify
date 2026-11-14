@@ -252,6 +252,7 @@ internal class ShellLocalState {
     var device by mutableStateOf("")
     var trackForOptions by mutableStateOf<TrackItem?>(null)
     var trackTasteExcluded by mutableStateOf<Boolean?>(null)
+    var trackOptionsSaved by mutableStateOf<Boolean?>(null)
     var sortOption by mutableStateOf(LibrarySortOption.RECENTS)
     var sortDirection by mutableStateOf(SortDirection.DESCENDING)
     var playbackOrigin by mutableStateOf<PlaybackOrigin?>(null)

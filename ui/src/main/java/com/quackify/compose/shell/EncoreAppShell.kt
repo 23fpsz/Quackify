@@ -55,6 +55,7 @@ import com.quackify.compose.sheets.EntityOptions
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.rememberBottomPadding
 import com.quackify.backend.api.Collection2
+import com.quackify.backend.api.Library
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
@@ -335,6 +336,7 @@ fun EncoreAppShell(
     }
 
     var trackTasteExcluded by local::trackTasteExcluded
+    var trackOptionsSaved by local::trackOptionsSaved
     val tasteExclusionCache = remember { mutableMapOf<String, Boolean>() }
     var currentSortOption by local::sortOption
     var currentSortDirection by local::sortDirection
@@ -389,14 +391,24 @@ fun EncoreAppShell(
         val uri = selectedTrackForOptions?.uri.orEmpty()
         if (!flags.isTrackOptionsOpen || !uri.startsWith("spotify:track:")) {
             trackTasteExcluded = null
+            trackOptionsSaved = null
             return@LaunchedEffect
         }
         trackTasteExcluded = tasteExclusionCache[uri]
+        trackOptionsSaved = null
         if (trackTasteExcluded == null) {
             val excluded = Collection2.excludedFromTasteProfile(context, uri)
             if (uri == selectedTrackForOptions?.uri) {
                 tasteExclusionCache[uri] = excluded
                 trackTasteExcluded = excluded
+            }
+        }
+        if (uri == playbackState?.trackUri) {
+            trackOptionsSaved = playbackState?.isLiked
+        } else {
+            val saved = Library.saved(context, listOf(uri))
+            if (uri == selectedTrackForOptions?.uri) {
+                trackOptionsSaved = uri in saved
             }
         }
     }
@@ -1397,7 +1409,26 @@ fun EncoreAppShell(
             },
             onSettings = handleOpenSettings,
             onLogout = { onLogout?.invoke() },
-            onLikeToggle = { liked -> if (playerListener != null) playerListener.onLikeToggle() else local.isLiked = liked },
+            onLikeToggle = { liked ->
+                val uri = local.trackForOptions?.uri.orEmpty()
+                when {
+                    uri.isNotBlank() && uri == playbackState?.trackUri && playerListener != null ->
+                        if (playbackState?.isLiked != liked) playerListener.onLikeToggle()
+                    uri.startsWith("spotify:track:") -> {
+                        local.trackForOptions = local.trackForOptions?.copy(saved = liked)
+                        local.trackOptionsSaved = liked
+                        shellScope.launch {
+                            val ok = Library.setSaved(context, listOf(uri), liked)
+                            if (!ok && uri == local.trackForOptions?.uri) {
+                                local.trackForOptions = local.trackForOptions?.copy(saved = !liked)
+                                local.trackOptionsSaved = !liked
+                            }
+                        }
+                    }
+                    playerListener != null -> playerListener.onLikeToggle()
+                    else -> local.isLiked = liked
+                }
+            },
             onAddToQueue = { track -> handleQueueAdd(track.uri) },
             onViewArtist = { artist, uri ->
                 flags.isTrackOptionsOpen = false
@@ -1427,6 +1458,7 @@ fun EncoreAppShell(
             onVolumeChange = { id, level -> playerListener?.onVolumeChange(id, level) },
             userQueue = playbackState?.queue.orEmpty(),
             trackTasteExcluded = trackTasteExcluded,
+            trackSavedOverride = trackOptionsSaved,
             onToggleTasteExclusion = toggle@{ exclude ->
                 val track = local.trackForOptions
                 val uri = track?.uri.orEmpty()

@@ -27,6 +27,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +66,8 @@ fun TrackOptionsSheet(
     isOpen: Boolean,
     onDismiss: () -> Unit,
     onLikeToggle: (Boolean) -> Unit = {},
+    /** Fresh library state for [track]; null while it is still loading. */
+    savedOverride: Boolean? = null,
     onAddToPlaylist: () -> Unit = {},
     onAddToQueue: () -> Unit = {},
     canAddToQueue: Boolean = true,
@@ -91,6 +94,10 @@ fun TrackOptionsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var isLiked by remember(track) { mutableStateOf(track.saved ?: false) }
     var isHeartPopping by remember { mutableStateOf(false) }
+
+    LaunchedEffect(savedOverride) {
+        savedOverride?.let { isLiked = it }
+    }
 
     val heartScale by animateFloatAsState(
         targetValue = if (isHeartPopping) 1.25f else 1f,
