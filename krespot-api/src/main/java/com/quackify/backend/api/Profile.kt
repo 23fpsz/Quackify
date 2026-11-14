@@ -140,9 +140,6 @@ object Profile {
             variables.put("userUri", target)
         }
         val data = Pathfinder.queryPost(context, token, OP_TOP_CONTENT, variables.toString()) ?: return null
-        // The self variant nests under data.me.profile. When another user is
-        // requested, `me` (by definition the signed-in user) must never be
-        // accepted — otherwise our own taste would leak onto their profile.
         val dataNode = data.optJSONObject("data") ?: return null
         val profile = if (target == null) {
             dataNode.optJSONObject("me")?.optJSONObject("profile")

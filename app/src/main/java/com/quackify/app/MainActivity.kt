@@ -440,10 +440,6 @@ class MainActivity : ComponentActivity() {
                                     val recentJob = async { runCatching { Profile.recentlyPlayed(context) }.getOrNull() }
                                     topJob.await() to recentJob.await()
                                 } else {
-                                    // Their public top content, not ours: when the query
-                                    // has nothing to say (private profile / no listening
-                                    // data) the screen explains that instead of falling
-                                    // back to the signed-in user's taste.
                                     val topJob = async {
                                         runCatching { Profile.topContent(context, target) }.getOrNull()
                                     }
@@ -789,10 +785,6 @@ class MainActivity : ComponentActivity() {
                             playStats = PlayStats.snapshot(context)
                         }
 
-                        // Older history rows were recorded without album info, so "Go to
-                        // album" from the history menu had nothing to open. Backfill the
-                        // album uri/name (and cover when missing); every uri is attempted
-                        // once so a dead network does not loop this effect.
                         val historyAlbumAttempts = remember { mutableSetOf<String>() }
                         LaunchedEffect(playHistory) {
                             val missing = playHistory

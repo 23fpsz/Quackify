@@ -95,7 +95,6 @@ fun EncoreProfileScreen(
     contextsTitle: String = "Recently played",
     fallbackName: String = "",
     avatarUrl: String = "",
-    /** Viewing someone else whose top artists/tracks are private or empty. */
     topContentUnavailable: Boolean = false,
     modifier: Modifier = Modifier
 ) {

@@ -263,17 +263,14 @@ fun EncoreAppShell(
     artistTracks: List<PopularTrack>? = null,
     artistReleases: List<ArtistRelease>? = null,
     artistMonthlyListeners: String? = null,
-    /** null while the library contains-check for the open artist is loading. */
     artistFollowed: Boolean? = null,
     onArtistFollowToggle: ((artistUri: String, follow: Boolean) -> Unit)? = null,
     onArtistTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     onAlbumTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     onPlaylistTrackLikeToggle: ((TrackItem) -> Unit)? = null,
-    /** Resolves the artist's radio playlist uri (null when it cannot be built). */
     onArtistRadio: (suspend (artistUri: String) -> String?)? = null,
     profile: UserProfile? = null,
     profileTop: ProfileTopContent? = null,
-    /** True when viewing someone else and their top artists/tracks are private or empty. */
     profileTopUnavailable: Boolean = false,
     profileContexts: List<ProfileContextCard> = emptyList(),
     profileLoading: Boolean = false,
