@@ -1,84 +1,61 @@
 package com.quackify.compose.shell
 
-import com.quackify.compose.sheets.EncoreCreateNameDialog
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.quackify.backend.api.Collection2
+import com.quackify.backend.api.Library
+import com.quackify.backend.model.AlbumDetail
+import com.quackify.backend.model.ArtistDetail
+import com.quackify.backend.model.BrowseCard
+import com.quackify.backend.model.BrowsePage
+import com.quackify.backend.model.CollectionDetail
+import com.quackify.backend.model.Credits
+import com.quackify.backend.model.EpisodeDetail
+import com.quackify.backend.model.HomeChip
+import com.quackify.backend.model.PlaylistChoice
+import com.quackify.backend.model.PlaylistPermissions
+import com.quackify.backend.model.ProfileTopContent
+import com.quackify.backend.model.ProfileUser
+import com.quackify.backend.model.SearchHit
+import com.quackify.backend.model.SearchKind
+import com.quackify.backend.model.SearchResults
+import com.quackify.backend.model.ShowDetail
+import com.quackify.backend.model.UserProfile
 import com.quackify.compose.R
-import com.quackify.compose.components.RepeatMode
-import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.components.SpotifyToastHost
 import com.quackify.compose.components.SpotifyToastState
+import com.quackify.compose.home.HomeShelf
 import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.home.RecommendationCard
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.library.LibraryItemType
-import com.quackify.compose.library.EncoreLibraryScreen
-import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.player.TimeSyncedLyric
-import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.AppUpdate
+import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.screens.CategoryShelf
+import com.quackify.compose.screens.EncoreNotification
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.PopularTrack
-import com.quackify.compose.screens.SettingsSwitches
+import com.quackify.compose.screens.ProfileContextCard
 import com.quackify.compose.screens.SettingsLocks
-import com.quackify.compose.screens.EncoreCategoryScreen
-import com.quackify.compose.screens.CategoryShelf
-import com.quackify.compose.screens.getCategoryColor
+import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.search.SearchHistoryItem
-import com.quackify.compose.sheets.ArtistAboutSheet
-import com.quackify.compose.sheets.DiscographySheet
-import com.quackify.compose.share.Share
-import com.quackify.compose.sheets.CreditsSheet
-import com.quackify.compose.sheets.AddToPlaylistSheet
-import com.quackify.compose.sheets.ProfileFollowSheet
-import com.quackify.compose.sheets.PlaylistContributorsSheet
-import com.quackify.compose.sheets.EntityOptions
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.rememberBottomPadding
-import com.quackify.backend.api.Collection2
-import com.quackify.backend.api.Library
-import com.quackify.backend.model.CollectionDetail
-import com.quackify.backend.model.AlbumDetail
-import com.quackify.backend.model.ArtistDetail
-import com.quackify.backend.model.Credits
-import com.quackify.backend.model.PlaylistChoice
-import com.quackify.backend.model.SearchHit
-import com.quackify.backend.model.SearchKind
-import com.quackify.backend.model.SearchResults
-import com.quackify.backend.model.BrowseCard
-import com.quackify.backend.model.BrowsePage
-import com.quackify.backend.model.HomeChip
-import com.quackify.backend.model.ProfileTopContent
-import com.quackify.backend.model.ProfileUser
-import com.quackify.backend.model.PlaylistPermissions
-import com.quackify.backend.model.UserProfile
-import com.quackify.backend.model.EpisodeDetail
-import com.quackify.backend.model.ShowDetail
-import com.quackify.compose.screens.EncoreNotification
-import com.quackify.compose.screens.ProfileContextCard
-import com.quackify.compose.screens.toTrackItem
-import com.quackify.compose.util.rememberDominantColor
-import com.quackify.compose.format.formatCount
-import com.quackify.compose.home.HomeShelf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -307,7 +284,21 @@ fun EncoreAppShell(
     val onLeaveActivity = activityState?.onLeave
     val onProfileDrawerOpened = activityState?.onDrawerOpened
     val searchQueryNow = searchQuery
-    val navController = remember(searchQueryNow, onSearchQueryChange, playerListener, onLoadPlaylist, onLoadAlbum, onLoadArtist, onOpenShow, onOpenEpisode, onOpenUserProfile, onRetryPlaylist, libraryItems, searchData, nowPlayingArtistImageUrl) {
+    val navController = remember(
+        searchQueryNow,
+        onSearchQueryChange,
+        playerListener,
+        onLoadPlaylist,
+        onLoadAlbum,
+        onLoadArtist,
+        onOpenShow,
+        onOpenEpisode,
+        onOpenUserProfile,
+        onRetryPlaylist,
+        libraryItems,
+        searchData,
+        nowPlayingArtistImageUrl
+    ) {
         ShellNavController(
             nav = navState,
             active = active,
@@ -455,10 +446,11 @@ fun EncoreAppShell(
         localTitle = localTrackTitle,
     )
 
-    val currentQueueRow = remember(playbackState?.trackUri, playbackState?.queue, playbackState?.queueFromContext) {
-        (playbackState?.queue.orEmpty() + playbackState?.queueFromContext.orEmpty())
-            .firstOrNull { it.uri == playbackState?.trackUri }
-    }
+    val currentQueueRow =
+        remember(playbackState?.trackUri, playbackState?.queue, playbackState?.queueFromContext) {
+            (playbackState?.queue.orEmpty() + playbackState?.queueFromContext.orEmpty())
+                .firstOrNull { it.uri == playbackState?.trackUri }
+        }
     val resolvedAlbumUri = playbackState?.albumUri?.takeIf { it.isNotBlank() }
         ?: currentQueueRow?.albumUri.orEmpty()
     val resolvedArtistUri = playbackState?.artistUri?.takeIf { it.isNotBlank() }
@@ -523,8 +515,16 @@ fun EncoreAppShell(
     val navItems = remember {
         listOf(
             NavItem("Home", R.drawable.encore_icon_home_24, R.drawable.encore_icon_home_active_24),
-            NavItem("Search", R.drawable.encore_icon_search_24, R.drawable.encore_icon_search_active_24),
-            NavItem("Your Library", R.drawable.encore_icon_your_library_24, R.drawable.encore_icon_your_library_active_24)
+            NavItem(
+                "Search",
+                R.drawable.encore_icon_search_24,
+                R.drawable.encore_icon_search_active_24
+            ),
+            NavItem(
+                "Your Library",
+                R.drawable.encore_icon_your_library_24,
+                R.drawable.encore_icon_your_library_active_24
+            )
         )
     }
 
@@ -757,6 +757,7 @@ fun EncoreAppShell(
                     onHomeFacetSelected = onHomeFacetSelected,
                     onOpenHistory = onOpenHistory,
                 )
+
                 ShellScreen.SEARCH -> ShellSearchRoute(
                     env = hosts.route(),
                     searchResults = searchResults,
@@ -780,11 +781,13 @@ fun EncoreAppShell(
                     onOpenBrowse = onOpenBrowse,
                     onOpenCategory = onOpenCategory,
                 )
+
                 ShellScreen.LIBRARY -> ShellLibraryRoute(
                     env = hosts.route(),
                     libraryItems = libraryItems,
                     libraryLoading = libraryLoading,
                 )
+
                 ShellScreen.PLAYLIST -> ShellPlaylistRoute(
                     env = hosts.route(),
                     playlistDetail = playlistDetail,
@@ -809,6 +812,7 @@ fun EncoreAppShell(
                     onEditPlaylist = onEditPlaylist,
                     onAddTracksOpen = onAddTracksOpen,
                 )
+
                 ShellScreen.ALBUM -> ShellAlbumRoute(
                     env = hosts.route(),
                     albumDetail = albumDetail,
@@ -821,6 +825,7 @@ fun EncoreAppShell(
                     onRetryAlbum = onRetryAlbum,
                     onAlbumTrackLikeToggle = onAlbumTrackLikeToggle,
                 )
+
                 ShellScreen.ARTIST -> ShellArtistRoute(
                     env = hosts.route(),
                     artistDetail = artistDetail,
@@ -834,6 +839,7 @@ fun EncoreAppShell(
                     onArtistFollowToggle = onArtistFollowToggle,
                     onArtistTrackLikeToggle = onArtistTrackLikeToggle,
                 )
+
                 ShellScreen.CATEGORY -> ShellCategoryRoute(
                     env = hosts.route(),
                     categoryShelves = categoryShelves,
@@ -841,6 +847,7 @@ fun EncoreAppShell(
                     homeRecommendations = homeRecommendations,
                     libraryItems = libraryItems,
                 )
+
                 ShellScreen.SETTINGS -> ShellSettingsRoute(
                     env = hosts.route(),
                     switches = settingsSwitches,
@@ -857,6 +864,7 @@ fun EncoreAppShell(
                     onCheckUpdates = onCheckUpdates,
                     onLogout = onLogout,
                 )
+
                 ShellScreen.NOTIFICATIONS -> ShellNotificationsRoute(
                     env = hosts.route(),
                     notifications = notifications,
@@ -866,6 +874,7 @@ fun EncoreAppShell(
                     onLoadPlaylist = onLoadPlaylist,
                     onOpenEpisode = onOpenEpisode,
                 )
+
                 ShellScreen.ACTIVITY -> ShellActivityRoute(
                     env = hosts.route(),
                     notifications = activityFeed,
@@ -875,6 +884,7 @@ fun EncoreAppShell(
                     onRetry = onRetryActivity,
                     onLeave = onLeaveActivity,
                 )
+
                 ShellScreen.HISTORY -> ShellHistoryRoute(
                     env = hosts.route(),
                     todayTracks = historyToday,
@@ -883,6 +893,7 @@ fun EncoreAppShell(
                     stats = historyStats,
                     loading = historyLoading,
                 )
+
                 ShellScreen.ADD_TRACKS -> ShellAddTracksRoute(
                     env = hosts.route(),
                     songs = addTracksSongs,
@@ -892,6 +903,7 @@ fun EncoreAppShell(
                     loading = addTracksLoading,
                     onAddTrack = onAddTrack,
                 )
+
                 ShellScreen.BROWSE -> ShellBrowseRoute(
                     env = hosts.route(),
                     page = browsePage,
@@ -899,6 +911,7 @@ fun EncoreAppShell(
                     onOpenShow = onOpenShow,
                     onLoadMore = onLoadMoreBrowse,
                 )
+
                 ShellScreen.SHOW -> ShellShowRoute(
                     env = hosts.route(),
                     show = showDetail,
@@ -906,18 +919,21 @@ fun EncoreAppShell(
                     onOpenShow = onOpenShow,
                     onLoadMore = onLoadMoreEpisodes,
                 )
+
                 ShellScreen.EPISODE -> ShellEpisodeRoute(
                     env = hosts.route(),
                     episode = episodeDetail,
                     loading = episodeLoading,
                     onOpenEpisode = onOpenEpisode,
                 )
+
                 ShellScreen.FOLDER -> ShellFolderRoute(
                     env = hosts.route(),
                     items = folderItems,
                     loading = folderLoading,
                     onLoadPlaylist = onLoadPlaylist,
                 )
+
                 ShellScreen.PROFILE -> ShellProfileRoute(
                     env = hosts.route(),
                     profile = profile,
@@ -929,7 +945,7 @@ fun EncoreAppShell(
                     onRetry = onRetryProfile,
                     onLoadProfileFollows = onLoadProfileFollows,
                 )
-        }
+            }
         }
 
 

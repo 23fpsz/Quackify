@@ -3,17 +3,12 @@ package com.quackify.compose.shell
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.quackify.backend.api.Collection2
 import com.quackify.backend.api.Library
 import com.quackify.backend.core.auth.EncoreAuth
-import com.quackify.backend.model.ActivityNotification
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.CollectionDetail
-import com.quackify.backend.model.PlaylistPermissions
-import com.quackify.backend.model.SelfProfile
-import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.sheets.EntityOptions
 import kotlinx.coroutines.CoroutineScope
@@ -152,7 +147,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         artistFollowing = env.artistFollowed == true,
         onArtistFollowToggle = {
             if (active.artistUri.startsWith("spotify:artist:")) {
-                env.onArtistFollowToggle?.invoke(active.artistUri, !(env.artistFollowed == true))
+                env.onArtistFollowToggle?.invoke(active.artistUri, env.artistFollowed != true)
             }
         },
         onArtistRadio = {

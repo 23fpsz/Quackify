@@ -1,11 +1,11 @@
 package com.quackify.compose.shell
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import com.quackify.compose.components.RepeatMode
@@ -73,8 +73,8 @@ internal class ShellPlayerEnv(
  * EncoreAppShell so that composable stays under the JIT method-size limit.
  */
 @Composable
-internal fun ShellPlayerLayer(env: ShellPlayerEnv) {
-    val bottomBarModifier = Modifier
+internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
+    val bottomBarModifier = Modifier.align(Alignment.BottomCenter)
     val playbackState = env.playbackState
     val progressState = env.progressState
     val currentProgress = progressState?.progress ?: env.local.progress

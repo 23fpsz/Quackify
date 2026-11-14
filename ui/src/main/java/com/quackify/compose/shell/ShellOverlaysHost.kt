@@ -2,24 +2,23 @@ package com.quackify.compose.shell
 
 import android.content.Context
 import androidx.compose.runtime.Composable
-import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.Credits
 import com.quackify.backend.model.PlaylistChoice
 import com.quackify.backend.model.PlaylistPermissions
 import com.quackify.backend.model.ProfileUser
 import com.quackify.backend.model.SearchHit
-import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.format.formatCount
+import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.share.Share
 import com.quackify.compose.sheets.AddToPlaylistSheet
 import com.quackify.compose.sheets.ArtistAboutSheet
 import com.quackify.compose.sheets.CreditsSheet
 import com.quackify.compose.sheets.DiscographySheet
 import com.quackify.compose.sheets.EncoreCreateNameDialog
-import com.quackify.compose.sheets.ProfileFollowSheet
 import com.quackify.compose.sheets.PlaylistContributorsSheet
-import com.quackify.compose.share.Share
+import com.quackify.compose.sheets.ProfileFollowSheet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -138,7 +137,7 @@ internal fun ShellOverlaysHost(env: ShellOverlaysEnv) {
                     env.active.playlistTitle = name
                     env.active.playlistUri = uri
                     env.setCurrentScreen(ShellScreen.PLAYLIST)
-                    if (env.onLoadPlaylist != null) env.onLoadPlaylist?.invoke(uri) else env.playerListener?.onLoadPlaylist(uri)
+                    if (env.onLoadPlaylist != null) env.onLoadPlaylist.invoke(uri) else env.playerListener?.onLoadPlaylist(uri)
                     if (env.active.folderUri.isNotBlank()) {
                         env.onMoveToFolder?.invoke(uri, env.active.folderUri)
                     }

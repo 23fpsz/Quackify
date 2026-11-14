@@ -3,11 +3,7 @@ package com.quackify.compose.shell
 import android.content.Context
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
-import com.quackify.backend.api.Collection2
-import com.quackify.backend.api.Library
 import com.quackify.backend.core.auth.EncoreAuth
-import com.quackify.backend.model.ActivityNotification
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.CollectionDetail
@@ -16,13 +12,11 @@ import com.quackify.backend.model.PlaylistChoice
 import com.quackify.backend.model.PlaylistPermissions
 import com.quackify.backend.model.ProfileUser
 import com.quackify.backend.model.SearchHit
-import com.quackify.backend.model.SelfProfile
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.playlist.TrackItem
-import com.quackify.compose.sheets.EntityOptions
 import com.quackify.compose.sheets.LibrarySortOption
 import com.quackify.compose.sheets.SortDirection
 import kotlinx.coroutines.CoroutineScope
