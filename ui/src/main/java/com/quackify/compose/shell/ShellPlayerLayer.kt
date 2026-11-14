@@ -144,7 +144,7 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
             onSkipNext = env.handleSkipNext,
             onSkipPrevious = env.handleSkipPrevious,
             hasTrack = env.playerIdentity.trackLoaded,
-            showMiniPlayer = playbackState?.trackUri.isNullOrBlank() || env.currentTrackTitle.isNotBlank(),
+            showMiniPlayer = env.playerIdentity.trackLoaded,
             modifier = bottomBarModifier
         )
     }
