@@ -1145,22 +1145,11 @@ fun EncoreAppShell(
         val bridgeContextLabel = playbackState?.queueContextLabel?.takeIf { it.isNotBlank() }
             ?: playbackState?.contextLabel?.takeIf { it.isNotBlank() }
             ?: ""
-        fun playlistLike(uri: String): Boolean = uri.startsWith("spotify:playlist:") ||
-                uri == "spotify:collection:tracks" ||
-                uri == "spotify:user:@me:collection"
-        val bridgeContextIsPlaylist = playlistLike(playbackState?.contextUri.orEmpty()) ||
-                playlistLike(playbackState?.queueContext.orEmpty())
         val (contextHeader, contextSub) = nowPlayingContext(
             trackLoaded = playerIdentity.trackLoaded,
             origin = playbackOrigin,
-            screen = currentScreen,
-            playlistTitle = active.playlistTitle.ifBlank {
-                if (bridgeContextIsPlaylist) bridgeContextLabel else ""
-            },
-            albumTitle = active.albumTitle,
-            artistName = active.artistName,
-            searchQuery = searchQuery,
-            queueLabel = bridgeContextLabel,
+            contextUri = playbackState?.contextUri,
+            contextLabel = bridgeContextLabel,
         )
         val remoteCtl = playbackState?.controllingRemote == true
         val effectiveCanShuffle = if (remoteCtl) playbackState?.remoteCanShuffle ?: true else playbackState?.canShuffle ?: true
