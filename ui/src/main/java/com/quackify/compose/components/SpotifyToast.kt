@@ -8,7 +8,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,18 +23,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.quackify.compose.theme.EncoreColors
 import kotlinx.coroutines.delay
+import android.content.res.Configuration
 
 /** How long the toast stays on screen before dismissing itself. */
 private const val TOAST_DURATION_MS = 2400L
 
-/** Spotify's in-app toast gray, slightly translucent like the real snackbar. */
-private val SpotifyToastBackground = Color(0xEB464646)
+/** Spotify's in-app toast surface, white like the real snackbar. */
+private val SpotifyToastBackground = Color(0xFFFFFFFF)
+
+private val SpotifyToastTextColor = Color(0xFF191414)
 
 /**
  * State holder for the Spotify-style in-app toast. `show()` can be called from
@@ -61,9 +66,11 @@ class SpotifyToastState {
 fun rememberSpotifyToastState(): SpotifyToastState = remember { SpotifyToastState() }
 
 /**
- * Spotify-style toast: a dark pill with white text that floats above the mini
+ * Spotify-style toast: a white bar with dark text that floats above the mini
  * player at the bottom of the app and dismisses itself after a few seconds,
- * matching the "Added to queue" snackbar of the real client.
+ * matching the "Added to queue" snackbar of the real client. Portrait spans
+ * the full screen width with a wrap-content height; landscape hugs its
+ * content instead so it never stretches across the wide layout.
  */
 @Composable
 fun SpotifyToastHost(
@@ -80,6 +87,8 @@ fun SpotifyToastHost(
     // Captured at show() time (keyed on the sequence) so the exit animation
     // still has the last message to draw after the state has been cleared.
     val text = remember(state.sequence) { state.message ?: "" }
+    val isLandscape =
+        LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     AnimatedVisibility(
         visible = state.message != null,
@@ -89,13 +98,20 @@ fun SpotifyToastHost(
     ) {
         Box(
             modifier = Modifier
-                .background(SpotifyToastBackground, RoundedCornerShape(8.dp))
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .then(
+                    if (isLandscape) Modifier.wrapContentWidth()
+                    else Modifier.fillMaxWidth()
+                )
+                .background(
+                    SpotifyToastBackground,
+                    if (isLandscape) RoundedCornerShape(10.dp) else RoundedCornerShape(4.dp)
+                )
+                .padding(horizontal = 20.dp, vertical = 14.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = text,
-                color = EncoreColors.TextPrimary,
+                color = SpotifyToastTextColor,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
