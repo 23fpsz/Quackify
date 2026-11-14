@@ -398,118 +398,118 @@ fun EncoreTrackRow(
         onAddToQueue = onAddToQueue,
         modifier = modifier
     ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(60.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (trackNumber != null) {
-            Box(
-                modifier = Modifier.width(28.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                if (isPlaying) {
-                    EncorePlayIndicator(
-                        isPlaying = true,
-                        color = EncoreColors.Green,
-                        size = 14.dp
-                    )
-                } else {
-                    Text(
-                        text = trackNumber.toString(),
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
-                    )
-                }
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                EncoreArtworkImage(
-                    imageUrl = imageUrl,
-                    contentDescription = title,
-                    modifier = Modifier.fillMaxSize(),
-                    cornerRadius = 4.dp
-                )
-                if (isPlaying) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f)),
-                        contentAlignment = Alignment.Center
-                    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (trackNumber != null) {
+                Box(
+                    modifier = Modifier.width(28.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (isPlaying) {
                         EncorePlayIndicator(
                             isPlaying = true,
                             color = EncoreColors.Green,
-                            size = 16.dp
+                            size = 14.dp
+                        )
+                    } else {
+                        Text(
+                            text = trackNumber.toString(),
+                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
                         )
                     }
                 }
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-        }
-
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(end = 8.dp)
-        ) {
-            Text(
-                text = title,
-                style = EncoreTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isPlaying) EncoreColors.Green else EncoreColors.TextPrimary
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isExplicit) {
-                    EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
-                }
-                if (hasVideo) {
-                    Icon(
-                        painter = painterResource(R.drawable.encore_icon_video_24),
-                        contentDescription = "Music video",
-                        tint = EncoreColors.TextSecondary,
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .size(14.dp)
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    EncoreArtworkImage(
+                        imageUrl = imageUrl,
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize(),
+                        cornerRadius = 4.dp
                     )
+                    if (isPlaying) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            EncorePlayIndicator(
+                                isPlaying = true,
+                                color = EncoreColors.Green,
+                                size = 16.dp
+                            )
+                        }
+                    }
                 }
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp)
+            ) {
                 Text(
-                    text = artist,
-                    style = EncoreTheme.typography.bodySmall,
+                    text = title,
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isPlaying) EncoreColors.Green else EncoreColors.TextPrimary
+                    ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isExplicit) {
+                        EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
+                    }
+                    if (hasVideo) {
+                        Icon(
+                            painter = painterResource(R.drawable.encore_icon_video_24),
+                            contentDescription = "Music video",
+                            tint = EncoreColors.TextSecondary,
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .size(14.dp)
+                        )
+                    }
+                    Text(
+                        text = artist,
+                        style = EncoreTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-        }
 
-        if (onLikeToggle != null) {
-            EncoreHeartButton(
-                isLiked = saved == true,
-                onLikeToggle = onLikeToggle,
+            if (onLikeToggle != null) {
+                EncoreHeartButton(
+                    isLiked = saved == true,
+                    onLikeToggle = onLikeToggle,
+                    size = 36.dp,
+                    iconSize = 20.dp
+                )
+            }
+
+            EncoreIconButton(
+                iconRes = R.drawable.encore_icon_more_android_24,
+                contentDescription = "More options for $title",
+                onClick = onMoreClick,
                 size = 36.dp,
                 iconSize = 20.dp
             )
         }
-
-        EncoreIconButton(
-            iconRes = R.drawable.encore_icon_more_android_24,
-            contentDescription = "More options for $title",
-            onClick = onMoreClick,
-            size = 36.dp,
-            iconSize = 20.dp
-        )
-    }
     }
 }
 

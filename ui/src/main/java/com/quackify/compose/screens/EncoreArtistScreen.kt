@@ -442,98 +442,102 @@ fun EncoreArtistScreen(
 
             itemsIndexed(popularTracks) { index, popTrack ->
                 val track = popTrack.track
-                val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
+                val isCurrentTrack =
+                    matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                 SwipeToQueueBox(
                     onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(track) } }
                 ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onTrackSelect(track) }
-                        .padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter3),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier.width(24.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        if (isCurrentTrack && isPlaying) {
-                            EncorePlayIndicator(
-                                isPlaying = true,
-                                color = EncoreColors.Green,
-                                size = 12.dp
-                            )
-                        } else {
-                            Text(
-                                text = "${index + 1}",
-                                style = EncoreTheme.typography.bodySmall.copy(
-                                    fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isCurrentTrack) EncoreColors.Green else EncoreColors.TextSecondary
-                                )
-                            )
-                        }
-                    }
-
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF242424)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (track.imageUrl != null) {
-                            EncoreArtworkImage(
-                                imageUrl = track.imageUrl,
-                                contentDescription = track.title,
-                                modifier = Modifier.fillMaxSize(),
-                                cornerRadius = 4.dp
-                            )
-                        } else {
-                            Text("♫", color = Color.White, fontSize = 16.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(EncoreSpacers.Tighter2))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = track.title,
-                            style = EncoreTheme.typography.bodySmall.copy(
-                                fontSize = 14.sp,
-                                lineHeight = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isCurrentTrack) EncoreColors.Green else Color.White
+                            .fillMaxWidth()
+                            .clickable { onTrackSelect(track) }
+                            .padding(
+                                horizontal = EncoreSpacers.Base,
+                                vertical = EncoreSpacers.Tighter3
                             ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (popTrack.streamCount.isNotBlank()) {
-                            Text(
-                                text = popTrack.streamCount,
-                                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
-                                maxLines = 1
-                            )
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.width(24.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            if (isCurrentTrack && isPlaying) {
+                                EncorePlayIndicator(
+                                    isPlaying = true,
+                                    color = EncoreColors.Green,
+                                    size = 12.dp
+                                )
+                            } else {
+                                Text(
+                                    text = "${index + 1}",
+                                    style = EncoreTheme.typography.bodySmall.copy(
+                                        fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isCurrentTrack) EncoreColors.Green else EncoreColors.TextSecondary
+                                    )
+                                )
+                            }
                         }
+
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFF242424)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (track.imageUrl != null) {
+                                EncoreArtworkImage(
+                                    imageUrl = track.imageUrl,
+                                    contentDescription = track.title,
+                                    modifier = Modifier.fillMaxSize(),
+                                    cornerRadius = 4.dp
+                                )
+                            } else {
+                                Text("♫", color = Color.White, fontSize = 16.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(EncoreSpacers.Tighter2))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = track.title,
+                                style = EncoreTheme.typography.bodySmall.copy(
+                                    fontSize = 14.sp,
+                                    lineHeight = 18.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isCurrentTrack) EncoreColors.Green else Color.White
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (popTrack.streamCount.isNotBlank()) {
+                                Text(
+                                    text = popTrack.streamCount,
+                                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        EncoreIconButton(
+                            iconRes = if (track.saved == true) R.drawable.encore_icon_heart_active_24 else R.drawable.encore_icon_heart_24,
+                            contentDescription = if (track.saved == true) "Remove from Liked Songs" else "Add to Liked Songs",
+                            onClick = { onTrackLikeToggle(track) },
+                            tint = if (track.saved == true) EncoreColors.Green else EncoreColors.TextSecondary,
+                            size = 32.dp,
+                            iconSize = 18.dp
+                        )
+
+                        EncoreIconButton(
+                            iconRes = R.drawable.encore_icon_more_android_24,
+                            contentDescription = "Track options",
+                            onClick = { onTrackOptionsClick(track) },
+                            tint = EncoreColors.TextSecondary,
+                            size = 32.dp,
+                            iconSize = 18.dp
+                        )
                     }
-
-                    EncoreIconButton(
-                        iconRes = if (track.saved == true) R.drawable.encore_icon_heart_active_24 else R.drawable.encore_icon_heart_24,
-                        contentDescription = if (track.saved == true) "Remove from Liked Songs" else "Add to Liked Songs",
-                        onClick = { onTrackLikeToggle(track) },
-                        tint = if (track.saved == true) EncoreColors.Green else EncoreColors.TextSecondary,
-                        size = 32.dp,
-                        iconSize = 18.dp
-                    )
-
-                    EncoreIconButton(
-                        iconRes = R.drawable.encore_icon_more_android_24,
-                        contentDescription = "Track options",
-                        onClick = { onTrackOptionsClick(track) },
-                        tint = EncoreColors.TextSecondary,
-                        size = 32.dp,
-                        iconSize = 18.dp
-                    )
-                }
                 }
             }
 

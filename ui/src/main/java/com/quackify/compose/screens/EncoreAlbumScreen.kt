@@ -762,83 +762,83 @@ private fun AlbumTrackRow(
         onAddToQueue = onAddToQueue,
         modifier = modifier
     ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier.width(28.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            if (isPlaying) {
-                EncorePlayIndicator(
-                    isPlaying = true,
-                    color = EncoreColors.Green,
-                    size = 14.dp
-                )
-            } else {
-                Text(
-                    text = trackNumber.toString(),
-                    style = EncoreTheme.typography.bodyMedium.copy(
-                        color = EncoreColors.TextSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-            }
-        }
-
-        Column(
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .padding(end = 8.dp)
+                .fillMaxWidth()
+                .height(56.dp)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = track.title,
-                style = EncoreTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = if (isPlaying) EncoreColors.Green else EncoreColors.TextPrimary
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (track.isExplicit) {
-                    EncoreExplicitTag(
-                        modifier = Modifier.padding(end = 6.dp),
-                        background = EncoreColors.TextSecondary.copy(alpha = 0.6f)
+            Box(
+                modifier = Modifier.width(28.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (isPlaying) {
+                    EncorePlayIndicator(
+                        isPlaying = true,
+                        color = EncoreColors.Green,
+                        size = 14.dp
+                    )
+                } else {
+                    Text(
+                        text = trackNumber.toString(),
+                        style = EncoreTheme.typography.bodyMedium.copy(
+                            color = EncoreColors.TextSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
                     )
                 }
+            }
 
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp)
+            ) {
                 Text(
-                    text = track.artist,
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    text = track.title,
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPlaying) EncoreColors.Green else EncoreColors.TextPrimary
+                    ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (track.isExplicit) {
+                        EncoreExplicitTag(
+                            modifier = Modifier.padding(end = 6.dp),
+                            background = EncoreColors.TextSecondary.copy(alpha = 0.6f)
+                        )
+                    }
+
+                    Text(
+                        text = track.artist,
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+
+            EncoreHeartButton(
+                isLiked = track.saved == true,
+                onLikeToggle = onLikeToggle,
+                size = 36.dp,
+                iconSize = 20.dp
+            )
+
+            EncoreIconButton(
+                iconRes = R.drawable.encore_icon_more_android_24,
+                contentDescription = "Track options",
+                onClick = onMoreClick,
+                tint = EncoreColors.TextSecondary,
+                size = 36.dp,
+                iconSize = 20.dp
+            )
         }
-
-        EncoreHeartButton(
-            isLiked = track.saved == true,
-            onLikeToggle = onLikeToggle,
-            size = 36.dp,
-            iconSize = 20.dp
-        )
-
-        EncoreIconButton(
-            iconRes = R.drawable.encore_icon_more_android_24,
-            contentDescription = "Track options",
-            onClick = onMoreClick,
-            tint = EncoreColors.TextSecondary,
-            size = 36.dp,
-            iconSize = 20.dp
-        )
-    }
     }
 }
 
