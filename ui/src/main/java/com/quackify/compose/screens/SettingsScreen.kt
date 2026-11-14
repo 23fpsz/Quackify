@@ -1,5 +1,12 @@
 package com.quackify.compose.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -56,6 +63,7 @@ import kotlinx.coroutines.delay
 import com.quackify.compose.R
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.compose.components.EncoreIconButton
+import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.theme.EncoreTheme
@@ -134,6 +142,7 @@ fun SettingsScreen(
         mutableStateOf(clientPrefs.getString("appIcon", "default").orEmpty().ifBlank { "default" })
     }
     var widgetOptions by remember { mutableStateOf(WidgetOptionsStore.load(context)) }
+    var category by remember { mutableStateOf<Int?>(null) }
 
 
     Column(
@@ -151,332 +160,385 @@ fun SettingsScreen(
             EncoreIconButton(
                 iconRes = R.drawable.encore_icon_arrow_left_24,
                 contentDescription = "Back",
-                onClick = onBackClick,
+                onClick = {
+                    if (category == null) onBackClick() else category = null
+                },
                 tint = EncoreColors.TextPrimary
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Settings",
+                text = when (category) {
+                    0 -> "General"
+                    1 -> "Personalization"
+                    2 -> "More"
+                    else -> "Settings"
+                },
                 style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
             )
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomPadding)
-        ) {
-            item {
-                ProfileSummary(account)
-                HorizontalDivider(
-                    color = EncoreColors.Card,
-                    thickness = 1.dp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-
-            item {
-                SettingsSectionHeader(title = "Videos and Canvas")
-                Text(
-                    text = "It may take some time for your experience to update.",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                SettingsToggleRow(
-                    title = "Music videos",
-                    subtitle = "When off, music videos and live performances play as audio-only.",
-                    isChecked = switches.musicVideos,
-                    enabled = !locks.musicVideos && !loading,
-                    onCheckedChange = onToggleMusicVideos
-                )
-                SettingsToggleRow(
-                    title = "Canvas",
-                    subtitle = "Short, looping visuals when a song is playing.",
-                    isChecked = switches.canvas,
-                    enabled = !locks.canvas && !loading,
-                    onCheckedChange = onToggleCanvas
-                )
-                SettingsToggleRow(
-                    title = "Other videos",
-                    subtitle = "Video podcasts and videos from creators. Video ads can't be turned off.",
-                    isChecked = switches.otherVideos,
-                    enabled = !locks.otherVideos && !loading,
-                    onCheckedChange = onToggleOtherVideos
-                )
-            }
-
-            item {
-                SettingsSectionHeader(title = "What others can see on your profile")
-                SettingsToggleRow(
-                    title = "Followers and following",
-                    subtitle = "On your profile, people can see who's following you and who you're following.",
-                    isChecked = switches.showFollows,
-                    enabled = !loading,
-                    onCheckedChange = onToggleShowFollows
-                )
-                SettingsToggleRow(
-                    title = "Public playlists",
-                    subtitle = "People can see the playlists you've added to your profile.",
-                    isChecked = switches.showPlaylists,
-                    enabled = !loading,
-                    onCheckedChange = onToggleShowPlaylists
-                )
-            }
-
-            item {
-                SettingsSectionHeader(title = "Playback")
-                SettingsToggleRow(
-                    title = "Autoplay on startup",
-                    subtitle = "When you open the app, the loaded track starts playing right away.",
-                    isChecked = autoplayOnStartup,
-                    enabled = true,
-                    onCheckedChange = { on ->
-                        autoplayOnStartup = on
-                        clientPrefs.edit().putBoolean("autoplayOnStartup", on).apply()
-                    }
-                )
-                SettingsToggleRow(
-                    title = "Autoplay",
-                    subtitle = "Keep playing a station when the album or playlist runs out.",
-                    isChecked = autoplayOnEnd,
-                    enabled = true,
-                    onCheckedChange = { on ->
-                        autoplayOnEnd = on
-                        clientPrefs.edit().putBoolean("autoplayOnEnd", on).apply()
-                    }
-                )
-                SettingsToggleRow(
-                    title = "Gapless playback",
-                    subtitle = "Prepares the next track while the current one plays, so albums and playlists flow without silence between songs.",
-                    isChecked = gapless,
-                    enabled = true,
-                    badge = "BETA",
-                    badgeInfo = "Gapless is not optimised yet and may use a lot of license key quota.",
-                    onCheckedChange = { on ->
-                        gapless = on
-                        clientPrefs.edit().putBoolean("gaplessPlayback", on).apply()
-                    }
-                )
-                SettingsToggleRow(
-                    title = "Full artwork",
-                    subtitle = "Stretch the cover edge to edge behind the status bar, fading into a blurred copy of it. When off, the cover sits in a card.",
-                    isChecked = fullArtwork,
-                    enabled = true,
-                    onCheckedChange = { on ->
-                        fullArtwork = on
-                        clientPrefs.edit().putBoolean("fullArtworkPlayer", on).apply()
-                        onToggleFullArtwork(on)
-                    }
-                )
-            }
-
-            item {
-                SettingsSectionHeader(title = "Widget")
-                Text(
-                    text = "Home screen widgets come in 4x1, 3x2 and 3x3 sizes. Changes show up the next time the widgets refresh.",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                SettingsToggleRow(
-                    title = "Show artwork",
-                    subtitle = "Display the album cover on the widgets.",
-                    isChecked = widgetOptions.showArtwork,
-                    enabled = true,
-                    onCheckedChange = { on ->
-                        widgetOptions = widgetOptions.copy(showArtwork = on)
-                        WidgetOptionsStore.saveShowArtwork(context, on)
-                    }
-                )
-                SettingsToggleRow(
-                    title = "Show like button",
-                    subtitle = "Keep the heart beside the playback controls.",
-                    isChecked = widgetOptions.showLike,
-                    enabled = true,
-                    onCheckedChange = { on ->
-                        widgetOptions = widgetOptions.copy(showLike = on)
-                        WidgetOptionsStore.saveShowLike(context, on)
-                    }
-                )
-                SettingsToggleRow(
-                    title = "Show progress bar",
-                    subtitle = "A thin playback line on the 3x2 and 3x3 widgets.",
-                    isChecked = widgetOptions.showProgress,
-                    enabled = true,
-                    onCheckedChange = { on ->
-                        widgetOptions = widgetOptions.copy(showProgress = on)
-                        WidgetOptionsStore.saveShowProgress(context, on)
-                    }
-                )
-                Text(
-                    text = "Background",
-                    style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SettingsChipOption(
-                        label = "Dark",
-                        selected = widgetOptions.background == WidgetBackgroundStyle.DARK,
-                        onClick = {
-                            widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.DARK)
-                            WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.DARK)
+        AnimatedContent(
+            targetState = category,
+            transitionSpec = {
+                val forward = (initialState ?: -1) < (targetState ?: -1)
+                (
+                    fadeIn(tween(EncoreAnimation.ScreenEnterDuration, easing = EncoreAnimation.BoxInterpolator)) +
+                        slideInHorizontally(
+                            tween(EncoreAnimation.ScreenEnterDuration, easing = EncoreAnimation.BoxInterpolator)
+                        ) { full -> if (forward) full / 6 else -full / 6 }
+                    ) togetherWith (
+                    fadeOut(tween(EncoreAnimation.ScreenExitDuration)) +
+                        slideOutHorizontally(tween(EncoreAnimation.ScreenExitDuration)) { full ->
+                            if (forward) -full / 8 else full / 8
                         }
                     )
-                    SettingsChipOption(
-                        label = "Artwork tint",
-                        selected = widgetOptions.background == WidgetBackgroundStyle.TINTED,
-                        onClick = {
-                            widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.TINTED)
-                            WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.TINTED)
-                        }
-                    )
-                    SettingsChipOption(
-                        label = "Transparent",
-                        selected = widgetOptions.background == WidgetBackgroundStyle.TRANSPARENT,
-                        onClick = {
-                            widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.TRANSPARENT)
-                            WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.TRANSPARENT)
-                        }
-                    )
+            },
+            label = "SettingsCategoryTransition"
+        ) { target ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomPadding)
+            ) {
+                if (target == null) {
+                    item {
+                        ProfileSummary(account)
+                        HorizontalDivider(
+                            color = EncoreColors.Card,
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    item {
+                        SettingsCategoryRow(
+                            title = "General",
+                            description = "Videos, profile visibility and account",
+                            onClick = { category = 0 }
+                        )
+                        SettingsCategoryRow(
+                            title = "Personalization",
+                            description = "App icon and home screen widgets",
+                            onClick = { category = 1 }
+                        )
+                        SettingsCategoryRow(
+                            title = "More",
+                            description = "Playback and app information",
+                            onClick = { category = 2 }
+                        )
+                    }
                 }
-            }
 
-            item {
-                SettingsSectionHeader(title = "App icon")
-                Text(
-                    text = "Pick the launcher icon. It can take a moment for your home screen to update, and the app may restart once.",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                    modifier = Modifier.padding(bottom = 10.dp)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SettingsIconOption(
-                        label = "Default",
-                        iconRes = R.mipmap.ic_launcher_default,
-                        selected = appIcon == "default",
-                        onClick = {
-                            appIcon = "default"
-                            clientPrefs.edit().putString("appIcon", "default").apply()
-                            onAppIconChange("default")
-                        }
-                    )
-                    SettingsIconOption(
-                        label = "Normal",
-                        iconRes = R.mipmap.ic_launcher_normal,
-                        selected = appIcon == "normal",
-                        onClick = {
-                            appIcon = "normal"
-                            clientPrefs.edit().putString("appIcon", "normal").apply()
-                            onAppIconChange("normal")
-                        }
-                    )
+                if (target == 0) {
+                    item {
+                        SettingsSectionHeader(title = "Videos and Canvas")
+                        Text(
+                            text = "It may take some time for your experience to update.",
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        SettingsToggleRow(
+                            title = "Music videos",
+                            subtitle = "When off, music videos and live performances play as audio-only.",
+                            isChecked = switches.musicVideos,
+                            enabled = !locks.musicVideos && !loading,
+                            onCheckedChange = onToggleMusicVideos
+                        )
+                        SettingsToggleRow(
+                            title = "Canvas",
+                            subtitle = "Short, looping visuals when a song is playing.",
+                            isChecked = switches.canvas,
+                            enabled = !locks.canvas && !loading,
+                            onCheckedChange = onToggleCanvas
+                        )
+                        SettingsToggleRow(
+                            title = "Other videos",
+                            subtitle = "Video podcasts and videos from creators. Video ads can't be turned off.",
+                            isChecked = switches.otherVideos,
+                            enabled = !locks.otherVideos && !loading,
+                            onCheckedChange = onToggleOtherVideos
+                        )
+                    }
+
+                    item {
+                        SettingsSectionHeader(title = "What others can see on your profile")
+                        SettingsToggleRow(
+                            title = "Followers and following",
+                            subtitle = "On your profile, people can see who's following you and who you're following.",
+                            isChecked = switches.showFollows,
+                            enabled = !loading,
+                            onCheckedChange = onToggleShowFollows
+                        )
+                        SettingsToggleRow(
+                            title = "Public playlists",
+                            subtitle = "People can see the playlists you've added to your profile.",
+                            isChecked = switches.showPlaylists,
+                            enabled = !loading,
+                            onCheckedChange = onToggleShowPlaylists
+                        )
+                    }
+
                 }
-            }
+                if (target == 1) {
+                    item {
+                        SettingsSectionHeader(title = "Widget")
+                        Text(
+                            text = "Home screen widgets come in 4x1, 3x2 and 3x3 sizes. Changes show up the next time the widgets refresh.",
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        SettingsToggleRow(
+                            title = "Show artwork",
+                            subtitle = "Display the album cover on the widgets.",
+                            isChecked = widgetOptions.showArtwork,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                widgetOptions = widgetOptions.copy(showArtwork = on)
+                                WidgetOptionsStore.saveShowArtwork(context, on)
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = "Show like button",
+                            subtitle = "Keep the heart beside the playback controls.",
+                            isChecked = widgetOptions.showLike,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                widgetOptions = widgetOptions.copy(showLike = on)
+                                WidgetOptionsStore.saveShowLike(context, on)
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = "Show progress bar",
+                            subtitle = "A thin playback line on the 3x2 and 3x3 widgets.",
+                            isChecked = widgetOptions.showProgress,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                widgetOptions = widgetOptions.copy(showProgress = on)
+                                WidgetOptionsStore.saveShowProgress(context, on)
+                            }
+                        )
+                        Text(
+                            text = "Background",
+                            style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SettingsChipOption(
+                                label = "Dark",
+                                selected = widgetOptions.background == WidgetBackgroundStyle.DARK,
+                                onClick = {
+                                    widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.DARK)
+                                    WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.DARK)
+                                }
+                            )
+                            SettingsChipOption(
+                                label = "Artwork tint",
+                                selected = widgetOptions.background == WidgetBackgroundStyle.TINTED,
+                                onClick = {
+                                    widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.TINTED)
+                                    WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.TINTED)
+                                }
+                            )
+                            SettingsChipOption(
+                                label = "Transparent",
+                                selected = widgetOptions.background == WidgetBackgroundStyle.TRANSPARENT,
+                                onClick = {
+                                    widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.TRANSPARENT)
+                                    WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.TRANSPARENT)
+                                }
+                            )
+                        }
+                    }
 
-            item {
-                SettingsSectionHeader(title = "Account")
-                val detail = listOfNotNull(
-                    product.takeIf { it.isNotBlank() },
-                    country.takeIf { it.isNotBlank() },
-                ).joinToString(" · ")
-                if (detail.isNotBlank()) {
-                    SettingsInfoRow(title = "Plan", value = detail)
+                    item {
+                        SettingsSectionHeader(title = "App icon")
+                        Text(
+                            text = "Pick the launcher icon. It can take a moment for your home screen to update, and the app may restart once.",
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SettingsIconOption(
+                                label = "Default",
+                                iconRes = R.mipmap.ic_launcher_default,
+                                selected = appIcon == "default",
+                                onClick = {
+                                    appIcon = "default"
+                                    clientPrefs.edit().putString("appIcon", "default").apply()
+                                    onAppIconChange("default")
+                                }
+                            )
+                            SettingsIconOption(
+                                label = "Normal",
+                                iconRes = R.mipmap.ic_launcher_normal,
+                                selected = appIcon == "normal",
+                                onClick = {
+                                    appIcon = "normal"
+                                    clientPrefs.edit().putString("appIcon", "normal").apply()
+                                    onAppIconChange("normal")
+                                }
+                            )
+                        }
+                    }
+
                 }
-                Text(
-                    text = "Log out",
-                    style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Error),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onLogout() }
-                        .padding(vertical = 12.dp)
-                )
-            }
+                if (target == 0) {
+                    item {
+                        SettingsSectionHeader(title = "Account")
+                        val detail = listOfNotNull(
+                            product.takeIf { it.isNotBlank() },
+                            country.takeIf { it.isNotBlank() },
+                        ).joinToString(" · ")
+                        if (detail.isNotBlank()) {
+                            SettingsInfoRow(title = "Plan", value = detail)
+                        }
+                        Text(
+                            text = "Log out",
+                            style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Error),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onLogout() }
+                                .padding(vertical = 12.dp)
+                        )
+                    }
 
-            item {
-                SettingsSectionHeader(title = "About")
-                Text(
-                    text = "Quackify is a native Android music client built with Jetpack Compose, continuing the SpotiDuck project.",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                SettingsInfoRow(
-                    title = "Version",
-                    value = version,
-                )
-                val context = LocalContext.current
-                if (update != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(EncoreColors.Card)
-                            .clickable {
-                                runCatching {
-                                    context.startActivity(
-                                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(update.url))
+                }
+                if (target == 2) {
+                    item {
+                        SettingsSectionHeader(title = "Playback")
+                        SettingsToggleRow(
+                            title = "Autoplay on startup",
+                            subtitle = "When you open the app, the loaded track starts playing right away.",
+                            isChecked = autoplayOnStartup,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                autoplayOnStartup = on
+                                clientPrefs.edit().putBoolean("autoplayOnStartup", on).apply()
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = "Autoplay",
+                            subtitle = "Keep playing a station when the album or playlist runs out.",
+                            isChecked = autoplayOnEnd,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                autoplayOnEnd = on
+                                clientPrefs.edit().putBoolean("autoplayOnEnd", on).apply()
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = "Gapless playback",
+                            subtitle = "Prepares the next track while the current one plays, so albums and playlists flow without silence between songs.",
+                            isChecked = gapless,
+                            enabled = true,
+                            badge = "BETA",
+                            badgeInfo = "Gapless is not optimised yet and may use a lot of license key quota.",
+                            onCheckedChange = { on ->
+                                gapless = on
+                                clientPrefs.edit().putBoolean("gaplessPlayback", on).apply()
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = "Full artwork",
+                            subtitle = "Stretch the cover edge to edge behind the status bar, fading into a blurred copy of it. When off, the cover sits in a card.",
+                            isChecked = fullArtwork,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                fullArtwork = on
+                                clientPrefs.edit().putBoolean("fullArtworkPlayer", on).apply()
+                                onToggleFullArtwork(on)
+                            }
+                        )
+                    }
+
+                    item {
+                        SettingsSectionHeader(title = "About")
+                        Text(
+                            text = "Quackify is a native Android music client built with Jetpack Compose, continuing the SpotiDuck project.",
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        SettingsInfoRow(
+                            title = "Version",
+                            value = version,
+                        )
+                        val context = LocalContext.current
+                        if (update != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(EncoreColors.Card)
+                                    .clickable {
+                                        runCatching {
+                                            context.startActivity(
+                                                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(update.url))
+                                            )
+                                        }
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Update available",
+                                        style = EncoreTheme.typography.bodyMediumBold
+                                    )
+                                    Text(
+                                        text = update.version,
+                                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                                     )
                                 }
+                                Text(
+                                    text = "Download",
+                                    style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green)
+                                )
                             }
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Latest version",
+                                    style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                                )
+                                Text(
+                                    text = when {
+                                        updateChecking -> "Checking\u2026"
+                                        updateChecked -> "Up to date"
+                                        else -> "\u2014"
+                                    },
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
                             Text(
-                                text = "Update available",
-                                style = EncoreTheme.typography.bodyMediumBold
-                            )
-                            Text(
-                                text = update.version,
-                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                text = "Check",
+                                style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(EncoreColors.Card)
+                                    .clickable { onCheckUpdates() }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
                             )
                         }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AboutLinkButton(label = "GitHub", iconRes = R.drawable.ic_github_24, url = GITHUB_URL)
+                            AboutLinkButton(label = "Discord", iconRes = R.drawable.ic_discord_24, url = DISCORD_URL)
+                        }
                         Text(
-                            text = "Download",
-                            style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green)
+                            text = "\u00A9 2026 Quackify Team",
+                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(120.dp))
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Latest version",
-                            style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
-                        )
-                        Text(
-                            text = when {
-                                updateChecking -> "Checking\u2026"
-                                updateChecked -> "Up to date"
-                                else -> "\u2014"
-                            },
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-                        )
-                    }
-                    Text(
-                        text = "Check",
-                        style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(EncoreColors.Card)
-                            .clickable { onCheckUpdates() }
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AboutLinkButton(label = "GitHub", iconRes = R.drawable.ic_github_24, url = GITHUB_URL)
-                    AboutLinkButton(label = "Discord", iconRes = R.drawable.ic_discord_24, url = DISCORD_URL)
-                }
-                Text(
-                    text = "\u00A9 2026 Quackify Team",
-                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(120.dp))
             }
         }
     }
@@ -757,6 +819,40 @@ private fun SettingsChipOption(
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp)
     )
+}
+
+@Composable
+private fun SettingsCategoryRow(
+    title: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = title,
+                style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+            )
+            Text(
+                text = description,
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+            )
+        }
+        Icon(
+            painter = painterResource(R.drawable.encore_icon_chevron_right_24),
+            contentDescription = null,
+            tint = EncoreColors.TextSecondary,
+            modifier = Modifier.size(20.dp)
+        )
+    }
 }
 
 @Composable
