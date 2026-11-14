@@ -399,6 +399,13 @@ class MainActivity : ComponentActivity() {
                                 settingsProduct = attrs.product
                                 settingsCountry = attrs.country
                             }
+                            val privacy = Settings.privacy(context, account?.id.orEmpty())
+                            if (privacy != null) {
+                                settingsSwitches = settingsSwitches.copy(
+                                    showFollows = privacy.showFollows,
+                                    showPlaylists = privacy.showPublishedPlaylists,
+                                )
+                            }
                             settingsLoading = false
                         }
 
