@@ -1,50 +1,65 @@
 package com.quackify.compose.components
 
-import androidx.compose.animation.AnimatedVisibility
+import android.content.res.Configuration
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
-import android.content.res.Configuration
+import kotlinx.coroutines.launch
 
-/** How long the toast stays on screen before dismissing itself. */
+/** How long a toast stays on screen before dismissing itself. */
 private const val TOAST_DURATION_MS = 2400L
 
 /** Toasts with an action stay a little longer so the button can be reached. */
 private const val TOAST_ACTION_DURATION_MS = 4000L
 
+/** How many toasts may be stacked above the player at the same time. */
+private const val TOAST_MAX_STACK = 3
+
+/** Horizontal distance the toast must be dragged before the release flings it away. */
+private val TOAST_SWIPE_THRESHOLD = 72.dp
+
 /** Gap between the message and the action button. */
 private val TOAST_ACTION_SPACING = 8.dp
+
+/** Vertical gap between stacked toasts. */
+private val TOAST_STACK_SPACING = 6.dp
 
 /** Spotify's in-app toast surface, white like the real snackbar. */
 private val SpotifyToastBackground = Color(0xFFFFFFFF)
@@ -60,40 +75,61 @@ class SpotifyToastAction(
     val onClick: () -> Unit,
 )
 
+/** One stacked toast: identity, message, optional action and how many times
+ * the same message was shown back to back. */
+data class SpotifyToastEntry(
+    val id: Long,
+    val message: String,
+    val action: SpotifyToastAction?,
+    val count: Int,
+)
+
 /**
- * State holder for the Spotify-style in-app toast. `show()` can be called from
- * any callback (options sheet, swipe gesture, ...); the host renders the pill
- * and clears it again after [TOAST_DURATION_MS]. An optional trailing action
- * button can be attached by passing its label and click handler.
+ * State holder for the Spotify-style in-app toasts. `show()` can be called
+ * from any callback; repeated messages bump the existing toast's counter
+ * ("x2") instead of stacking a twin, while new messages stack on top of the
+ * player with the oldest at the very top. Once [TOAST_MAX_STACK] toasts are
+ * up, the next arrival drops the top-most one even if its time has not run
+ * out yet.
  */
 class SpotifyToastState {
-    var message by mutableStateOf<String?>(null)
+    var entries by mutableStateOf<List<SpotifyToastEntry>>(emptyList())
         private set
 
-    var action by mutableStateOf<SpotifyToastAction?>(null)
-        private set
-
-    /** Bumped on every show() so a toast showing right now restarts its timer. */
-    var sequence by mutableIntStateOf(0)
-        private set
+    private var nextId = 0L
 
     fun show(
         text: String,
         actionLabel: String? = null,
         onAction: (() -> Unit)? = null,
     ) {
-        message = text
-        action = if (actionLabel != null && onAction != null) {
+        val existing = entries.firstOrNull { it.message == text }
+        if (existing != null) {
+            entries = entries.map { entry ->
+                if (entry.id == existing.id) entry.copy(count = entry.count + 1) else entry
+            }
+            return
+        }
+        val action = if (actionLabel != null && onAction != null) {
             SpotifyToastAction(actionLabel, onAction)
         } else {
             null
         }
-        sequence++
+        val fresh = SpotifyToastEntry(nextId++, text, action, 1)
+        val stacked = listOf(fresh) + entries
+        entries = if (stacked.size > TOAST_MAX_STACK) {
+            stacked.dropLast(stacked.size - TOAST_MAX_STACK)
+        } else {
+            stacked
+        }
+    }
+
+    fun dismiss(id: Long) {
+        entries = entries.filterNot { it.id == id }
     }
 
     fun clear() {
-        message = null
-        action = null
+        entries = emptyList()
     }
 }
 
@@ -101,81 +137,130 @@ class SpotifyToastState {
 fun rememberSpotifyToastState(): SpotifyToastState = remember { SpotifyToastState() }
 
 /**
- * Spotify-style toast: a white bar with dark text that floats above the mini
- * player at the bottom of the app and dismisses itself after a few seconds,
- * matching the "Added to queue" snackbar of the real client. Portrait spans
- * the full screen width with a wrap-content height; landscape hugs its
- * content instead so it never stretches across the wide layout. When an
- * action is attached it sits at the far end in portrait and follows the
- * centered content with a small gap in landscape.
+ * Spotify-style toast stack: white bars with dark text floating above the
+ * mini player. The newest toast lands closest to the player and pushes the
+ * older ones up; every toast can be swiped away horizontally, dismisses
+ * itself after a few seconds, and repeated messages are folded into a
+ * counter on the existing toast instead of a new bar. Portrait rows span
+ * the full screen width, landscape rows hug their content.
  */
 @Composable
 fun SpotifyToastHost(
     state: SpotifyToastState,
     modifier: Modifier = Modifier,
 ) {
-    LaunchedEffect(state.sequence) {
-        if (state.message != null) {
-            delay(if (state.action != null) TOAST_ACTION_DURATION_MS else TOAST_DURATION_MS)
-            state.clear()
-        }
-    }
-
-    // Captured at show() time (keyed on the sequence) so the exit animation
-    // still has the last message and action to draw after the state has been
-    // cleared.
-    val text = remember(state.sequence) { state.message ?: "" }
-    val action = remember(state.sequence) { state.action }
     val isLandscape =
         LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    AnimatedVisibility(
-        visible = state.message != null,
-        enter = fadeIn(tween(160)) + slideInVertically(tween(240)) { it / 2 },
-        exit = fadeOut(tween(200)) + slideOutVertically(tween(240)) { it / 2 },
+    LazyColumn(
         modifier = modifier,
+        reverseLayout = true,
+        verticalArrangement = Arrangement.spacedBy(TOAST_STACK_SPACING),
+        horizontalAlignment = if (isLandscape) Alignment.CenterHorizontally else Alignment.Start,
+        userScrollEnabled = false,
+    ) {
+        items(state.entries, key = { it.id }) { entry ->
+            SpotifyToastRow(
+                entry = entry,
+                state = state,
+                isLandscape = isLandscape,
+                modifier = Modifier.animateItem(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpotifyToastRow(
+    entry: SpotifyToastEntry,
+    state: SpotifyToastState,
+    isLandscape: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    LaunchedEffect(entry.id, entry.count) {
+        delay(if (entry.action != null) TOAST_ACTION_DURATION_MS else TOAST_DURATION_MS)
+        state.dismiss(entry.id)
+    }
+
+    val swipeThresholdPx = with(LocalDensity.current) { TOAST_SWIPE_THRESHOLD.toPx() }
+    val xOffset = remember(entry.id) { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+
+    Row(
+        modifier = modifier
+            .then(
+                if (isLandscape) Modifier.wrapContentWidth()
+                else Modifier.fillMaxWidth()
+            )
+            .offset { IntOffset(xOffset.value.roundToInt(), 0) }
+            .pointerInput(entry.id) {
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        scope.launch { xOffset.snapTo(xOffset.value + dragAmount) }
+                    },
+                    onDragEnd = {
+                        if (abs(xOffset.value) > swipeThresholdPx) {
+                            val direction = if (xOffset.value > 0f) 1f else -1f
+                            scope.launch {
+                                xOffset.animateTo(direction * size.width.toFloat(), tween(180))
+                                state.dismiss(entry.id)
+                            }
+                        } else {
+                            scope.launch { xOffset.animateTo(0f, spring()) }
+                        }
+                    },
+                )
+            }
+            .background(
+                SpotifyToastBackground,
+                if (isLandscape) RoundedCornerShape(12.dp) else RoundedCornerShape(6.dp)
+            )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (isLandscape) Arrangement.Center else Arrangement.Start,
     ) {
         Row(
-            modifier = Modifier
-                .then(
-                    if (isLandscape) Modifier.wrapContentWidth()
-                    else Modifier.fillMaxWidth()
-                )
-                .background(
-                    SpotifyToastBackground,
-                    if (isLandscape) RoundedCornerShape(12.dp) else RoundedCornerShape(6.dp)
-                )
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = if (isLandscape) Modifier else Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (isLandscape) Arrangement.Center else Arrangement.Start,
         ) {
             Text(
-                text = text,
+                text = entry.message,
                 color = SpotifyToastTextColor,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = if (isLandscape) TextAlign.Center else TextAlign.Start,
                 maxLines = 2,
-                modifier = if (isLandscape) Modifier else Modifier.weight(1f),
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (isLandscape) Modifier else Modifier.weight(1f, fill = false),
             )
-            val currentAction = action
-            if (currentAction != null) {
-                Spacer(modifier = Modifier.width(TOAST_ACTION_SPACING))
+            if (entry.count > 1) {
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = currentAction.label,
-                    color = SpotifyToastActionColor,
-                    fontSize = 15.sp,
+                    text = "x${entry.count}",
+                    color = SpotifyToastTextColor.copy(alpha = 0.6f),
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .clickable {
-                            currentAction.onClick()
-                            state.clear()
-                        }
-                        .padding(vertical = 2.dp),
                 )
             }
+        }
+        val currentAction = entry.action
+        if (currentAction != null) {
+            Spacer(modifier = Modifier.width(TOAST_ACTION_SPACING))
+            Text(
+                text = currentAction.label,
+                color = SpotifyToastActionColor,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .clickable {
+                        currentAction.onClick()
+                        state.dismiss(entry.id)
+                    }
+                    .padding(vertical = 2.dp),
+            )
         }
     }
 }
