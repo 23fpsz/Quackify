@@ -60,6 +60,8 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
+import com.quackify.compose.widget.WidgetBackgroundStyle
+import com.quackify.compose.widget.WidgetOptionsStore
 
 data class AppUpdate(
     val version: String,
@@ -131,6 +133,7 @@ fun SettingsScreen(
     var appIcon by remember {
         mutableStateOf(clientPrefs.getString("appIcon", "default").orEmpty().ifBlank { "default" })
     }
+    var widgetOptions by remember { mutableStateOf(WidgetOptionsStore.load(context)) }
 
 
     Column(
@@ -264,6 +267,76 @@ fun SettingsScreen(
                         onToggleFullArtwork(on)
                     }
                 )
+            }
+
+            item {
+                SettingsSectionHeader(title = "Widget")
+                Text(
+                    text = "Home screen widgets come in 4x1, 3x2 and 3x3 sizes. Changes show up the next time the widgets refresh.",
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                SettingsToggleRow(
+                    title = "Show artwork",
+                    subtitle = "Display the album cover on the widgets.",
+                    isChecked = widgetOptions.showArtwork,
+                    enabled = true,
+                    onCheckedChange = { on ->
+                        widgetOptions = widgetOptions.copy(showArtwork = on)
+                        WidgetOptionsStore.saveShowArtwork(context, on)
+                    }
+                )
+                SettingsToggleRow(
+                    title = "Show like button",
+                    subtitle = "Keep the heart beside the playback controls.",
+                    isChecked = widgetOptions.showLike,
+                    enabled = true,
+                    onCheckedChange = { on ->
+                        widgetOptions = widgetOptions.copy(showLike = on)
+                        WidgetOptionsStore.saveShowLike(context, on)
+                    }
+                )
+                SettingsToggleRow(
+                    title = "Show progress bar",
+                    subtitle = "A thin playback line on the 3x2 and 3x3 widgets.",
+                    isChecked = widgetOptions.showProgress,
+                    enabled = true,
+                    onCheckedChange = { on ->
+                        widgetOptions = widgetOptions.copy(showProgress = on)
+                        WidgetOptionsStore.saveShowProgress(context, on)
+                    }
+                )
+                Text(
+                    text = "Background",
+                    style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SettingsChipOption(
+                        label = "Dark",
+                        selected = widgetOptions.background == WidgetBackgroundStyle.DARK,
+                        onClick = {
+                            widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.DARK)
+                            WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.DARK)
+                        }
+                    )
+                    SettingsChipOption(
+                        label = "Artwork tint",
+                        selected = widgetOptions.background == WidgetBackgroundStyle.TINTED,
+                        onClick = {
+                            widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.TINTED)
+                            WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.TINTED)
+                        }
+                    )
+                    SettingsChipOption(
+                        label = "Transparent",
+                        selected = widgetOptions.background == WidgetBackgroundStyle.TRANSPARENT,
+                        onClick = {
+                            widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.TRANSPARENT)
+                            WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.TRANSPARENT)
+                        }
+                    )
+                }
             }
 
             item {
@@ -659,6 +732,31 @@ private fun SettingsIconOption(
             )
         )
     }
+}
+
+@Composable
+private fun SettingsChipOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Text(
+        text = label,
+        style = EncoreTheme.typography.bodySmall.copy(
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) Color.White else EncoreColors.TextSecondary
+        ),
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) EncoreColors.Green else EncoreColors.Card)
+            .border(
+                width = 1.dp,
+                color = if (selected) EncoreColors.Green else EncoreColors.Divider,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    )
 }
 
 @Composable
