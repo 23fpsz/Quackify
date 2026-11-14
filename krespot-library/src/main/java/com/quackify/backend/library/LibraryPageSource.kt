@@ -43,6 +43,8 @@ internal const val PAGE = 50
 object LibraryPageSource {
 
     private const val OP_PAGE = "libraryV3"
+    private const val OP_PIN = "pinLibraryItem"
+    private const val OP_UNPIN = "unpinLibraryItem"
     private const val CACHE_MS = 5 * 60_000L
 
     /** Search keystrokes mint cache keys without limit; stale ones are dropped, live ones capped. */
@@ -149,6 +151,24 @@ object LibraryPageSource {
         return page
     }
 
+    suspend fun setPinned(context: Context, uri: String, pinned: Boolean): Boolean {
+        if (uri.isBlank()) return false
+        val token = EncoreAuth.token(context)
+        if (token.isBlank()) {
+            log.w("setPinned: no token")
+            return false
+        }
+        val operation = if (pinned) OP_PIN else OP_UNPIN
+        val variables = JSONObject().put("pinnableItemUri", uri).toString()
+        val json = Pathfinder.queryPost(context, token, operation, variables, fallbackToGet = false)
+        val key = if (pinned) "pinItemInLibrary" else "unpinItemInLibrary"
+        val result = json?.optJSONObject("data")?.optJSONObject(key)
+        log.i("$operation '$uri' -> ${result?.optString("pinResult").orEmpty()}")
+        val ok = result != null
+        if (ok) invalidate()
+        return ok
+    }
+
     suspend fun folder(context: Context, uri: String): LibraryPage? {
         if (uri.isBlank()) return null
         val hash = FolderSource.folderHash(uri)
@@ -199,6 +219,7 @@ object LibraryPageSource {
         val uri = data.optString("uri").ifBlank { wrapper.optString("_uri") }
         if (uri.isBlank()) return null
         val pinned = node.optBoolean("pinned", false)
+        val pinnable = node.optBoolean("pinnable", false)
         val name = data.optString("name").plainText()
         return when (val type = data.optString("__typename")) {
             "PseudoPlaylist" -> ShelfItem(
@@ -209,6 +230,7 @@ object LibraryPageSource {
                 imageUrl = GraphQl.largestSource(data.optJSONObject("image")),
                 colorHex = GraphQl.colorHex(data.optJSONObject("image")),
                 pinned = pinned,
+                pinnable = pinnable,
                 count = data.optInt("count"),
             )
             "Playlist" -> ShelfItem(
@@ -222,6 +244,7 @@ object LibraryPageSource {
                 imageUrl = GraphQl.entityImage(data),
                 colorHex = GraphQl.entityColor(data),
                 pinned = pinned,
+                pinnable = pinnable,
             )
             "Album" -> ShelfItem(
                 uri = uri,
@@ -231,6 +254,7 @@ object LibraryPageSource {
                 imageUrl = GraphQl.entityImage(data),
                 colorHex = GraphQl.entityColor(data),
                 pinned = pinned,
+                pinnable = pinnable,
             )
             "Artist" -> ShelfItem(
                 uri = uri,
@@ -240,6 +264,7 @@ object LibraryPageSource {
                 imageUrl = GraphQl.entityImage(data),
                 colorHex = GraphQl.entityColor(data),
                 pinned = pinned,
+                pinnable = pinnable,
             )
             "Folder" -> {
                 val lists = data.optInt("playlistCount")
@@ -253,6 +278,7 @@ object LibraryPageSource {
                     subtitle = if (parts.isEmpty()) "Folder" else parts.joinToString(", "),
                     kind = ShelfKind.FOLDER,
                     pinned = pinned,
+                    pinnable = pinnable,
                     count = lists,
                 )
             }
@@ -264,6 +290,7 @@ object LibraryPageSource {
                 imageUrl = GraphQl.entityImage(data),
                 colorHex = GraphQl.entityColor(data),
                 pinned = pinned,
+                pinnable = pinnable,
             )
             else -> ShelfItem(
                 uri = uri,
@@ -273,6 +300,7 @@ object LibraryPageSource {
                 imageUrl = GraphQl.entityImage(data),
                 colorHex = GraphQl.entityColor(data),
                 pinned = pinned,
+                pinnable = pinnable,
             )
         }
     }

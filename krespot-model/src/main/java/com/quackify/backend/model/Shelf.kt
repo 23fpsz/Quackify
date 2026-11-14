@@ -30,6 +30,7 @@ data class ShelfItem(
     val imageUrl: String = "",
     val colorHex: String = "",
     val pinned: Boolean = false,
+    val pinnable: Boolean = false,
     val count: Int = 0,
 )
 

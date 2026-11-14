@@ -76,6 +76,10 @@ object Pathfinder {
             "896ebcb47815681340860d121cb5d494e157e2a78d3950385cd54e0393c67148",
         "removeFromLibrary" to
             "896ebcb47815681340860d121cb5d494e157e2a78d3950385cd54e0393c67148",
+        "pinLibraryItem" to
+            "896ebcb47815681340860d121cb5d494e157e2a78d3950385cd54e0393c67148",
+        "unpinLibraryItem" to
+            "896ebcb47815681340860d121cb5d494e157e2a78d3950385cd54e0393c67148",
         "libraryV3" to
             "390c78e5b951029bad359785e69b07b536a509c581cbcd0aded5e5067f187455",
         "fetchLibraryTracks" to
