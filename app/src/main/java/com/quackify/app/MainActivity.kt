@@ -68,6 +68,7 @@ import com.quackify.compose.components.UpdateDialog
 import com.quackify.compose.components.UpdateInstallPhase
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.format.parseHexColor
+import com.quackify.app.widget.WidgetSync
 import com.quackify.compose.home.toArtistRelease
 import com.quackify.compose.home.toFavoriteArtistsShelf
 import com.quackify.compose.home.toQuickAccess
@@ -107,6 +108,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.lifecycle.lifecycleScope
 import java.util.Calendar
 
 private val log = Logs.of(Logs.Module.MAIN)
@@ -926,6 +928,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        WidgetSync.start(applicationContext)
+    }
+
     override fun onPause() {
         super.onPause()
         pausedAt = System.currentTimeMillis()
@@ -935,6 +942,9 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         sawStop = true
+        lifecycleScope.launch {
+            WidgetSync.refresh(applicationContext)
+        }
     }
 
     override fun onDestroy() {
