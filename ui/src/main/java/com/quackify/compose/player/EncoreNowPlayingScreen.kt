@@ -10,6 +10,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -340,7 +341,29 @@ fun EncoreNowPlayingScreen(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() }
-    val videoAreaHeight = (configuration.screenWidthDp * 0.8f * 9f / 16f).dp + 24.dp
+    val videoTopHeight = (configuration.screenWidthDp * 9f / 16f).dp
+    val artworkSide = (configuration.screenWidthDp - 48).dp
+    val mediaTransition = tween<Dp>(350, easing = EncoreAnimation.DecelerateInterpolator)
+    val animatedMediaHeight by animateDpAsState(
+        targetValue = if (videoActive) videoTopHeight else artworkSide,
+        animationSpec = mediaTransition,
+        label = "mediaHeight"
+    )
+    val animatedMediaPadding by animateDpAsState(
+        targetValue = if (videoActive) 0.dp else 24.dp,
+        animationSpec = mediaTransition,
+        label = "mediaPadding"
+    )
+    val animatedVideoCorner by animateDpAsState(
+        targetValue = if (videoActive) 0.dp else 16.dp,
+        animationSpec = mediaTransition,
+        label = "videoCorner"
+    )
+    val topSpacerWeight by animateFloatAsState(
+        targetValue = if (videoActive) 0f else 1f,
+        animationSpec = tween(350, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "topSpacerWeight"
+    )
 
     LaunchedEffect(Unit) {
         playerOffsetY.snapTo(0f)
@@ -404,7 +427,7 @@ fun EncoreNowPlayingScreen(
         )
 
         val animatedDominantColor by animateColorAsState(
-            targetValue = dynamicArtworkColor,
+            targetValue = if (videoActive) Color(0xFF121212) else dynamicArtworkColor,
             animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
             label = "npvDominantColorTransition"
         )
@@ -638,12 +661,12 @@ fun EncoreNowPlayingScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.weight(1f))
+                            Spacer(modifier = Modifier.weight(topSpacerWeight))
 
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 24.dp)
+                                    .padding(horizontal = animatedMediaPadding)
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -662,16 +685,15 @@ fun EncoreNowPlayingScreen(
                                         canvasFilePath = canvasFilePath,
                                         isCanvasEnabled = canvasActive,
                                         videoActive = videoActive,
+                                        videoFullBleed = videoActive,
+                                        videoCorner = animatedVideoCorner,
                                         videoQualities = videoQualities,
                                         onVideoQuality = onVideoQuality,
                                         onVideoSurface = onVideoSurface,
                                         onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .then(
-                                                if (videoActive) Modifier.height(videoAreaHeight)
-                                                else Modifier.aspectRatio(1.0f)
-                                            )
+                                            .height(animatedMediaHeight)
                                     )
                                 }
                             }
@@ -684,12 +706,14 @@ fun EncoreNowPlayingScreen(
                                 .padding(bottom = 12.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            NowPlayingSyncedLyricLine(
-                                lyricText = activeLyricLine,
-                                visible = effectiveLyricsVisible,
-                                height = lyricLineHeight,
-                                onOpenLyrics = { isLyricsFullscreen = true }
-                            )
+                            if (!videoActive) {
+                                NowPlayingSyncedLyricLine(
+                                    lyricText = activeLyricLine,
+                                    visible = effectiveLyricsVisible,
+                                    height = lyricLineHeight,
+                                    onOpenLyrics = { isLyricsFullscreen = true }
+                                )
+                            }
 
                             MusicVideoSwitchRow(
                                 available = musicVideoAvailable,
@@ -698,7 +722,9 @@ fun EncoreNowPlayingScreen(
                                 onSwitch = onSwitchVideo
                             )
 
-                            Spacer(modifier = Modifier.height(lyricBottomSpacerHeight))
+                            if (!videoActive) {
+                                Spacer(modifier = Modifier.height(lyricBottomSpacerHeight))
+                            }
 
                             NowPlayingTrackInfoRow(
                                 title = title,
@@ -1055,6 +1081,7 @@ private fun NowPlayingArtworkCard(
     gestureModifier: Modifier = Modifier,
     videoActive: Boolean = false,
     videoFullBleed: Boolean = false,
+    videoCorner: Dp = 16.dp,
     videoOverlayVisible: Boolean? = null,
     onVideoOverlayTap: (() -> Unit)? = null,
     videoQualities: List<Int> = emptyList(),
@@ -1063,7 +1090,10 @@ private fun NowPlayingArtworkCard(
     onToggleVideoFullscreen: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val corner = EncoreCornerRadii.Larger2
+    val corner = when {
+        videoActive || videoFullBleed -> videoCorner
+        else -> EncoreCornerRadii.Larger2
+    }
     val canvasActive = isCanvasEnabled && canvasFilePath != null
     val surfaceModifier = if (canvasActive || videoActive) {
         Modifier
@@ -1072,7 +1102,7 @@ private fun NowPlayingArtworkCard(
     }
     Box(
         modifier = modifier
-            .shadow(elevation = 16.dp, shape = RoundedCornerShape(corner))
+            .shadow(elevation = if (videoActive || videoFullBleed) 0.dp else 16.dp, shape = RoundedCornerShape(corner))
             .then(gestureModifier)
             .clip(RoundedCornerShape(corner))
             .then(surfaceModifier),
@@ -1236,6 +1266,7 @@ private fun VideoFullscreenLayout(
             isCanvasEnabled = false,
             videoActive = true,
             videoFullBleed = true,
+            videoCorner = 0.dp,
             videoOverlayVisible = overlayVisible,
             videoQualities = videoQualities,
             onVideoQuality = onVideoQuality,
