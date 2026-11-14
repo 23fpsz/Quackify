@@ -824,6 +824,14 @@ fun EncoreAppShell(
                 onReleaseClick = { release ->
                     openAlbum(release.title, active.artistName, release.uri)
                 },
+                onArtistClick = { name, uri -> openArtist(name, uri) },
+                onShelfClick = { title, uri ->
+                    if (uri.startsWith("spotify:album:")) {
+                        openAlbum(title, "", uri)
+                    } else {
+                        openPlaylist(title, uri)
+                    }
+                },
                 onAboutClick = { flags.isArtistAboutOpen = true },
                 onDiscographyClick = { flags.isDiscographyOpen = true },
                 onOptionsClick = { flags.isArtistOptionsOpen = true }

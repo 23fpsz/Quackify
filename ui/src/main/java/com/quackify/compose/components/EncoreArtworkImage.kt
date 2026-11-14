@@ -72,6 +72,15 @@ fun EncoreArtworkImage(
     val resolvedUrl = resolveRemoteImageUrl(imageUrl)
     var loaded by remember(resolvedUrl) { mutableStateOf(false) }
     var attempt by remember(resolvedUrl) { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    val request = remember(resolvedUrl, attempt) {
+        ImageRequest.Builder(context)
+            .data(resolvedUrl)
+            .crossfade(true)
+            .size(requestSize)
+            .setParameter("retry", attempt)
+            .build()
+    }
     val scope = rememberCoroutineScope()
     val artworkAlpha by animateFloatAsState(
         targetValue = if (loaded) 1f else 0f,
@@ -85,12 +94,7 @@ fun EncoreArtworkImage(
     ) {
         if (!resolvedUrl.isNullOrBlank()) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(resolvedUrl)
-                    .crossfade(true)
-                    .size(requestSize)
-                    .setParameter("retry", attempt)
-                    .build(),
+                model = request,
                 contentDescription = contentDescription,
                 contentScale = contentScale,
                 onSuccess = { loaded = true },

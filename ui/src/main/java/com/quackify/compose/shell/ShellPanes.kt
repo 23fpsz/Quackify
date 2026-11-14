@@ -546,6 +546,8 @@ internal fun ShellArtistPane(
     onTrackAddToQueue: ((TrackItem) -> Unit)? = null,
     onFollowToggle: (String, Boolean) -> Unit,
     onReleaseClick: (ArtistRelease) -> Unit,
+    onArtistClick: (String, String) -> Unit = { _, _ -> },
+    onShelfClick: (String, String) -> Unit = { _, _ -> },
     onAboutClick: () -> Unit,
     onDiscographyClick: () -> Unit,
     onOptionsClick: () -> Unit,
@@ -562,6 +564,10 @@ internal fun ShellArtistPane(
             releases = artistReleases.orEmpty(),
             albums = artistDetail?.albums.orEmpty().map { it.toArtistRelease() },
             singles = artistDetail?.singles.orEmpty().map { it.toArtistRelease() },
+            relatedArtists = artistDetail?.relatedArtists.orEmpty(),
+            appearsOn = artistDetail?.appearsOn.orEmpty(),
+            featuring = artistDetail?.featuring.orEmpty(),
+            discoveredOn = artistDetail?.discoveredOn.orEmpty(),
             currentTrackTitle = currentTrackTitle,
             currentTrackUri = currentTrackUri,
             isPlaying = isPlaying,
@@ -588,6 +594,8 @@ internal fun ShellArtistPane(
                 }
             },
             onReleaseClick = onReleaseClick,
+            onArtistClick = onArtistClick,
+            onShelfClick = onShelfClick,
             onAboutClick = onAboutClick,
             onDiscographyClick = onDiscographyClick
         )
