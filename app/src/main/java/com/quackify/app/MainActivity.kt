@@ -496,8 +496,10 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        LaunchedEffect(playlistUri, addTracksFetch) {
-                            if (playlistUri.isBlank()) return@LaunchedEffect
+                        LaunchedEffect(addTracksFetch) {
+                            // keyed on the sheet opening only, so opening a playlist does not fetch every library playlist
+                            val uri = playlistUri
+                            if (uri.isBlank()) return@LaunchedEffect
                             addTracksLoading = true
                             try {
                                 coroutineScope {
@@ -530,7 +532,7 @@ class MainActivity : ComponentActivity() {
                                             .map { it.item }
                                     }
                                     val sourceUris = page?.items
-                                        ?.filter { it.kind == ShelfKind.PLAYLIST && it.uri != playlistUri }
+                                        ?.filter { it.kind == ShelfKind.PLAYLIST && it.uri != uri }
                                         ?.map { it.uri }
                                         .orEmpty()
                                     val seen = HashSet<String>()
