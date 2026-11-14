@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Quackify</string>
+    <string name="widget_4x1_label">Quackify 4x1</string>
+    <string name="widget_3x2_label">Quackify 3x2</string>
+    <string name="widget_3x3_label">Quackify 3x3</string>
+    <string name="widget_4x1_desc">Playback bar with cover, like and controls</string>
+    <string name="widget_3x2_desc">Playback card with cover, progress and controls</string>
+    <string name="widget_3x3_desc">Large playback card with big cover and controls</string>
 </resources>

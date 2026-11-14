@@ -79,6 +79,43 @@
             android:exported="false"
             android:stopWithTask="true"
             android:foregroundServiceType="mediaPlayback" />
+
+        <receiver
+            android:name=".widget.QuackifyWidget4x1Receiver"
+            android:exported="false"
+            android:label="@string/widget_4x1_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_4x1" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuackifyWidget3x2Receiver"
+            android:exported="false"
+            android:label="@string/widget_3x2_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_3x2" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuackifyWidget3x3Receiver"
+            android:exported="false"
+            android:label="@string/widget_3x3_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_3x3" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
