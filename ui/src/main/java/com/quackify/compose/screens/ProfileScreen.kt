@@ -91,6 +91,7 @@ fun EncoreProfileScreen(
     onArtistClick: (String, String) -> Unit,
     onTrackSelect: (ProfileTopTrack) -> Unit,
     onTrackOptionsClick: (ProfileTopTrack) -> Unit,
+    onTrackAddToQueue: ((ProfileTopTrack) -> Unit)? = null,
     onContextClick: (ProfileContextCard) -> Unit,
     contextsTitle: String = "Recently played",
     fallbackName: String = "",
@@ -199,7 +200,8 @@ fun EncoreProfileScreen(
                             onClick = { onTrackSelect(track) },
                             onMoreClick = { onTrackOptionsClick(track) },
                             isExplicit = track.explicit,
-                            imageUrl = track.imageUrl.takeIf { it.isNotBlank() }
+                            imageUrl = track.imageUrl.takeIf { it.isNotBlank() },
+                            onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(track) } }
                         )
                     }
                 }

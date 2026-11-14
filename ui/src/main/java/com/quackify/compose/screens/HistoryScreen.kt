@@ -75,6 +75,7 @@ fun HistoryScreen(
     onBackClick: () -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
+    onTrackAddToQueue: (TrackItem) -> Unit = {},
     currentTrackTitle: String = "",
     currentTrackUri: String = "",
     isPlaying: Boolean = false,
@@ -159,6 +160,7 @@ fun HistoryScreen(
                     isPlaying = isPlaying,
                     onTrackSelect = onTrackSelect,
                     onTrackOptionsClick = onTrackOptionsClick,
+                    onTrackAddToQueue = onTrackAddToQueue,
                     expandedGroups = expandedGroups
                 )
                 historySection(
@@ -168,6 +170,7 @@ fun HistoryScreen(
                     isPlaying = isPlaying,
                     onTrackSelect = onTrackSelect,
                     onTrackOptionsClick = onTrackOptionsClick,
+                    onTrackAddToQueue = onTrackAddToQueue,
                     expandedGroups = expandedGroups
                 )
                 historySection(
@@ -177,6 +180,7 @@ fun HistoryScreen(
                     isPlaying = isPlaying,
                     onTrackSelect = onTrackSelect,
                     onTrackOptionsClick = onTrackOptionsClick,
+                    onTrackAddToQueue = onTrackAddToQueue,
                     expandedGroups = expandedGroups
                 )
 
@@ -238,6 +242,7 @@ private fun LazyListScope.historySection(
     isPlaying: Boolean,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit,
+    onTrackAddToQueue: (TrackItem) -> Unit,
     expandedGroups: SnapshotStateMap<String, Boolean>
 ) {
     if (tracks.isEmpty()) return
@@ -267,7 +272,8 @@ private fun LazyListScope.historySection(
                 imageUrl = entry.track.imageUrl,
                 isPlaying = isPlaying && entry.track.title == currentTrackTitle,
                 onClick = { onTrackSelect(entry.track) },
-                onMoreClick = { onTrackOptionsClick(entry.track) }
+                onMoreClick = { onTrackOptionsClick(entry.track) },
+                onAddToQueue = { onTrackAddToQueue(entry.track) }
             )
             is HistoryEntry.Group -> {
                 val groupKey = "$label:${entry.id}"
@@ -281,7 +287,8 @@ private fun LazyListScope.historySection(
                     currentTrackTitle = currentTrackTitle,
                     isPlaying = isPlaying,
                     onTrackSelect = onTrackSelect,
-                    onTrackOptionsClick = onTrackOptionsClick
+                    onTrackOptionsClick = onTrackOptionsClick,
+                    onTrackAddToQueue = onTrackAddToQueue
                 )
             }
         }
@@ -297,7 +304,8 @@ private fun HistoryArtistGroup(
     currentTrackTitle: String,
     isPlaying: Boolean,
     onTrackSelect: (TrackItem) -> Unit,
-    onTrackOptionsClick: (TrackItem) -> Unit
+    onTrackOptionsClick: (TrackItem) -> Unit,
+    onTrackAddToQueue: (TrackItem) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -359,7 +367,8 @@ private fun HistoryArtistGroup(
                     imageUrl = track.imageUrl,
                     isPlaying = isPlaying && track.title == currentTrackTitle,
                     onClick = { onTrackSelect(track) },
-                    onMoreClick = { onTrackOptionsClick(track) }
+                    onMoreClick = { onTrackOptionsClick(track) },
+                    onAddToQueue = { onTrackAddToQueue(track) }
                 )
             }
         }

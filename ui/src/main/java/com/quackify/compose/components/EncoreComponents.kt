@@ -391,10 +391,15 @@ fun EncoreTrackRow(
     hasVideo: Boolean = false,
     imageUrl: String? = null,
     saved: Boolean? = null,
-    onLikeToggle: (() -> Unit)? = null
+    onLikeToggle: (() -> Unit)? = null,
+    onAddToQueue: (() -> Unit)? = null
 ) {
-    Row(
+    SwipeToQueueBox(
+        onAddToQueue = onAddToQueue,
         modifier = modifier
+    ) {
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
             .height(60.dp)
             .clickable(onClick = onClick)
@@ -504,6 +509,7 @@ fun EncoreTrackRow(
             size = 36.dp,
             iconSize = 20.dp
         )
+    }
     }
 }
 

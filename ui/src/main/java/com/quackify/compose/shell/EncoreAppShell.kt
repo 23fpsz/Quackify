@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
@@ -24,6 +25,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.quackify.compose.R
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.components.SpotifyToastHost
+import com.quackify.compose.components.SpotifyToastState
 import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.home.RecommendationCard
 import com.quackify.compose.library.LibraryItem
@@ -50,6 +53,7 @@ import com.quackify.compose.sheets.ProfileFollowSheet
 import com.quackify.compose.sheets.PlaylistContributorsSheet
 import com.quackify.compose.sheets.EntityOptions
 import com.quackify.compose.theme.EncoreColors
+import com.quackify.compose.theme.rememberBottomPadding
 import com.quackify.backend.api.Collection2
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.AlbumDetail
@@ -464,6 +468,15 @@ fun EncoreAppShell(
 
     val handleTrackOptions: (TrackItem) -> Unit = { track -> actions.openTrackOptions(track) }
 
+    /** Single funnel for every "add to queue" action so they all fire the
+     * Spotify-style confirmation toast from one place. */
+    val toast = remember { SpotifyToastState() }
+    val handleQueueAdd: (String) -> Unit = { uri ->
+        playerListener?.onQueueAdd(uri)
+        toast.show("Added to queue")
+    }
+    val handleTrackAddToQueue: (TrackItem) -> Unit = { track -> handleQueueAdd(track.uri) }
+
     val handlePodcastOpen: (String, String) -> Unit = { _, uri ->
         if (uri.isNotEmpty()) openShow(uri)
     }
@@ -652,6 +665,7 @@ fun EncoreAppShell(
                 onUserClick = openUserProfile,
                 onTrackSelect = handleTrackPlay,
                 onTrackOptionsClick = handleTrackOptions,
+                onTrackAddToQueue = handleTrackAddToQueue,
                 onProfileClick = openProfileDrawer,
             )
             ShellScreen.LIBRARY -> {
@@ -714,6 +728,7 @@ fun EncoreAppShell(
                     onLoadPlaylistContributors?.invoke()
                 },
                 onTrackLikeToggle = { onPlaylistTrackLikeToggle?.invoke(it) },
+                onTrackAddToQueue = handleTrackAddToQueue,
                 handleBack = handleBack,
                 handleTrackOptions = handleTrackOptions,
                 shareEntity = shareEntity,
@@ -760,6 +775,7 @@ fun EncoreAppShell(
                 handlePlayPause = handlePlayPause,
                 handleTrackOptions = handleTrackOptions,
                 onTrackLikeToggle = { onAlbumTrackLikeToggle?.invoke(it) },
+                onTrackAddToQueue = handleTrackAddToQueue,
                 openArtist = openArtist,
                 openAlbum = openAlbum,
                 onAlbumOptions = { flags.isAlbumOptionsOpen = true },
@@ -785,6 +801,7 @@ fun EncoreAppShell(
                 onTrackSelect = handleTrackPlay,
                 onTrackOptionsClick = handleTrackOptions,
                 onTrackLikeToggle = { onArtistTrackLikeToggle?.invoke(it) },
+                onTrackAddToQueue = handleTrackAddToQueue,
                 onFollowToggle = { uri, follow ->
                     onArtistFollowToggle?.invoke(uri, follow)
                 },
@@ -896,6 +913,7 @@ fun EncoreAppShell(
                 onBackClick = handleBack,
                 onTrackSelect = { track -> actions.onTrackPlay(track) },
                 onTrackOptionsClick = { track -> actions.openTrackOptions(track) },
+                onTrackAddToQueue = handleTrackAddToQueue,
                 todayTracks = historyToday,
                 yesterdayTracks = historyYesterday,
                 earlierTracks = historyEarlier,
@@ -1020,6 +1038,7 @@ fun EncoreAppShell(
                 onArtistClick = openArtist,
                 onTrackSelect = { track -> actions.onTrackPlay(track.toTrackItem()) },
                 onTrackOptionsClick = { track -> handleTrackOptions(track.toTrackItem()) },
+                onTrackAddToQueue = { track -> handleTrackAddToQueue(track.toTrackItem()) },
                 onContextClick = { card ->
                     when {
                         card.uri.startsWith("spotify:artist:") -> openArtist(card.title, card.uri)
@@ -1379,7 +1398,7 @@ fun EncoreAppShell(
             onSettings = handleOpenSettings,
             onLogout = { onLogout?.invoke() },
             onLikeToggle = { liked -> if (playerListener != null) playerListener.onLikeToggle() else local.isLiked = liked },
-            onAddToQueue = { track -> playerListener?.onQueueAdd(track.uri) },
+            onAddToQueue = { track -> handleQueueAdd(track.uri) },
             onViewArtist = { artist, uri ->
                 flags.isTrackOptionsOpen = false
                 isPlayerExpanded = false
@@ -1595,7 +1614,15 @@ fun EncoreAppShell(
             onEditPlaylistDetails = onEditPlaylistDetails,
             onCopyEntityLink = copyEntityLink,
             onShareEntity = shareEntity,
+            onQueueAdd = handleQueueAdd,
             playerListener = playerListener,
+        )
+
+        SpotifyToastHost(
+            state = toast,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = rememberBottomPadding())
         )
 
     }

@@ -87,6 +87,7 @@ import com.quackify.compose.components.EncoreProfileAvatar
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncorePlayIndicator
+import com.quackify.compose.components.SwipeToQueueBox
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.format.parseHexColor
 import com.quackify.backend.model.SearchHit
@@ -166,6 +167,7 @@ fun EncoreSearchScreen(
     onCategoryClick: (CategoryCard) -> Unit,
     onTrackSelect: (TrackItem) -> Unit = {},
     onTrackOptionsClick: (TrackItem) -> Unit = {},
+    onTrackAddToQueue: ((TrackItem) -> Unit)? = null,
     onProfileClick: () -> Unit = {},
     onAlbumClick: (String, String, String) -> Unit = { _, _, _ -> },
     onArtistClick: (String, String) -> Unit = { _, _ -> },
@@ -1008,7 +1010,8 @@ fun EncoreSearchScreen(
                                         playFromSearch(track)
                                     },
                                     onMoreClick = { onTrackOptionsClick(track) },
-                                    onLikeClick = { onToggleSaved(track.uri, track.saved == true) }
+                                    onLikeClick = { onToggleSaved(track.uri, track.saved == true) },
+                                    onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(track) } }
                                 )
                             }
 
@@ -1133,6 +1136,7 @@ fun EncoreSearchScreen(
                                     currentTrackUri = currentTrackUri,
                                     onTrackSelect = playFromSearch,
                                     onTrackOptionsClick = onTrackOptionsClick,
+                                    onTrackAddToQueue = onTrackAddToQueue,
                                     onAlbumClick = onAlbumClick,
                                     onArtistClick = onArtistClick,
                                     onPlaylistClick = onPlaylistClick,
@@ -1197,6 +1201,7 @@ fun EncoreSearchScreen(
                                         currentTrackUri = currentTrackUri,
                                         onTrackSelect = playFromSearch,
                                         onTrackOptionsClick = onTrackOptionsClick,
+                                        onTrackAddToQueue = onTrackAddToQueue,
                                         onAlbumClick = onAlbumClick,
                                         onArtistClick = onArtistClick,
                                         onPlaylistClick = onPlaylistClick,
@@ -1222,6 +1227,7 @@ fun EncoreSearchScreen(
                                 currentTrackUri = currentTrackUri,
                                 onTrackSelect = playFromSearch,
                                 onTrackOptionsClick = onTrackOptionsClick,
+                                onTrackAddToQueue = onTrackAddToQueue,
                                 onAlbumClick = onAlbumClick,
                                 onArtistClick = onArtistClick,
                                 onPlaylistClick = onPlaylistClick,
@@ -1397,10 +1403,15 @@ private fun SearchTrackRow(
     onClick: () -> Unit,
     onMoreClick: () -> Unit,
     onLikeClick: () -> Unit = {},
+    onAddToQueue: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    SwipeToQueueBox(
+        onAddToQueue = onAddToQueue,
         modifier = modifier
+    ) {
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -1488,6 +1499,7 @@ private fun SearchTrackRow(
             size = 36.dp,
             iconSize = 20.dp
         )
+    }
     }
 }
 
@@ -1773,6 +1785,7 @@ private fun SearchHitRow(
     currentTrackUri: String,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit,
+    onTrackAddToQueue: ((TrackItem) -> Unit)? = null,
     onAlbumClick: (String, String, String) -> Unit,
     onArtistClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
@@ -1791,7 +1804,8 @@ private fun SearchHitRow(
                     onTrackSelect(item)
                 },
                 onMoreClick = { onTrackOptionsClick(item) },
-                onLikeClick = { onToggleSaved(item.uri, item.saved == true) }
+                onLikeClick = { onToggleSaved(item.uri, item.saved == true) },
+                onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(item) } }
             )
         }
         SearchKind.PLAYLIST -> PlaylistRow(

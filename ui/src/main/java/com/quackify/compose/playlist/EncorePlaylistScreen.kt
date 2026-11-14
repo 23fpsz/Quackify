@@ -167,6 +167,7 @@ fun EncorePlaylistScreen(
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit = {},
     onTrackLikeToggle: (TrackItem) -> Unit = {},
+    onTrackAddToQueue: ((TrackItem) -> Unit)? = null,
     onPlaylistOptionsClick: () -> Unit = {},
     onEditModeChange: (Boolean) -> Unit = {},
     onSaveOrder: (List<TrackItem>) -> Unit = {},
@@ -504,7 +505,8 @@ fun EncorePlaylistScreen(
                             onClick = { onTrackSelect(track) },
                             onMoreClick = { onTrackOptionsClick(track) },
                             saved = track.saved,
-                            onLikeToggle = { onTrackLikeToggle(track) }
+                            onLikeToggle = { onTrackLikeToggle(track) },
+                            onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(track) } }
                         )
                     }
                 }
@@ -1088,7 +1090,8 @@ fun EncorePlaylistScreen(
                         onClick = { onTrackSelect(track) },
                         onMoreClick = { onTrackOptionsClick(track) },
                         saved = track.saved,
-                        onLikeToggle = { onTrackLikeToggle(track) }
+                        onLikeToggle = { onTrackLikeToggle(track) },
+                        onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(track) } }
                     )
                 }
 
