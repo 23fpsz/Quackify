@@ -264,10 +264,20 @@ private fun parseAdBreak(node: JSONObject?): AdBreak? {
 
 object ClusterParser {
 
-    fun parse(payload: String, localDeviceId: String = ""): ClusterState? {
+    fun parse(payload: String, localDeviceId: String = "", previous: ClusterState? = null): ClusterState? {
         val root = runCatching { JSONObject(payload) }.getOrNull() ?: return null
         val cluster = root.optJSONObject("cluster") ?: root
-        val player = cluster.optJSONObject("player_state") ?: return null
+        val player = cluster.optJSONObject("player_state")
+        if (player == null) {
+            val prev = previous ?: return null
+            val declared = root.text("active_device_id")
+                .ifBlank { cluster.text("active_device_id") }
+            return prev.copy(
+                devices = parseDevices(cluster, declared.ifBlank { prev.activeDeviceId }, localDeviceId),
+                activeDeviceId = declared.ifBlank { prev.activeDeviceId },
+                updateReason = root.text("update_reason").ifBlank { prev.updateReason },
+            )
+        }
         val track = parseTrack(player.optJSONObject("track")) ?: EMPTY_TRACK
         val restrictions = player.optJSONObject("restrictions")
         val options = player.optJSONObject("options") ?: JSONObject()
