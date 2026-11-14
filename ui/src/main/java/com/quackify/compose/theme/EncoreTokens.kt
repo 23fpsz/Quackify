@@ -69,6 +69,8 @@ object EncoreAnimation {
     const val NowPlayingEnterDuration: Int = 150
     const val NowPlayingExitDuration: Int = 200
     const val LyricsFullscreenDuration: Int = 250
+    const val ScreenEnterDuration: Int = 260
+    const val ScreenExitDuration: Int = 200
 
     val ButtonInterpolator = CubicBezierEasing(0.3f, 0.0f, 0.0f, 1.0f)
     val BoxInterpolator = CubicBezierEasing(0.3f, 0.0f, 0.4f, 1.0f)
