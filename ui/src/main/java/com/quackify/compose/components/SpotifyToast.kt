@@ -104,15 +104,19 @@ fun SpotifyToastHost(
                 )
                 .background(
                     SpotifyToastBackground,
-                    if (isLandscape) RoundedCornerShape(10.dp) else RoundedCornerShape(4.dp)
+                    if (isLandscape) RoundedCornerShape(12.dp) else RoundedCornerShape(6.dp)
                 )
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            contentAlignment = Alignment.Center,
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            contentAlignment = if (isLandscape) {
+                Alignment.Center
+            } else {
+                Alignment.CenterStart
+            },
         ) {
             Text(
                 text = text,
                 color = SpotifyToastTextColor,
-                fontSize = 14.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
