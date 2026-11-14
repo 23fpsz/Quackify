@@ -343,7 +343,6 @@ fun EncoreAppShell(
     var playlistCreateName by local::playlistCreateName
     var creditsTrack by local::creditsTrack
     var addTrackTarget by local::addTrackTarget
-    var activeSleepTimer by local::sleepTimer
     val selectedTrackForOptions = local.trackForOptions
 
     val shellScope = rememberCoroutineScope()

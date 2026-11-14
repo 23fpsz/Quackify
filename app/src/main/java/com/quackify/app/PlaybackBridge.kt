@@ -20,6 +20,7 @@ import com.quackify.compose.shell.ChapterMarker
 import com.quackify.compose.shell.ComposePlaybackState
 import com.quackify.compose.shell.ComposePlayerListener
 import com.quackify.compose.shell.PlaybackProgress
+import com.quackify.compose.sheets.SleepTimerOption
 import com.quackify.backend.connect.KrespotConnect
 import com.quackify.backend.connect.cluster.ClusterState
 import com.quackify.backend.connect.cluster.ClusterTrack
@@ -117,6 +118,14 @@ class PlaybackBridge(private val context: Context) {
     @Volatile
     private var gaplessQueuedUri: String = ""
 
+    private var sleepTimerJob: Job? = null
+
+    @Volatile
+    private var sleepEndOfTrackArmed = false
+
+    @Volatile
+    private var sleepArmedTrackUri = ""
+
     private var adoptDuration: Long = 0L
 
     /**
@@ -204,6 +213,7 @@ class PlaybackBridge(private val context: Context) {
     /** Queues the next track into the live engine so the handoff is seamless. */
     private fun queueGaplessNext(currentUri: String) {
         if (!gaplessEnabled()) return
+        if (sleepEndOfTrackArmed) return
         val next = peekNextTrack(currentUri) ?: return
         if (!next.uri.startsWith("spotify:track:")) return
         if (!player.hasSourceFor(next.uri)) player.prefetch(next.uri, connect.spclientHost)
@@ -406,6 +416,10 @@ class PlaybackBridge(private val context: Context) {
     val listener = object : ComposePlayerListener {
         override fun onPlayPause() {
             scope.launch { toggle() }
+        }
+
+        override fun onSleepTimer(option: SleepTimerOption) {
+            sleepTimer(option)
         }
 
         override fun onSkipNext() {
@@ -775,6 +789,21 @@ class PlaybackBridge(private val context: Context) {
                     }
             }
             launch {
+                snapshotFlow { state.trackUri }.collect { uri ->
+                    if (!sleepEndOfTrackArmed) return@collect
+                    if (uri.isBlank()) {
+                        sleepEndOfTrackArmed = false
+                        state = state.copy(sleepTimer = null)
+                        return@collect
+                    }
+                    if (uri == sleepArmedTrackUri) return@collect
+                    sleepEndOfTrackArmed = false
+                    log.i("sleep timer: the armed track gave way to '${uri.takeLast(12)}', stopping")
+                    fireSleepTimer()
+                    state = state.copy(sleepTimer = null)
+                }
+            }
+            launch {
                 player.state.collect { playing ->
                     if (state.controllingRemote) return@collect
                     val waiting = held
@@ -830,6 +859,10 @@ class PlaybackBridge(private val context: Context) {
 
     fun stop() {
         pauseRemoteOnExit()
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        sleepEndOfTrackArmed = false
+        sleepArmedTrackUri = ""
         connect.holdsStream = false
         runCatching {
             runBlocking { withTimeoutOrNull(2_000L) { connect.unregister() } }
@@ -1509,6 +1542,50 @@ class PlaybackBridge(private val context: Context) {
         }
         log.i("toggle -> paused=$wasPlaying source=$source pos=${player.positionMs}")
         connect.report(snapshot)
+    }
+
+    /** Arms, re-arms or cancels the sleep timer; the bridge owns the countdown
+     * so it survives recomposition and keeps ticking while the app idles. */
+    private fun sleepTimer(option: SleepTimerOption) {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        sleepEndOfTrackArmed = false
+        sleepArmedTrackUri = ""
+        when (option) {
+            SleepTimerOption.OFF -> {
+                state = if (state.sleepTimer == null) state else state.copy(sleepTimer = null)
+                log.i("sleep timer off")
+            }
+            SleepTimerOption.END_OF_TRACK -> {
+                sleepEndOfTrackArmed = true
+                sleepArmedTrackUri = state.trackUri
+                state = state.copy(sleepTimer = option)
+                log.i("sleep timer armed at the end of '${state.trackUri.takeLast(12)}'")
+            }
+            else -> {
+                state = state.copy(sleepTimer = option)
+                log.i("sleep timer armed for ${option.minutes} minutes")
+                sleepTimerJob = scope.launch {
+                    delay(option.minutes * 60_000L)
+                    log.i("sleep timer fired after ${option.minutes}m")
+                    fireSleepTimer()
+                    state = state.copy(sleepTimer = null)
+                }
+            }
+        }
+    }
+
+    private suspend fun fireSleepTimer() {
+        if (!state.isPlaying) return
+        val active = connect.cluster.value?.activeDevice
+        if (active != null && active.id != deviceId) {
+            toggle()
+            return
+        }
+        if (player.hasSource) {
+            player.pause()
+            reportPaused()
+        }
     }
 
     private suspend fun toggleRemote(cluster: ClusterState, active: com.quackify.backend.model.ConnectDevice) {
@@ -3771,6 +3848,14 @@ class PlaybackBridge(private val context: Context) {
 
     private suspend fun runAdvance(endedIn: String) {
         val ended = endedIn
+        if (sleepEndOfTrackArmed) {
+            sleepEndOfTrackArmed = false
+            log.i("sleep timer: '${ended.takeLast(12)}' ended, stopping instead of advancing")
+            player.pause()
+            reportPaused()
+            state = state.copy(sleepTimer = null)
+            return
+        }
         val rows = chainFor()
         val at = rowOf(rows, ended)
         if (at >= 0) resumeRow = at + 1
