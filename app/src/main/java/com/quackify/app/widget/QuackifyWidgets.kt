@@ -164,15 +164,17 @@ private fun CompactContent(snapshot: WidgetSnapshot, options: WidgetOptions, art
             modifier = GlanceModifier.defaultWeight(),
         )
         Spacer(modifier = GlanceModifier.width(4.dp))
-        if (options.showLike) {
-            LikeButton(snapshot)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (options.showLike) {
+                LikeButton(snapshot)
+                Spacer(modifier = GlanceModifier.width(2.dp))
+            }
+            SkipButton(previous = true)
             Spacer(modifier = GlanceModifier.width(2.dp))
+            PlayButton(snapshot, size = 34.dp, iconSize = 18.dp)
+            Spacer(modifier = GlanceModifier.width(2.dp))
+            SkipButton(previous = false)
         }
-        SkipButton(previous = true)
-        Spacer(modifier = GlanceModifier.width(2.dp))
-        PlayButton(snapshot, size = 34.dp, iconSize = 18.dp)
-        Spacer(modifier = GlanceModifier.width(2.dp))
-        SkipButton(previous = false)
     }
 }
 
