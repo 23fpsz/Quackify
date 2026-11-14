@@ -79,6 +79,7 @@ import com.quackify.compose.screens.toTrackItem
 import com.quackify.compose.util.rememberDominantColor
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.home.HomeShelf
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -486,7 +487,15 @@ fun EncoreAppShell(
     val toast = remember { SpotifyToastState() }
     val handleQueueAdd: (String) -> Unit = { uri ->
         playerListener?.onQueueAdd(uri)
-        toast.show("Added to queue")
+        toast.show("Added to queue", "Queue") {
+            isPlayerExpanded = true
+            shellScope.launch {
+                // Let the player's reveal animation finish before the queue
+                // sheet slides in on top of it.
+                delay(440L)
+                if (isPlayerExpanded) flags.isQueueSheetOpen = true
+            }
+        }
     }
     val handleTrackAddToQueue: (TrackItem) -> Unit = { track -> handleQueueAdd(track.uri) }
 
