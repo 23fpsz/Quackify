@@ -422,7 +422,7 @@ fun EncoreNowPlayingScreen(
                 )
         )
 
-        if (canvasActive && !isLandscape) {
+        if (canvasActive && !videoActive && !isLandscape) {
             CanvasVideoPlayer(
                 filePath = canvasFilePath,
                 zoom = CANVAS_ZOOM,
@@ -647,7 +647,7 @@ fun EncoreNowPlayingScreen(
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (canvasActive) {
+                                if (canvasActive && !videoActive) {
                                     Spacer(
                                         modifier = Modifier
                                             .fillMaxWidth()
