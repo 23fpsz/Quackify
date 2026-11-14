@@ -552,6 +552,18 @@ object EncoreAuth {
         editor.apply()
     }
 
+    /**
+     * Persists the accent color of a specific saved account — used to backfill
+     * colors for accounts that were saved before their profile was ever opened,
+     * so the account switcher can tint their avatars too.
+     */
+    fun saveAccountColor(context: Context, accountId: String, colorHex: String) {
+        if (colorHex.isBlank() || accountId.isBlank()) return
+        val editor = prefs(context).edit().putString("multi.$accountId.color", colorHex)
+        if (activeAccountId(context) == accountId) editor.putString(KEY_COLOR, colorHex)
+        editor.apply()
+    }
+
     fun applySession(context: Context) {
         val session = prefs(context).getString(KEY_SESSION, null) ?: return
         val map = runCatching { JSONObject(session) }.getOrNull() ?: return

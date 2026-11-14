@@ -407,6 +407,20 @@ class MainActivity : ComponentActivity() {
                                 EncoreAuth.storeCurrentAccount(context)
                                 savedAccountsList = EncoreAuth.savedAccounts(context)
                             }
+                            val missing = savedAccountsList.filter { it.colorHex.isBlank() }
+                            if (missing.isNotEmpty()) {
+                                log.i("backfilling profile colors for ${missing.size} account(s)")
+                                missing.forEach { saved ->
+                                    val color = runCatching {
+                                        Profile.profile(context, saved.id)
+                                    }.getOrNull()?.colorHex.orEmpty()
+                                    if (color.isNotBlank()) {
+                                        EncoreAuth.saveAccountColor(context, saved.id, color)
+                                        log.i("profile color backfilled for '${saved.name}' -> $color")
+                                    }
+                                }
+                                savedAccountsList = EncoreAuth.savedAccounts(context)
+                            }
                         }
 
                         LaunchedEffect(whatsNewFetch) {
