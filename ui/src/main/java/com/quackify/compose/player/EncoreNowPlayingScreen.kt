@@ -416,7 +416,7 @@ fun EncoreNowPlayingScreen(
             label = "npvDominantColorTransition"
         )
 
-        val fullArtworkBlur by rememberFullArtworkBlur(coverUrl)
+        val fullArtworkBlur by rememberFullArtworkBlur(if (fullArtwork && !canvasActive && !isLandscape) coverUrl else null)
 
         Box(
             modifier = Modifier
@@ -431,7 +431,7 @@ fun EncoreNowPlayingScreen(
                 )
         )
 
-        if (fullArtwork) {
+        if (fullArtwork && !canvasActive && !isLandscape) {
             FullArtworkBackdrop(
                 image = fullArtworkBlur,
                 modifier = Modifier.fillMaxSize()
@@ -626,7 +626,8 @@ fun EncoreNowPlayingScreen(
                             .heightIn(min = viewportHeight - PEEK_HEIGHT),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (fullArtwork) {
+                        val isFullBleed = fullArtwork || canvasActive
+                        if (isFullBleed) {
                             val card: @Composable () -> Unit = {
                                 Box(
                                     modifier = Modifier
