@@ -31,6 +31,8 @@ import com.quackify.backend.model.PlaylistMember
 import com.quackify.backend.model.TrackPage
 import com.quackify.backend.model.TrackRow
 import org.json.JSONObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.quackify.backend.core.net.plainText
 
 private val log = Logs.of(Logs.Module.COLLECTION)
@@ -61,44 +63,48 @@ object CollectionSource {
         val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val target = canonical(uri)
-        if (target.startsWith("spotify:collection:")) {
-            val page = likedPage(context, token, target, offset, PAGE) ?: return null
-            return TrackPage(
-                rows = likedRows(page),
-                total = page.optInt("totalCount", 0),
-                offset = offset,
+        return withContext(Dispatchers.Default) {
+            if (target.startsWith("spotify:collection:")) {
+                val page = likedPage(context, token, target, offset, PAGE) ?: return@withContext null
+                TrackPage(
+                    rows = likedRows(page),
+                    total = page.optInt("totalCount", 0),
+                    offset = offset,
+                    fetched = page.optJSONArray("items")?.length() ?: 0,
+                )
+            } else {
+                val playlist = playlistPage(context, token, uri, offset, PAGE) ?: return@withContext null
+                val content = playlist.optJSONObject("content")
+                TrackPage(
+                    rows = withSaved(context, playlistRows(content)),
+                    total = content?.optInt("totalCount", 0) ?: 0,
+                    offset = offset,
+                    fetched = content?.optJSONArray("items")?.length() ?: 0,
+                )
+            }
+        }
+    }
+
+    private suspend fun liked(context: Context, token: String, uri: String): CollectionDetail? =
+        withContext(Dispatchers.Default) {
+            val page = likedPage(context, token, uri, 0, PAGE) ?: return@withContext null
+            val total = page.optInt("totalCount", 0)
+            val rows = likedRows(page)
+            log.i("liked $uri -> ${rows.size}/$total")
+            CollectionDetail(
+                uri = uri,
+                title = "Liked Songs",
+                creator = "",
+                saveCount = if (total == 1) "1 song" else "$total songs",
+                description = "",
+                imageUrl = LIKED_COVER,
+                colorHex = "#5018F0",
+                tracks = rows,
+                total = total,
+                offset = 0,
                 fetched = page.optJSONArray("items")?.length() ?: 0,
             )
         }
-        val playlist = playlistPage(context, token, uri, offset, PAGE) ?: return null
-        val content = playlist.optJSONObject("content")
-        return TrackPage(
-            rows = withSaved(context, playlistRows(content)),
-            total = content?.optInt("totalCount", 0) ?: 0,
-            offset = offset,
-            fetched = content?.optJSONArray("items")?.length() ?: 0,
-        )
-    }
-
-    private suspend fun liked(context: Context, token: String, uri: String): CollectionDetail? {
-        val page = likedPage(context, token, uri, 0, PAGE) ?: return null
-        val total = page.optInt("totalCount", 0)
-        val rows = likedRows(page)
-        log.i("liked $uri -> ${rows.size}/$total")
-        return CollectionDetail(
-            uri = uri,
-            title = "Liked Songs",
-            creator = "",
-            saveCount = if (total == 1) "1 song" else "$total songs",
-            description = "",
-            imageUrl = LIKED_COVER,
-            colorHex = "#5018F0",
-            tracks = rows,
-            total = total,
-            offset = 0,
-            fetched = page.optJSONArray("items")?.length() ?: 0,
-        )
-    }
 
     private suspend fun likedPage(
         context: Context,
@@ -179,45 +185,46 @@ object CollectionSource {
         return out
     }
 
-    private suspend fun playlist(context: Context, token: String, uri: String): CollectionDetail? {
-        val playlist = playlistPage(context, token, uri, 0, PAGE) ?: return null
-        val content = playlist.optJSONObject("content")
-        val rows = withSaved(context, playlistRows(content))
-        val total = content?.optInt("totalCount", rows.size) ?: rows.size
-        val owner = playlist.optJSONObject("ownerV2")?.optJSONObject("data")
-        val followers = playlist.optLong("followers", 0L)
-        val capabilities = playlist.optJSONObject("currentUserCapabilities")
-        val editable = capabilities?.optBoolean("canEditItems", false) == true ||
-            capabilities?.optBoolean("canEditMetadata", false) == true
-        val detail = CollectionDetail(
-            uri = uri,
-            title = playlist.optString("name").plainText(),
-            creator = owner?.optString("name").orEmpty(),
-            creatorAvatarUrl = GraphQl.userAvatar(owner),
-            saveCount = when {
-                followers > 0L -> {
-                    val formatted = java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(followers)
-                    if (followers == 1L) "1 save" else "$formatted saves"
-                }
-                total == 1 -> "1 song"
-                total > 0 -> "$total songs"
-                else -> ""
-            },
-            description = playlist.optString("description").plainText(),
-            imageUrl = GraphQl.entityImage(playlist),
-            colorHex = GraphQl.visualColor(playlist).ifBlank { GraphQl.entityColor(playlist) },
-            tracks = rows,
-            total = total,
-            offset = 0,
-            fetched = content?.optJSONArray("items")?.length() ?: 0,
-            editable = editable,
-            members = members(playlist),
-        )
-        log.i("playlist $uri '${detail.title}' -> ${rows.size}/$total owner='${detail.creator}' " +
-                "followers=$followers editable=$editable members=${detail.members.size} " +
-                "saved=${rows.count { it.saved == true }} " +
-                "video=${rows.count { it.video }}"
-        )
-        return detail
-    }
+    private suspend fun playlist(context: Context, token: String, uri: String): CollectionDetail? =
+        withContext(Dispatchers.Default) {
+            val playlist = playlistPage(context, token, uri, 0, PAGE) ?: return@withContext null
+            val content = playlist.optJSONObject("content")
+            val rows = withSaved(context, playlistRows(content))
+            val total = content?.optInt("totalCount", rows.size) ?: rows.size
+            val owner = playlist.optJSONObject("ownerV2")?.optJSONObject("data")
+            val followers = playlist.optLong("followers", 0L)
+            val capabilities = playlist.optJSONObject("currentUserCapabilities")
+            val editable = capabilities?.optBoolean("canEditItems", false) == true ||
+                capabilities?.optBoolean("canEditMetadata", false) == true
+            val detail = CollectionDetail(
+                uri = uri,
+                title = playlist.optString("name").plainText(),
+                creator = owner?.optString("name").orEmpty(),
+                creatorAvatarUrl = GraphQl.userAvatar(owner),
+                saveCount = when {
+                    followers > 0L -> {
+                        val formatted = java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(followers)
+                        if (followers == 1L) "1 save" else "$formatted saves"
+                    }
+                    total == 1 -> "1 song"
+                    total > 0 -> "$total songs"
+                    else -> ""
+                },
+                description = playlist.optString("description").plainText(),
+                imageUrl = GraphQl.entityImage(playlist),
+                colorHex = GraphQl.visualColor(playlist).ifBlank { GraphQl.entityColor(playlist) },
+                tracks = rows,
+                total = total,
+                offset = 0,
+                fetched = content?.optJSONArray("items")?.length() ?: 0,
+                editable = editable,
+                members = members(playlist),
+            )
+            log.i("playlist $uri '${detail.title}' -> ${rows.size}/$total owner='${detail.creator}' " +
+                    "followers=$followers editable=$editable members=${detail.members.size} " +
+                    "saved=${rows.count { it.saved == true }} " +
+                    "video=${rows.count { it.video }}"
+            )
+            detail
+        }
 }

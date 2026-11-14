@@ -37,6 +37,8 @@ import com.quackify.backend.model.ShelfItem
 import com.quackify.backend.model.TrackRow
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.quackify.backend.core.net.plainText
 
 private val log = Logs.of(Logs.Module.ARTIST)
@@ -58,87 +60,89 @@ object ArtistSource {
             .put("locale", "")
             .put("preReleaseV2", true)
             .toString()
-        val json = Pathfinder.queryPost(context, token, OP_ARTIST, variables) ?: return null
-        val union = json.optJSONObject("data")?.optJSONObject("artistUnion") ?: return null
-        val profile = union.optJSONObject("profile")
-        val discography = union.optJSONObject("discography")
-        val top = discography?.optJSONObject("topTracks")?.optJSONArray("items")
-        val rows = ArrayList<TrackRow>(top?.length() ?: 0)
-        for (i in 0 until (top?.length() ?: 0)) {
-            val item = top?.optJSONObject(i) ?: continue
-            val trackNode = item.optJSONObject("track") ?: item
-            val row = track(trackNode, "") ?: continue
-            val playcount = item.optString("playcount").ifBlank {
-                item.optLong("playcount", 0L).takeIf { it > 0L }?.toString()
-            } ?: trackNode.optString("playcount").ifBlank {
-                trackNode.optLong("playcount", 0L).takeIf { it > 0L }?.toString()
-            }
-            val plays = playcount?.toLongOrNull() ?: row.plays
-            rows.add(if (row.plays == 0L && plays > 0L) row.copy(plays = plays) else row)
-        }
-        val stats = union.optJSONObject("stats")
-        val related = union.optJSONObject("relatedContent")
-        val pinnedNode = profile?.optJSONObject("pinnedItem")
-        val discovered = related?.optJSONObject("discoveredOnV2")
-            ?.let { discoveredShelf(context, token, uri) }
-            .orEmpty()
-        val detail = ArtistDetail(
-            uri = uri,
-            name = profile?.optString("name").orEmpty().plainText(),
-            imageUrl = GraphQl.entityImage(union.optJSONObject("visuals")),
-            headerImageUrl = GraphQl.headerImage(union),
-            gallery = GraphQl.gallery(union),
-            colorHex = GraphQl.visualColor(union).ifBlank {
-                GraphQl.colorHex(union.optJSONObject("visuals")?.optJSONObject("avatarImage"))
-            },
-            monthlyListeners = stats?.optLong("monthlyListeners", 0L) ?: 0L,
-            followers = stats?.optLong("followers", 0L) ?: 0L,
-            biography = profile?.optJSONObject("biography")?.optString("text").orEmpty().plainText(),
-            verified = union.optJSONObject("onPlatformReputationTrait")
-                ?.optJSONObject("verification")
-                ?.optBoolean("isVerified", false) == true ||
-                profile?.optBoolean("verified", false) == true,
-            saved = union.optBoolean("saved", false),
-            topTracks = withSaved(context, rows),
-            releases = releases(discography),
-            pinned = pinned(pinnedNode),
-            pinnedComment = pinnedNode?.optString("comment").orEmpty().plainText(),
-            albums = releaseGroup(discography?.optJSONObject("albums")),
-            singles = releaseGroup(discography?.optJSONObject("singles")),
-            compilations = releaseGroup(discography?.optJSONObject("compilations")),
-            featuring = dataShelf(related?.optJSONObject("featuringV2")),
-            appearsOn = releaseGroup(related?.optJSONObject("appearsOn")),
-            artistPlaylists = dataShelf(profile?.optJSONObject("playlistsV2")),
-            relatedArtists = artistNodes(related?.optJSONObject("relatedArtists")),
-            videos = videoShelf(union.optJSONObject("relatedMusicVideos")),
-            topCities = stats?.optJSONObject("topCities")?.optJSONArray("items")?.let { cities ->
-                (0 until cities.length()).mapNotNull { i ->
-                    val node = cities.optJSONObject(i) ?: return@mapNotNull null
-                    val city = node.optString("city").plainText()
-                    if (city.isBlank()) null
-                    else CityStat(city, node.optLong("numberOfListeners", 0L))
+        return withContext(Dispatchers.Default) {
+            val json = Pathfinder.queryPost(context, token, OP_ARTIST, variables) ?: return@withContext null
+            val union = json.optJSONObject("data")?.optJSONObject("artistUnion") ?: return@withContext null
+            val profile = union.optJSONObject("profile")
+            val discography = union.optJSONObject("discography")
+            val top = discography?.optJSONObject("topTracks")?.optJSONArray("items")
+            val rows = ArrayList<TrackRow>(top?.length() ?: 0)
+            for (i in 0 until (top?.length() ?: 0)) {
+                val item = top?.optJSONObject(i) ?: continue
+                val trackNode = item.optJSONObject("track") ?: item
+                val row = track(trackNode, "") ?: continue
+                val playcount = item.optString("playcount").ifBlank {
+                    item.optLong("playcount", 0L).takeIf { it > 0L }?.toString()
+                } ?: trackNode.optString("playcount").ifBlank {
+                    trackNode.optLong("playcount", 0L).takeIf { it > 0L }?.toString()
                 }
-            }.orEmpty(),
-            worldRank = stats?.optInt("worldRank", 0) ?: 0,
-            merch = merch(union.optJSONObject("goods")?.optJSONObject("merch")),
-            externalLinks = links(profile?.optJSONObject("externalLinks")),
-            discoveredOn = discovered,
-            concerts = concerts(union.optJSONObject("goods")?.optJSONObject("concerts")),
-        )
-        log.i("artist $uri '${detail.name}' top=${detail.topTracks.size} releases=${detail.releases.size} " +
-                "listeners=${detail.monthlyListeners} followers=${detail.followers} " +
-                "banner=${detail.headerImageUrl.isNotBlank()} gallery=${detail.gallery.size} " +
-                "verified=${detail.verified} saved=${detail.saved} " +
-                "albums=${detail.albums.size} singles=${detail.singles.size} " +
-                "compilations=${detail.compilations.size} featuring=${detail.featuring.size} " +
-                "appearsOn=${detail.appearsOn.size} playlists=${detail.artistPlaylists.size} " +
-                "related=${detail.relatedArtists.size} videos=${detail.videos.size} " +
-                "pinned=${detail.pinned != null} rank=${detail.worldRank} " +
-                "bio=${detail.biography.length} cities=${detail.topCities.size} " +
-                "merch=${detail.merch.size} links=${detail.externalLinks.size} " +
-                "discovered=${detail.discoveredOn.size} concerts=${detail.concerts.size}"
-        )
-        return detail
+                val plays = playcount?.toLongOrNull() ?: row.plays
+                rows.add(if (row.plays == 0L && plays > 0L) row.copy(plays = plays) else row)
+            }
+            val stats = union.optJSONObject("stats")
+            val related = union.optJSONObject("relatedContent")
+            val pinnedNode = profile?.optJSONObject("pinnedItem")
+            val discovered = related?.optJSONObject("discoveredOnV2")
+                ?.let { discoveredShelf(context, token, uri) }
+                .orEmpty()
+            val detail = ArtistDetail(
+                uri = uri,
+                name = profile?.optString("name").orEmpty().plainText(),
+                imageUrl = GraphQl.entityImage(union.optJSONObject("visuals")),
+                headerImageUrl = GraphQl.headerImage(union),
+                gallery = GraphQl.gallery(union),
+                colorHex = GraphQl.visualColor(union).ifBlank {
+                    GraphQl.colorHex(union.optJSONObject("visuals")?.optJSONObject("avatarImage"))
+                },
+                monthlyListeners = stats?.optLong("monthlyListeners", 0L) ?: 0L,
+                followers = stats?.optLong("followers", 0L) ?: 0L,
+                biography = profile?.optJSONObject("biography")?.optString("text").orEmpty().plainText(),
+                verified = union.optJSONObject("onPlatformReputationTrait")
+                    ?.optJSONObject("verification")
+                    ?.optBoolean("isVerified", false) == true ||
+                    profile?.optBoolean("verified", false) == true,
+                saved = union.optBoolean("saved", false),
+                topTracks = withSaved(context, rows),
+                releases = releases(discography),
+                pinned = pinned(pinnedNode),
+                pinnedComment = pinnedNode?.optString("comment").orEmpty().plainText(),
+                albums = releaseGroup(discography?.optJSONObject("albums")),
+                singles = releaseGroup(discography?.optJSONObject("singles")),
+                compilations = releaseGroup(discography?.optJSONObject("compilations")),
+                featuring = dataShelf(related?.optJSONObject("featuringV2")),
+                appearsOn = releaseGroup(related?.optJSONObject("appearsOn")),
+                artistPlaylists = dataShelf(profile?.optJSONObject("playlistsV2")),
+                relatedArtists = artistNodes(related?.optJSONObject("relatedArtists")),
+                videos = videoShelf(union.optJSONObject("relatedMusicVideos")),
+                topCities = stats?.optJSONObject("topCities")?.optJSONArray("items")?.let { cities ->
+                    (0 until cities.length()).mapNotNull { i ->
+                        val node = cities.optJSONObject(i) ?: return@mapNotNull null
+                        val city = node.optString("city").plainText()
+                        if (city.isBlank()) null
+                        else CityStat(city, node.optLong("numberOfListeners", 0L))
+                    }
+                }.orEmpty(),
+                worldRank = stats?.optInt("worldRank", 0) ?: 0,
+                merch = merch(union.optJSONObject("goods")?.optJSONObject("merch")),
+                externalLinks = links(profile?.optJSONObject("externalLinks")),
+                discoveredOn = discovered,
+                concerts = concerts(union.optJSONObject("goods")?.optJSONObject("concerts")),
+            )
+            log.i("artist $uri '${detail.name}' top=${detail.topTracks.size} releases=${detail.releases.size} " +
+                    "listeners=${detail.monthlyListeners} followers=${detail.followers} " +
+                    "banner=${detail.headerImageUrl.isNotBlank()} gallery=${detail.gallery.size} " +
+                    "verified=${detail.verified} saved=${detail.saved} " +
+                    "albums=${detail.albums.size} singles=${detail.singles.size} " +
+                    "compilations=${detail.compilations.size} featuring=${detail.featuring.size} " +
+                    "appearsOn=${detail.appearsOn.size} playlists=${detail.artistPlaylists.size} " +
+                    "related=${detail.relatedArtists.size} videos=${detail.videos.size} " +
+                    "pinned=${detail.pinned != null} rank=${detail.worldRank} " +
+                    "bio=${detail.biography.length} cities=${detail.topCities.size} " +
+                    "merch=${detail.merch.size} links=${detail.externalLinks.size} " +
+                    "discovered=${detail.discoveredOn.size} concerts=${detail.concerts.size}"
+            )
+            detail
+        }
     }
 
     suspend fun discographyCounts(context: Context, uri: String): Map<String, Int> {
