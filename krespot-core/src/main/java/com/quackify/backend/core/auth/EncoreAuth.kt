@@ -582,6 +582,26 @@ object EncoreAuth {
         log.i("applySession restored ${map.length()} domains")
     }
 
+    /**
+     * Empties the WebView cookie jar (leaving the stored session, tokens and
+     * per-account snapshots in prefs untouched). The add-account flow calls
+     * this before its login webview opens: without it the live sp_dc of the
+     * signed-in account makes accounts.spotify.com skip the login form and
+     * bounce straight into the player, which the poll loop resolves as the
+     * already-saved account — a duplicate that is refused, so the user ends
+     * up back on the original account without ever seeing the login page.
+     * Cancelling the flow restores the jar via [applySession].
+     */
+    fun clearCookies() {
+        val manager = cookieManagerOrNull() ?: run {
+            log.w("clearCookies skipped, the cookie jar is unavailable")
+            return
+        }
+        manager.removeAllCookies(null)
+        manager.flush()
+        log.i("clearCookies emptied the cookie jar")
+    }
+
     fun logout(context: Context) {
         log.i("logout")
         val active = activeAccountId(context)
