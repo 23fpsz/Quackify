@@ -106,12 +106,9 @@ import com.quackify.compose.components.EncoreMenuItem
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreRepeatButton
 import com.quackify.compose.components.EncoreSmartShuffleButton
-import com.quackify.compose.components.FullArtworkBackdrop
-import com.quackify.compose.components.dissolveInto
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.components.EncoreArtworkImage
-import com.quackify.compose.components.rememberFullArtworkBlur
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
@@ -141,10 +138,8 @@ private const val REVEAL_INFO_DELAY_MS = 90
 private const val REVEAL_CONTROLS_DELAY_MS = 160
 private const val REVEAL_REST_DELAY_MS = 220
 private const val REVEAL_RISE_FRACTION = 0.06f
-private const val ARTWORK_FADE_FRACTION = 0.42f
 
 /** Canvas banners are glued to the status bar and zoomed to hide the seam. */
-private const val CANVAS_FADE_FRACTION = 0.30f
 private const val CANVAS_ZOOM = 1.06f
 private val HEADER_ROW_HEIGHT = 60.dp
 private val PEEK_HEIGHT = 44.dp
@@ -239,7 +234,6 @@ fun EncoreNowPlayingScreen(
     canvasFilePath: String? = null,
     isCanvasAllowed: Boolean = true,
     isCanvasEnabled: Boolean = false,
-    fullArtwork: Boolean = true,
     onCanvasToggle: (Boolean) -> Unit = {},
     musicVideoAvailable: Boolean = false,
     videoActive: Boolean = false,
@@ -346,7 +340,6 @@ fun EncoreNowPlayingScreen(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() }
-    val fullArtworkHeight = (configuration.screenWidthDp + 76).dp
     val videoAreaHeight = (configuration.screenWidthDp * 0.8f * 9f / 16f).dp + 24.dp
 
     LaunchedEffect(Unit) {
@@ -416,8 +409,6 @@ fun EncoreNowPlayingScreen(
             label = "npvDominantColorTransition"
         )
 
-        val fullArtworkBlur by rememberFullArtworkBlur(if (fullArtwork && !canvasActive && !isLandscape) coverUrl else null)
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -431,10 +422,16 @@ fun EncoreNowPlayingScreen(
                 )
         )
 
-        if (fullArtwork && !canvasActive && !isLandscape) {
-            FullArtworkBackdrop(
-                image = fullArtworkBlur,
+        if (canvasActive && !isLandscape) {
+            CanvasVideoPlayer(
+                filePath = canvasFilePath,
+                zoom = CANVAS_ZOOM,
                 modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.28f))
             )
         }
 
@@ -626,67 +623,6 @@ fun EncoreNowPlayingScreen(
                             .heightIn(min = viewportHeight - PEEK_HEIGHT),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        val isFullBleed = fullArtwork || canvasActive
-                        if (isFullBleed) {
-                            val card: @Composable () -> Unit = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat())
-                                ) {
-                                    NowPlayingArtworkCard(
-                                        title = title,
-                                        coverUrl = coverUrl,
-                                        dominantColor = dynamicArtworkColor,
-                                        backgroundColor = animatedDominantColor,
-                                        canvasFilePath = canvasFilePath,
-                                        isCanvasEnabled = canvasActive,
-                                        fullBleed = true,
-                                        fadeFraction = if (canvasActive) CANVAS_FADE_FRACTION else ARTWORK_FADE_FRACTION,
-                                        canvasZoom = CANVAS_ZOOM,
-                                        videoActive = videoActive,
-                                        videoQualities = videoQualities,
-                                        onVideoQuality = onVideoQuality,
-                                        onVideoSurface = onVideoSurface,
-                                        onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .then(
-                                                if (videoActive) Modifier.height(videoAreaHeight)
-                                                else Modifier.height(fullArtworkHeight)
-                                            )
-                                    )
-                                }
-                            }
-                            val header: @Composable () -> Unit = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .statusBarsPadding()
-                                ) {
-                                    NowPlayingHeaderRow(
-                                        resolvedContextTitle = resolvedContextTitle,
-                                        contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
-                                        onCollapseClick = onCollapseClick,
-                                        onMoreClick = onMoreClick,
-                                        dominantColor = animatedDominantColor,
-                                        dragModifier = headerDragModifier
-                                    )
-                                }
-                            }
-                            if (videoActive) {
-                                header()
-                                Spacer(modifier = Modifier.weight(1f))
-                                card()
-                                Spacer(modifier = Modifier.weight(1f))
-                            } else {
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    card()
-                                    header()
-                                }
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        } else {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -711,31 +647,36 @@ fun EncoreNowPlayingScreen(
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
                                 contentAlignment = Alignment.Center
                             ) {
-                                NowPlayingArtworkCard(
-                                    title = title,
-                                    coverUrl = coverUrl,
-                                    dominantColor = dynamicArtworkColor,
-                                    backgroundColor = animatedDominantColor,
-                                    canvasFilePath = canvasFilePath,
-                                    isCanvasEnabled = canvasActive,
-                                    fullBleed = false,
-                                    fadeFraction = 0f,
-                                    videoActive = videoActive,
-                                    videoQualities = videoQualities,
-                                    onVideoQuality = onVideoQuality,
-                                    onVideoSurface = onVideoSurface,
-                                    onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .then(
-                                            if (videoActive) Modifier.height(videoAreaHeight)
-                                            else Modifier.aspectRatio(1.0f)
-                                        )
-                                )
+                                if (canvasActive) {
+                                    Spacer(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(1.0f)
+                                    )
+                                } else {
+                                    NowPlayingArtworkCard(
+                                        title = title,
+                                        coverUrl = coverUrl,
+                                        dominantColor = dynamicArtworkColor,
+                                        backgroundColor = animatedDominantColor,
+                                        canvasFilePath = canvasFilePath,
+                                        isCanvasEnabled = canvasActive,
+                                        videoActive = videoActive,
+                                        videoQualities = videoQualities,
+                                        onVideoQuality = onVideoQuality,
+                                        onVideoSurface = onVideoSurface,
+                                        onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .then(
+                                                if (videoActive) Modifier.height(videoAreaHeight)
+                                                else Modifier.aspectRatio(1.0f)
+                                            )
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.weight(1f))
-                        }
 
                         Column(
                             modifier = Modifier
@@ -1112,9 +1053,6 @@ private fun NowPlayingArtworkCard(
     canvasFilePath: String?,
     isCanvasEnabled: Boolean,
     gestureModifier: Modifier = Modifier,
-    fullBleed: Boolean = false,
-    fadeFraction: Float = 0f,
-    canvasZoom: Float = 1f,
     videoActive: Boolean = false,
     videoFullBleed: Boolean = false,
     videoOverlayVisible: Boolean? = null,
@@ -1125,15 +1063,8 @@ private fun NowPlayingArtworkCard(
     onToggleVideoFullscreen: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val corner = if (fullBleed) 0.dp else EncoreCornerRadii.Larger2
+    val corner = EncoreCornerRadii.Larger2
     val canvasActive = isCanvasEnabled && canvasFilePath != null
-    val layerModifier = if (!canvasActive && !videoActive && fadeFraction > 0f) {
-        Modifier
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .dissolveInto(fadeFraction)
-    } else {
-        Modifier
-    }
     val surfaceModifier = if (canvasActive || videoActive) {
         Modifier
     } else {
@@ -1141,8 +1072,7 @@ private fun NowPlayingArtworkCard(
     }
     Box(
         modifier = modifier
-            .then(layerModifier)
-            .shadow(elevation = if (fullBleed) 0.dp else 16.dp, shape = RoundedCornerShape(corner))
+            .shadow(elevation = 16.dp, shape = RoundedCornerShape(corner))
             .then(gestureModifier)
             .clip(RoundedCornerShape(corner))
             .then(surfaceModifier),
@@ -1255,8 +1185,6 @@ private fun NowPlayingArtworkCard(
             canvasActive -> {
                 CanvasVideoPlayer(
                     filePath = canvasFilePath,
-                    fadeFraction = fadeFraction,
-                    zoom = canvasZoom,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -1306,7 +1234,6 @@ private fun VideoFullscreenLayout(
             backgroundColor = Color.Black,
             canvasFilePath = null,
             isCanvasEnabled = false,
-            fullBleed = true,
             videoActive = true,
             videoFullBleed = true,
             videoOverlayVisible = overlayVisible,
