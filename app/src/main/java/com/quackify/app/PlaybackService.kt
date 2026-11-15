@@ -64,6 +64,9 @@ class PlaybackService : Service() {
     /** Identity of the last posted notification; position ticks must not repost. */
     private var lastIdentity = ""
 
+    @Volatile
+    private var finished = false
+
     override fun onCreate() {
         super.onCreate()
         channel()
@@ -84,10 +87,15 @@ class PlaybackService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        if (intent == null) {
+            log.w("restarted by the system with nothing to play, leaving the foreground")
+            stopPlayback()
+            return START_NOT_STICKY
+        }
+        when (intent.action) {
             ACTION_STOP -> {
                 log.i("stop requested, leaving the foreground")
-                stopSelf()
+                stopPlayback()
                 return START_NOT_STICKY
             }
             ACTION_TOGGLE -> PlaybackHost.bridge?.listener?.onPlayPause()
@@ -100,23 +108,35 @@ class PlaybackService : Service() {
         PlaybackHost.ensure(this)
         PlaybackHost.markForeground()
         WidgetSync.start(this)
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         log.i("task removed, the app is gone from recents")
+        stopPlayback()
         PlaybackHost.teardown(this)
-        stopSelf()
         super.onTaskRemoved(rootIntent)
+    }
+
+    private fun stopPlayback() {
+        finished = true
+        watcher?.cancel()
+        artJob?.cancel()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        getSystemService(NotificationManager::class.java)?.cancel(NOTIFICATION_ID)
+        stopSelf()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         log.i("service destroyed")
+        finished = true
         watcher?.cancel()
         artJob?.cancel()
         scope.cancel()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        getSystemService(NotificationManager::class.java)?.cancel(NOTIFICATION_ID)
         session?.isActive = false
         session?.release()
         session = null
@@ -194,6 +214,7 @@ class PlaybackService : Service() {
     }
 
     private fun apply(state: ComposePlaybackState, progress: PlaybackProgressSnapshot) {
+        if (finished) return
         val hasTrack = state.trackUri.isNotBlank() || state.title.isNotBlank()
         val session = session ?: return
         updatePlaybackState(session, state, progress, hasTrack)
@@ -299,6 +320,7 @@ class PlaybackService : Service() {
         artJob?.cancel()
         artJob = scope.launch {
             val bitmap = withContext(Dispatchers.IO) { fetchArt(url) }
+            if (finished) return@launch
             if (bitmap == null) {
                 artRefused = url
                 log.w("cover '${url.takeLast(28)}' could not be decoded, the notification stays bare")
@@ -414,6 +436,7 @@ class PlaybackService : Service() {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
     private fun notify(notification: android.app.Notification) {
+        if (finished) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
         manager.notify(NOTIFICATION_ID, notification)
     }
