@@ -136,6 +136,8 @@ data class ComposePlaybackState(
     val devices: List<ConnectDevice> = emptyList(),
     val queue: List<TrackItem> = emptyList(),
     val queueFromContext: List<TrackItem> = emptyList(),
+    val previousTrack: TrackItem? = null,
+    val nextTrack: TrackItem? = null,
     val queueContext: String = "",
     val queueContextLabel: String = "",
     val contextUri: String = "",
