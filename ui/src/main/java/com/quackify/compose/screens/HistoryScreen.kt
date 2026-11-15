@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -277,69 +276,70 @@ private fun LazyListScope.historySection(
     onToggle: () -> Unit
 ) {
     if (tracks.isEmpty()) return
-    item(key = "header-$label") {
-        Row(
+    item(key = "section-$label") {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(top = 12.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .animateContentSize()
         ) {
-            Text(
-                text = label,
-                style = EncoreTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                ),
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                painter = painterResource(
-                    id = if (isExpanded) R.drawable.encore_icon_chevron_up_24
-                    else R.drawable.encore_icon_chevron_down_24
-                ),
-                contentDescription = if (isExpanded) "Collapse $label" else "Expand $label",
-                tint = EncoreColors.TextSecondary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-    if (!isExpanded) return
-    val entries = groupByArtist(tracks)
-    itemsIndexed(entries, key = { index, entry ->
-        when (entry) {
-            is HistoryEntry.Single -> "$label-$index-${entry.track.uri}"
-            is HistoryEntry.Group -> "group-$label-${entry.id}"
-        }
-    }) { _, entry ->
-        when (entry) {
-            is HistoryEntry.Single -> EncoreTrackRow(
-                trackNumber = null,
-                title = entry.track.title,
-                artist = entry.track.artist,
-                isExplicit = entry.track.isExplicit,
-                imageUrl = entry.track.imageUrl,
-                artistUri = entry.track.artistUri,
-                isPlaying = isPlaying && entry.track.title == currentTrackTitle,
-                onClick = { onTrackSelect(entry.track) },
-                onMoreClick = { onTrackOptionsClick(entry.track) },
-                onAddToQueue = { onTrackAddToQueue(entry.track) }
-            )
-            is HistoryEntry.Group -> {
-                val groupKey = "$label:${entry.id}"
-                val expanded = expandedGroups[groupKey] == true
-                HistoryArtistGroup(
-                    group = entry,
-                    isExpanded = expanded,
-                    onToggle = {
-                        expandedGroups[groupKey] = !expanded
-                    },
-                    currentTrackTitle = currentTrackTitle,
-                    isPlaying = isPlaying,
-                    onTrackSelect = onTrackSelect,
-                    onTrackOptionsClick = onTrackOptionsClick,
-                    onTrackAddToQueue = onTrackAddToQueue
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle)
+                    .padding(top = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = label,
+                    style = EncoreTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    ),
+                    modifier = Modifier.weight(1f)
                 )
+                Icon(
+                    painter = painterResource(
+                        id = if (isExpanded) R.drawable.encore_icon_chevron_up_24
+                        else R.drawable.encore_icon_chevron_down_24
+                    ),
+                    contentDescription = if (isExpanded) "Collapse $label" else "Expand $label",
+                    tint = EncoreColors.TextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            if (isExpanded) {
+                groupByArtist(tracks).forEach { entry ->
+                    when (entry) {
+                        is HistoryEntry.Single -> EncoreTrackRow(
+                            trackNumber = null,
+                            title = entry.track.title,
+                            artist = entry.track.artist,
+                            isExplicit = entry.track.isExplicit,
+                            imageUrl = entry.track.imageUrl,
+                            artistUri = entry.track.artistUri,
+                            isPlaying = isPlaying && entry.track.title == currentTrackTitle,
+                            onClick = { onTrackSelect(entry.track) },
+                            onMoreClick = { onTrackOptionsClick(entry.track) },
+                            onAddToQueue = { onTrackAddToQueue(entry.track) }
+                        )
+                        is HistoryEntry.Group -> {
+                            val groupKey = "$label:${entry.id}"
+                            val expanded = expandedGroups[groupKey] == true
+                            HistoryArtistGroup(
+                                group = entry,
+                                isExpanded = expanded,
+                                onToggle = {
+                                    expandedGroups[groupKey] = !expanded
+                                },
+                                currentTrackTitle = currentTrackTitle,
+                                isPlaying = isPlaying,
+                                onTrackSelect = onTrackSelect,
+                                onTrackOptionsClick = onTrackOptionsClick,
+                                onTrackAddToQueue = onTrackAddToQueue
+                            )
+                        }
+                    }
+                }
             }
         }
     }
