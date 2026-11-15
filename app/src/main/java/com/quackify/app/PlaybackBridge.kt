@@ -834,7 +834,14 @@ class PlaybackBridge(private val context: Context) {
                     val waiting = held
                     val engineUri = playing.trackUri
                     val engineOwns = player.hasSource && engineUri.isNotBlank()
-                    val local = engineOwns && (waiting == null || engineUri == waiting.uri)
+                    // A held track only repaints the screen once the engine
+                    // truly plays it: play() stamps the uri optimistically
+                    // while the source is still resolving, and adopting the
+                    // held identity in that window shows the next track's
+                    // artwork over the audio that is still the previous one.
+                    val engineStarted = playing.playing || playing.fileId.isNotBlank()
+                    val local = engineOwns && engineStarted &&
+                        (waiting == null || engineUri == waiting.uri)
                     val position = if (engineOwns) playing.positionMs else progress.positionMs
                     val duration = if (engineOwns) {
                         playing.durationMs.takeIf { it > 0L } ?: progress.durationMs
@@ -3080,26 +3087,39 @@ class PlaybackBridge(private val context: Context) {
                 state = state.copy(isPlaying = player.isPlaying, isBuffering = false)
             }
             if (remoteNow) {
-                val duration = cluster.durationMs.takeIf { it > 0L } ?: progress.durationMs
-                val changed = cluster.track.uri != state.trackUri
-                val intent = remoteIntent()
-                val effPlaying = intent ?: cluster.isPlaying
-                val live = when {
-                    intent != null && intent != cluster.isPlaying -> progress.positionMs
-                    intent == false -> cluster.positionMs
-                    else -> cluster.positionNow()
+                // The server often names the next track before this device's
+                // engine has left the current one (it advanced on our own
+                // finalized report). Following that here would repaint the
+                // screen with the next track's identity while its audio is
+                // still the old one, so the block only moves once the engine
+                // agrees or nothing is playing locally.
+                val engineHolds = player.hasSource && player.state.value.trackUri.isNotBlank()
+                val changed = cluster.track.uri != state.trackUri &&
+                        (!engineHolds || cluster.track.uri == player.state.value.trackUri)
+                if (changed) {
+                    val duration = cluster.durationMs.takeIf { it > 0L } ?: progress.durationMs
+                    val intent = remoteIntent()
+                    val effPlaying = intent ?: cluster.isPlaying
+                    val live = when {
+                        intent != null && intent != cluster.isPlaying -> progress.positionMs
+                        intent == false -> cluster.positionMs
+                        else -> cluster.positionNow()
+                    }
+                    val resync = changed || state.isPlaying != effPlaying ||
+                            kotlin.math.abs(live - progress.positionMs) > RESYNC_MS
+                    val position = if (resync) live else progress.positionMs
+                    state = state.copy(
+                        title = "",
+                        artist = "",
+                        coverUrl = "",
+                        trackUri = cluster.track.uri,
+                        isPlaying = effPlaying,
+                    )
+                    progress.set(position, duration)
+                } else {
+                    val intent = remoteIntent()
+                    state = state.copy(isPlaying = intent ?: cluster.isPlaying)
                 }
-                val resync = changed || state.isPlaying != effPlaying ||
-                        kotlin.math.abs(live - progress.positionMs) > RESYNC_MS
-                val position = if (resync) live else progress.positionMs
-                state = state.copy(
-                    title = if (changed) "" else state.title,
-                    artist = if (changed) "" else state.artist,
-                    coverUrl = if (changed) "" else state.coverUrl,
-                    trackUri = cluster.track.uri,
-                    isPlaying = effPlaying,
-                )
-                progress.set(position, duration)
             }
             return
         }
@@ -3815,6 +3835,23 @@ class PlaybackBridge(private val context: Context) {
                 log.i("hold '${track.name}' until the engine leaves '${loaded.takeLast(12)}'")
             }
             held = track
+            return
+        }
+        // The engine names this track optimistically: play() stamps the uri
+        // before the source resolves, so the collector has not moved the
+        // screen's identity yet. Repainting it from the command here would
+        // show the next track's artwork while the previous one is still
+        // audible (and leave it stranded there when the load fails). Hold
+        // the identity until the engine actually starts the track; only a
+        // blank block, where there is nothing to protect, adopts it early.
+        val optimistic = player.hasSource && loaded == track.uri &&
+                state.trackUri != track.uri && state.title.isNotBlank() &&
+                !player.isPlaying
+        if (optimistic) {
+            if (held?.uri != track.uri) {
+                held = track
+                log.i("hold '${track.name}' until the engine really starts it")
+            }
             return
         }
         held = null
