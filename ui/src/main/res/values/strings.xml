@@ -165,6 +165,10 @@
     <string name="log_out">Log out</string>
     <string name="login_streak">Login streak</string>
     <string name="lyrics">Lyrics</string>
+    <string name="lyrics_show">Lyrics</string>
+    <string name="lyrics_show_desc">Show the synced lyrics of the playing track</string>
+    <string name="lyrics_preview">Line above the title</string>
+    <string name="lyrics_preview_desc">Show the current lyric line above the track title</string>
     <string name="minutes_played">Minutes played</string>
     <string name="more">More</string>
     <string name="more_like_this">More Like This</string>

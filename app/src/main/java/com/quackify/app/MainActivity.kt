@@ -262,6 +262,7 @@ class MainActivity : ComponentActivity() {
         savedAccountsList = EncoreAuth.savedAccounts(applicationContext)
         userProfileColorHex = EncoreAuth.account(applicationContext)?.colorHex.orEmpty()
         canvasEnabled = clientPrefs.getBoolean("canvasNpvEnabled", true)
+        com.quackify.compose.player.LyricsOptions.load(applicationContext)
         syncLauncherIcon(applicationContext)
         canvasResolution = clientPrefs.getInt("canvasResolution", 1080)
         val appContext = applicationContext

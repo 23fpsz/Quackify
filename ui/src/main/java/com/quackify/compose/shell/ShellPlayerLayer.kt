@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.player.LyricsOptions
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.util.rememberDominantColor
@@ -233,7 +234,8 @@ private fun NowPlayingScreenLayer(
                 env.onArtistFollowToggle?.invoke(env.resolvedArtistUri, follow)
             }
         },
-        lyrics = env.nowPlayingLyrics,
+        lyrics = if (LyricsOptions.enabled) env.nowPlayingLyrics else emptyList(),
+        lyricsPreview = LyricsOptions.preview,
         canvasFilePath = env.canvasFilePath,
         isCanvasAllowed = env.isCanvasAllowed,
         isCanvasEnabled = env.isCanvasEnabled,

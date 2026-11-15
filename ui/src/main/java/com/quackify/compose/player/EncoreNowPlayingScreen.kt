@@ -286,7 +286,8 @@ fun EncoreNowPlayingScreen(
     artistImageUrl: String? = null,
     isArtistFollowing: Boolean = false,
     onArtistFollowToggle: (Boolean) -> Unit = {},
-    lyrics: List<TimeSyncedLyric> = emptyList()
+    lyrics: List<TimeSyncedLyric> = emptyList(),
+    showLyricsPreview: Boolean = true,
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
@@ -338,9 +339,10 @@ fun EncoreNowPlayingScreen(
 
     val effectiveIsLoading = isLoading
     val effectiveLyricsVisible = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
+    val previewLyricVisible = effectiveLyricsVisible && showLyricsPreview
 
     val lyricLineHeight by animateDpAsState(
-        targetValue = if (effectiveLyricsVisible) 44.dp else 0.dp,
+        targetValue = if (previewLyricVisible) 44.dp else 0.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -348,7 +350,7 @@ fun EncoreNowPlayingScreen(
         label = "lyricLineHeight"
     )
     val lyricBottomSpacerHeight by animateDpAsState(
-        targetValue = if (effectiveLyricsVisible) 28.dp else 0.dp,
+        targetValue = if (previewLyricVisible) 28.dp else 0.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -357,7 +359,7 @@ fun EncoreNowPlayingScreen(
     )
 
     val artworkPushUpOffset by animateDpAsState(
-        targetValue = if (effectiveLyricsVisible) 0.dp else 40.dp,
+        targetValue = if (previewLyricVisible) 0.dp else 40.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -605,8 +607,8 @@ fun EncoreNowPlayingScreen(
 
                         NowPlayingSyncedLyricLine(
                             lyricText = activeLyricLine,
-                            visible = effectiveLyricsVisible,
-                            height = if (effectiveLyricsVisible) 44.dp else 0.dp,
+                            visible = previewLyricVisible,
+                            height = if (previewLyricVisible) 44.dp else 0.dp,
                             onOpenLyrics = { isLyricsFullscreen = true }
                         )
 
@@ -617,7 +619,7 @@ fun EncoreNowPlayingScreen(
                             onSwitch = onSwitchVideo
                         )
 
-                        if (effectiveLyricsVisible) {
+                        if (previewLyricVisible) {
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
@@ -795,7 +797,7 @@ fun EncoreNowPlayingScreen(
                             if (!videoActive) {
                                 NowPlayingSyncedLyricLine(
                                     lyricText = activeLyricLine,
-                                    visible = effectiveLyricsVisible,
+                                    visible = previewLyricVisible,
                                     height = lyricLineHeight,
                                     onOpenLyrics = { isLyricsFullscreen = true }
                                 )
