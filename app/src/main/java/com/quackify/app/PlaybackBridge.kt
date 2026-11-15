@@ -653,12 +653,27 @@ class PlaybackBridge(private val context: Context) {
                 if (allowed.size < uris.size) {
                     log.i("queue set: dropped ${uris.size - allowed.size} banned row(s)")
                 }
-                if (allowed.isEmpty()) return@launch
                 if (!writeQueue(allowed, cluster)) return@launch
+                // Only rows the queue already owned stay queued tail rows; the
+                // context rows a clear or remove leaves behind must keep their
+                // context slot instead of being re-published as queued.
+                val queuedSoFar = buildSet {
+                    queuedTail.forEach { add(it.uri) }
+                    state.queue.forEach { add(it.uri) }
+                    cluster.queued.forEach { add(it.uri) }
+                }
                 val local = queuedTail.associateBy { it.uri }
-                queuedTail = allowed.map { local[it] ?: TrackItem(title = "", artist = "", uri = it) }
-                publishQueue(cluster)
-                connect.refreshCluster()
+                queuedTail = allowed.filter { it in queuedSoFar }
+                    .map { local[it] ?: TrackItem(title = "", artist = "", uri = it) }
+                if (connect.holdsStream && player.hasSource) {
+                    // The server cluster still lists the pre-command queue, so
+                    // reading it back would resurrect the removed rows. Publish
+                    // the local state instead: the member PUT carries the new
+                    // queue and its answer commits a fresh cluster for the UI.
+                    publishLocalFromEngine()
+                } else {
+                    connect.refreshCluster(force = true)
+                }
             }
         }
     }
@@ -1848,7 +1863,7 @@ class PlaybackBridge(private val context: Context) {
                     }
                 }
             }
-            "set_queue" -> scope.launch { runCatching { connect.refreshCluster() } }
+            "set_queue" -> scope.launch { runCatching { connect.refreshCluster(force = true) } }
             else -> log.i("remote command '${command.endpoint}' is not handled here yet")
         }
     }
