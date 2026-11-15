@@ -32,7 +32,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -232,31 +231,28 @@ fun EncoreArtistScreen(
                     alpha = (1f - (scrollOffset / (heroHeightPx * 0.85f))).coerceIn(0f, 1f)
                 }
         ) {
-            val heroOnScreen = listState.firstVisibleItemIndex == 0
-            key(heroOnScreen) {
-                if (headerImageUrl != null) {
-                    EncoreArtworkImage(
-                        imageUrl = headerImageUrl,
-                        contentDescription = artistName,
-                        modifier = Modifier.fillMaxSize(),
-                        cornerRadius = 0.dp
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(smoothHeroColor),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isLoading) {
-                            ShimmerHost {
-                                ShimmerBlock(
-                                    modifier = Modifier.fillMaxSize(),
-                                    shape = RectangleShape,
-                                    base = smoothHeroColor,
-                                    highlight = smoothHeroColor.copy(alpha = 0.65f)
-                                )
-                            }
+            if (headerImageUrl != null) {
+                EncoreArtworkImage(
+                    imageUrl = headerImageUrl,
+                    contentDescription = artistName,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 0.dp
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(smoothHeroColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        ShimmerHost {
+                            ShimmerBlock(
+                                modifier = Modifier.fillMaxSize(),
+                                shape = RectangleShape,
+                                base = smoothHeroColor,
+                                highlight = smoothHeroColor.copy(alpha = 0.65f)
+                            )
                         }
                     }
                 }
