@@ -555,18 +555,25 @@ fun EncoreNowPlayingScreen(
                                 )
                             }
                         } else {
-                            SwipableTrackArtwork(
-                                currentTitle = title,
-                                currentCoverUrl = coverUrl,
-                                currentDominantColor = dynamicArtworkColor,
-                                cardBackgroundColor = animatedDominantColor,
-                                previousTrack = previousTrack,
-                                nextTrack = nextTrack,
-                                canSwipePrevious = canSkipPrevious,
-                                onSwipePrevious = onSkipToPreviousClick,
-                                onSwipeNext = onSkipNextClick,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                SwipableTrackArtwork(
+                                    currentTitle = title,
+                                    currentCoverUrl = coverUrl,
+                                    currentDominantColor = dynamicArtworkColor,
+                                    cardBackgroundColor = animatedDominantColor,
+                                    previousTrack = previousTrack,
+                                    nextTrack = nextTrack,
+                                    canSwipePrevious = canSkipPrevious,
+                                    onSwipePrevious = onSkipToPreviousClick,
+                                    onSwipeNext = onSkipNextClick,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
 
