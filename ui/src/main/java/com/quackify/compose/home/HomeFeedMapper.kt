@@ -56,7 +56,8 @@ private fun HomeItem.toCard() = RecommendationCard(
     caption = caption,
 )
 
-private fun List<HomeItem>.toCards(): List<RecommendationCard> = map { it.toCard() }
+private fun List<HomeItem>.toCards(): List<RecommendationCard> =
+    map { it.toCard() }.distinctBy { it.uri }
 
 fun List<HomeSection>.toShelves(): List<HomeShelf> {
     val out = ArrayList<HomeShelf>()
@@ -150,7 +151,7 @@ fun List<TrackItem>.toRecentlyPlayedShelf(): HomeShelf? {
     return HomeShelf(
         id = LOCAL_RECENT_SHELF_ID,
         title = "Recently played",
-        cards = take(RECENT_SHELF_SIZE).map { track ->
+        cards = distinctBy { it.uri }.take(RECENT_SHELF_SIZE).map { track ->
             RecommendationCard(
                 title = track.title,
                 subtitle = track.artist,
