@@ -25,8 +25,8 @@ android {
         applicationId = "com.quackify.app"
         minSdk = 24
         targetSdk = 37
-        versionCode = 26111201
-        versionName = "0.9.26.11.12"
+        versionCode = 26111501
+        versionName = "0.10.26.11.15"
         multiDexEnabled = true
 
         ndk {
