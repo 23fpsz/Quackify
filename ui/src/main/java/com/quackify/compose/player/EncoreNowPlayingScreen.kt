@@ -323,10 +323,11 @@ fun EncoreNowPlayingScreen(
     }
 
     val effectiveIsLoading = isLoading
-    val effectiveLyricsVisible = isLyricsUnderCoverEnabled && lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
+    val lyricsAvailable = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
+    val syncedLyricLineVisible = isLyricsUnderCoverEnabled && lyricsAvailable
 
     val lyricLineHeight by animateDpAsState(
-        targetValue = if (effectiveLyricsVisible) 44.dp else 0.dp,
+        targetValue = if (syncedLyricLineVisible) 44.dp else 0.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -334,7 +335,7 @@ fun EncoreNowPlayingScreen(
         label = "lyricLineHeight"
     )
     val lyricBottomSpacerHeight by animateDpAsState(
-        targetValue = if (effectiveLyricsVisible) 28.dp else 0.dp,
+        targetValue = if (syncedLyricLineVisible) 28.dp else 0.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -343,7 +344,7 @@ fun EncoreNowPlayingScreen(
     )
 
     val artworkPushUpOffset by animateDpAsState(
-        targetValue = if (effectiveLyricsVisible) 0.dp else 40.dp,
+        targetValue = if (syncedLyricLineVisible) 0.dp else 40.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -588,8 +589,8 @@ fun EncoreNowPlayingScreen(
 
                         NowPlayingSyncedLyricLine(
                             lyricText = activeLyricLine,
-                            visible = effectiveLyricsVisible,
-                            height = if (effectiveLyricsVisible) 44.dp else 0.dp,
+                            visible = syncedLyricLineVisible,
+                            height = if (syncedLyricLineVisible) 44.dp else 0.dp,
                             onOpenLyrics = { isLyricsFullscreen = true }
                         )
 
@@ -600,7 +601,7 @@ fun EncoreNowPlayingScreen(
                             onSwitch = onSwitchVideo
                         )
 
-                        if (effectiveLyricsVisible) {
+                        if (syncedLyricLineVisible) {
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
@@ -672,7 +673,7 @@ fun EncoreNowPlayingScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         NowPlayingLyricsCard(
-                            visible = effectiveLyricsVisible,
+                            visible = lyricsAvailable,
                             lyrics = lyrics,
                             activeIndex = activeLyricIndex,
                             dominantColor = dynamicArtworkColor,
@@ -682,7 +683,7 @@ fun EncoreNowPlayingScreen(
                         )
 
                         if (!effectiveIsLoading && artist.isNotBlank()) {
-                            if (effectiveLyricsVisible) {
+                            if (lyricsAvailable) {
                                 Spacer(modifier = Modifier.height(EncoreSpacers.Base))
                             }
 
@@ -792,7 +793,7 @@ fun EncoreNowPlayingScreen(
                             if (!videoActive) {
                                 NowPlayingSyncedLyricLine(
                                     lyricText = activeLyricLine,
-                                    visible = effectiveLyricsVisible,
+                                    visible = syncedLyricLineVisible,
                                     height = lyricLineHeight,
                                     onOpenLyrics = { isLyricsFullscreen = true }
                                 )
@@ -898,7 +899,7 @@ fun EncoreNowPlayingScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             NowPlayingLyricsCard(
-                                visible = effectiveLyricsVisible && canvasControlsShown,
+                                visible = lyricsAvailable && canvasControlsShown,
                                 lyrics = lyrics,
                                 activeIndex = activeLyricIndex,
                                 dominantColor = dynamicArtworkColor,
@@ -913,7 +914,7 @@ fun EncoreNowPlayingScreen(
                                     exit = fadeOut(tween(200)) + shrinkVertically(tween(300))
                                 ) {
                                     Column {
-                                        if (effectiveLyricsVisible) {
+                                        if (lyricsAvailable) {
                                             Spacer(modifier = Modifier.height(EncoreSpacers.Base))
                                         }
 
