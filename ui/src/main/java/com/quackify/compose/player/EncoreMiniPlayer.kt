@@ -47,7 +47,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.quackify.backend.model.DeviceKind
 import com.quackify.compose.R
@@ -319,27 +318,5 @@ fun EncoreMiniPlayer(
                 trackColor = EncoreColors.ProgressBarBackground
             )
         }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewEncoreMiniPlayer() {
-    EncoreAppTheme {
-        var isPlaying by remember { mutableStateOf(true) }
-        var isLiked by remember { mutableStateOf(true) }
-
-        EncoreMiniPlayer(
-            title = "Starboy",
-            artist = "The Weeknd, Daft Punk",
-            isPlaying = isPlaying,
-            progress = 0.45f,
-            isLiked = isLiked,
-            connectedDeviceName = "Galaxy Buds2 Pro",
-            onPlayPauseClick = { isPlaying = !isPlaying },
-            onLikeClick = { isLiked = !isLiked },
-            onDeviceClick = {},
-            onBarClick = {}
-        )
     }
 }

@@ -52,7 +52,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -943,36 +942,5 @@ private fun AlbumLoadError(title: String, onRetry: (() -> Unit)?) {
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewEncoreAlbumScreen() {
-    EncoreAppTheme {
-        EncoreAlbumScreen(
-            albumTitle = "After Hours",
-            artistName = "The Weeknd",
-            releaseYear = "2020",
-            releaseDate = "March 20, 2020",
-            tracks = listOf(
-                TrackItem("Alone Again", "The Weeknd"),
-                TrackItem("Too Late", "The Weeknd"),
-                TrackItem("Hardest To Love", "The Weeknd"),
-                TrackItem("Scared To Live", "The Weeknd"),
-                TrackItem("Snowchild", "The Weeknd", isExplicit = true),
-                TrackItem("Escape From LA", "The Weeknd", isExplicit = true),
-                TrackItem("Heartless", "The Weeknd", isExplicit = true),
-                TrackItem("Faith", "The Weeknd", isExplicit = true),
-                TrackItem("Blinding Lights", "The Weeknd"),
-                TrackItem("In Your Eyes", "The Weeknd"),
-                TrackItem("Save Your Tears", "The Weeknd"),
-                TrackItem("Repeat After Me (Interlude)", "The Weeknd"),
-                TrackItem("After Hours", "The Weeknd"),
-                TrackItem("Until I Bleed Out", "The Weeknd")
-            ),
-            currentTrackTitle = "Blinding Lights",
-            isPlaying = true
-        )
     }
 }

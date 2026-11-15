@@ -55,7 +55,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.backend.model.AlbumDetail
@@ -208,14 +207,6 @@ internal fun ShellLoadingState(loading: Boolean, onRetry: () -> Unit) {
                 Text(text = stringResource(R.string.try_again), color = EncoreColors.Green)
             }
         }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewEncoreAppShell() {
-    EncoreAppTheme {
-        EncoreAppShell()
     }
 }
 

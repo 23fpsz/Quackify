@@ -214,18 +214,3 @@ fun ProfileFollowSheet(
         }
     }
 }
-
-@androidx.compose.ui.tooling.preview.Preview
-@Composable
-fun PreviewProfileFollowSheet() {
-    EncoreAppTheme {
-        ProfileFollowSheet(
-            isOpen = true,
-            onDismiss = {},
-            followers = emptyList(),
-            following = emptyList(),
-            loading = false,
-            onArtistClick = { _, _ -> }
-        )
-    }
-}

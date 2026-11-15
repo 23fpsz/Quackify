@@ -13,6 +13,16 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -75,6 +85,10 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 
 private const val SPLIT_PLAYER_MIN_WIDTH_DP = 600
+
+internal const val SPLIT_PLAYER_GAP_FRACTION = 0.02f
+
+private const val SPLIT_PLAYER_CORNER_DP = 14
 
 private const val SPLIT_PLAYER_PANE_WIDTH_DP = 340
 
@@ -839,13 +853,10 @@ fun EncoreAppShell(
         )
         val splitPlayer = isSplitPlayerLayout()
         val splitFraction = splitPlayerWidthFraction()
-        val contentFraction = if (splitPlayer) 1f - splitFraction else 1f
-
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(contentFraction)
-        ) {
+        val splitGap = LocalConfiguration.current.screenWidthDp * SPLIT_PLAYER_GAP_FRACTION
+        val contentFraction = if (splitPlayer) 1f - splitFraction - SPLIT_PLAYER_GAP_FRACTION else 1f
+        val paneShape = RoundedCornerShape(SPLIT_PLAYER_CORNER_DP.dp)
+        val screenHost: @Composable () -> Unit = {
             ShellScreenSlot(currentScreen) { screen ->
                 when (screen) {
                     ShellScreen.HOME -> ShellHomeRoute(
@@ -1059,11 +1070,41 @@ fun EncoreAppShell(
                     )
                 }
             }
-            ShellPlayerLayer(env = hosts.player(), docked = splitPlayer)
         }
 
         if (splitPlayer) {
-            ShellDockedPlayer(env = hosts.player(), widthFraction = splitFraction)
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .consumeWindowInsets(WindowInsets.systemBars)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(contentFraction)
+                        .fillMaxHeight()
+                        .clip(paneShape)
+                        .background(EncoreColors.Background)
+                ) {
+                    screenHost()
+                    ShellPlayerLayer(env = hosts.player(), docked = true)
+                }
+                Spacer(modifier = Modifier.width(splitGap.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(splitFraction)
+                        .fillMaxHeight()
+                        .clip(paneShape)
+                        .background(EncoreColors.Background)
+                ) {
+                    ShellDockedPlayer(env = hosts.player())
+                }
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+                screenHost()
+                ShellPlayerLayer(env = hosts.player())
+            }
         }
         ShellSheetsHost(env = hosts.sheets())
         ShellOverlaysHost(env = hosts.overlays())

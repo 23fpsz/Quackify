@@ -34,7 +34,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
@@ -501,26 +500,3 @@ private fun daysLabel(days: Int): String =
 @Composable
 private fun playsLabel(plays: Int): String =
     pluralStringResource(R.plurals.play_count, plays, formatCount(plays.toLong()))
-
-@Preview
-@Composable
-fun PreviewHistoryScreen() {
-    EncoreAppTheme {
-        HistoryScreen(
-            onBackClick = {},
-            onTrackSelect = {},
-            stats = HistoryStats(
-                totalPlayedMs = 1_512_000L,
-                listenStreakDays = 4,
-                loginStreakDays = 12,
-                topArtistName = "Piche Kota",
-                topArtistPlays = 37,
-                topPlaylistName = "My Playlist #18",
-                topPlaylistPlays = 21,
-                topReplayTitle = "Bahagia Lagi",
-                topReplayArtist = "Piche Kota",
-                topReplayPlays = 9,
-            )
-        )
-    }
-}

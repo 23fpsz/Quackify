@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
@@ -260,24 +259,5 @@ fun EncoreEpisodeScreen(
                 }
             }
         }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewEncoreEpisodeScreen() {
-    EncoreAppTheme {
-        EncoreEpisodeScreen(
-            title = "How to Be Respected",
-            showName = "The Mindset Mentor",
-            description = "What makes someone truly worth looking up to? In this episode I share the four " +
-                "daily habits that build genuine respect.",
-            imageUrl = null,
-            headerColor = Color(0xFF1B4A3A),
-            metaLabel = "October 28, 2026 • 16 min",
-            durationMs = 964362,
-            onBackClick = {},
-            onPlayPauseClick = {},
-        )
     }
 }

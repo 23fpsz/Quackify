@@ -3,10 +3,9 @@ package com.quackify.compose.shell
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -14,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
@@ -168,30 +166,14 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv, docked: Boolean = fa
 }
 
 @Composable
-internal fun BoxScope.ShellDockedPlayer(env: ShellPlayerEnv, widthFraction: Float) {
+internal fun ShellDockedPlayer(env: ShellPlayerEnv, modifier: Modifier = Modifier) {
     if (!env.playerIdentity.trackLoaded) return
-    Row(
-        modifier = Modifier
-            .align(Alignment.CenterEnd)
-            .fillMaxHeight()
-            .fillMaxWidth(widthFraction)
-            .background(EncoreColors.Background)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(1.dp)
-                .background(EncoreColors.Outline)
-        )
-        NowPlayingScreenLayer(
-            env = env,
-            visible = !env.flags.isLogcatOpen,
-            docked = true,
-            modifier = Modifier
-                .fillMaxHeight()
-                .weight(1f)
-        )
-    }
+    NowPlayingScreenLayer(
+        env = env,
+        visible = !env.flags.isLogcatOpen,
+        docked = true,
+        modifier = modifier.fillMaxSize()
+    )
 }
 
 @Composable

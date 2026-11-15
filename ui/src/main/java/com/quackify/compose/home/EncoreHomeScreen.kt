@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
@@ -737,18 +736,4 @@ private fun getGreeting(name: String, feedGreeting: String = ""): String {
     }
     val who = name.trim()
     return if (who.isBlank()) base else "$base, $who"
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewEncoreHomeScreen() {
-    EncoreAppTheme {
-        EncoreHomeScreen(
-            onPlaylistClick = { _, _ -> },
-            onProfileClick = {},
-            onNotificationsClick = {},
-            onHistoryClick = {},
-            onSettingsClick = {}
-        )
-    }
 }

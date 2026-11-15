@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.quackify.compose.R
 import com.quackify.backend.model.ConnectDevice
@@ -271,19 +270,4 @@ private fun currentDeviceIconRes(kind: DeviceKind?, isLocal: Boolean): Int = whe
     kind == DeviceKind.CAR -> R.drawable.encore_icon_device_car_24
     kind == DeviceKind.CAST -> R.drawable.encore_icon_chromecast_connected_24
     else -> R.drawable.encore_icon_devices_24
-}
-
-@Preview
-@Composable
-fun PreviewEncoreConnectDeviceSheet() {
-    EncoreAppTheme {
-        EncoreConnectDeviceSheet(
-            onDismissRequest = {},
-            currentDeviceName = "",
-            currentTrackTitle = "Blinding Lights",
-            currentDeviceKind = null,
-            currentDeviceLocal = true,
-            onSelectDevice = {}
-        )
-    }
 }

@@ -51,7 +51,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -1125,37 +1124,6 @@ private fun ArtistLoadError(title: String, onRetry: () -> Unit) {
                 .clip(RoundedCornerShape(24.dp))
                 .clickable(onClick = onRetry)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-    }
-}
-
-@Preview
-@Composable
-fun PreviewEncoreArtistScreen() {
-    EncoreAppTheme {
-        EncoreArtistScreen(
-            artistName = "The Weeknd",
-            monthlyListeners = "104,239,812",
-            heroColor = Color(0xFF6B1A24),
-            popularTracks = listOf(
-                PopularTrack(TrackItem("Blinding Lights", "The Weeknd"), "4,250,810,912"),
-                PopularTrack(TrackItem("Starboy", "The Weeknd, Daft Punk"), "3,119,402,118"),
-                PopularTrack(TrackItem("Save Your Tears", "The Weeknd"), "2,845,190,441"),
-                PopularTrack(TrackItem("Die For You", "The Weeknd"), "2,301,894,520"),
-                PopularTrack(TrackItem("The Hills", "The Weeknd"), "2,190,341,080")
-            ),
-            releases = listOf(
-                ArtistRelease("After Hours", "2020", stringResource(R.string.album), Color(0xFF5A1A22)),
-                ArtistRelease("Dawn FM", "2022", stringResource(R.string.album), Color(0xFF243B55)),
-                ArtistRelease("Starboy", "2016", stringResource(R.string.album), Color(0xFF8E0E00)),
-                ArtistRelease("Timeless", "2024", stringResource(R.string.single), Color(0xFF333333))
-            ),
-            currentTrackTitle = "Starboy",
-            currentTrackUri = "",
-            isPlaying = true,
-            onBackClick = {},
-            onPlayPauseClick = {},
-            onTrackSelect = {}
         )
     }
 }

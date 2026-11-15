@@ -524,38 +524,3 @@ private fun ContributorSearchBox(
         }
     }
 }
-
-@androidx.compose.ui.tooling.preview.Preview
-@Composable
-fun PreviewPlaylistContributorsSheet() {
-    EncoreAppTheme {
-        PlaylistContributorsSheet(
-            isOpen = true,
-            onDismiss = {},
-            permissions = PlaylistPermissions(
-                uri = "spotify:playlist:preview",
-                members = listOf(
-                    PlaylistMember(
-                        userId = "owner",
-                        uri = "spotify:user:owner",
-                        name = "Malrusez",
-                        isOwner = true,
-                        permissionLevel = "CONTRIBUTOR"
-                    ),
-                    PlaylistMember(
-                        userId = "friend",
-                        uri = "spotify:user:friend",
-                        name = "BRIB0",
-                        permissionLevel = "CONTRIBUTOR"
-                    )
-                ),
-                canAdministratePermissions = true
-            ),
-            loading = false,
-            onAddContributor = {},
-            onRemoveAsContributor = {},
-            onRemoveFromPlaylist = {},
-            onOpenProfile = { _, _ -> }
-        )
-    }
-}

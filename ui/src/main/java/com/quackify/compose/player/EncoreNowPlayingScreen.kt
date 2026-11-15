@@ -102,7 +102,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -2357,76 +2356,4 @@ private fun formatTime(ms: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return String.format("%d:%02d", minutes, seconds)
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewEncoreNowPlayingScreen() {
-    EncoreAppTheme {
-        var isPlaying by remember { mutableStateOf(true) }
-        var isLiked by remember { mutableStateOf(true) }
-        var isShuffle by remember { mutableStateOf(false) }
-        var isRepeat by remember { mutableStateOf(true) }
-
-        EncoreNowPlayingScreen(
-            title = "Starboy",
-            artist = "The Weeknd, Daft Punk",
-            albumOrPlaylistContext = "Today's Top Hits",
-            isPlaying = isPlaying,
-            progress = 0.35f,
-            durationMs = 230000L,
-            currentPositionMs = 80000L,
-            isLiked = isLiked,
-            isShuffle = isShuffle,
-            isRepeat = isRepeat,
-            connectedDeviceName = "Living Room Speaker",
-            onCollapseClick = {},
-            onPlayPauseClick = { isPlaying = !isPlaying },
-            onSkipNextClick = {},
-            onSkipPreviousClick = {},
-            onLikeClick = { isLiked = !isLiked },
-            onShuffleClick = { isShuffle = !isShuffle },
-            onRepeatClick = { isRepeat = !isRepeat },
-            onSeek = {},
-            onMoreClick = {},
-            onQueueClick = {},
-            onDeviceClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212, widthDp = 800, heightDp = 360)
-@Composable
-fun PreviewEncoreNowPlayingScreenLandscape() {
-    EncoreAppTheme {
-        var isPlaying by remember { mutableStateOf(true) }
-        var isLiked by remember { mutableStateOf(true) }
-        var isShuffle by remember { mutableStateOf(false) }
-        var isRepeat by remember { mutableStateOf(true) }
-
-        EncoreNowPlayingScreen(
-            title = "Starboy",
-            artist = "The Weeknd, Daft Punk",
-            albumOrPlaylistContext = "Today's Top Hits",
-            isPlaying = isPlaying,
-            progress = 0.35f,
-            durationMs = 230000L,
-            currentPositionMs = 80000L,
-            isLiked = isLiked,
-            isShuffle = isShuffle,
-            isRepeat = isRepeat,
-            connectedDeviceName = "Living Room Speaker",
-            onCollapseClick = {},
-            onPlayPauseClick = { isPlaying = !isPlaying },
-            onSkipNextClick = {},
-            onSkipPreviousClick = {},
-            onLikeClick = { isLiked = !isLiked },
-            onShuffleClick = { isShuffle = !isShuffle },
-            onRepeatClick = { isRepeat = !isRepeat },
-            onSeek = {},
-            onMoreClick = {},
-            onQueueClick = {},
-            onDeviceClick = {}
-        )
-    }
 }

@@ -32,7 +32,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.backend.model.ActivityNotification
@@ -285,35 +284,5 @@ internal fun relativeTime(atMillis: Long): String {
             val days = minutes / (60 * 24)
             "${days / 7}w ago"
         }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewActivityScreen() {
-    EncoreAppTheme {
-        ActivityScreen(
-            onBackClick = {},
-            selfName = "Duck User",
-            notifications = listOf(
-                ActivityNotification(
-                    id = "1",
-                    title = "BRIB0 saved your playlist, My playlist #19",
-                    createdTimestamp = "2026-11-13T13:28:17.501Z",
-                    actionUri = "spotify:playlist:24NCO8JiZlpAxH2XbtMrAl",
-                    actionType = "NAVIGATE",
-                    actorNames = listOf("BRIB0"),
-                    isNew = true,
-                ),
-                ActivityNotification(
-                    id = "2",
-                    title = "BRIB0 started following you",
-                    createdTimestamp = "2026-11-13T03:24:10.436Z",
-                    actionUri = "spotify:user:31xqn3z3ikq2jusd7567w6oormja",
-                    actionType = "NAVIGATE",
-                    actorNames = listOf("BRIB0"),
-                ),
-            )
-        )
     }
 }
