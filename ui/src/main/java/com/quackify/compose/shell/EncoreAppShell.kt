@@ -74,18 +74,35 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 
-private const val SPLIT_PLAYER_MIN_SHORTEST_DP = 600
+private const val SPLIT_PLAYER_MIN_WIDTH_DP = 600
+
+private const val SPLIT_PLAYER_PANE_WIDTH_DP = 340
+
+private const val SPLIT_PLAYER_MIN_FRACTION = 0.3f
+
+private const val SPLIT_PLAYER_MAX_FRACTION = 0.46f
 
 /**
- * Tablets and wide foldables in landscape keep the now playing screen docked
- * as a side pane next to the app instead of collapsing it into a mini player.
+ * Any landscape window wide enough for two columns keeps the now playing
+ * screen docked as a side pane next to the app instead of collapsing it into
+ * a mini player.
  */
 @Composable
 internal fun isSplitPlayerLayout(): Boolean {
     val configuration = LocalConfiguration.current
-    val shortest = minOf(configuration.screenWidthDp, configuration.screenHeightDp)
     return configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
-        shortest >= SPLIT_PLAYER_MIN_SHORTEST_DP
+        configuration.screenWidthDp >= SPLIT_PLAYER_MIN_WIDTH_DP
+}
+
+/**
+ * The pane keeps a readable width on phones (where 30% would be too narrow)
+ * while staying at 30% on tablets.
+ */
+@Composable
+internal fun splitPlayerWidthFraction(): Float {
+    val width = LocalConfiguration.current.screenWidthDp.coerceAtLeast(1)
+    return (SPLIT_PLAYER_PANE_WIDTH_DP.toFloat() / width)
+        .coerceIn(SPLIT_PLAYER_MIN_FRACTION, SPLIT_PLAYER_MAX_FRACTION)
 }
 
 @Composable
@@ -821,7 +838,8 @@ fun EncoreAppShell(
             playlistDescription = playlistDetail?.description.orEmpty(),
         )
         val splitPlayer = isSplitPlayerLayout()
-        val contentFraction = if (splitPlayer) 1f - SPLIT_PLAYER_WIDTH_FRACTION else 1f
+        val splitFraction = splitPlayerWidthFraction()
+        val contentFraction = if (splitPlayer) 1f - splitFraction else 1f
 
         Box(
             modifier = Modifier
@@ -1045,7 +1063,7 @@ fun EncoreAppShell(
         }
 
         if (splitPlayer) {
-            ShellDockedPlayer(env = hosts.player())
+            ShellDockedPlayer(env = hosts.player(), widthFraction = splitFraction)
         }
         ShellSheetsHost(env = hosts.sheets())
         ShellOverlaysHost(env = hosts.overlays())

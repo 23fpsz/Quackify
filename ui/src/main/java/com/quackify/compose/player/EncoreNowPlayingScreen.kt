@@ -384,7 +384,10 @@ fun EncoreNowPlayingScreen(
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() }
     val videoTopHeight = (configuration.screenWidthDp * 9f / 16f).dp
-    val artworkSide = (configuration.screenWidthDp - 48).dp
+    val artworkSide = minOf(
+        configuration.screenWidthDp - 48,
+        (configuration.screenHeightDp * 0.55f).toInt()
+    ).coerceAtLeast(120).dp
     val mediaTransition = tween<Dp>(350, easing = EncoreAnimation.DecelerateInterpolator)
     val animatedMediaHeight by animateDpAsState(
         targetValue = if (videoActive) videoTopHeight else artworkSide,

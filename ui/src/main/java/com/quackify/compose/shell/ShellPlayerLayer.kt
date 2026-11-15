@@ -23,7 +23,6 @@ import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.CoroutineScope
 
-internal const val SPLIT_PLAYER_WIDTH_FRACTION = 0.3f
 
 internal class ShellPlayerEnv(
     val flags: ShellUiFlags,
@@ -169,13 +168,13 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv, docked: Boolean = fa
 }
 
 @Composable
-internal fun BoxScope.ShellDockedPlayer(env: ShellPlayerEnv) {
+internal fun BoxScope.ShellDockedPlayer(env: ShellPlayerEnv, widthFraction: Float) {
     if (!env.playerIdentity.trackLoaded) return
     Row(
         modifier = Modifier
             .align(Alignment.CenterEnd)
             .fillMaxHeight()
-            .fillMaxWidth(SPLIT_PLAYER_WIDTH_FRACTION)
+            .fillMaxWidth(widthFraction)
             .background(EncoreColors.Background)
     ) {
         Box(
