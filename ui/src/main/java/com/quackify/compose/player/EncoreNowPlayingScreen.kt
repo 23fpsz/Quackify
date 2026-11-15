@@ -89,13 +89,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import coil.imageLoader
-import coil.request.ImageRequest
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
-import com.quackify.compose.components.resolveRemoteImageUrl
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChange
@@ -248,8 +242,6 @@ fun EncoreNowPlayingScreen(
     onSkipNextClick: () -> Unit,
     onSkipPreviousClick: () -> Unit,
     onSwipePreviousClick: () -> Unit = onSkipPreviousClick,
-    nextCoverUrl: String = "",
-    previousCoverUrl: String = "",
     onLikeClick: () -> Unit,
     onShuffleClick: () -> Unit,
     onRepeatClick: () -> Unit,
@@ -331,22 +323,6 @@ fun EncoreNowPlayingScreen(
     val playerOffsetY = remember { Animatable(0f) }
     val artworkOffsetX = remember { Animatable(0f) }
     val haptics = LocalHapticFeedback.current
-
-    val imageContext = LocalContext.current
-    LaunchedEffect(nextCoverUrl, previousCoverUrl) {
-        val loader = imageContext.imageLoader
-        listOf(nextCoverUrl, previousCoverUrl).forEach { url ->
-            val resolved = resolveRemoteImageUrl(url) ?: return@forEach
-            runCatching {
-                loader.enqueue(
-                    ImageRequest.Builder(imageContext)
-                        .data(resolved)
-                        .size(640)
-                        .build()
-                )
-            }
-        }
-    }
     val scrollState = rememberScrollState()
     val reveal = rememberRevealProgress()
 
@@ -542,31 +518,6 @@ fun EncoreNowPlayingScreen(
         )
 
         if (canvasActive && !videoActive && !isLandscape) {
-            val canvasSpanPx = with(LocalDensity.current) { maxWidth.toPx() }.coerceAtLeast(1f)
-            val canvasDragged = artworkOffsetX.value
-            val canvasNeighbour = when {
-                canvasDragged < -1f -> nextCoverUrl
-                canvasDragged > 1f -> previousCoverUrl
-                else -> ""
-            }
-            if (canvasNeighbour.isNotBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            translationX = canvasDragged + if (canvasDragged < 0f) canvasSpanPx else -canvasSpanPx
-                        }
-                ) {
-                    EncoreArtworkImage(
-                        imageUrl = canvasNeighbour,
-                        contentDescription = null,
-                        fallbackColor = dynamicArtworkColor,
-                        requestSize = 640,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
             CanvasVideoPlayer(
                 filePath = canvasFilePath,
                 zoom = CANVAS_ZOOM,
@@ -600,56 +551,30 @@ fun EncoreNowPlayingScreen(
                         .statusBarsPadding()
                         .navigationBarsPadding()
                 ) {
-                    var cardSpan by remember { mutableStateOf(0) }
-                    BoxWithConstraints(
+                    Box(
                         modifier = Modifier
                             .weight(LANDSCAPE_ARTWORK_PANE_WEIGHT)
                             .fillMaxHeight()
                             .then(artworkGestureModifier)
+                            .graphicsLayer { translationX = artworkOffsetX.value }
                             .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        val dragged = artworkOffsetX.value
-                        val neighbour = when {
-                            dragged < -1f -> nextCoverUrl
-                            dragged > 1f -> previousCoverUrl
-                            else -> ""
-                        }
-                        Box(
+                        NowPlayingArtworkCard(
+                            title = title,
+                            coverUrl = coverUrl,
+                            dominantColor = dynamicArtworkColor,
+                            backgroundColor = animatedDominantColor,
+                            canvasFilePath = canvasFilePath,
+                            isCanvasEnabled = canvasActive,
+                            videoActive = videoActive,
+                            videoQualities = videoQualities,
+                            onVideoQuality = onVideoQuality,
+                            onVideoSurface = onVideoSurface,
+                            onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                             modifier = Modifier
                                 .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
-                                .onSizeChanged { cardSpan = it.width }
-                        ) {
-                            val spanPx = cardSpan.toFloat().coerceAtLeast(1f)
-                            if (neighbour.isNotBlank() && !videoActive) {
-                                ArtworkPeek(
-                                    url = neighbour,
-                                    dominantColor = dynamicArtworkColor,
-                                    modifier = Modifier
-                                        .matchParentSize()
-                                        .graphicsLayer {
-                                            translationX = dragged +
-                                                if (dragged < 0f) spanPx else -spanPx
-                                        }
-                                )
-                            }
-                            NowPlayingArtworkCard(
-                                title = title,
-                                coverUrl = coverUrl,
-                                dominantColor = dynamicArtworkColor,
-                                backgroundColor = animatedDominantColor,
-                                canvasFilePath = canvasFilePath,
-                                isCanvasEnabled = canvasActive,
-                                videoActive = videoActive,
-                                videoQualities = videoQualities,
-                                onVideoQuality = onVideoQuality,
-                                onVideoSurface = onVideoSurface,
-                                onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer { translationX = dragged }
-                            )
-                        }
+                        )
                     }
 
                     Column(
@@ -814,38 +739,19 @@ fun EncoreNowPlayingScreen(
 
                             Spacer(modifier = Modifier.weight(topSpacerWeight.coerceAtLeast(0.01f)))
 
-                            BoxWithConstraints(
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = animatedMediaPadding)
+                                    .graphicsLayer { translationX = artworkOffsetX.value }
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
                                 contentAlignment = Alignment.Center
                             ) {
-                                val spanPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-                                val dragged = artworkOffsetX.value
-                                val neighbour = when {
-                                    dragged < -1f -> nextCoverUrl
-                                    dragged > 1f -> previousCoverUrl
-                                    else -> ""
-                                }
-                                if (neighbour.isNotBlank() && !canvasActive && !videoActive) {
-                                    ArtworkPeek(
-                                        url = neighbour,
-                                        dominantColor = dynamicArtworkColor,
-                                        modifier = Modifier
-                                            .matchParentSize()
-                                            .graphicsLayer {
-                                                translationX = dragged +
-                                                    if (dragged < 0f) spanPx else -spanPx
-                                            }
-                                    )
-                                }
                                 if (canvasActive && !videoActive) {
                                     Spacer(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .aspectRatio(1.0f)
-                                            .graphicsLayer { translationX = dragged }
                                     )
                                 } else {
                                     NowPlayingArtworkCard(
@@ -864,7 +770,6 @@ fun EncoreNowPlayingScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(animatedMediaHeight)
-                                            .graphicsLayer { translationX = dragged }
                                     )
                                 }
                             }
@@ -1315,29 +1220,6 @@ private fun NowPlayingHeaderRow(
  * video (when the track has one) and the CANVAS toggle pill.
  * Reference: revised_template_page_layout.xml (@id/track_carousel) -> bounds [63,308][1017,1262] (24dp margins)
  */
-@Composable
-private fun ArtworkPeek(
-    url: String,
-    dominantColor: Color,
-    modifier: Modifier = Modifier
-) {
-    val corner = RoundedCornerShape(EncoreCornerRadii.Larger2)
-    Box(
-        modifier = modifier
-            .shadow(elevation = 16.dp, shape = corner)
-            .clip(corner)
-            .background(dominantColor)
-    ) {
-        EncoreArtworkImage(
-            imageUrl = url,
-            contentDescription = null,
-            fallbackColor = dominantColor,
-            requestSize = 640,
-            modifier = Modifier.fillMaxSize()
-        )
-    }
-}
-
 @Composable
 private fun NowPlayingArtworkCard(
     title: String,

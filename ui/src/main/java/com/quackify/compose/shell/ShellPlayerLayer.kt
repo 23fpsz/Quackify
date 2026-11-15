@@ -220,8 +220,6 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
         onSkipNext = env.handleSkipNext,
         onSkipPrevious = env.handleSkipPrevious,
         onPreviousSwipe = env.handlePreviousSwipe,
-        nextCoverUrl = playbackState?.nextCoverUrl.orEmpty(),
-        previousCoverUrl = playbackState?.previousCoverUrl.orEmpty(),
         onLike = {
             val playingTrack = TrackItem(
                 title = env.currentTrackTitle,
