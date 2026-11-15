@@ -20,19 +20,26 @@
 
 package com.quackify.backend.core.net
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response as RawResponse
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import com.quackify.backend.core.log.Logs
@@ -109,6 +116,12 @@ object Net {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .followRedirects(true)
+        .dispatcher(
+            Dispatcher().apply {
+                maxRequests = Int.MAX_VALUE
+                maxRequestsPerHost = Int.MAX_VALUE
+            }
+        )
         .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
         .build()
 
@@ -139,6 +152,19 @@ object Net {
             builder.header(k, v)
         }
         return builder.build()
+    }
+
+    private suspend fun Call.await(): RawResponse = suspendCancellableCoroutine { continuation ->
+        enqueue(object : Callback {
+            override fun onResponse(call: Call, response: RawResponse) {
+                continuation.resumeWith(Result.success(response))
+            }
+
+            override fun onFailure(call: Call, e: IOException) {
+                continuation.resumeWith(Result.failure(e))
+            }
+        })
+        continuation.invokeOnCancellation { cancel() }
     }
 
     suspend fun get(
@@ -234,7 +260,7 @@ object Net {
         while (true) {
             val started = System.currentTimeMillis()
             val outcome = runCatching {
-                baseClient.newCall(buildRequest(method, url, headers, body)).execute().use { raw ->
+                baseClient.newCall(buildRequest(method, url, headers, body)).await().use { raw ->
                     val text = raw.body?.string().orEmpty()
                     val type = raw.header("Content-Type").orEmpty()
                     val millis = System.currentTimeMillis() - started
@@ -242,6 +268,7 @@ object Net {
                     Response(code = raw.code, body = text, contentType = type, millis = millis, url = url)
                 }
             }
+            outcome.exceptionOrNull()?.let { if (it is CancellationException) throw it }
             outcome.onFailure {
                 val millis = System.currentTimeMillis() - started
                 log.e("$label ✗ ${it.javaClass.simpleName}: ${it.message} after ${millis}ms ${short(url)}")
@@ -272,7 +299,7 @@ object Net {
         log.i("$label → GET ${short(url)} ${headers.size} headers")
         val started = System.currentTimeMillis()
         val outcome = runCatching {
-            longClient.newCall(buildRequest("GET", url, headers, null)).execute().use { raw ->
+            longClient.newCall(buildRequest("GET", url, headers, null)).await().use { raw ->
                 val bytes = raw.body?.bytes() ?: ByteArray(0)
                 val type = raw.header("Content-Type").orEmpty()
                 val fromServer = received(raw.headers)
@@ -282,6 +309,7 @@ object Net {
                 Blob(raw.code, bytes, type, millis, fromServer)
             }
         }
+        outcome.exceptionOrNull()?.let { if (it is CancellationException) throw it }
         outcome.onFailure {
             log.e("$label ✗ ${it.javaClass.simpleName}: ${it.message} ${short(url)}")
         }
@@ -327,7 +355,7 @@ object Net {
         val outcome = runCatching {
             longClient.newCall(
                 buildRequest("POST", url, headers + mapOf("Content-Type" to contentType), body)
-            ).execute().use { raw ->
+            ).await().use { raw ->
                 val bytes = raw.body?.bytes() ?: ByteArray(0)
                 val type = raw.header("Content-Type").orEmpty()
                 val fromServer = received(raw.headers)
@@ -337,6 +365,7 @@ object Net {
                 Blob(raw.code, bytes, type, millis, fromServer)
             }
         }
+        outcome.exceptionOrNull()?.let { if (it is CancellationException) throw it }
         outcome.onFailure {
             log.e("$label ✗ ${it.javaClass.simpleName}: ${it.message} ${short(url)}")
         }
@@ -379,8 +408,10 @@ object Net {
     private fun short(url: String): String =
         if (url.length <= 180) url else url.take(180) + "…(${url.length})"
 
+    private val whitespace = Regex("\\s+")
+
     private fun preview(body: String): String {
-        val flat = body.replace(Regex("\\s+"), " ").trim()
+        val flat = whitespace.replace(body, " ").trim()
         val safe = tokenValue.replace(flat) { match ->
             "\"${match.groupValues[1]}\":\"…${match.groupValues[2].length}B\""
         }
