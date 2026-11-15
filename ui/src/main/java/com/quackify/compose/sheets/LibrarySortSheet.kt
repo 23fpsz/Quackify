@@ -150,7 +150,13 @@ fun LibrarySortSheet(
                                         R.drawable.encore_icon_arrow_down_24
                                     }
                                 ),
-                                contentDescription = if (currentDirection == SortDirection.ASCENDING) "Sorted ascending" else "Sorted descending",
+                                contentDescription = stringResource(
+                                    if (currentDirection == SortDirection.ASCENDING) {
+                                        R.string.sorted_ascending
+                                    } else {
+                                        R.string.sorted_descending
+                                    }
+                                ),
                                 tint = EncoreColors.Green,
                                 modifier = Modifier.size(20.dp)
                             )
