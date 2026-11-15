@@ -86,7 +86,7 @@ import androidx.compose.ui.res.stringResource
 
 private const val SPLIT_PLAYER_MIN_WIDTH_DP = 600
 
-internal const val SPLIT_PLAYER_GAP_FRACTION = 0.02f
+internal const val SPLIT_PLAYER_GAP_FRACTION = 0.009f
 
 private const val SPLIT_PLAYER_CORNER_DP = 14
 
