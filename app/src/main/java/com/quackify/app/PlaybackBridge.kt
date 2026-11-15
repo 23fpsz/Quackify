@@ -1402,8 +1402,22 @@ class PlaybackBridge(private val context: Context) {
             }
         }
         log.i("shuffle toggle on '${target.take(8)}' -> $next smart=$nextSmart")
-        if (!connect.setShuffleOn(target, next, nextSmart)) {
-            log.w("shuffle: '${target.take(8)}' refused the option, applying it locally anyway")
+        // When this phone's engine holds the stream, a connect-state command
+        // aimed back at this device is a no-op: the cluster never made it the
+        // active player (the member PUT did not carry is_active, or another
+        // device's stale state still owns the slot), so the server accepts
+        // the command with a 202 and nobody consumes it - update_context even
+        // answers 405 "Device not active". The mode has to travel as a member
+        // PUT instead: publishLocalFromEngine serialises shuffling_context and
+        // context_enhancement from the remembered mode, and its answer is the
+        // cluster, so the follow-up adopt sees the shuffled window at once.
+        val remotePlayer = remoteTarget().isNotBlank()
+        if (remotePlayer) {
+            if (!connect.setShuffleOn(target, next, nextSmart)) {
+                log.w("shuffle: '${target.take(8)}' refused the option, applying it locally anyway")
+            }
+        } else {
+            log.i("shuffle: the local engine owns the stream, publishing the mode as member state")
         }
         rememberModes(shuffle = next, smart = nextSmart, repeatContext = null, repeatTrack = null)
         if (!nextSmart) {
@@ -1420,6 +1434,11 @@ class PlaybackBridge(private val context: Context) {
         }
         publishQueue(connect.cluster.value)
         publishModes()
+        if (!remotePlayer && player.hasSource) {
+            // The member PUT doubles as a cluster refresh; the adopt below
+            // then reads the order this phone just published.
+            publishLocalFromEngine()
+        }
         if (nextSmart) enhanceReset(cluster)
         pullMachineAfterCommand()
         delay(MODE_SETTLE_MS)
@@ -1806,17 +1825,37 @@ class PlaybackBridge(private val context: Context) {
             }
             "set_shuffling_context" -> {
                 val value = command.value ?: return
+                if (command.sentByDeviceId == deviceId) {
+                    // Echo of this device's own set_options: the mode change
+                    // already went out with the toggle, treating the dealer
+                    // bounce as a new instruction re-runs it (and flips it
+                    // straight back when the cluster state is still old).
+                    log.i("set_shuffling_context echo of this device's own command, the toggle covers it")
+                    return
+                }
                 if (shuffleOn(connect.cluster.value) != value) toggleShuffle()
             }
             "set_repeating_context" -> {
                 val value = command.value ?: return
+                if (command.sentByDeviceId == deviceId) {
+                    log.i("set_repeating_context echo of this device's own command, the setter covers it")
+                    return
+                }
                 setRepeatExplicit(context = value, track = null)
             }
             "set_repeating_track" -> {
                 val value = command.value ?: return
+                if (command.sentByDeviceId == deviceId) {
+                    log.i("set_repeating_track echo of this device's own command, the setter covers it")
+                    return
+                }
                 setRepeatExplicit(context = null, track = value)
             }
             "set_options" -> {
+                if (command.sentByDeviceId == deviceId) {
+                    log.i("set_options echo of this device's own command, the setter covers it")
+                    return
+                }
                 command.shuffle?.let { if (shuffleOn(connect.cluster.value) != it) toggleShuffle() }
                 if (command.repeatContext != null || command.repeatTrack != null) {
                     setRepeatExplicit(context = command.repeatContext, track = command.repeatTrack)
@@ -1861,11 +1900,22 @@ class PlaybackBridge(private val context: Context) {
         val nextTrack = track ?: repeatTrackOn(cluster)
         if (nextContext == repeatContextOn(cluster) && nextTrack == repeatTrackOn(cluster)) return
         log.i("repeat set on '${target.take(8)}' -> context=$nextContext track=$nextTrack")
-        if (!connect.setRepeatOn(target, nextContext, nextTrack)) {
-            log.w("repeat: '${target.take(8)}' refused the option, applying it locally anyway")
+        // Same rule as the shuffle toggle: a command aimed at this device
+        // changes nothing while another member owns (or nobody owns) the
+        // player slot, so the local engine's mode travels as member state.
+        val remotePlayer = remoteTarget().isNotBlank()
+        if (remotePlayer) {
+            if (!connect.setRepeatOn(target, nextContext, nextTrack)) {
+                log.w("repeat: '${target.take(8)}' refused the option, applying it locally anyway")
+            }
+        } else {
+            log.i("repeat: the local engine owns the stream, publishing the mode as member state")
         }
         rememberModes(shuffle = null, smart = null, repeatContext = nextContext, repeatTrack = nextTrack)
         publishModes()
+        if (!remotePlayer && player.hasSource) {
+            publishLocalFromEngine()
+        }
         delay(MODE_SETTLE_MS)
         runCatching { connect.refreshCluster() }
         publishModes()
