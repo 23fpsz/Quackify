@@ -293,7 +293,7 @@ object ClusterParser {
         return ClusterState(
             track = track,
             nextTracks = parseTracks(player.optJSONArray("next_tracks")),
-            prevTracks = parseTracks(player.optJSONArray("prev_tracks")),
+            prevTracks = parseTracks(player.optJSONArray("prev_tracks")).reversed(),
             contextUri = player.text("context_uri"),
             contextIndex = index?.optInt("track", 0) ?: 0,
             pageIndex = index?.optInt("page", 0) ?: 0,

@@ -441,6 +441,10 @@ class PlaybackBridge(private val context: Context) {
             scope.launch { skipTo(next = false) }
         }
 
+        override fun onSkipToPreviousTrack() {
+            scope.launch { skipTo(next = false, forcePrevious = true) }
+        }
+
         override fun onSeek(positionMs: Long) {
             val cluster = connect.cluster.value
             val remoteActive = cluster?.activeDevice?.let { it.id != deviceId } == true
@@ -2303,7 +2307,7 @@ class PlaybackBridge(private val context: Context) {
         return at.takeIf { it > 0L }
     }
 
-    private suspend fun skipTo(next: Boolean) {
+    private suspend fun skipTo(next: Boolean, forcePrevious: Boolean = false) {
         val cluster = connect.cluster.value
         val active = cluster?.activeDevice
         val remote = active != null && active.id != deviceId
@@ -2318,7 +2322,7 @@ class PlaybackBridge(private val context: Context) {
             log.w("skip: '${active.name}' refused the $what, leaving the stream where it is")
             return
         }
-        skipLocal(forward = next)
+        skipLocal(forward = next, forcePrevious = forcePrevious)
     }
 
     private fun applyReplaceState(command: PlaybackCommand) {
@@ -2420,9 +2424,9 @@ class PlaybackBridge(private val context: Context) {
         }
     }
 
-    private suspend fun skipLocal(forward: Boolean) {
+    private suspend fun skipLocal(forward: Boolean, forcePrevious: Boolean = false) {
         if (!forward) {
-            previous()
+            if (forcePrevious) skipToPreviousTrack() else previous()
             return
         }
         val cluster = connect.cluster.value ?: run {
@@ -2623,6 +2627,10 @@ class PlaybackBridge(private val context: Context) {
             player.seekTo(0L)
             return
         }
+        skipToPreviousTrack()
+    }
+
+    private suspend fun skipToPreviousTrack() {
         val current = state.trackUri
         val rows = chainFor()
         val at = rowOf(rows, current)
@@ -3511,30 +3519,8 @@ class PlaybackBridge(private val context: Context) {
                 tailRowsFilled)
                 .filterNot { it.uri == anchor }
         }
-        val previousRow = run {
-            val fromServer = cluster?.prevTracks
-                ?.firstOrNull { it.isVisible && !it.isAd }
-                ?.takeIf { !bannedCachedUri(it.uri) }
-            if (fromServer != null) {
-                val row = fromServer.asTrackItem()
-                if (row.title.isBlank()) decorated[row.uri] ?: row else row
-            } else if (anchor.isNotBlank()) {
-                val at = chain.indexOf(anchor)
-                if (at > 0) {
-                    val uri = chain[at - 1]
-                    if (bannedCachedUri(uri)) {
-                        null
-                    } else {
-                        decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri)
-                    }
-                } else {
-                    null
-                }
-            } else {
-                null
-            }
-        }
-        val nextRow = (queued + upcoming).firstOrNull()
+        val previousRow = previousRowFor(anchor)
+        val nextRow = nextRowFor(anchor)
         val sparse = ((if (enhancedTail.isNotEmpty()) emptyList() else contextRows) + queued)
             .filter { it.title.isBlank() }.map { it.uri }
         val missing = (sparse + tailUris.filterNot { it in knownUpcoming } +
@@ -3560,6 +3546,59 @@ class PlaybackBridge(private val context: Context) {
                 "'${label.ifBlank { context.ifBlank { "?" } }}' " +
                 "${if (server) "the server" else "the list on screen"}"
         )
+    }
+
+    private fun rowItem(uri: String): TrackItem =
+        decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri)
+
+    private fun nextRowFor(anchor: String): TrackItem? {
+        val cluster = connect.cluster.value
+        val contextUri = chainContext.ifBlank { cluster?.contextUri.orEmpty() }
+        val queuedUris = queuedTail.map { it.uri } + cluster?.queued.orEmpty().map { it.uri }
+        queuedUris.firstOrNull { it != anchor && !bannedCachedUri(it) }?.let { return rowItem(it) }
+        enhancedUpcoming(contextUri, anchor)
+            .firstOrNull { it.uri != anchor && !bannedCachedUri(it.uri) }
+            ?.let { return rowItem(it.uri) }
+        if (sessionQueueContext == contextUri && sessionQueue.isNotEmpty()) {
+            sessionQueue.firstOrNull { it != anchor && !bannedCachedUri(it) }?.let { return rowItem(it) }
+        }
+        val chain = chainFor()
+        val chainAt = rowOf(chain, anchor)
+        if (chainAt >= 0 && chainAt + 1 < chain.size) {
+            var row = chainAt + 1
+            while (row < chain.size && bannedCachedUri(chain[row])) row++
+            chain.getOrNull(row)?.takeIf { it != anchor }?.let { return rowItem(it) }
+        }
+        val window = cluster?.window() ?: return null
+        val at = window.indexOfFirst { it.uri == anchor }
+        if (at < 0) return null
+        var cursor = at + 1
+        while (cursor in window.indices &&
+            (!window[cursor].isVisible || untitled(window[cursor]) || bannedRow(window[cursor]))
+        ) cursor++
+        if (cursor !in window.indices && repeatContextOn(cluster)) {
+            cursor = window.indexOfFirst { it.isVisible }
+        }
+        return window.getOrNull(cursor)
+            ?.takeIf { it.isVisible && it.uri != anchor }
+            ?.asTrackItem()
+            ?.let { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
+    }
+
+    private fun previousRowFor(anchor: String): TrackItem? {
+        val chain = chainFor()
+        val chainAt = rowOf(chain, anchor)
+        if (chainAt > 0 && chain[chainAt - 1] != anchor) {
+            return rowItem(chain[chainAt - 1])
+        }
+        val cluster = connect.cluster.value ?: return null
+        val window = cluster.window()
+        var cursor = cluster.anchorOf(anchor) - 1
+        while (cursor in window.indices && !window[cursor].isVisible) cursor--
+        return window.getOrNull(cursor)
+            ?.takeIf { it.isVisible && it.uri != anchor }
+            ?.asTrackItem()
+            ?.let { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
     }
 
     private fun playlistLabelOf(contextUri: String): String {
