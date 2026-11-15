@@ -242,6 +242,7 @@ fun EncoreNowPlayingScreen(
     onSkipNextClick: () -> Unit,
     onSkipPreviousClick: () -> Unit,
     onSwipePreviousClick: () -> Unit = onSkipPreviousClick,
+    docked: Boolean = false,
     onLikeClick: () -> Unit,
     onShuffleClick: () -> Unit,
     onRepeatClick: () -> Unit,
@@ -435,13 +436,17 @@ fun EncoreNowPlayingScreen(
         }
     }
 
-    val headerDragModifier = Modifier.npvDismissDragGesture(
-        coroutineScope = coroutineScope,
-        playerOffsetY = playerOffsetY,
-        dismissThresholdPx = dismissThresholdPx,
-        onDismiss = dismissPlayer,
-        onSnapBack = snapBackPlayer
-    )
+    val headerDragModifier = if (docked) {
+        Modifier
+    } else {
+        Modifier.npvDismissDragGesture(
+            coroutineScope = coroutineScope,
+            playerOffsetY = playerOffsetY,
+            dismissThresholdPx = dismissThresholdPx,
+            onDismiss = dismissPlayer,
+            onSnapBack = snapBackPlayer
+        )
+    }
 
     val artworkGestureModifier = Modifier.npvArtworkGesture(
         coroutineScope = coroutineScope,
@@ -450,6 +455,7 @@ fun EncoreNowPlayingScreen(
         scrollState = scrollState,
         scrollEnabled = !effectiveIsLoading,
         dismissThresholdPx = dismissThresholdPx,
+        dismissEnabled = !docked,
         swipeEnabled = !effectiveIsLoading && !videoActive,
         canSwipePrevious = canSkipPrevious,
         onSwipePrevious = {
@@ -586,6 +592,7 @@ fun EncoreNowPlayingScreen(
                         NowPlayingHeaderRow(
                             resolvedContextTitle = resolvedContextTitle,
                             contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                            showCollapse = !docked,
                             onCollapseClick = onCollapseClick,
                             onMoreClick = onMoreClick,
                             dominantColor = animatedDominantColor,
@@ -730,6 +737,7 @@ fun EncoreNowPlayingScreen(
                                 NowPlayingHeaderRow(
                                     resolvedContextTitle = resolvedContextTitle,
                                     contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                                    showCollapse = !docked,
                                     onCollapseClick = onCollapseClick,
                                     onMoreClick = onMoreClick,
                                     dominantColor = animatedDominantColor,
@@ -1033,13 +1041,14 @@ private fun Modifier.npvArtworkGesture(
     scrollState: ScrollState,
     scrollEnabled: Boolean,
     dismissThresholdPx: Float,
+    dismissEnabled: Boolean,
     swipeEnabled: Boolean,
     canSwipePrevious: Boolean,
     onSwipePrevious: () -> Unit,
     onSwipeNext: () -> Unit,
     onDismiss: () -> Unit,
     onSnapBack: () -> Unit
-): Modifier = pointerInput(dismissThresholdPx, scrollEnabled, swipeEnabled, canSwipePrevious) {
+): Modifier = pointerInput(dismissThresholdPx, scrollEnabled, dismissEnabled, swipeEnabled, canSwipePrevious) {
     var axis = AXIS_UNDECIDED
     var totalDragX = 0f
     var totalDragY = 0f
@@ -1069,7 +1078,7 @@ private fun Modifier.npvArtworkGesture(
                     axis = if (swipeEnabled) AXIS_HORIZONTAL else AXIS_YIELD
                 } else if (totalDragY > DRAG_AXIS_SLOP_PX) {
                     val pageAtTop = !scrollEnabled || scrollState.value <= 0
-                    axis = if (pageAtTop) AXIS_VERTICAL else AXIS_YIELD
+                    axis = if (pageAtTop && dismissEnabled) AXIS_VERTICAL else AXIS_YIELD
                 } else if (totalDragY < -DRAG_AXIS_SLOP_PX) {
                     axis = AXIS_YIELD
                 }
@@ -1151,6 +1160,7 @@ private fun Modifier.npvArtworkGesture(
 private fun NowPlayingHeaderRow(
     resolvedContextTitle: String,
     contextSubtitle: String?,
+    showCollapse: Boolean = true,
     onCollapseClick: () -> Unit,
     onMoreClick: () -> Unit,
     dominantColor: Color,
@@ -1165,14 +1175,18 @@ private fun NowPlayingHeaderRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        EncoreIconButton(
-            iconRes = R.drawable.encore_icon_chevron_down_24,
-            contentDescription = stringResource(R.string.collapse_player),
-            onClick = onCollapseClick,
-            tint = ink,
-            size = 48.dp,
-            iconSize = 24.dp
-        )
+        if (showCollapse) {
+            EncoreIconButton(
+                iconRes = R.drawable.encore_icon_chevron_down_24,
+                contentDescription = stringResource(R.string.collapse_player),
+                onClick = onCollapseClick,
+                tint = ink,
+                size = 48.dp,
+                iconSize = 24.dp
+            )
+        } else {
+            Spacer(modifier = Modifier.size(48.dp))
+        }
 
         Column(
             modifier = Modifier

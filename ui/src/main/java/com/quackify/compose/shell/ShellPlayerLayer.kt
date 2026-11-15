@@ -1,6 +1,12 @@
 package com.quackify.compose.shell
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -8,12 +14,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.CoroutineScope
+
+internal const val SPLIT_PLAYER_WIDTH_FRACTION = 0.3f
 
 internal class ShellPlayerEnv(
     val flags: ShellUiFlags,
@@ -73,7 +83,7 @@ internal class ShellPlayerEnv(
  * EncoreAppShell so that composable stays under the JIT method-size limit.
  */
 @Composable
-internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
+internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv, docked: Boolean = false) {
     val bottomBarModifier = Modifier.align(Alignment.BottomCenter)
     val playbackState = env.playbackState
     val progressState = env.progressState
@@ -143,11 +153,65 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
             onSkipNext = env.handleSkipNext,
             onSkipPrevious = env.handleSkipPrevious,
             hasTrack = env.playerIdentity.trackLoaded,
-            showMiniPlayer = env.playerIdentity.trackLoaded,
+            showMiniPlayer = env.playerIdentity.trackLoaded && !docked,
             modifier = bottomBarModifier
         )
     }
 
+    if (!docked) {
+        NowPlayingScreenLayer(
+            env = env,
+            visible = env.isPlayerExpanded && !env.flags.isLogcatOpen,
+            docked = false,
+            modifier = Modifier
+        )
+    }
+}
+
+@Composable
+internal fun BoxScope.ShellDockedPlayer(env: ShellPlayerEnv) {
+    if (!env.playerIdentity.trackLoaded) return
+    Row(
+        modifier = Modifier
+            .align(Alignment.CenterEnd)
+            .fillMaxHeight()
+            .fillMaxWidth(SPLIT_PLAYER_WIDTH_FRACTION)
+            .background(EncoreColors.Background)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(1.dp)
+                .background(EncoreColors.Outline)
+        )
+        NowPlayingScreenLayer(
+            env = env,
+            visible = !env.flags.isLogcatOpen,
+            docked = true,
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun NowPlayingScreenLayer(
+    env: ShellPlayerEnv,
+    visible: Boolean,
+    docked: Boolean,
+    modifier: Modifier
+) {
+    val playbackState = env.playbackState
+    val progressState = env.progressState
+    val currentProgress = progressState?.progress ?: env.local.progress
+    val currentPositionMs = progressState?.positionMs ?: env.local.positionMs
+    val durationMs = progressState?.durationMs ?: 0L
+    val nowPlayingDominantColor by rememberDominantColor(
+        imageUrl = env.currentCoverUrl,
+        fallbackSeed = env.currentTrackTitle + env.currentArtist,
+        defaultColor = Color(0xFF432371)
+    )
     val bridgeContextLabel = playbackState?.queueContextLabel?.takeIf { it.isNotBlank() }
         ?: playbackState?.contextLabel?.takeIf { it.isNotBlank() }
         ?: ""
@@ -164,7 +228,9 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
     val effectiveCanSeek = if (remoteCtl) playbackState?.remoteCanSeek ?: true else true
 
     ShellNowPlaying(
-        visible = env.isPlayerExpanded && !env.flags.isLogcatOpen,
+        visible = visible,
+        docked = docked,
+        modifier = modifier,
         title = env.playerIdentity.title,
         artist = env.playerIdentity.artist,
         contextHeader = contextHeader,
