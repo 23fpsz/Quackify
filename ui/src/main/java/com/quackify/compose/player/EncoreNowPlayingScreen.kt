@@ -745,7 +745,9 @@ fun EncoreNowPlayingScreen(
                                 )
                             }
 
-                            Box(
+                        Spacer(modifier = Modifier.weight(topSpacerWeight.coerceAtLeast(0.01f)))
+
+                        Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
@@ -794,8 +796,6 @@ fun EncoreNowPlayingScreen(
                                     )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.weight(topSpacerWeight.coerceAtLeast(0.01f)))
 
                             Spacer(modifier = Modifier.weight(bottomSpacerWeight.coerceAtLeast(0.01f)))
 
@@ -1448,7 +1448,7 @@ private fun SwipableTrackArtwork(
             modifier = Modifier
                 .requiredWidth(pageWidth * 3)
                 .fillMaxHeight()
-                .graphicsLayer { translationX = drag.value - pageWidthPx }
+                .graphicsLayer { translationX = drag.value }
         ) {
             SwipeTrackArtworkSlot(
                 title = previousTrack?.title.orEmpty(),
