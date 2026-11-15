@@ -58,6 +58,7 @@ internal class ShellPlayerEnv(
     val handlePlayPause: () -> Unit,
     val handleSkipNext: () -> Unit,
     val handleSkipPrevious: () -> Unit,
+    val handlePreviousSwipe: () -> Unit,
     val onCanvasToggle: ((Boolean) -> Unit)?,
     val onToggleVideoFullscreen: ((Boolean) -> Unit)?,
     val onArtistFollowToggle: ((String, Boolean) -> Unit)?,
@@ -218,6 +219,9 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
         onPlayPause = env.handlePlayPause,
         onSkipNext = env.handleSkipNext,
         onSkipPrevious = env.handleSkipPrevious,
+        onPreviousSwipe = env.handlePreviousSwipe,
+        nextCoverUrl = playbackState?.nextCoverUrl.orEmpty(),
+        previousCoverUrl = playbackState?.previousCoverUrl.orEmpty(),
         onLike = {
             val playingTrack = TrackItem(
                 title = env.currentTrackTitle,

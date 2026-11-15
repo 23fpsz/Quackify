@@ -91,6 +91,10 @@ internal class ShellActions(
         playerListener?.onSkipPrevious()
     }
 
+    fun previousSwipe() {
+        playerListener?.onPreviousSwipe()
+    }
+
     fun openTrackOptions(track: TrackItem) {
         local.trackForOptions = track
         flags.isTrackOptionsFromPlayer = false

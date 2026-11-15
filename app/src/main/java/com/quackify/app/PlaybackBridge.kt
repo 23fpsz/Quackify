@@ -459,6 +459,10 @@ class PlaybackBridge(private val context: Context) {
             scope.launch { skipTo(next = false) }
         }
 
+        override fun onPreviousSwipe() {
+            scope.launch { skipTo(next = false, force = true) }
+        }
+
         override fun onSeek(positionMs: Long) {
             val cluster = connect.cluster.value
             val remoteActive = cluster?.activeDevice?.let { it.id != deviceId } == true
@@ -1150,6 +1154,34 @@ class PlaybackBridge(private val context: Context) {
 
     private fun pendingActive(): Boolean =
         pendingTrack.isNotBlank() && System.currentTimeMillis() - pendingAt < PENDING_MS
+
+    /**
+     * Warms what a swipe back lands on: the row before the current one, or the
+     * track this session really played last when shuffling. The manifest is
+     * resolved now, so the gesture finds it cached instead of paying for a
+     * round trip after it ends.
+     */
+    private fun prefetchBehind(contextUri: String, currentUri: String) {
+        if (contextUri.isBlank() || currentUri.isBlank()) return
+        if (chainContext == contextUri && chainRows.size > 1) {
+            val at = chainRows.indexOf(currentUri)
+            if (at > 0) prefetchRow(chainRows[at - 1])
+        }
+        val cluster = connect.cluster.value
+        if (cluster != null && shuffleOn(cluster)) {
+            val back = synchronized(shuffleOrderLock) {
+                playedInShuffle.lastOrNull { it != currentUri }
+            }
+            if (back != null) prefetchRow(back)
+        }
+    }
+
+    private fun prefetchRow(uri: String) {
+        if (!uri.startsWith("spotify:track:") && !uri.startsWith("spotify:episode:")) return
+        if (player.hasSourceFor(uri)) return
+        if (bannedCachedUri(uri)) return
+        player.prefetch(uri, connect.spclientHost)
+    }
 
     /** Speculative manifests for playlist rows, so a tap skips that round trip. */
     fun prefetchUris(uris: List<String>) {
@@ -2359,7 +2391,7 @@ class PlaybackBridge(private val context: Context) {
         return at.takeIf { it > 0L }
     }
 
-    private suspend fun skipTo(next: Boolean) {
+    private suspend fun skipTo(next: Boolean, force: Boolean = false) {
         val cluster = connect.cluster.value
         val active = cluster?.activeDevice
         val remote = active != null && active.id != deviceId
@@ -2374,7 +2406,7 @@ class PlaybackBridge(private val context: Context) {
             log.w("skip: '${active.name}' refused the $what, leaving the stream where it is")
             return
         }
-        skipLocal(forward = next)
+        skipLocal(forward = next, force = force)
     }
 
     private fun applyReplaceState(command: PlaybackCommand) {
@@ -2461,9 +2493,9 @@ class PlaybackBridge(private val context: Context) {
         }
     }
 
-    private suspend fun skipLocal(forward: Boolean) {
+    private suspend fun skipLocal(forward: Boolean, force: Boolean = false) {
         if (!forward) {
-            previous()
+            previous(force)
             return
         }
         val cluster = connect.cluster.value ?: run {
@@ -2658,9 +2690,9 @@ class PlaybackBridge(private val context: Context) {
         log.w("skip: the cluster still names '${state.trackUri.takeLast(12)}' after ${SKIP_TRIES} reads")
     }
 
-    private suspend fun previous() {
+    private suspend fun previous(force: Boolean = false) {
         val loaded = player.positionMs
-        if (player.hasSource && loaded > RESTART_MS) {
+        if (!force && player.hasSource && loaded > RESTART_MS) {
             log.i("previous: at ${loaded}ms, restarting the track instead")
             player.seekTo(0L)
             return
@@ -3149,6 +3181,7 @@ class PlaybackBridge(private val context: Context) {
                 connect.spclientHost,
                 cluster.track.uri
             )
+            prefetchBehind(cluster.contextUri, cluster.track.uri)
         }
         if (cluster.activeDeviceId.isNotBlank() && cluster.activeDeviceId != activeSeen) {
             activeSeen = cluster.activeDeviceId
@@ -3456,6 +3489,7 @@ class PlaybackBridge(private val context: Context) {
     )
 
     private fun publishQueue(cluster: ClusterState?) {
+        refreshNeighbors()
         val loaded = player.state.value.trackUri
         val anchor = (if (pendingActive()) pendingTrack else "")
             .ifBlank { loaded }
@@ -3571,6 +3605,56 @@ class PlaybackBridge(private val context: Context) {
                 "'${label.ifBlank { context.ifBlank { "?" } }}' " +
                 "${if (server) "the server" else "the list on screen"}"
         )
+    }
+
+    /**
+     * The rows a horizontal swipe would land on, resolved to their artwork so
+     * the player can show them while the finger is still moving.
+     */
+    private fun refreshNeighbors() {
+        val current = state.trackUri
+        if (current.isBlank()) {
+            if (state.nextCoverUrl.isNotBlank() || state.previousCoverUrl.isNotBlank()) {
+                state = state.copy(nextCoverUrl = "", previousCoverUrl = "")
+            }
+            return
+        }
+        val (next, previous) = neighborUris(current)
+        val nextCover = coverOf(next)
+        val previousCover = coverOf(previous)
+        if (nextCover == state.nextCoverUrl && previousCover == state.previousCoverUrl) return
+        state = state.copy(nextCoverUrl = nextCover, previousCoverUrl = previousCover)
+        log.v("neighbours: next='${next.takeLast(12)}' prev='${previous.takeLast(12)}'")
+    }
+
+    private fun neighborUris(current: String): Pair<String, String> {
+        val cluster = connect.cluster.value
+        val rows = if (chainContext.isNotBlank() && chainRows.isNotEmpty()) {
+            chainRows
+        } else {
+            cluster?.window()?.filter { it.isVisible }?.map { it.uri }.orEmpty()
+        }
+        val at = rows.indexOf(current)
+        val next = when {
+            queuedTail.isNotEmpty() -> queuedTail.first().uri
+            cluster != null && cluster.queued.isNotEmpty() -> cluster.queued.first().uri
+            at >= 0 && at + 1 < rows.size -> rows[at + 1]
+            else -> ""
+        }
+        val previous = when {
+            cluster != null && shuffleOn(cluster) ->
+                synchronized(shuffleOrderLock) { playedInShuffle.lastOrNull { it != current } }.orEmpty()
+            at > 0 -> rows[at - 1]
+            else -> ""
+        }
+        return next to previous
+    }
+
+    private fun coverOf(uri: String): String {
+        if (uri.isBlank()) return ""
+        decorated[uri]?.imageUrl?.takeIf { it.isNotBlank() }?.let { return it }
+        val cluster = connect.cluster.value
+        return cluster?.window()?.firstOrNull { it.uri == uri }?.imageUrl.orEmpty()
     }
 
     private fun playlistLabelOf(contextUri: String): String {
