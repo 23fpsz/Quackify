@@ -745,8 +745,6 @@ fun EncoreNowPlayingScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.weight(topSpacerWeight.coerceAtLeast(0.01f)))
-
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -796,6 +794,8 @@ fun EncoreNowPlayingScreen(
                                     )
                                 }
                             }
+
+                            Spacer(modifier = Modifier.weight(topSpacerWeight.coerceAtLeast(0.01f)))
 
                             Spacer(modifier = Modifier.weight(bottomSpacerWeight.coerceAtLeast(0.01f)))
 
