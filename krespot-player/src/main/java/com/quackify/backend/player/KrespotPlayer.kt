@@ -518,6 +518,7 @@ class KrespotPlayer(private val context: Context) {
                         prefetched = manifestFor(track.uri),
                     )?.also { rememberSource(track.uri, it) }
                 if (source == null) {
+                    if (id == generation) settleStopped()
                     _events.emit(PlayerEvent.Failed("no source"))
                     return@launch
                 }
@@ -549,6 +550,12 @@ class KrespotPlayer(private val context: Context) {
                 val ready = player.prepare(source, track.uri, startAt, autoplay = !pendingPause, file?.gainDb ?: 0.0)
                 if (!ready || id != generation) {
                     player.stop()
+                    if (id == generation) {
+                        settleStopped()
+                        _events.emit(PlayerEvent.Failed("prepare"))
+                    } else {
+                        log.i("play was superseded before the engine came up")
+                    }
                     return@launch
                 }
                 engine = player
@@ -708,6 +715,11 @@ class KrespotPlayer(private val context: Context) {
         log.i("seek -> ${ms}ms")
         engine.seekTo(ms)
         _state.update { it.copy(positionMs = engine.currentPositionMs) }
+    }
+
+    /** Nothing is running: the state must not keep claiming it plays. */
+    private fun settleStopped() {
+        _state.update { it.copy(playing = false, paused = false, buffering = false) }
     }
 
     fun stop() {

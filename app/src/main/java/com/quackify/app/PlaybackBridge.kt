@@ -268,6 +268,11 @@ class PlaybackBridge(private val context: Context) {
     @Volatile
     private var chainContext: String = ""
 
+    private var chainFullJob: Job? = null
+
+    @Volatile
+    private var chainFullContext: String = ""
+
     @Volatile
     private var rememberedChain: String = ""
 
@@ -1397,13 +1402,23 @@ class PlaybackBridge(private val context: Context) {
      */
     private fun shufflePermutation(context: String, rows: List<String>): List<String> {
         if (context == shuffleOrderContext && rows == shuffleOrderRows) return shuffleOrder
-        val order = rows.shuffled()
         synchronized(shuffleOrderLock) {
+            val grown = if (context == shuffleOrderContext && shuffleOrder.isNotEmpty() &&
+                rows.size > shuffleOrderRows.size && shuffleOrder.all { it in rows }
+            ) {
+                val list = shuffleOrder.toMutableList()
+                rows.filterNot { it in list }.forEach { row ->
+                    if (list.isEmpty()) list.add(row) else list.add(list.indices.random(), row)
+                }
+                list
+            } else {
+                rows.shuffled()
+            }
             shuffleOrderContext = context
             shuffleOrderRows = rows
-            shuffleOrder = order
+            shuffleOrder = grown
+            return grown
         }
-        return order
     }
 
     /** The rows after [anchor] in the context's shuffle permutation. */
@@ -1950,6 +1965,9 @@ class PlaybackBridge(private val context: Context) {
      * around.
      */
     private suspend fun toggleLocal() {
+        log.i("toggle: engine source=${player.hasSource} " +
+                "uri='${player.state.value.trackUri.takeLast(12)}' playing=${player.isPlaying}"
+        )
         if (player.hasSource) {
             if (player.isPlaying) {
                 log.i("toggle: pausing the engine here")
@@ -1985,8 +2003,42 @@ class PlaybackBridge(private val context: Context) {
             return
         }
         val at = cluster.positionNow()
+        if (state.isPlaying && state.trackUri == track.uri) {
+            log.i("toggle: the engine holds no source, pausing the stream at ${at}ms")
+            pausePresented(cluster, at)
+            return
+        }
         log.i("toggle: starting '${track.title}' here at ${at}ms, this phone takes the stream")
         startLocal(track, cluster.contextUri, cluster.contextIndex, at, playing = true)
+    }
+
+    /**
+     * Pauses what this device is presenting without an engine to pause: the
+     * member state goes out stopped so the next press resumes from here
+     * instead of restarting the track from its first second.
+     */
+    private suspend fun pausePresented(cluster: ClusterState, at: Long) {
+        player.pause()
+        progress.set(at, progress.durationMs)
+        state = state.copy(isPlaying = false, isBuffering = false)
+        connect.publishLocalState(
+            track = cluster.track,
+            contextUri = state.contextUri.takeIf { it.isNotBlank() } ?: cluster.contextUri,
+            contextIndex = cluster.contextIndex,
+            positionMs = at,
+            playing = false,
+            durationMs = cluster.track.durationMs.takeIf { it > 0L } ?: progress.durationMs,
+            shuffle = state.shuffleMode != ShuffleMode.OFF,
+            repeatContext = state.repeatMode == RepeatMode.REPEAT_ALL,
+            repeatTrack = state.repeatMode == RepeatMode.REPEAT_ONE,
+            enhancement = if (state.shuffleMode == ShuffleMode.SMART_SHUFFLE) ENHANCEMENT_SMART else "NONE",
+            queueRevision = cluster.queueRevision.orEmpty(),
+            contextDescription = state.queueContextLabel
+                .takeIf { it.isNotBlank() && state.queueContext == cluster.contextUri }
+                .orEmpty(),
+            nextRows = queueTailRows(cluster.contextUri),
+            prevRows = queuePrevRows(),
+        )
     }
 
     /**
@@ -3686,7 +3738,7 @@ class PlaybackBridge(private val context: Context) {
         contextUri.startsWith("spotify:collection:") ||
             contextUri.startsWith("spotify:user:") -> {
             val detail = Krespot.collections.collection(context, contextUri) ?: return emptyList()
-            detail.tracks.map { it.uri }
+            fullRows(contextUri, detail.tracks.map { it.uri }, detail.total)
         }
         contextUri.startsWith("spotify:album:") -> {
             val detail = Krespot.albums.album(context, contextUri) ?: return emptyList()
@@ -3698,13 +3750,49 @@ class PlaybackBridge(private val context: Context) {
         }
         contextUri.startsWith("spotify:playlist:") -> {
             val detail = Krespot.collections.collection(context, contextUri) ?: return emptyList()
-            detail.tracks.map { it.uri }
+            fullRows(contextUri, detail.tracks.map { it.uri }, detail.total)
         }
         contextUri.startsWith("spotify:show:") -> {
             val detail = Podcasts.show(context, contextUri) ?: return emptyList()
             detail.episodes.map { it.uri }
         }
         else -> emptyList()
+    }
+
+    /** Walks the remaining pages so a long playlist hands over every row, not one page. */
+    private suspend fun fullRows(
+        contextUri: String,
+        first: List<String>,
+        total: Int,
+    ): List<String> {
+        if (first.isEmpty() || total <= first.size) return first
+        val all = ArrayList<String>(minOf(total, CONTEXT_ROWS_MAX))
+        all += first
+        while (all.size < total && all.size < CONTEXT_ROWS_MAX) {
+            val page = runCatching { Krespot.collections.collectionMore(context, contextUri, all.size) }
+                .getOrNull() ?: break
+            val rows = page.rows.map { it.uri }.filter { it.isNotBlank() }
+            if (rows.isEmpty() || page.fetched <= 0) break
+            all += rows
+        }
+        return all
+    }
+
+    private fun fillChain(contextUri: String, rows: List<String>) {
+        if (contextUri.startsWith("spotify:track:") || contextUri.startsWith("spotify:episode:")) return
+        if (chainFullContext == contextUri && chainFullJob?.isActive != true) return
+        chainFullContext = contextUri
+        chainFullJob?.cancel()
+        chainFullJob = scope.launch {
+            val all = runCatching { rowsOf(contextUri) }.getOrNull().orEmpty()
+            if (all.size <= rows.size) return@launch
+            if (chainContext != contextUri || chainRows.size < rows.size || chainRows.size >= all.size) {
+                return@launch
+            }
+            chainRows = all
+            log.i("chain: ${all.size} rows, '${contextUri.takeLast(16)}' paged in full")
+            publishQueue(connect.cluster.value)
+        }
     }
 
     private fun captureChain(contextUri: String) {
@@ -3755,6 +3843,7 @@ class PlaybackBridge(private val context: Context) {
         resumeRow = -1
         log.i("chain: ${rows.size} rows in '${chainContext.ifBlank { "one track per row" }}' " +
                 "from '${rows.first().takeLast(12)}'")
+        fillChain(contextUri, rows)
     }
 
     private fun mirrorState(command: PlaybackCommand?) {
@@ -3921,7 +4010,17 @@ class PlaybackBridge(private val context: Context) {
                     scope.launch { advance(ended) }
                 }
                 is PlayerEvent.Failed -> {
+                    log.w("player failed with no command: ${event.message}")
                     gaplessQueuedUri = ""
+                    state = state.copy(isPlaying = false, isBuffering = false)
+                    scope.launch {
+                        runCatching {
+                            publishLocalFromEngine(
+                                positionMs = progress.positionMs,
+                                playing = false,
+                            )
+                        }
+                    }
                     if (videoActive()) {
                         fallbackFromVideo()
                         return
@@ -4037,6 +4136,15 @@ class PlaybackBridge(private val context: Context) {
 
             is PlayerEvent.Failed -> {
                 log.w("player failed: ${event.message}")
+                state = state.copy(isPlaying = false, isBuffering = false)
+                scope.launch {
+                    runCatching {
+                        publishLocalFromEngine(
+                            positionMs = progress.positionMs,
+                            playing = false,
+                        )
+                    }
+                }
                 if (gaplessQueuedUri.isNotBlank()) {
                     log.w("gapless: the queued '${gaplessQueuedUri.takeLast(12)}' failed to take over, advancing the hard way")
                     gaplessQueuedUri = ""
@@ -4408,5 +4516,6 @@ class PlaybackBridge(private val context: Context) {
         const val ENHANCED_TAIL_MAX = 80
         const val SHUFFLE_HISTORY_MAX = 64
         const val PREV_HISTORY_MAX = 24
+        const val CONTEXT_ROWS_MAX = 500
     }
 }
