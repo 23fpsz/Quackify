@@ -111,6 +111,33 @@ object CommandClient {
         return response
     }
 
+    /**
+     * Moves the target device's cursor to a row of the state machine it is
+     * already running. Unlike play it keeps the machine (and with it the
+     * queue every other device sees) instead of rebuilding it.
+     */
+    suspend fun skipToTrack(
+        context: Context,
+        spclient: String,
+        localDeviceId: String,
+        targetDeviceId: String,
+        trackUri: String,
+        trackUid: String,
+    ): Net.Response? {
+        val track = JSONObject().put("uri", trackUri)
+        if (trackUid.isNotBlank()) track.put("uid", trackUid)
+        val command = JSONObject()
+            .put("track", track)
+            .put("logging_params", JSONObject().put("command_id", commandId()))
+            .put("endpoint", "skip_to")
+        val to = targetDeviceId.ifBlank { localDeviceId }
+        val url = "https://$spclient/connect-state/v1/player/command/from/$localDeviceId/to/$to"
+        val body = JSONObject().put("command", command).toString()
+        val response = Net.postJson(url, body, ConnectHeaders.of(context), tag = "skip_to")
+        log.i("skip_to '$trackUri' on ${to.take(8)} -> ${response?.code ?: "no response"}")
+        return response
+    }
+
     suspend fun setQueue(
         context: Context,
         spclient: String,
