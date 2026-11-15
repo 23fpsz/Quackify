@@ -83,6 +83,13 @@ private const val PREV_TRACKS_MAX = 10
 
 private const val NEXT_TRACKS_MAX = 80
 
+private const val SHUFFLE_ALGORITHM_STABLE = "stable"
+
+private const val SHUFFLE_ALGORITHM_NONE = "none"
+
+/** The dealer labels commands this device sent itself instead of naming it. */
+private const val SELF_SENT = "local"
+
 class KrespotConnect(private val context: Context) {
 
     val deviceId: String = Device.id(context)
@@ -258,6 +265,12 @@ class KrespotConnect(private val context: Context) {
                 frame.payloads.forEach { payload ->
                     val remote = withContext(Dispatchers.Default) { RemoteCommandParser.parse(payload) }
                     if (remote != null) {
+                        if (!remote.isTransfer &&
+                            (remote.sentByDeviceId == deviceId || remote.sentByDeviceId == SELF_SENT)
+                        ) {
+                            log.d("remote command '${remote.endpoint}' is this device's own, already applied")
+                            return@forEach
+                        }
                         log.i("remote command '${remote.endpoint}' from '${remote.sentByDeviceId.take(8)}' " +
                                 (if (remote.isTransfer) "" else "value=${remote.value} seek=${remote.seekToMs} " +
                                 "track=${remote.trackUri.takeLast(12)} shuffle=${remote.shuffle} " +
@@ -370,6 +383,7 @@ class KrespotConnect(private val context: Context) {
         queueRevision: String = "",
         contextDescription: String = "",
         nextRows: List<ClusterTrack> = emptyList(),
+        prevRows: List<ClusterTrack> = emptyList(),
     ): Boolean {
         val connection = _connectionId.value
         if (spclient.isBlank() || connection.isBlank()) {
@@ -382,7 +396,7 @@ class KrespotConnect(private val context: Context) {
             localPlayerState(
                 track, contextUri, contextIndex, positionMs, playing, durationMs,
                 shuffle, repeatContext, repeatTrack, enhancement, queueRevision,
-                contextDescription, nextRows,
+                contextDescription, nextRows, prevRows,
             )
         }
         val response = Registration.connectState(
@@ -437,6 +451,7 @@ class KrespotConnect(private val context: Context) {
         queueRevision: String,
         contextDescription: String,
         nextRows: List<ClusterTrack>,
+        prevRows: List<ClusterTrack>,
     ): JSONObject {
         val now = System.currentTimeMillis()
         val window = _cluster.value
@@ -444,7 +459,11 @@ class KrespotConnect(private val context: Context) {
             ?.window()
             .orEmpty()
         val anchor = window.indexOfFirst { it.uri == track.uri }
-        val prev = if (anchor > 0) window.take(anchor).takeLast(PREV_TRACKS_MAX) else emptyList()
+        val prev = if (prevRows.isNotEmpty()) {
+            prevRows.filter { it.uri.isNotBlank() && it.uri != track.uri }.take(PREV_TRACKS_MAX)
+        } else if (anchor > 0) {
+            window.take(anchor).takeLast(PREV_TRACKS_MAX)
+        } else emptyList()
         val upcoming = LinkedHashMap<String, ClusterTrack>()
         nextRows.filter { it.uri.isNotBlank() && it.uri != track.uri }.forEach { upcoming[it.uri] = it }
         if (anchor >= 0) {
@@ -477,13 +496,18 @@ class KrespotConnect(private val context: Context) {
             .put("position_as_of_timestamp", positionMs)
             .put("timestamp", now)
             .put("duration", if (durationMs > 0L) durationMs else track.durationMs)
-            .put("is_playing", true)
+            .put("is_playing", playing)
             .put("is_paused", !playing)
             .put("is_buffering", !playing)
             .put("context_uri", contextUri)
             .put("context_url", "context://$contextUri")
             .put("context_restrictions", JSONObject())
-            .put("context_metadata", JSONObject().put("context_description", contextDescription))
+            .put(
+                "context_metadata",
+                JSONObject()
+                    .put("context_description", contextDescription)
+                    .put("shuffle.algorithm", if (shuffle) SHUFFLE_ALGORITHM_STABLE else SHUFFLE_ALGORITHM_NONE),
+            )
             .put(
                 "play_origin",
                 JSONObject()
