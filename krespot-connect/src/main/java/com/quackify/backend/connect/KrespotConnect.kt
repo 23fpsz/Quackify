@@ -581,7 +581,7 @@ class KrespotConnect(private val context: Context) {
         )
     }
 
-    suspend fun refreshCluster(): Boolean {
+    suspend fun refreshCluster(force: Boolean = false): Boolean {
         if (spclient.isBlank()) {
             log.w("cluster refresh: no spclient host yet")
             return false
@@ -592,10 +592,13 @@ class KrespotConnect(private val context: Context) {
         // One fetch at a time: the poll loop (4s/15s), the device sheet, every
         // screen load and the settle loops all funnel in here, and without
         // the gate they used to stack parallel observer PUTs whose replies
-        // then landed in whatever order the network answered.
+        // then landed in whatever order the network answered. A forced call
+        // still queues behind an in-flight fetch but skips the coalescing
+        // window, because it needs state the last fetch cannot have seen -
+        // the cluster right after a set_queue command this device sent.
         return refreshGate.withLock {
             val now = SystemClock.elapsedRealtime()
-            if (now - lastRefreshOkAt < REFRESH_COALESCE_MS) {
+            if (!force && now - lastRefreshOkAt < REFRESH_COALESCE_MS) {
                 log.v("cluster refresh rides on the one from ${now - lastRefreshOkAt}ms ago")
                 return@withLock true
             }
