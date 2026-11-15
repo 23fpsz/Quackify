@@ -44,6 +44,13 @@ object CollectionSource {
 
     private const val OP_LIKED = "fetchLibraryTracks"
     private const val OP_PLAYLIST = "fetchPlaylist"
+    private val ADDED_AT_KEYS = listOf("addedAt", "added_at", "addedTimestamp", "timestamp")
+    private val ISO_PATTERNS = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ssX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+    )
 
     fun canonical(uri: String): String =
         if (uri.startsWith("spotify:user:") && uri.endsWith(":collection")) LIKED_URI else uri
@@ -160,9 +167,47 @@ object CollectionSource {
         for (i in 0 until (items?.length() ?: 0)) {
             val entry = items?.optJSONObject(i) ?: continue
             val node = entry.optJSONObject("itemV2") ?: continue
-            track(node.optJSONObject("data"), "")?.let { rows.add(it.copy(uid = entry.optString("uid"))) }
+            val addedAt = entryTimestamp(entry)
+            track(node.optJSONObject("data"), "")?.let {
+                rows.add(it.copy(uid = entry.optString("uid"), addedAt = addedAt))
+            }
+        }
+        if (items != null && items.length() > 0) {
+            log.i("playlist page: ${rows.size} row(s), ${rows.count { it.addedAt > 0L }} with addedAt")
+            log.i("addedAt: ${rows.map { it.addedAt }.toSet().size} distinct stamp(s)")
         }
         return rows
+    }
+
+    private fun entryTimestamp(entry: JSONObject): Long {
+        for (key in ADDED_AT_KEYS) {
+            val value = entry.opt(key) ?: continue
+            val stamp = parseTimestamp(value)
+            if (stamp > 0L) return stamp
+        }
+        return 0L
+    }
+
+    private fun parseTimestamp(value: Any?): Long = when (value) {
+        is Number -> value.toLong()
+        is JSONObject -> value.optLong("milliseconds", 0L).takeIf { it > 0L }
+            ?: parseTimestamp(value.optString("isoString"))
+        is String -> value.toLongOrNull() ?: parseIso(value)
+        else -> 0L
+    }
+
+    private fun parseIso(text: String): Long {
+        if (text.isBlank()) return 0L
+        for (pattern in ISO_PATTERNS) {
+            val parsed = runCatching {
+                java.text.SimpleDateFormat(pattern, java.util.Locale.US).apply {
+                    timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    isLenient = false
+                }.parse(text)
+            }.getOrNull()
+            if (parsed != null) return parsed.time
+        }
+        return 0L
     }
 
     private fun members(playlist: JSONObject?): List<PlaylistMember> {

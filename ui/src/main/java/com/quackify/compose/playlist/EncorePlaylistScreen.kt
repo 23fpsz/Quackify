@@ -123,6 +123,7 @@ data class TrackItem(
     val hasVideo: Boolean = false,
     val isEnhanced: Boolean = false,
     val plays: Long = 0L,
+    val addedAt: Long = 0L,
 )
 
 private val trackSearchEngine = GenericSearchEngine<TrackItem>(maxResult = Int.MAX_VALUE)
@@ -268,7 +269,13 @@ fun EncorePlaylistScreen(
                 }
             }
             PlaylistSort.RECENTLY_ADDED -> {
-                if (sortDirection == SortDirection.DESCENDING) {
+                if (base.any { it.addedAt > 0L }) {
+                    if (sortDirection == SortDirection.DESCENDING) {
+                        base.sortedByDescending { it.addedAt }
+                    } else {
+                        base.sortedBy { it.addedAt }
+                    }
+                } else if (sortDirection == SortDirection.DESCENDING) {
                     base.reversed()
                 } else {
                     base
