@@ -26,6 +26,7 @@ import android.view.Surface
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -42,6 +43,10 @@ import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
 
 private val log = Logs.of(Logs.Module.PLAYER)
+
+private const val LICENCE_SETTLE_MS = 900L
+
+private const val LICENCE_SKIP_WINDOW_MS = 2_500L
 
 private const val MANIFEST_CACHE = 8
 
@@ -107,6 +112,12 @@ class KrespotPlayer(private val context: Context) {
 
     @Volatile
     private var generation = 0
+
+    @Volatile
+    private var lastPlayAt = 0L
+
+    @Volatile
+    private var licenceSettling = false
 
     @Volatile
     private var pausedByFocus = false
@@ -481,6 +492,9 @@ class KrespotPlayer(private val context: Context) {
         spclient: String,
         fromMs: Long = 0L,
     ) {
+        val sinceLast = System.currentTimeMillis() - lastPlayAt
+        licenceSettling = lastPlayAt > 0L && sinceLast < LICENCE_SKIP_WINDOW_MS
+        lastPlayAt = System.currentTimeMillis()
         if (track.isDirect) {
             playDirect(track)
             return
@@ -523,6 +537,14 @@ class KrespotPlayer(private val context: Context) {
                     return@launch
                 }
                 rememberFile(track.uri, source.fileId)
+                if (licenceSettling) {
+                    log.i("licence deferred, the user is still skipping")
+                    delay(LICENCE_SETTLE_MS)
+                    if (id != generation) {
+                        log.i("licence skipped, playback moved on before settling")
+                        return@launch
+                    }
+                }
                 if (id != generation) {
                     log.i("play was skipped while its source resolved")
                     return@launch

@@ -55,6 +55,64 @@ private val log = Logs.of(Logs.Module.PLAYER)
 
 private const val PROGRESS_MS = 500L
 
+internal object DrmLevel {
+
+    private const val PROP_SECURITY_LEVEL = "securityLevel"
+
+    @Volatile
+    var applied = "auto"
+
+    fun provider(): ExoMediaDrm.Provider = ExoMediaDrm.Provider { uuid ->
+        val drm = FrameworkMediaDrm.newInstance(uuid)
+        val forced = runCatching {
+            drm.setPropertyString(PROP_SECURITY_LEVEL, "L3")
+            drm.getPropertyString(PROP_SECURITY_LEVEL)
+        }.getOrElse { "L1" }
+        applied = forced
+        log.i("drm security level '$forced' for ${uuid.toString().take(8)}")
+        drm
+    }
+}
+
+private fun shape(bytes: ByteArray, depth: Int = 0, limit: Int = 3): String = runCatching {
+    val out = StringBuilder()
+    val reader = Reader(bytes)
+    var count = 0
+    while (!reader.done() && count < 24) {
+        count++
+        val (field, wire) = reader.tag()
+        when (wire) {
+            0 -> out.append("$field=").append(reader.varint()).append(' ')
+            1 -> {
+                reader.skip(1)
+                out.append("$field! ").append(' ')
+            }
+            2 -> {
+                val raw = reader.bytes()
+                val nested = raw.isNotEmpty() && raw.size > 4 && looksNested(raw)
+                if (depth < limit && nested) {
+                    out.append("$field{").append(shape(raw, depth + 1, limit)).append("} ")
+                } else {
+                    out.append("$field#").append(raw.size).append(' ')
+                }
+            }
+            5 -> {
+                reader.skip(5)
+                out.append("$field~ ")
+            }
+            else -> return@runCatching out.append("$field?wire$wire").toString().trim()
+        }
+    }
+    out.toString().trim()
+}.getOrElse { "shape unreadable ${it.message}" }
+
+private fun looksNested(raw: ByteArray): Boolean {
+    val head = raw[0].toInt() and 255
+    val field = head ushr 3
+    val wire = head and 7
+    return field in 1..15 && wire in 0..5 && wire != 3 && wire != 4
+}
+
 internal class AudioDrmCallback(
     private val context: Context,
     private val licenseUrl: suspend () -> String,
@@ -77,7 +135,8 @@ internal class AudioDrmCallback(
             throw IOException("audio licence ${response?.code ?: "failed"}")
         }
         LicenseGate.clear()
-        log.i("audio licence ${body.bytes.size}B ${licencePolicy(body.bytes)}")
+        log.i("audio licence ${body.bytes.size}B level=${DrmLevel.applied} ${licencePolicy(body.bytes)}")
+        log.i("audio licence shape ${shape(body.bytes)}")
         return MediaDrmCallback.Response(body.bytes)
     }
 
@@ -203,7 +262,7 @@ internal class AudioEngine(
                     val existing = cachedManager
                     if (existing != null) return@DrmSessionManagerProvider existing
                     DefaultDrmSessionManager.Builder()
-                        .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                        .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
                         .setMultiSession(true)
                         .build(callback)
                         .also { cachedManager = it }
