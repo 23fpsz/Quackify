@@ -36,7 +36,7 @@ private const val GATE_MAX_MS = 60_000L
 
 private const val GATE_STEPS = 5
 
-private const val GATE_MAX_STRIKES = 6
+private const val GATE_MAX_STRIKES = 4
 
 internal object LicenseGate {
 
@@ -55,12 +55,15 @@ internal object LicenseGate {
 
     @Volatile
     var rateLimited = false
-        private set
+
+    @Volatile
+    var lastStatus = 0
 
     fun remainingMs(): Long = (until - System.currentTimeMillis()).coerceAtLeast(0L)
 
     fun hold(status: Int = 429, millis: Long = 0L) {
         strikes++
+        lastStatus = status
         rateLimited = status == 429
         log.w("licence refused $status, strike $strikes")
         val escalated = (GATE_BASE_MS shl (strikes - 1).coerceAtMost(GATE_STEPS))

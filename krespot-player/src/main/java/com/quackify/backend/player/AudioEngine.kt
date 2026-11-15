@@ -171,7 +171,7 @@ internal class AudioDrmCallback(
                 values[1] in 0L..1L && (values.containsKey(5) || values.containsKey(6))
             if (looksLikePolicy) return values
             for (child in nested) {
-                val found = policyOf(child, depth + 1)
+                val found = runCatching { policyOf(child, depth + 1) }.getOrNull()
                 if (found != null) return found
             }
             return null
@@ -187,8 +187,14 @@ internal class AudioEngine(
     private val context: Context,
     private val spclient: () -> String,
     private val scope: CoroutineScope,
-    private val onEvent: (PlayerEvent) -> Unit,
+    var onEvent: (PlayerEvent) -> Unit,
 ) {
+
+    private var kit: DefaultMediaSourceFactory? = null
+
+    private var drmManager: DefaultDrmSessionManager? = null
+
+    private val licensedFiles = java.util.LinkedHashSet<String>()
 
     private val main = Handler(Looper.getMainLooper())
 
@@ -249,44 +255,47 @@ internal class AudioEngine(
         gainDb: Double,
     ): Boolean =
         withContext(Dispatchers.Main) {
-            release()
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
-            val encrypted = source.seektable.pssh.isNotBlank()
-            val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
-            if (encrypted) {
-                val callback = AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) }
-                var cachedManager: DrmSessionManager? = null
-                factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { _: MediaItem ->
-                    val existing = cachedManager
-                    if (existing != null) return@DrmSessionManagerProvider existing
-                    DefaultDrmSessionManager.Builder()
-                        .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
-                        .setMultiSession(true)
-                        .build(callback)
-                        .also { cachedManager = it }
-                })
-                log.i("audio drm session asked for '${source.fileId.take(12)}'")
-            } else {
-                log.i("clear content, no drm session asked")
-            }
+            val factory = ensureKit()
+            val reused = !licensedFiles.add(source.fileId)
+            log.i(
+                if (reused) "licence reused for '${source.fileId.take(12)}' and its ${licensedFiles.size} sibling(s)"
+                else "audio drm session asked for '${source.fileId.take(12)}'"
+            )
             gainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
             durationMs = totalMs
             announced = false
             lastItemUri = uri
             if (uri.isNotBlank()) itemDurations[uri] = totalMs
-            val created = ExoPlayer.Builder(context)
+            val live = player ?: ExoPlayer.Builder(context)
                 .setMediaSourceFactory(factory)
                 .build()
-            created.addListener(listener)
-            created.setMediaSource(factory.createMediaSource(itemFor(uri, source)))
-            player = created
-            created.prepare()
-            created.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
-            created.playWhenReady = autoplay
+                .also {
+                    it.addListener(listener)
+                    player = it
+                }
+            live.setMediaSource(factory.createMediaSource(itemFor(uri, source)))
+            live.prepare()
+            live.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
+            live.playWhenReady = autoplay
             started = autoplay
             log.i("audio engine ready '${source.fileId.take(12)}' ${totalMs}ms at ${fromMs}ms autoplay=$autoplay")
             true
         }
+
+    private fun ensureKit(): DefaultMediaSourceFactory {
+        kit?.let { return it }
+        val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
+        val manager = DefaultDrmSessionManager.Builder()
+            .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
+            .setMultiSession(true)
+            .build(AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) })
+        factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { manager })
+        drmManager = manager
+        kit = factory
+        log.i("drm kit built, one player and one session manager for the whole run")
+        return factory
+    }
 
     fun queueNext(uri: String, source: AudioSource) {
         runOnMain {
@@ -378,11 +387,7 @@ internal class AudioEngine(
         started = false
         progressJob?.cancel()
         progressJob = null
-        runOnMain {
-            player?.stop()
-            player?.release()
-            player = null
-        }
+        runOnMain { player?.stop() }
     }
 
     private fun applyVolume() {
@@ -452,12 +457,17 @@ internal class AudioEngine(
         }
     }
 
-    private fun release() {
+    fun release() {
+        started = false
         progressJob?.cancel()
         progressJob = null
         runOnMain {
             player?.release()
             player = null
+            drmManager?.release()
+            drmManager = null
+            kit = null
+            licensedFiles.clear()
         }
     }
 
