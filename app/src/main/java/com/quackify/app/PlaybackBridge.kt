@@ -4324,8 +4324,21 @@ class PlaybackBridge(private val context: Context) {
         }
         if (sessionQueueContext == chainContext.ifBlank { server?.contextUri.orEmpty() } && sessionQueue.isNotEmpty()) {
             if (sessionQueue.firstOrNull() == ended) sessionQueue = sessionQueue.drop(1)
-            val pick = sessionQueue.firstOrNull()
-            if (!pick.isNullOrBlank()) {
+            // The adopted play order can carry rows the context already
+            // played (the server keeps shuffling them into next_tracks);
+            // replaying them here is what makes two tracks alternate forever.
+            val played = buildSet {
+                server?.prevTracks?.forEach { add(it.uri) }
+                server?.track?.let { add(it.uri) }
+                add(ended)
+            }
+            var pick = sessionQueue.firstOrNull()
+            while (pick != null && pick in played) {
+                sessionQueue = sessionQueue.drop(1)
+                log.i("advance: '${pick.takeLast(12)}' already played in this context, dropping it from the play order")
+                pick = sessionQueue.firstOrNull()
+            }
+            if (pick != null) {
                 sessionQueue = sessionQueue.drop(1)
                 log.i("advance -> '${pick.takeLast(12)}' from the play order, ${sessionQueue.size} left")
                 playTrack(pick, chainContext.ifBlank { server?.contextUri.orEmpty() }, -1)
@@ -4334,7 +4347,13 @@ class PlaybackBridge(private val context: Context) {
         }
         if (shuffleOn(server) && !smartOn(server) && !ended.startsWith(AD_PREFIX) && server != null) {
             val shuffled = targetFrom(server, 0)
-            if (shuffled != null && shuffled.track.uri != ended) {
+            // The shuffled window can still hold the row this context just
+            // played (a queued track's play leaves it behind in next_tracks
+            // until the server rewrites the order); picking it here would
+            // bounce straight back into it and loop the same two tracks.
+            if (shuffled != null && shuffled.track.uri != ended &&
+                !server.prevTracks.any { it.uri == shuffled.track.uri }
+            ) {
                 log.i("advance -> '${shuffled.track.title}' from the server's shuffled order")
                 playTrack(shuffled.track.uri, server.contextUri, shuffled.index)
                 return
@@ -4342,11 +4361,24 @@ class PlaybackBridge(private val context: Context) {
         }
         if (resumeRow in rows.indices) {
             val row = rows[resumeRow]
-            log.i("advance -> '$row' from the list that started it, row $resumeRow of ${rows.size} " +
-                    "in '$chainContext'"
+            // Same guard as above: the chain resumes at the row after the
+            // last context track, but when the ending track was queued the
+            // cursor still points into rows this context already played.
+            val played = buildSet {
+                server?.prevTracks?.forEach { add(it.uri) }
+                server?.track?.let { add(it.uri) }
+                add(ended)
+            }
+            if (row !in played || repeatContextOn(server)) {
+                log.i("advance -> '$row' from the list that started it, row $resumeRow of ${rows.size} " +
+                        "in '$chainContext'"
+                )
+                playTrack(row, chainContext, resumeRow)
+                return
+            }
+            log.i("advance: row $resumeRow '${row.takeLast(12)}' already played in this context, " +
+                "not resuming the list there"
             )
-            playTrack(row, chainContext, resumeRow)
-            return
         }
         if (next != null && moved != null) {
             startFromServer(next, moved)
@@ -4430,7 +4462,26 @@ class PlaybackBridge(private val context: Context) {
         val same = command.currentTrack?.uri.orEmpty() == ended
         val following = if (same) command.following() else command
         val track = following?.currentTrack ?: return null
-        return if (track.uri.isBlank() || track.uri == ended) null else following
+        if (track.uri.isBlank() || track.uri == ended) return null
+        // A stale state machine points backwards as easily as forwards: when
+        // the finalized report of a queued row was refused, the machine still
+        // names the track that came before it, and following() happily walks
+        // straight back into it - the two tracks then alternate forever.
+        // Anything the cluster already lists behind the current track has
+        // played in this context, so it is not "next" no matter what the
+        // machine says.
+        val cluster = connect.cluster.value
+        val played = buildSet {
+            cluster?.prevTracks?.forEach { add(it.uri) }
+            cluster?.track?.let { add(it.uri) }
+        }
+        if (track.uri in played) {
+            log.i("advance: the machine points back to '${track.uri.takeLast(12)}' " +
+                "which already played in this context, ignoring it"
+            )
+            return null
+        }
+        return following
     }
 
     private suspend fun awaitServerNext(ended: String): PlaybackCommand? {
