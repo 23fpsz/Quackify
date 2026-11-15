@@ -618,7 +618,7 @@ fun EncoreSearchScreen(
                     )
                 }
 
-                items(recentSearches, key = { it.uri.ifBlank { it.title } }) { searchItem ->
+                items(recentSearches.distinctBy { it.uri }, key = { it.uri.ifBlank { it.title } }) { searchItem ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -740,7 +740,7 @@ fun EncoreSearchScreen(
                     .background(EncoreColors.Background),
                 contentPadding = PaddingValues(top = 4.dp, bottom = bottomPadding)
             ) {
-                items(dropHits, key = { it.uri.ifBlank { it.title } }) { hit ->
+                items(dropHits.distinctBy { it.uri }, key = { it.uri.ifBlank { it.title } }) { hit ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -996,7 +996,7 @@ fun EncoreSearchScreen(
                                 )
                             }
 
-                            items(filteredTracks.take(4), key = { it.uri }) { track ->
+                            items(filteredTracks.take(4).distinctBy { it.uri }, key = { it.uri }) { track ->
                                 val isThisPlaying = isPlaying &&
                                     matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                                 SearchTrackRow(
@@ -1034,7 +1034,7 @@ fun EncoreSearchScreen(
                                 )
                             }
 
-                            items(filteredArtists.take(2), key = { it.uri }) { artist ->
+                            items(filteredArtists.take(2).distinctBy { it.uri }, key = { it.uri }) { artist ->
                                 ArtistRow(
                                     artist = artist,
                                     onArtistClick = {
@@ -1067,7 +1067,7 @@ fun EncoreSearchScreen(
                                 )
                             }
 
-                            items(filteredAlbums.take(2), key = { it.uri }) { album ->
+                            items(filteredAlbums.take(2).distinctBy { it.uri }, key = { it.uri }) { album ->
                                 AlbumRow(
                                     album = album,
                                     onClick = {
@@ -1100,7 +1100,7 @@ fun EncoreSearchScreen(
                                 )
                             }
 
-                            items(filteredPlaylists.take(2), key = { it.uri }) { playlist ->
+                            items(filteredPlaylists.take(2).distinctBy { it.uri }, key = { it.uri }) { playlist ->
                                 PlaylistRow(
                                     playlist = playlist,
                                     onClick = {
@@ -1165,7 +1165,7 @@ fun EncoreSearchScreen(
                                 )
                             }
 
-                            items(filteredPodcasts.take(2), key = { it.uri }) { podcast ->
+                            items(filteredPodcasts.take(2).distinctBy { it.uri }, key = { it.uri }) { podcast ->
                                 PodcastRow(
                                     podcast = podcast,
                                     onClick = {
@@ -1198,7 +1198,7 @@ fun EncoreSearchScreen(
                                     )
                                 }
 
-                                items(section.items, key = { "hit_${it.uri}_${it.title}" }) { hit ->
+                                items(section.items.distinctBy { "hit_${it.uri}_${it.title}" }, key = { "hit_${it.uri}_${it.title}" }) { hit ->
                                     SearchHitRow(
                                         hit = hit,
                                         isPlaying = isPlaying,
@@ -1224,7 +1224,7 @@ fun EncoreSearchScreen(
                     }
 
                     if (tabKind != null) {
-                        items(tabHits, key = { "tab_${it.uri}_${it.title}" }) { hit ->
+                        items(tabHits.distinctBy { "tab_${it.uri}_${it.title}" }, key = { "tab_${it.uri}_${it.title}" }) { hit ->
                             SearchHitRow(
                                 hit = hit,
                                 isPlaying = isPlaying,
@@ -1327,7 +1327,7 @@ fun EncoreSearchScreen(
                     }
                 }
 
-                items(categories, key = { it.uri.ifBlank { it.title } }) { category ->
+                items(categories.distinctBy { it.uri }, key = { it.uri.ifBlank { it.title } }) { category ->
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()

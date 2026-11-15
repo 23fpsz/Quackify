@@ -355,7 +355,7 @@ fun AddToPlaylistSheet(
                         }
                     }
 
-                    items(visibleRows, key = { it.uri }) { choice ->
+                    items(visibleRows.distinctBy { it.uri }, key = { it.uri }) { choice ->
                         if (choice.kind == PlaylistChoice.Kind.FOLDER) {
                             AddToFolderRow(folder = choice, onOpen = { openFolder(choice) })
                         } else {

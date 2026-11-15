@@ -297,7 +297,7 @@ fun EncoreHomeScreen(
             }
         }
 
-        items(shelfSections, key = { it.id }) { shelf ->
+        items(shelfSections.distinctBy { it.id }, key = { it.id }) { shelf ->
             when {
                 shelf.artists.isNotEmpty() -> ArtistShelfSection(
                     title = shelf.title,
@@ -505,7 +505,7 @@ private fun ShelfSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(cards, key = { it.uri }) { card ->
+            items(cards.distinctBy { it.uri }, key = { it.uri }) { card ->
                 Column(
                     modifier = Modifier
                         .width(148.dp)
@@ -605,7 +605,7 @@ private fun ArtistShelfSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(artists, key = { it.uri }) { artist ->
+            items(artists.distinctBy { it.uri }, key = { it.uri }) { artist ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier

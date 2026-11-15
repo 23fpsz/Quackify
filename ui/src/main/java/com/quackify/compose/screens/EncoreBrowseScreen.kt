@@ -190,7 +190,7 @@ fun EncoreBrowseScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(section.cards, key = { it.uri }) { card ->
+                        items(section.cards.distinctBy { it.uri }, key = { it.uri }) { card ->
                             BrowseCardTile(card = card, onClick = { onCardClick(card.title, card.uri) })
                         }
                     }

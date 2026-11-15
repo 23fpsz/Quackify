@@ -309,7 +309,7 @@ fun EncoreShowScreen(
                 }
             }
 
-            items(episodes, key = { it.uri }) { episode ->
+            items(episodes.distinctBy { it.uri }, key = { it.uri }) { episode ->
                 EpisodeListRow(
                     episode = episode,
                     isCurrent = matchesCurrent(episode.uri, currentTrackUri, episode.title, currentTrackTitle),
@@ -347,7 +347,7 @@ fun EncoreShowScreen(
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            items(related, key = { it.uri }) { card ->
+                            items(related.distinctBy { it.uri }, key = { it.uri }) { card ->
                                 RelatedShowCard(card = card, onClick = { onRelatedClick(card) })
                             }
                         }

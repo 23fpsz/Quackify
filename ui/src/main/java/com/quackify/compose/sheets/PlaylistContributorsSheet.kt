@@ -183,7 +183,7 @@ fun PlaylistContributorsSheet(
                                         .padding(vertical = 24.dp)
                                 )
                                 else -> LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                                    items(searchResults, key = { it.uri }) { hit ->
+                                    items(searchResults.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -324,7 +324,7 @@ fun PlaylistContributorsSheet(
                                 }
                             }
                         }
-                        items(members, key = { it.uri }) { member ->
+                        items(members.distinctBy { it.uri }, key = { it.uri }) { member ->
                             ContributorRow(
                                 member = member,
                                 isAdmin = isAdmin,

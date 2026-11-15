@@ -213,7 +213,7 @@ fun DiscographySheet(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    gridItems(rows, key = { it.uri }) { row ->
+                    gridItems(rows.distinctBy { it.uri }, key = { it.uri }) { row ->
                         ReleaseTile(
                             row = row,
                             onClick = {
@@ -236,7 +236,7 @@ fun DiscographySheet(
                     contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 24.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(rows, key = { it.uri }) { row ->
+                    items(rows.distinctBy { it.uri }, key = { it.uri }) { row ->
                         ReleaseRow(
                             row = row,
                             onClick = {

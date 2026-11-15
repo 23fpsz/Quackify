@@ -1254,7 +1254,7 @@ internal fun ShellAddTracksPane(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
-                        items(defaultItems, key = { it.uri }) { item ->
+                        items(defaultItems.distinctBy { it.uri }, key = { it.uri }) { item ->
                             AddTrackRow(
                                 item = item,
                                 added = item.uri in added,
@@ -1359,7 +1359,7 @@ internal fun ShellAddTracksPane(
                                 contentPadding = PaddingValues(bottom = 76.dp)
                             ) {
                                 // Interleaved mixed results matching Spotify
-                                items(remoteTracks, key = { it.uri }) { hit ->
+                                items(remoteTracks.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                     AssistedSearchTrackHitRow(
                                         hit = hit,
                                         added = hit.uri in added,
@@ -1370,7 +1370,7 @@ internal fun ShellAddTracksPane(
                                         }
                                     )
                                 }
-                                items(localMatches, key = { it.uri }) { item ->
+                                items(localMatches.distinctBy { it.uri }, key = { it.uri }) { item ->
                                     AddTrackRow(
                                         item = item,
                                         added = item.uri in added,
@@ -1381,7 +1381,7 @@ internal fun ShellAddTracksPane(
                                         }
                                     )
                                 }
-                                items(remoteAlbums, key = { it.uri }) { hit ->
+                                items(remoteAlbums.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                     AssistedSearchNavRow(
                                         title = hit.title,
                                         subtitle = if (hit.subtitle.isNotBlank()) "Album • ${hit.subtitle}" else stringResource(R.string.album),
@@ -1390,7 +1390,7 @@ internal fun ShellAddTracksPane(
                                         onClick = { onOpenAlbum?.invoke(hit.uri, hit.title, hit.subtitle) }
                                     )
                                 }
-                                items(remotePlaylists, key = { it.uri }) { hit ->
+                                items(remotePlaylists.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                     AssistedSearchNavRow(
                                         title = hit.title,
                                         subtitle = if (hit.subtitle.isNotBlank()) "Playlist • ${hit.subtitle}" else stringResource(R.string.playlist),
@@ -1399,7 +1399,7 @@ internal fun ShellAddTracksPane(
                                         onClick = { onOpenPlaylist?.invoke(hit.uri, hit.title) }
                                     )
                                 }
-                                items(remoteArtists, key = { it.uri }) { hit ->
+                                items(remoteArtists.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                     AssistedSearchNavRow(
                                         title = hit.title,
                                         subtitle = stringResource(R.string.artist),
@@ -1408,7 +1408,7 @@ internal fun ShellAddTracksPane(
                                         onClick = { onOpenArtist?.invoke(hit.uri, hit.title) }
                                     )
                                 }
-                                items(remoteEpisodes, key = { it.uri }) { hit ->
+                                items(remoteEpisodes.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                     AssistedSearchTrackHitRow(
                                         hit = hit,
                                         added = hit.uri in added,
@@ -1419,7 +1419,7 @@ internal fun ShellAddTracksPane(
                                         }
                                     )
                                 }
-                                items(remoteShows, key = { it.uri }) { hit ->
+                                items(remoteShows.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                     AssistedSearchNavRow(
                                         title = hit.title,
                                         subtitle = if (hit.subtitle.isNotBlank()) "Podcast • ${hit.subtitle}" else stringResource(R.string.podcast),
@@ -1452,7 +1452,7 @@ internal fun ShellAddTracksPane(
                                         .imePadding(),
                                     contentPadding = PaddingValues(bottom = 76.dp)
                                 ) {
-                                    items(remoteHits, key = { it.uri }) { hit ->
+                                    items(remoteHits.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                         AssistedSearchTrackHitRow(
                                             hit = hit,
                                             added = hit.uri in added,
@@ -1463,7 +1463,7 @@ internal fun ShellAddTracksPane(
                                             }
                                         )
                                     }
-                                    items(localMatches, key = { it.uri }) { item ->
+                                    items(localMatches.distinctBy { it.uri }, key = { it.uri }) { item ->
                                         AddTrackRow(
                                             item = item,
                                             added = item.uri in added,
@@ -1490,7 +1490,7 @@ internal fun ShellAddTracksPane(
                                         .imePadding(),
                                     contentPadding = PaddingValues(bottom = 76.dp)
                                 ) {
-                                    items(albums, key = { it.uri }) { hit ->
+                                    items(albums.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                         AssistedSearchNavRow(
                                             title = hit.title,
                                             subtitle = if (hit.subtitle.isNotBlank()) "Album • ${hit.subtitle}" else stringResource(R.string.album),
@@ -1515,7 +1515,7 @@ internal fun ShellAddTracksPane(
                                         .imePadding(),
                                     contentPadding = PaddingValues(bottom = 76.dp)
                                 ) {
-                                    items(playlists, key = { it.uri }) { hit ->
+                                    items(playlists.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                         AssistedSearchNavRow(
                                             title = hit.title,
                                             subtitle = if (hit.subtitle.isNotBlank()) "Playlist • ${hit.subtitle}" else stringResource(R.string.playlist),
@@ -1540,7 +1540,7 @@ internal fun ShellAddTracksPane(
                                         .imePadding(),
                                     contentPadding = PaddingValues(bottom = 76.dp)
                                 ) {
-                                    items(artists, key = { it.uri }) { hit ->
+                                    items(artists.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                         AssistedSearchNavRow(
                                             title = hit.title,
                                             subtitle = stringResource(R.string.artist),
@@ -1570,7 +1570,7 @@ internal fun ShellAddTracksPane(
                                         .imePadding(),
                                     contentPadding = PaddingValues(bottom = 76.dp)
                                 ) {
-                                    items(remoteEpisodes, key = { it.uri }) { hit ->
+                                    items(remoteEpisodes.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                         AssistedSearchTrackHitRow(
                                             hit = hit,
                                             added = hit.uri in added,
@@ -1581,7 +1581,7 @@ internal fun ShellAddTracksPane(
                                             }
                                         )
                                     }
-                                    items(localEpisodes, key = { it.uri }) { item ->
+                                    items(localEpisodes.distinctBy { it.uri }, key = { it.uri }) { item ->
                                         AddTrackRow(
                                             item = item,
                                             added = item.uri in added,
@@ -1608,7 +1608,7 @@ internal fun ShellAddTracksPane(
                                         .imePadding(),
                                     contentPadding = PaddingValues(bottom = 76.dp)
                                 ) {
-                                    items(podcasts, key = { it.uri }) { hit ->
+                                    items(podcasts.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                         AssistedSearchNavRow(
                                             title = hit.title,
                                             subtitle = if (hit.subtitle.isNotBlank()) "Podcast • ${hit.subtitle}" else stringResource(R.string.podcast),

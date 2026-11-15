@@ -79,12 +79,13 @@ fun List<HomeSection>.toShelves(): List<HomeShelf> {
                 )
             } else {
                 open += section.items
-                out[runIndex] = out[runIndex].copy(cards = open.toCards())
+                val merged = open.distinctBy { it.uri.ifBlank { it.title } }
+                out[runIndex] = out[runIndex].copy(cards = merged.toCards())
             }
             continue
         }
         run = null
-        val cards = section.items.toCards()
+        val cards = section.items.distinctBy { it.uri.ifBlank { it.title } }.toCards()
         if (cards.isEmpty()) continue
         val artistsOnly = section.items.all { tagOf(it.kind) == "ARTIST" }
         out += HomeShelf(

@@ -508,7 +508,7 @@ fun EncoreLibraryScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(filteredItems, key = { it.uri }) { item ->
+                items(filteredItems.distinctBy { it.uri }, key = { it.uri }) { item ->
                     val isArtist = item.type == LibraryItemType.ARTIST
                     Column(
                         modifier = Modifier
@@ -613,7 +613,7 @@ fun EncoreLibraryScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = bottomPadding)
             ) {
-                items(filteredItems, key = { it.uri }) { item ->
+                items(filteredItems.distinctBy { it.uri }, key = { it.uri }) { item ->
                     val isArtist = item.type == LibraryItemType.ARTIST
                     Row(
                         modifier = Modifier
