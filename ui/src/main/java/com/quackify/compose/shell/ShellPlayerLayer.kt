@@ -189,6 +189,8 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
             }
         },
         lyrics = env.nowPlayingLyrics,
+        previousTrack = playbackState?.previousTrack,
+        nextTrack = playbackState?.nextTrack,
         canvasFilePath = env.canvasFilePath,
         isCanvasAllowed = env.isCanvasAllowed,
         isCanvasEnabled = env.isCanvasEnabled,

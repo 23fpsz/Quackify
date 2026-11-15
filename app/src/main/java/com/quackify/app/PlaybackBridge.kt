@@ -3500,12 +3500,6 @@ class PlaybackBridge(private val context: Context) {
             emptyList()
         }
         val tailUris = if (enhancedTail.isNotEmpty()) enhancedTail else if (contextRows.isEmpty()) chainTail else emptyList()
-        val sparse = ((if (enhancedTail.isNotEmpty()) emptyList() else contextRows) + queued)
-            .filter { it.title.isBlank() }.map { it.uri }
-        val missing = (sparse + tailUris.filterNot { it in knownUpcoming })
-            .filterNot { decorated.containsKey(it) || it in undecoratable }
-            .distinct()
-        if (missing.isNotEmpty()) scheduleDecorate(missing)
         val tailRowsFilled = tailUris.map { uri ->
             (decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri))
                 .copy(isEnhanced = enhanced.firstOrNull { it.uri == uri }?.enhanced == true)
@@ -3517,8 +3511,40 @@ class PlaybackBridge(private val context: Context) {
                 tailRowsFilled)
                 .filterNot { it.uri == anchor }
         }
+        val previousRow = run {
+            val fromServer = cluster?.prevTracks
+                ?.firstOrNull { it.isVisible && !it.isAd }
+                ?.takeIf { !bannedCachedUri(it.uri) }
+            if (fromServer != null) {
+                val row = fromServer.asTrackItem()
+                if (row.title.isBlank()) decorated[row.uri] ?: row else row
+            } else if (anchor.isNotBlank()) {
+                val at = chain.indexOf(anchor)
+                if (at > 0) {
+                    val uri = chain[at - 1]
+                    if (bannedCachedUri(uri)) {
+                        null
+                    } else {
+                        decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri)
+                    }
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        }
+        val nextRow = (queued + upcoming).firstOrNull()
+        val sparse = ((if (enhancedTail.isNotEmpty()) emptyList() else contextRows) + queued)
+            .filter { it.title.isBlank() }.map { it.uri }
+        val missing = (sparse + tailUris.filterNot { it in knownUpcoming } +
+            listOfNotNull(previousRow, nextRow).filter { it.title.isBlank() }.map { it.uri })
+            .filterNot { decorated.containsKey(it) || it in undecoratable }
+            .distinct()
+        if (missing.isNotEmpty()) scheduleDecorate(missing)
         if (queued == state.queue && upcoming == state.queueFromContext &&
-            context == state.queueContext && label == state.queueContextLabel
+            context == state.queueContext && label == state.queueContextLabel &&
+            previousRow == state.previousTrack && nextRow == state.nextTrack
         ) {
             return
         }
@@ -3527,6 +3553,8 @@ class PlaybackBridge(private val context: Context) {
             queueFromContext = upcoming,
             queueContext = context,
             queueContextLabel = label,
+            previousTrack = previousRow,
+            nextTrack = nextRow,
         )
         log.i("queue ${queued.size} queued + ${upcoming.size} next from " +
                 "'${label.ifBlank { context.ifBlank { "?" } }}' " +

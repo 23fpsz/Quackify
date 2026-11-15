@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -26,6 +27,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +47,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -73,6 +76,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -124,6 +128,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import com.quackify.compose.theme.EncoreTheme
+import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.util.rememberDominantColor
 import androidx.compose.ui.res.stringResource
 
@@ -272,7 +277,9 @@ fun EncoreNowPlayingScreen(
     isArtistFollowing: Boolean = false,
     onArtistFollowToggle: (Boolean) -> Unit = {},
     lyrics: List<TimeSyncedLyric> = emptyList(),
-    isLyricsUnderCoverEnabled: Boolean = true
+    isLyricsUnderCoverEnabled: Boolean = true,
+    previousTrack: TrackItem? = null,
+    nextTrack: TrackItem? = null
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
@@ -716,7 +723,7 @@ fun EncoreNowPlayingScreen(
                                             .fillMaxWidth()
                                             .aspectRatio(1.0f)
                                     )
-                                } else {
+                                } else if (videoActive) {
                                     NowPlayingArtworkCard(
                                         title = title,
                                         coverUrl = coverUrl,
@@ -724,12 +731,27 @@ fun EncoreNowPlayingScreen(
                                         backgroundColor = animatedDominantColor,
                                         canvasFilePath = canvasFilePath,
                                         isCanvasEnabled = canvasActive,
-                                        videoActive = videoActive,
-                                        videoFullBleed = videoActive,
+                                        videoActive = true,
+                                        videoFullBleed = true,
                                         videoQualities = videoQualities,
                                         onVideoQuality = onVideoQuality,
                                         onVideoSurface = onVideoSurface,
                                         onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(animatedMediaHeight)
+                                    )
+                                } else {
+                                    SwipableTrackArtwork(
+                                        currentTitle = title,
+                                        currentCoverUrl = coverUrl,
+                                        currentDominantColor = dynamicArtworkColor,
+                                        cardBackgroundColor = animatedDominantColor,
+                                        previousTrack = previousTrack,
+                                        nextTrack = nextTrack,
+                                        canSwipePrevious = canSkipPrevious,
+                                        onSwipePrevious = onSkipPreviousClick,
+                                        onSwipeNext = onSkipNextClick,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(animatedMediaHeight)
@@ -1298,6 +1320,152 @@ private fun NowPlayingArtworkCard(
                 )
             }
         }
+    }
+}
+
+private const val SWIPE_COMMIT_FRACTION = 0.3f
+private const val SWIPE_SETTLE_MS = 240
+
+@Composable
+private fun SwipableTrackArtwork(
+    currentTitle: String,
+    currentCoverUrl: String?,
+    currentDominantColor: Color,
+    cardBackgroundColor: Color,
+    previousTrack: TrackItem?,
+    nextTrack: TrackItem?,
+    canSwipePrevious: Boolean,
+    onSwipePrevious: () -> Unit,
+    onSwipeNext: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hasPrev = canSwipePrevious && previousTrack != null
+    val hasNext = nextTrack != null
+    val drag = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(currentCoverUrl, currentTitle) {
+        drag.snapTo(0f)
+    }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .clipToBounds()
+            .pointerInput(hasPrev, hasNext) {
+                val cardWidthPx = size.width.toFloat()
+                val flickVelocity = cardWidthPx * 1.5f
+                val tracker = VelocityTracker()
+                detectHorizontalDragGestures(
+                    onDragStart = { tracker.resetTracking() },
+                    onDragEnd = {
+                        val velocity = tracker.calculateVelocity().x
+                        tracker.resetTracking()
+                        val offset = drag.value
+                        val commitNext = hasNext && offset < 0f &&
+                            (offset < -cardWidthPx * SWIPE_COMMIT_FRACTION || velocity < -flickVelocity)
+                        val commitPrev = hasPrev && offset > 0f &&
+                            (offset > cardWidthPx * SWIPE_COMMIT_FRACTION || velocity > flickVelocity)
+                        if (commitNext) onSwipeNext()
+                        if (commitPrev) onSwipePrevious()
+                        scope.launch {
+                            drag.animateTo(
+                                targetValue = 0f,
+                                animationSpec = tween(
+                                    durationMillis = SWIPE_SETTLE_MS,
+                                    easing = FastOutSlowInEasing
+                                )
+                            )
+                        }
+                    },
+                    onDragCancel = {
+                        scope.launch {
+                            drag.animateTo(
+                                targetValue = 0f,
+                                animationSpec = tween(
+                                    durationMillis = SWIPE_SETTLE_MS,
+                                    easing = FastOutSlowInEasing
+                                )
+                            )
+                        }
+                    },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        val raw = drag.value + amount
+                        val clamped = when {
+                            raw > 0f && !hasPrev -> 0f
+                            raw < 0f && !hasNext -> 0f
+                            raw > cardWidthPx -> cardWidthPx
+                            raw < -cardWidthPx -> -cardWidthPx
+                            else -> raw
+                        }
+                        scope.launch { drag.snapTo(clamped) }
+                    }
+                )
+            }
+    ) {
+        val cardWidth = maxWidth
+        val cardWidthPx = with(LocalDensity.current) { cardWidth.toPx() }
+        Row(
+            modifier = Modifier
+                .requiredWidth(cardWidth * 3)
+                .fillMaxHeight()
+                .graphicsLayer { translationX = drag.value - cardWidthPx }
+        ) {
+            SwipeTrackArtworkSlot(
+                title = previousTrack?.title.orEmpty(),
+                coverUrl = previousTrack?.imageUrl,
+                dominantColor = currentDominantColor,
+                backgroundColor = cardBackgroundColor,
+                modifier = Modifier
+                    .width(cardWidth)
+                    .fillMaxHeight()
+            )
+            SwipeTrackArtworkSlot(
+                title = currentTitle,
+                coverUrl = currentCoverUrl,
+                dominantColor = currentDominantColor,
+                backgroundColor = cardBackgroundColor,
+                modifier = Modifier
+                    .width(cardWidth)
+                    .fillMaxHeight()
+            )
+            SwipeTrackArtworkSlot(
+                title = nextTrack?.title.orEmpty(),
+                coverUrl = nextTrack?.imageUrl,
+                dominantColor = currentDominantColor,
+                backgroundColor = cardBackgroundColor,
+                modifier = Modifier
+                    .width(cardWidth)
+                    .fillMaxHeight()
+            )
+        }
+    }
+}
+
+@Composable
+private fun SwipeTrackArtworkSlot(
+    title: String,
+    coverUrl: String?,
+    dominantColor: Color,
+    backgroundColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .padding(horizontal = 2.dp)
+            .shadow(elevation = 16.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
+            .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
+            .background(backgroundColor),
+        contentAlignment = Alignment.Center
+    ) {
+        EncoreArtworkImage(
+            imageUrl = coverUrl,
+            contentDescription = title.ifBlank { null },
+            fallbackColor = dominantColor,
+            requestSize = 640,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 

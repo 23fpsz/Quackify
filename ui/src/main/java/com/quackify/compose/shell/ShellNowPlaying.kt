@@ -10,6 +10,7 @@ import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.player.EncoreNowPlayingScreen
 import com.quackify.compose.player.TimeSyncedLyric
+import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreAnimation
 
 /** The screen itself only fades: the artwork carries the movement. */
@@ -47,6 +48,8 @@ internal fun ShellNowPlaying(
     coverUrl: String,
     lyrics: List<TimeSyncedLyric> = emptyList(),
     isLyricsUnderCoverEnabled: Boolean = true,
+    previousTrack: TrackItem? = null,
+    nextTrack: TrackItem? = null,
     canvasFilePath: String? = null,
     isCanvasAllowed: Boolean = true,
     isCanvasEnabled: Boolean = false,
@@ -124,6 +127,8 @@ internal fun ShellNowPlaying(
             coverUrl = coverUrl,
             lyrics = lyrics,
             isLyricsUnderCoverEnabled = isLyricsUnderCoverEnabled,
+            previousTrack = previousTrack,
+            nextTrack = nextTrack,
             canvasFilePath = canvasFilePath,
             isCanvasAllowed = isCanvasAllowed,
             isCanvasEnabled = isCanvasEnabled,
