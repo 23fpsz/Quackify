@@ -32,7 +32,7 @@ private val log = Logs.of(Logs.Module.DRM)
 
 private const val GATE_BASE_MS = 600_000L
 
-private const val GATE_MAX_MS = 1_200_000L
+private const val GATE_MAX_MS = 86_400_000L
 
 private const val GATE_STEPS = 1
 
@@ -53,11 +53,12 @@ internal object LicenseGate {
 
     fun remainingMs(): Long = (until - System.currentTimeMillis()).coerceAtLeast(0L)
 
-    fun hold(millis: Long) {
+    fun hold(retryAfterSeconds: Long) {
         strikes++
         val escalated = (GATE_BASE_MS shl (strikes - 1).coerceAtMost(GATE_STEPS))
             .coerceAtMost(GATE_MAX_MS)
-        val wait = if (millis > 0L) maxOf(millis, escalated).coerceAtMost(GATE_MAX_MS) else escalated
+        val server = (retryAfterSeconds.coerceAtLeast(0L) * 1000L).coerceAtMost(GATE_MAX_MS)
+        val wait = if (server > 0L) maxOf(server, escalated) else escalated
         val target = System.currentTimeMillis() + wait
         if (target > until) until = target
         log.w("licence gate closed for ${wait / 1000}s (strike $strikes)")

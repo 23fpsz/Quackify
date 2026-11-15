@@ -203,6 +203,9 @@ class KrespotPlayer(private val context: Context) {
         private set
 
     @Volatile
+    private var queuedNextTrack: CommandTrack? = null
+
+    @Volatile
     private var queuedGainDb = 0.0
 
     /**
@@ -226,6 +229,7 @@ class KrespotPlayer(private val context: Context) {
             live.queueNext(track.uri, cached)
             SongCache.touch(track.uri, context)
             queuedNextUri = track.uri
+            queuedNextTrack = track
             queuedGainDb = file?.gainDb ?: 0.0
             log.i("queued next '${track.name}' from the warm source")
             return
@@ -247,6 +251,7 @@ class KrespotPlayer(private val context: Context) {
             }
             still.queueNext(track.uri, source)
             queuedNextUri = track.uri
+            queuedNextTrack = track
             queuedGainDb = file?.gainDb ?: 0.0
             log.i("queued next '${track.name}' after resolving")
         }
@@ -254,6 +259,7 @@ class KrespotPlayer(private val context: Context) {
 
     fun clearQueuedNext() {
         queuedNextUri = ""
+        queuedNextTrack = null
     }
 
     fun hasSourceFor(trackUri: String): Boolean = sourceFor(trackUri) != null
@@ -503,6 +509,7 @@ class KrespotPlayer(private val context: Context) {
         val id = ++generation
         pendingPause = false
         queuedNextUri = ""
+        queuedNextTrack = null
         _state.value = PlayerState(
             playing = true,
             buffering = true,
@@ -537,15 +544,25 @@ class KrespotPlayer(private val context: Context) {
                 val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
                 player = AudioEngine(context, { spclient }, scope) { event ->
                     if (id == generation) {
-                        val refusedSource = (event as? PlayerEvent.Failed)?.message
-                            ?.takeIf { it.contains("DRM_LICENSE_ACQUISITION_FAILED") }
-                            ?.let { sourceFor(track.uri) }
-                        if (refusedSource != null) {
-                            SourceResolver.blockFormat(refusedSource.format)
-                            forgetSource(track.uri)
-                            log.w("the licence refused format ${refusedSource.format}, trying the next one")
-                            scope.launch {
-                                if (id == generation) play(track, spclient)
+                        val drmRefused = (event as? PlayerEvent.Failed)?.message
+                            ?.contains("DRM_LICENSE_ACQUISITION_FAILED") == true
+                        if (drmRefused) {
+                            val movedTo = _state.value.trackUri == queuedNextUri
+                            val waiting = if (movedTo) queuedNextTrack ?: track else track
+                            val refusedSource = sourceFor(waiting.uri)
+                            if (LicenseGate.remainingMs() > 0L) {
+                                refused = waiting
+                                refusedFrom = if (movedTo) 0L else player?.currentPositionMs ?: 0L
+                                log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
+                                        "keeping '${waiting.name.ifBlank { waiting.uri }}' for a retry"
+                                )
+                            } else {
+                                if (refusedSource != null) SourceResolver.blockFormat(refusedSource.format)
+                                forgetSource(waiting.uri)
+                                log.w("the licence refused format ${refusedSource?.format ?: "?"}, trying the next one")
+                                scope.launch {
+                                    if (id == generation) play(waiting, spclient)
+                                }
                             }
                         } else {
                             mirror(event, player?.durationMs ?: totalMs)
@@ -589,7 +606,8 @@ class KrespotPlayer(private val context: Context) {
                 }
                 val refusedSource = sourceFor(track.uri)
                 if (refusedSource != null &&
-                    failure.message.orEmpty().contains("DRM_LICENSE_ACQUISITION_FAILED")
+                    failure.message.orEmpty().contains("DRM_LICENSE_ACQUISITION_FAILED") &&
+                    LicenseGate.remainingMs() <= 0L
                 ) {
                     SourceResolver.blockFormat(refusedSource.format)
                     forgetSource(track.uri)
@@ -603,6 +621,7 @@ class KrespotPlayer(private val context: Context) {
                     log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
                             "keeping '${track.name.ifBlank { track.uri }}' for a retry"
                     )
+                    return@launch
                 }
                 _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
             }
@@ -723,6 +742,7 @@ class KrespotPlayer(private val context: Context) {
         pendingPause = false
         pendingSeekMs = -1L
         queuedNextUri = ""
+        queuedNextTrack = null
         refused = null
         stopVideo()
         deepJob?.cancel()
