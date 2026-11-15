@@ -123,6 +123,11 @@ data class ClusterState(
     val canSmartShuffle: Boolean = false,
     /** Server clock of the snapshot this state was taken at, in ms. */
     val stateAtMs: Long = 0L,
+    /** True when this state is a device-list graft onto an earlier snapshot
+     * (the payload carried no player_state) rather than a full server
+     * snapshot; grafts keep the previous stamp and are re-based by the
+     * committer, never treated as stale on their own. */
+    val deviceOnly: Boolean = false,
 ) {
     val isAd: Boolean get() = track.isAd
 
@@ -276,6 +281,7 @@ object ClusterParser {
                 devices = parseDevices(cluster, declared.ifBlank { prev.activeDeviceId }, localDeviceId),
                 activeDeviceId = declared.ifBlank { prev.activeDeviceId },
                 updateReason = root.text("update_reason").ifBlank { prev.updateReason },
+                deviceOnly = true,
             )
         }
         val track = parseTrack(player.optJSONObject("track")) ?: EMPTY_TRACK

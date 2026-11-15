@@ -1736,36 +1736,48 @@ class PlaybackBridge(private val context: Context) {
         connect.refreshCluster()
     }
 
+    /** Uris with a queue add still in flight; a double tap and a dealer
+     * echo used to send the command twice for the same track. Main-thread only. */
+    private val queueAddsInFlight = HashSet<String>()
+
     private fun queueAdd(uri: String) {
         scope.launch {
             if (uri.isBlank()) return@launch
-            val bannedArtist = artistUriOf(uri).takeIf { it.isNotBlank() }
-            if (bannedArtist != null && ArtistBanStore.banned(context, bannedArtist)) {
-                log.i("queue: '$uri' refused, artist '$bannedArtist' is banned")
+            if (!queueAddsInFlight.add(uri)) {
+                log.i("queue += '$uri' already in flight, not sending the command twice")
                 return@launch
             }
-            if (queuedTail.none { it.uri == uri }) {
-                queuedTail = queuedTail + TrackItem(title = "", artist = "", uri = uri)
-            }
-            publishQueue(connect.cluster.value)
-            var added = connect.addToQueue(uri)
-            if (!added) {
-                connect.refreshCluster()
-                delay(QUEUE_RETRY_MS)
-                added = connect.addToQueue(uri)
-            }
-            log.i("queue += '$uri' ok=$added")
-            val cluster = connect.cluster.value
-            val written = added || (cluster != null && writeQueue(queueTailUris(uri), cluster))
-            if (!added && cluster != null) log.i("queue += '$uri' through set_queue ok=$written")
-            if (!written) {
-                queuedTail = queuedTail.filterNot { it.uri == uri }
+            try {
+                val bannedArtist = artistUriOf(uri).takeIf { it.isNotBlank() }
+                if (bannedArtist != null && ArtistBanStore.banned(context, bannedArtist)) {
+                    log.i("queue: '$uri' refused, artist '$bannedArtist' is banned")
+                    return@launch
+                }
+                if (queuedTail.none { it.uri == uri }) {
+                    queuedTail = queuedTail + TrackItem(title = "", artist = "", uri = uri)
+                }
+                publishQueue(connect.cluster.value)
+                var added = connect.addToQueue(uri)
+                if (!added) {
+                    connect.refreshCluster()
+                    delay(QUEUE_RETRY_MS)
+                    added = connect.addToQueue(uri)
+                }
+                log.i("queue += '$uri' ok=$added")
+                val cluster = connect.cluster.value
+                val written = added || (cluster != null && writeQueue(queueTailUris(uri), cluster))
+                if (!added && cluster != null) log.i("queue += '$uri' through set_queue ok=$written")
+                if (!written) {
+                    queuedTail = queuedTail.filterNot { it.uri == uri }
+                    publishQueue(cluster)
+                    return@launch
+                }
                 publishQueue(cluster)
-                return@launch
+                connect.refreshCluster()
+                scheduleDecorate(listOf(uri))
+            } finally {
+                queueAddsInFlight.remove(uri)
             }
-            publishQueue(cluster)
-            connect.refreshCluster()
-            scheduleDecorate(listOf(uri))
         }
     }
 
@@ -1812,7 +1824,12 @@ class PlaybackBridge(private val context: Context) {
             }
             "add_to_queue" -> {
                 val uri = command.trackUri
-                if (uri.isNotBlank()) queueAdd(uri)
+                when {
+                    uri.isBlank() -> Unit
+                    command.sentByDeviceId == deviceId ->
+                        log.i("add_to_queue echo of this device's own command, the local add already covers it")
+                    else -> queueAdd(uri)
+                }
             }
             "skip_to" -> {
                 val uri = command.trackUri

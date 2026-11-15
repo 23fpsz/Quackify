@@ -37,6 +37,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicLong
 import com.quackify.backend.connect.cluster.ClusterParser
 import com.quackify.backend.connect.cluster.ClusterState
 import com.quackify.backend.connect.cluster.ClusterTrack
@@ -84,6 +87,14 @@ private const val PREV_TRACKS_MAX = 10
 
 private const val NEXT_TRACKS_MAX = 80
 
+/** Calls arriving inside this window of a successful fetch ride on it
+ * instead of stacking another observer PUT on top. */
+private const val REFRESH_COALESCE_MS = 900L
+
+/** A full snapshot from the same active device stamped this much older than
+ * the one already committed is a slow reply landing late, not new state. */
+private const val STATE_STALE_MS = 1500L
+
 class KrespotConnect(private val context: Context) {
 
     val deviceId: String = Device.id(context)
@@ -124,6 +135,23 @@ class KrespotConnect(private val context: Context) {
 
     @Volatile
     var accepts: ((PlaybackCommand) -> Boolean)? = null
+
+    /**
+     * The one door every cluster write walks through. Fetch replies land
+     * from three places at once (the dealer collector, the register
+     * handshake scope, the bridge poll loop), so without a funnel two
+     * in-flight snapshots overwrite each other in whatever order the
+     * network answers and the UI sees track, queue and device rows from
+     * different snapshots mixed together.
+     */
+    private val clusterLock = Any()
+
+    /** Single-flight gate for [refreshCluster]: one cluster fetch at a time. */
+    private val refreshGate = Mutex()
+
+    /** Elapsed-realtime of the last successful fetch, for coalescing bursts. */
+    @Volatile
+    private var lastRefreshOkAt = 0L
 
     /**
      * The three registration PUTs take a few round trips; running them here
@@ -250,15 +278,13 @@ class KrespotConnect(private val context: Context) {
             }
 
             frame.uri == DealerUri.CLUSTER -> frame.payloads.forEach { payload ->
-                val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(payload, deviceId, _cluster.value) }
+                val parsed = commitCluster(payload, "cluster push")
                 if (parsed == null) {
-                    log.w("cluster frame did not parse, ${payload.length}B " +
+                    log.w("cluster frame did not parse or was stale, ${payload.length}B " +
                             "head=${payload.take(140)}"
                     )
                     return@forEach
                 }
-                _cluster.value = parsed
-                TrackUid.learn(parsed)
                 if (parsed.isAd || parsed.adBreak != null) {
                     log.i("cluster ${parsed.updateReason} ad=${parsed.track.uri.take(24)} " +
                             "break=${parsed.adBreak?.positionInBreak}/${parsed.adBreak?.totalEstimate} " +
@@ -311,10 +337,8 @@ class KrespotConnect(private val context: Context) {
         val body = observer?.takeIf { it.ok }?.body.orEmpty()
             .ifBlank { member?.takeIf { it.ok }?.body.orEmpty() }
         if (body.isNotBlank()) {
-            val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(body, deviceId, _cluster.value) }
+            val parsed = commitCluster(body, "register")
             if (parsed != null) {
-                _cluster.value = parsed
-                TrackUid.learn(parsed)
                 log.i("cluster '${parsed.track.title}' idx=${parsed.contextIndex} " +
                         "next=${parsed.nextTracks.size} prev=${parsed.prevTracks.size} " +
                         "context=${parsed.contextUri.take(32)}"
@@ -323,15 +347,14 @@ class KrespotConnect(private val context: Context) {
         }
         _registered.value = (player?.ok == true) || (member?.ok == true)
         if (player?.ok == true) reporter.seed(Registration.initialSeq(player))
-        memberPutAt = SystemClock.elapsedRealtime()
+        memberPutAt.set(SystemClock.elapsedRealtime())
         log.i("registration observer=${observer?.code ?: "-"} player=${player?.code ?: "-"} " +
                 "member=${member?.code ?: "-"} registered=${_registered.value} " +
                 "in ${SystemClock.elapsedRealtime() - started}ms"
         )
     }
 
-    @Volatile
-    private var memberPutAt = 0L
+    private val memberPutAt = AtomicLong(0L)
 
     /**
      * Keeps the connect-state player member alive. The observer poll keeps
@@ -344,8 +367,12 @@ class KrespotConnect(private val context: Context) {
         if (spclient.isBlank() || connection.isBlank()) return
         if (_cluster.value?.activeDeviceId == deviceId) return
         val now = SystemClock.elapsedRealtime()
-        if (now - memberPutAt < MEMBER_PUT_MS) return
-        memberPutAt = now
+        val last = memberPutAt.get()
+        if (now - last < MEMBER_PUT_MS) return
+        // claim the slot atomically: the poll loop (Main) and the register
+        // handshake (Default) both throttle through here, and a plain
+        // check-then-set let both threads fire the member PUT at once
+        if (!memberPutAt.compareAndSet(last, now)) return
         Registration.connectState(context, spclient, deviceId, connection)
     }
 
@@ -416,13 +443,10 @@ class KrespotConnect(private val context: Context) {
             )
             return false
         }
-        memberPutAt = SystemClock.elapsedRealtime()
-        val parsed = withContext(Dispatchers.Default) {
-            ClusterParser.parse(response.body, deviceId, _cluster.value)
-        }
+        memberPutAt.set(SystemClock.elapsedRealtime())
+        val parsed = commitCluster(response.body, "publish")
         if (parsed != null) {
-            _cluster.value = parsed
-            TrackUid.learn(parsed)
+            log.v("publish committed '${parsed.track.title}' devices=${parsed.devices.size}")
         }
         log.i("publish '${track.title.ifBlank { track.uri.takeLast(12) }}' " +
                 "pos=${positionMs}ms playing=$playing idx=$contextIndex " +
@@ -547,20 +571,17 @@ class KrespotConnect(private val context: Context) {
             log.w("cluster seed: ${response?.code ?: "no response"}")
             return
         }
-        val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(body, deviceId) }
+        val parsed = commitCluster(body, "cluster seed")
         if (parsed == null) {
             log.i("cluster seed: no player_state in ${body.length}B, nothing to mirror")
             return
         }
-        _cluster.value = parsed
-        TrackUid.learn(parsed)
         log.i("cluster seed '${parsed.track.title}' active=${parsed.activeDeviceId.take(12)} " +
                 "devices=${parsed.devices.size} playing=${parsed.isPlaying}"
         )
     }
 
     suspend fun refreshCluster(): Boolean {
-        val connection = _connectionId.value
         if (spclient.isBlank()) {
             log.w("cluster refresh: no spclient host yet")
             return false
@@ -568,6 +589,24 @@ class KrespotConnect(private val context: Context) {
         if (holdsStream) {
             return true
         }
+        // One fetch at a time: the poll loop (4s/15s), the device sheet, every
+        // screen load and the settle loops all funnel in here, and without
+        // the gate they used to stack parallel observer PUTs whose replies
+        // then landed in whatever order the network answered.
+        return refreshGate.withLock {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastRefreshOkAt < REFRESH_COALESCE_MS) {
+                log.v("cluster refresh rides on the one from ${now - lastRefreshOkAt}ms ago")
+                return@withLock true
+            }
+            val ok = fetchCluster()
+            if (ok) lastRefreshOkAt = SystemClock.elapsedRealtime()
+            ok
+        }
+    }
+
+    private suspend fun fetchCluster(): Boolean {
+        val connection = _connectionId.value
         val response = if (connection.isBlank()) {
             runCatching { Registration.cluster(context, spclient) }.getOrNull()
         } else {
@@ -580,13 +619,11 @@ class KrespotConnect(private val context: Context) {
             )
             return false
         }
-        val parsed = withContext(Dispatchers.Default) { ClusterParser.parse(body, deviceId) }
+        val parsed = commitCluster(body, "cluster refresh")
         if (parsed == null) {
-            log.w("cluster refresh: ${body.length}B with no player_state")
+            log.w("cluster refresh: nothing to commit from ${body.length}B")
             return false
         }
-        _cluster.value = parsed
-        TrackUid.learn(parsed)
         if (parsed.devices.isEmpty()) {
             log.w("cluster refresh: the reply named no devices, root keys " +
                     runCatching { JSONObject(body).keys().asSequence().joinToString(",") }
@@ -599,6 +636,61 @@ class KrespotConnect(private val context: Context) {
         )
         refreshMember()
         return true
+    }
+
+    /**
+     * Parses a cluster payload against the state current at read time and
+     * commits it under [clusterLock]. If that state was superseded while the
+     * parse ran, a device-list graft is re-based onto the newer state instead
+     * of resurrecting the stale one, and a full snapshot the server already
+     * moved past is dropped, so the last writer is always the freshest
+     * writer.
+     */
+    private suspend fun commitCluster(body: String, source: String): ClusterState? {
+        val prev = synchronized(clusterLock) { _cluster.value }
+        val parsed = withContext(Dispatchers.Default) {
+            ClusterParser.parse(body, deviceId, prev)
+        } ?: return null
+        val landed: ClusterState? = synchronized(clusterLock) {
+            val current = _cluster.value
+            val next: ClusterState? = when {
+                isStaleSnapshot(parsed, current) -> null
+                parsed.deviceOnly && current != null && current !== prev -> current.copy(
+                    devices = parsed.devices,
+                    activeDeviceId = parsed.activeDeviceId.ifBlank { current.activeDeviceId },
+                    updateReason = parsed.updateReason,
+                    deviceOnly = true,
+                )
+                else -> parsed
+            }
+            if (next != null) {
+                _cluster.value = next
+                TrackUid.learn(next)
+            }
+            next
+        }
+        if (landed == null) {
+            log.w("$source: dropped, a fresher state of the same device is already committed")
+        } else {
+            log.v("$source: committed '${landed.track.title}' " +
+                    "active=${landed.activeDeviceId.take(8)} devices=${landed.devices.size}"
+            )
+        }
+        return landed
+    }
+
+    /**
+     * True when [incoming] is a full snapshot the server has already moved
+     * past: the same active device (so both stamps share one clock) stamped
+     * clearly older than what is committed. Device-list grafts re-base onto
+     * the current state and epoch changes (another device took the stream)
+     * always land.
+     */
+    private fun isStaleSnapshot(incoming: ClusterState, current: ClusterState?): Boolean {
+        if (current == null || incoming.deviceOnly) return false
+        if (incoming.activeDeviceId != current.activeDeviceId) return false
+        if (incoming.stateAtMs <= 0L || current.stateAtMs <= 0L) return false
+        return current.stateAtMs - incoming.stateAtMs > STATE_STALE_MS
     }
 
     suspend fun play(
@@ -854,6 +946,7 @@ class KrespotConnect(private val context: Context) {
         connected = false
         holdsStream = false
         activeSince = 0L
+        lastRefreshOkAt = 0L
         Device.forget(context)
         log.i("reset, command, cluster and registration dropped")
     }
@@ -867,13 +960,15 @@ class KrespotConnect(private val context: Context) {
     }
 
     private fun reconcile(command: PlaybackCommand) {
-        val cluster = _cluster.value ?: return
-        val uri = command.currentTrack?.uri.orEmpty()
-        if (uri.isBlank() || uri == cluster.track.uri) return
-        val moved = cluster.movedTo(uri) ?: return
-        _cluster.value = moved
-        log.i("cluster follows to '${moved.track.title}' idx=${moved.contextIndex} " +
-                "prev=${moved.prevTracks.size} next=${moved.nextTracks.size}"
-        )
+        synchronized(clusterLock) {
+            val cluster = _cluster.value ?: return
+            val uri = command.currentTrack?.uri.orEmpty()
+            if (uri.isBlank() || uri == cluster.track.uri) return
+            val moved = cluster.movedTo(uri) ?: return
+            _cluster.value = moved
+            log.i("cluster follows to '${moved.track.title}' idx=${moved.contextIndex} " +
+                    "prev=${moved.prevTracks.size} next=${moved.nextTracks.size}"
+            )
+        }
     }
 }
