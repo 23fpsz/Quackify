@@ -47,6 +47,7 @@ import com.quackify.backend.player.VideoManifests
 import com.quackify.backend.api.Podcasts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -793,13 +794,16 @@ class PlaybackBridge(private val context: Context) {
         player.warm()
         if (autoplayOnStartup) {
             scope.launch {
-                ArtistBanStore.warm(context)
+                // The ban set needs a round trip of its own, so the source warm
+                // runs beside it instead of behind it; a banned artist just
+                // leaves the warmed source unused, toggle still refuses it.
+                val banWarm = async { ArtistBanStore.warm(context) }
+                player.resumeLast(connect.spclientHost)
+                banWarm.await()
                 val savedArtist = com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
                     .getString(LAST_TRACK_ARTIST_PREF, "").orEmpty()
                 if (savedArtist.isNotBlank() && ArtistBanStore.bannedCached(savedArtist)) {
-                    log.i("resume: the saved track's artist '$savedArtist' is banned, not warming it")
-                } else {
-                    player.resumeLast(connect.spclientHost)
+                    log.i("resume: the saved track's artist '$savedArtist' is banned, the warm source stays unused")
                 }
             }
         }
