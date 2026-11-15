@@ -131,6 +131,7 @@ private val TRACK_SEARCH_FIELDS = SearchableFieldExtractor<TrackItem> {
 }
 
 private const val PRELOAD_REMAINING_TRACKS = 25
+private const val SORT_LOAD_STALL = 3
 
 enum class PlaylistSort(
     val labelRes: Int,
@@ -269,6 +270,23 @@ fun EncorePlaylistScreen(
 
     val listState = rememberLazyListState()
     val density = LocalDensity.current
+
+    var sortStallAttempts by remember(sortOption) { mutableStateOf(0) }
+    var sortLoadedRows by remember(sortOption) { mutableStateOf(tracks.size) }
+    LaunchedEffect(sortOption, hasMore, loadingMore, loadFailed, tracks.size) {
+        if (sortOption == PlaylistSort.CUSTOM) {
+            sortStallAttempts = 0
+            sortLoadedRows = tracks.size
+            return@LaunchedEffect
+        }
+        if (tracks.size > sortLoadedRows) {
+            sortLoadedRows = tracks.size
+            sortStallAttempts = 0
+        }
+        if (!hasMore || loadingMore || loadFailed || sortStallAttempts >= SORT_LOAD_STALL) return@LaunchedEffect
+        sortStallAttempts += 1
+        onLoadMore()
+    }
 
     val shouldLoadMore by remember(hasMore, loadingMore, displayedTracks.size, isEditable, canAddTracks, onLoadMore) {
         derivedStateOf {
