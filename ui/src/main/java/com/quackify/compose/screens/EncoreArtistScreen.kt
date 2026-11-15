@@ -178,6 +178,17 @@ fun EncoreArtistScreen(
     val pinnedTopPx = with(density) { pinnedTop.toPx() }
     val heroHeight = 360.dp
     val heroHeightPx = with(density) { heroHeight.toPx() }
+    val heroScrollFraction by remember {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex == 0) {
+                (listState.firstVisibleItemScrollOffset / heroHeightPx).coerceIn(0f, 1f)
+            } else {
+                1f
+            }
+        }
+    }
+    val heroParallaxPx = -heroScrollFraction * heroHeightPx * 0.45f
+    val heroFadeAlpha = (1f - (heroScrollFraction / 0.85f)).coerceIn(0f, 1f)
 
     val scrollPx by remember {
         derivedStateOf {
@@ -222,13 +233,8 @@ fun EncoreArtistScreen(
                 .fillMaxWidth()
                 .height(heroHeight)
                 .graphicsLayer {
-                    val scrollOffset = if (listState.firstVisibleItemIndex == 0) {
-                        listState.firstVisibleItemScrollOffset.toFloat()
-                    } else {
-                        heroHeightPx
-                    }
-                    translationY = -scrollOffset * 0.45f
-                    alpha = (1f - (scrollOffset / (heroHeightPx * 0.85f))).coerceIn(0f, 1f)
+                    translationY = heroParallaxPx
+                    alpha = heroFadeAlpha
                 }
         ) {
             if (headerImageUrl != null) {
