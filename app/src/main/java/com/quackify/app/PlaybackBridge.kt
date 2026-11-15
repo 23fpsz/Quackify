@@ -323,6 +323,11 @@ class PlaybackBridge(private val context: Context) {
     @Volatile
     private var sessionQueueContext: String = ""
 
+    /** The context's own order before a local shuffle rearranged the play
+     *  order, kept so turning shuffle off can put the rows back. */
+    @Volatile
+    private var unshuffledQueue: List<String> = emptyList()
+
     @Volatile
     private var pendingRepeatContext: Boolean? = null
 
@@ -533,6 +538,7 @@ class PlaybackBridge(private val context: Context) {
             captureChain(contextUri)
             sessionQueue = emptyList()
             sessionQueueContext = ""
+            unshuffledQueue = emptyList()
             scope.launch {
                 playTrack(uri, contextUri, index)
                 if (shuffleOn(connect.cluster.value) && !smartOn(connect.cluster.value)) {
@@ -654,10 +660,38 @@ class PlaybackBridge(private val context: Context) {
                     log.i("queue set: dropped ${uris.size - allowed.size} banned row(s)")
                 }
                 if (allowed.isEmpty()) return@launch
-                if (!writeQueue(allowed, cluster)) return@launch
-                val local = queuedTail.associateBy { it.uri }
-                queuedTail = allowed.map { local[it] ?: TrackItem(title = "", artist = "", uri = it) }
+                // The sheet hands back "queued rows + context rows". The
+                // context rows are the playlist window (fromContext), so
+                // anything else in the list is a queued row; rewriting both
+                // halves locally is what makes a clear or a swipe stick -
+                // the next render and the member PUT carry the reduced list
+                // instead of the server window re-adding every dropped row.
+                val contextUri = state.queueContext.ifBlank {
+                    cluster.contextUri.ifBlank { chainContext }
+                }
+                val contextSet = cluster.fromContext.map { it.uri }.toSet()
+                val queuedUris = allowed.filter { it !in contextSet }
+                val contextUris = allowed.filter { it in contextSet }
+                queuedTail = queuedUris.map { uri ->
+                    queuedTail.firstOrNull { it.uri == uri }
+                        ?: decorated[uri]
+                        ?: TrackItem(title = "", artist = "", uri = uri)
+                }
+                if (contextUri.isNotBlank() && contextUris.isNotEmpty()) {
+                    sessionQueueContext = contextUri
+                    sessionQueue = contextUris
+                    unshuffledQueue = emptyList()
+                }
+                // Rows the sheet dropped from the context tail (a swipe on an
+                // upcoming playlist row) leave the play order too.
+                if (contextUri.isNotBlank() && sessionQueueContext == contextUri) {
+                    sessionQueue = sessionQueue.filter { it in allowed || it == state.trackUri }
+                }
+                writeQueue(allowed, cluster)
                 publishQueue(cluster)
+                if (player.hasSource && remoteTarget().isBlank()) {
+                    publishLocalFromEngine()
+                }
                 connect.refreshCluster()
             }
         }
@@ -1358,12 +1392,20 @@ class PlaybackBridge(private val context: Context) {
         val window = cluster.window()
         val at = if (anchor.isNotBlank()) window.indexOfFirst { it.uri == anchor } else cluster.pivot()
         val rows = if (at >= 0) window.drop(at + 1) else cluster.nextTracks
+        // The window the server echoes back after a mode change can carry the
+        // same rows with is_queued metadata from an earlier queue; filtering
+        // them out here left nothing to adopt ("no upcoming rows to adopt")
+        // and froze the play order on the pre-toggle arrangement.
         val uris = rows
             .filter { it.isVisible && it.uri.isNotBlank() && !it.isQueued }
             .map { it.uri }
+            .ifEmpty { rows.filter { it.isVisible && it.uri.isNotBlank() }.map { it.uri } }
         if (uris.isEmpty()) {
             log.i("server order: '${contextUri.takeLast(16)}' has no upcoming rows to adopt")
             return
+        }
+        if (sessionQueueContext == contextUri && unshuffledQueue.isEmpty() && pendingShuffle != true) {
+            unshuffledQueue = uris
         }
         sessionQueue = uris
         sessionQueueContext = contextUri
@@ -1432,6 +1474,16 @@ class PlaybackBridge(private val context: Context) {
                 }
             }
         }
+        // The flag alone changes nothing on screen: the server's window keeps
+        // the old order (and while this device is the player, that window is
+        // whatever the last member PUT said). Rearranging the play order
+        // here - shuffling the upcoming rows on, restoring the context's own
+        // order off - is what the queue view and the next advance() consume;
+        // the member PUT below then publishes that order as next_tracks so
+        // every other client sees the same arrangement.
+        if (!remotePlayer) {
+            rearrangePlayOrder(next, nextSmart)
+        }
         publishQueue(connect.cluster.value)
         publishModes()
         if (!remotePlayer && player.hasSource) {
@@ -1453,8 +1505,64 @@ class PlaybackBridge(private val context: Context) {
             val contextUri = connect.cluster.value?.contextUri.orEmpty().ifBlank { chainContext }
             adoptServerQueueOrder(contextUri)
         }
+        // The adopt above may have re-read a stale server window and stamped
+        // the old order back over the local rearrangement; the arrangement
+        // this toggle just decided is the one to keep until the next change.
+        if (!remotePlayer && sessionQueueContext.isNotBlank() && sessionQueue.isNotEmpty()) {
+            rearrangePlayOrder(next, nextSmart, quiet = true)
+        }
         publishQueue(connect.cluster.value)
         publishModes()
+    }
+
+    /**
+     * Applies the shuffle mode to the upcoming play order: plain shuffle
+     * shuffles the context rows still ahead (keeping the untouched order in
+     * [unshuffledQueue] so off can put them back), and off restores that
+     * order. Smart shuffle leaves the interleaving to the enhance rows. Only
+     * the local play order moves; the published next_tracks follow it.
+     */
+    private fun rearrangePlayOrder(shuffle: Boolean, smart: Boolean, quiet: Boolean = false) {
+        val contextUri = chainContext.ifBlank { connect.cluster.value?.contextUri.orEmpty() }
+        if (contextUri.isBlank()) return
+        if (contextUri.contains(":station") || contextUri.contains(":radio")) return
+        if (sessionQueueContext == contextUri && sessionQueue.isNotEmpty()) {
+            val current = sessionQueue
+            if (shuffle && !smart) {
+                if (unshuffledQueue.isEmpty() || unshuffledQueue.sorted() != current.sorted()) {
+                    unshuffledQueue = current
+                }
+                val shuffled = current.toMutableList().also { it.shuffle() }
+                if (shuffled != current) {
+                    sessionQueue = shuffled
+                    if (!quiet) log.i("shuffle: play order reshuffled, ${shuffled.size} row(s) ahead")
+                }
+            } else if (!shuffle && !smart && unshuffledQueue.isNotEmpty()) {
+                val restored = unshuffledQueue.filter { it in current }
+                if (restored.isNotEmpty() && restored != current) {
+                    sessionQueue = restored
+                    if (!quiet) log.i("shuffle: play order restored to the context's own, " +
+                            "${restored.size} row(s) ahead")
+                }
+            }
+            shuffledContext = contextUri
+        } else {
+            // No adopted order yet: fall back to the chain rows after the
+            // playing one, so the first shuffle still rearranges something.
+            val chain = chainFor()
+            if (chain.size > 1) {
+                val anchor = state.trackUri
+                val at = chain.indexOf(anchor)
+                val ahead = if (at >= 0) chain.drop(at + 1) else chain
+                if (ahead.isNotEmpty()) {
+                    unshuffledQueue = ahead
+                    sessionQueue = if (shuffle && !smart) ahead.shuffled() else ahead
+                    sessionQueueContext = contextUri
+                    shuffledContext = contextUri
+                    if (!quiet) log.i("shuffle: play order set from the chain, ${sessionQueue.size} row(s) ahead")
+                }
+            }
+        }
     }
 
     /**
@@ -2367,12 +2475,16 @@ class PlaybackBridge(private val context: Context) {
                 ?: at?.window()?.firstOrNull { it.uri == row.uri && it.isQueued }
             known ?: asQueued(clusterTrackFor(row.uri))
         }
-        val context = if (follows) {
-            serverRows.filterNot { row -> queued.any { it.uri == row.uri } }
-        } else if (sessionQueueContext == contextUri && sessionQueue.isNotEmpty()) {
-            sessionQueue.map { uri -> clusterTrackFor(uri) }
-        } else {
-            emptyList()
+        val context = when {
+            // The locally arranged order (shuffled, restored, or reduced by a
+            // swipe) is authoritative while this device is the player: the
+            // server window only echoes what the last member PUT said, and a
+            // stale one would resurrect rows the user just removed.
+            sessionQueueContext == contextUri && sessionQueue.isNotEmpty() ->
+                sessionQueue.map { uri -> clusterTrackFor(uri) }
+            follows ->
+                serverRows.filterNot { row -> queued.any { it.uri == row.uri } }
+            else -> emptyList()
         }
         return queued + context
     }
@@ -3541,15 +3653,34 @@ class PlaybackBridge(private val context: Context) {
         val follows = clusterContext.isNotBlank() &&
                 (clusterContext == context || (single && context.isBlank()))
         val smartActive = smartOn(cluster)
+        val shuffleActive = shuffleOn(cluster) && !smartActive
+        val localOrder = sessionQueue
+            .takeIf { sessionQueueContext == context && it.isNotEmpty() }
+        // While this device is the player, the member PUT's answer echoes the
+        // play order back from cluster.fromContext - the order this phone
+        // arranged the last time the mode changed. But a server window that
+        // predates the toggle still carries the old arrangement, so the
+        // locally arranged order (just shuffled or restored) wins until a
+        // genuinely newer server window replaces it.
         val serverTracks = if (server && follows) {
-            if (smartActive) cluster!!.fromContext else cluster!!.fromContext
+            val rows = if (smartActive) cluster!!.fromContext else cluster!!.fromContext
                 .filterNot { it.isEnhanced }
                 .filterNot { bannedCachedUri(it.uri) }
+            if (shuffleActive && localOrder != null &&
+                rows.isNotEmpty() && rows.map { it.uri } != localOrder
+            ) {
+                val orderIndex = localOrder.withIndex().associate { (i, uri) -> uri to i }
+                // Rows the server window still carries but the local order
+                // dropped (a swipe removed them) do not come back here.
+                rows.filter { it.uri in orderIndex }
+                    .sortedBy { orderIndex[it.uri] ?: Int.MAX_VALUE }
+            } else {
+                rows
+            }
         } else emptyList()
         val serverRows = serverTracks.map { it.asTrackItem() }
         val serverEnhanced = smartActive && serverTracks.any { it.isEnhanced }
-        val localRows = sessionQueue
-            .takeIf { sessionQueueContext == context && it.isNotEmpty() }
+        val localRows = localOrder
             ?.map { uri -> decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri) }
             ?.filterNot { bannedCachedUri(it.uri) }
             .orEmpty()
@@ -3883,6 +4014,7 @@ class PlaybackBridge(private val context: Context) {
         if (contextUri != chainContext) {
             sessionQueue = emptyList()
             sessionQueueContext = ""
+            unshuffledQueue = emptyList()
             shuffledContext = ""
         }
         val rows = screen
