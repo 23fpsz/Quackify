@@ -341,7 +341,7 @@ class PlaybackService : Service() {
     private fun buildNotification(state: ComposePlaybackState): android.app.Notification {
         val hasTrack = state.trackUri.isNotBlank() || state.title.isNotBlank()
         val builder = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_media)
+            .setSmallIcon(R.drawable.ic_stat_duck)
             .setContentIntent(contentIntent())
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
