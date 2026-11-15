@@ -1202,7 +1202,11 @@ class MainActivity : ComponentActivity() {
         return results?.let { decorateSearchTracks(applicationContext, it) } to hits
     }
 
-    internal fun buildHistoryStats(stats: PlayStatsSnapshot, history: List<PlayedTrack>): HistoryStats {
+    internal fun buildHistoryStats(
+        stats: PlayStatsSnapshot,
+        history: List<PlayedTrack>,
+        playlistImages: Map<String, String> = emptyMap(),
+    ): HistoryStats {
         val replayed = history
             .groupBy { it.item.title.trim().lowercase() to it.item.artist.trim().lowercase() }
             .filterValues { rows -> rows.sumOf { it.plays } > 1 }
@@ -1213,12 +1217,17 @@ class MainActivity : ComponentActivity() {
             listenStreakDays = stats.listenStreak,
             loginStreakDays = stats.loginStreak,
             topArtistName = stats.topArtistName,
+            topArtistUri = stats.topArtistUri,
             topArtistPlays = stats.topArtistPlays,
+            topArtistImageUrl = homeArtistImages[stats.topArtistUri]?.takeIf { it.isNotBlank() },
             topPlaylistName = stats.topPlaylistName,
+            topPlaylistUri = stats.topPlaylistUri,
             topPlaylistPlays = stats.topPlaylistPlays,
+            topPlaylistImageUrl = playlistImages[stats.topPlaylistUri]?.takeIf { it.isNotBlank() },
             topReplayTitle = replayed?.value?.second?.title.orEmpty(),
             topReplayArtist = replayed?.value?.second?.artist.orEmpty(),
             topReplayPlays = replayed?.value?.first ?: 0,
+            topReplayImageUrl = replayed?.value?.second?.imageUrl,
         )
     }
 

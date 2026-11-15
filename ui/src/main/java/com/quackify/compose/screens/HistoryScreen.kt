@@ -6,9 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +32,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,12 +63,17 @@ data class HistoryStats(
     val listenStreakDays: Int = 0,
     val loginStreakDays: Int = 0,
     val topArtistName: String = "",
+    val topArtistUri: String = "",
     val topArtistPlays: Int = 0,
+    val topArtistImageUrl: String? = null,
     val topPlaylistName: String = "",
+    val topPlaylistUri: String = "",
     val topPlaylistPlays: Int = 0,
+    val topPlaylistImageUrl: String? = null,
     val topReplayTitle: String = "",
     val topReplayArtist: String = "",
     val topReplayPlays: Int = 0,
+    val topReplayImageUrl: String? = null,
 ) {
     val hasAny: Boolean
         get() = totalPlayedMs > 0L || listenStreakDays > 0 || loginStreakDays > 0 ||
@@ -94,6 +102,7 @@ fun HistoryScreen(
         earlierTracks.isNotEmpty()
 
     val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
+    val sectionExpanded = remember { mutableStateMapOf<String, Boolean>() }
 
     Column(
         modifier = modifier
@@ -166,7 +175,12 @@ fun HistoryScreen(
                     onTrackSelect = onTrackSelect,
                     onTrackOptionsClick = onTrackOptionsClick,
                     onTrackAddToQueue = onTrackAddToQueue,
-                    expandedGroups = expandedGroups
+                    expandedGroups = expandedGroups,
+                    isExpanded = sectionExpanded[todayLabel] != false,
+                    onToggle = {
+                        val wasExpanded = sectionExpanded[todayLabel] != false
+                        sectionExpanded[todayLabel] = !wasExpanded
+                    }
                 )
                 historySection(
                     label = yesterdayLabel,
@@ -176,7 +190,12 @@ fun HistoryScreen(
                     onTrackSelect = onTrackSelect,
                     onTrackOptionsClick = onTrackOptionsClick,
                     onTrackAddToQueue = onTrackAddToQueue,
-                    expandedGroups = expandedGroups
+                    expandedGroups = expandedGroups,
+                    isExpanded = sectionExpanded[yesterdayLabel] != false,
+                    onToggle = {
+                        val wasExpanded = sectionExpanded[yesterdayLabel] != false
+                        sectionExpanded[yesterdayLabel] = !wasExpanded
+                    }
                 )
                 historySection(
                     label = earlierLabel,
@@ -186,7 +205,12 @@ fun HistoryScreen(
                     onTrackSelect = onTrackSelect,
                     onTrackOptionsClick = onTrackOptionsClick,
                     onTrackAddToQueue = onTrackAddToQueue,
-                    expandedGroups = expandedGroups
+                    expandedGroups = expandedGroups,
+                    isExpanded = sectionExpanded[earlierLabel] != false,
+                    onToggle = {
+                        val wasExpanded = sectionExpanded[earlierLabel] != false
+                        sectionExpanded[earlierLabel] = !wasExpanded
+                    }
                 )
 
                 item {
@@ -248,19 +272,39 @@ private fun LazyListScope.historySection(
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit,
     onTrackAddToQueue: (TrackItem) -> Unit,
-    expandedGroups: SnapshotStateMap<String, Boolean>
+    expandedGroups: SnapshotStateMap<String, Boolean>,
+    isExpanded: Boolean,
+    onToggle: () -> Unit
 ) {
     if (tracks.isEmpty()) return
     item(key = "header-$label") {
-        Text(
-            text = label,
-            style = EncoreTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            ),
-            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(top = 12.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = EncoreTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                painter = painterResource(
+                    id = if (isExpanded) R.drawable.encore_icon_chevron_up_24
+                    else R.drawable.encore_icon_chevron_down_24
+                ),
+                contentDescription = if (isExpanded) "Collapse $label" else "Expand $label",
+                tint = EncoreColors.TextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
+    if (!isExpanded) return
     val entries = groupByArtist(tracks)
     itemsIndexed(entries, key = { index, entry ->
         when (entry) {
@@ -400,7 +444,12 @@ private fun HistoryStatsSection(
             ),
             modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .height(IntrinsicSize.Min)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             HistoryStatCard(
                 label = stringResource(R.string.minutes_played),
                 value = formatMinutes(stats.totalPlayedMs),
@@ -413,7 +462,12 @@ private fun HistoryStatsSection(
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .height(IntrinsicSize.Min)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             HistoryStatCard(
                 label = stringResource(R.string.login_streak),
                 value = daysLabel(stats.loginStreakDays),
@@ -423,15 +477,24 @@ private fun HistoryStatsSection(
                 label = stringResource(R.string.top_artist),
                 value = stats.topArtistName.ifBlank { "—" },
                 sub = playsLabel(stats.topArtistPlays),
+                imageUrl = stats.topArtistImageUrl?.takeIf { it.isNotBlank() },
+                imageShape = CircleShape,
                 modifier = Modifier.weight(1f)
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .height(IntrinsicSize.Min)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             HistoryStatCard(
                 label = stringResource(R.string.top_playlist),
                 value = stats.topPlaylistName.ifBlank { "—" },
                 sub = playsLabel(stats.topPlaylistPlays),
+                imageUrl = stats.topPlaylistImageUrl?.takeIf { it.isNotBlank() },
+                imageShape = RoundedCornerShape(4.dp),
                 modifier = Modifier.weight(1f)
             )
             HistoryStatCard(
@@ -441,6 +504,8 @@ private fun HistoryStatsSection(
                     stats.topReplayArtist.takeIf { it.isNotBlank() },
                     playsLabel(stats.topReplayPlays).takeIf { stats.topReplayPlays > 1 },
                 ).joinToString(" · ").ifBlank { null },
+                imageUrl = stats.topReplayImageUrl?.takeIf { it.isNotBlank() },
+                imageShape = RoundedCornerShape(4.dp),
                 modifier = Modifier.weight(1f)
             )
         }
@@ -452,36 +517,51 @@ private fun HistoryStatCard(
     label: String,
     value: String,
     sub: String? = null,
+    imageUrl: String? = null,
+    imageShape: Shape? = null,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier
+            .fillMaxHeight()
             .background(EncoreColors.Card, RoundedCornerShape(EncoreCornerRadii.Larger2))
-            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            text = label,
-            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            style = EncoreTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.SemiBold,
-                color = EncoreColors.TextPrimary
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (sub != null) {
+        if (imageUrl != null && imageShape != null) {
+            EncoreArtworkImage(
+                imageUrl = imageUrl,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                shape = imageShape
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = sub,
+                text = label,
                 style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = EncoreTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = EncoreColors.TextPrimary
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (sub != null) {
+                Text(
+                    text = sub,
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
