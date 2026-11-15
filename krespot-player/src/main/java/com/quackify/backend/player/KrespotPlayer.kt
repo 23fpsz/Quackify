@@ -221,7 +221,7 @@ class KrespotPlayer(private val context: Context) {
     fun queueNext(track: CommandTrack, spclient: String) {
         if (track.isDirect) return
         this.spclient = spclient
-        val live = engine ?: return
+        val live = engine?.takeIf { it.hasMedia } ?: return
         val askedFor = _state.value.trackUri
         if (askedFor.isBlank() || live.currentUri != askedFor) return
         if (queuedNextUri == track.uri) return
@@ -480,7 +480,7 @@ class KrespotPlayer(private val context: Context) {
     }
 
     val positionMs: Long
-        get() = if (videoActive) video.positionMs else engine?.currentPositionMs
+        get() = if (videoActive) video.positionMs else engine?.takeIf { it.hasMedia }?.currentPositionMs
             ?: mp3?.currentPositionMs ?: _state.value.positionMs
 
     val durationMs: Long get() = _state.value.durationMs
@@ -495,12 +495,12 @@ class KrespotPlayer(private val context: Context) {
 
     val quality: String get() = _state.value.quality
 
-    val hasSource: Boolean get() = videoActive || engine != null || mp3 != null || job?.isActive == true
+    val hasSource: Boolean get() = videoActive || engine?.hasMedia == true || mp3 != null || job?.isActive == true
 
-    val hasQueuedNext: Boolean get() = !videoActive && mp3 == null && (engine?.hasQueuedNext ?: false)
+    val hasQueuedNext: Boolean get() = !videoActive && mp3 == null && (engine?.takeIf { it.hasMedia }?.hasQueuedNext ?: false)
 
     val currentUri: String
-        get() = engine?.currentUri ?: _state.value.trackUri
+        get() = engine?.takeIf { it.hasMedia }?.currentUri ?: _state.value.trackUri
 
     fun play(
         track: CommandTrack,
@@ -547,7 +547,8 @@ class KrespotPlayer(private val context: Context) {
                     return@launch
                 }
                 val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
-                player = AudioEngine(context, { spclient }, scope) { event ->
+                player = engine ?: AudioEngine(context, { spclient }, scope).also { engine = it }
+                player.onEvent = { event ->
                     if (id == generation) {
                         val drmRefused = (event as? PlayerEvent.Failed)?.message
                             ?.contains("DRM_LICENSE_ACQUISITION_FAILED") == true
@@ -581,7 +582,6 @@ class KrespotPlayer(private val context: Context) {
                     player.stop()
                     return@launch
                 }
-                engine = player
                 _state.value = PlayerState(
                     playing = !pendingPause,
                     paused = pendingPause,
@@ -605,10 +605,7 @@ class KrespotPlayer(private val context: Context) {
                 throw cancellation
             } catch (failure: Throwable) {
                 log.e("play failed ${failure.javaClass.simpleName}: ${failure.message}")
-                if (player != null && engine === player) {
-                    player.stop()
-                    engine = null
-                }
+                player?.stop()
                 val refusedSource = sourceFor(track.uri)
                 if (refusedSource != null &&
                     failure.message.orEmpty().contains("DRM_LICENSE_ACQUISITION_FAILED") &&
@@ -726,7 +723,7 @@ class KrespotPlayer(private val context: Context) {
             _state.update { it.copy(positionMs = ms) }
             return
         }
-        val engine = engine
+        val engine = engine?.takeIf { it.hasMedia }
         if (engine == null) {
             if (job?.isActive == true) {
                 pendingSeekMs = ms
@@ -753,7 +750,6 @@ class KrespotPlayer(private val context: Context) {
         deepJob?.cancel()
         deepTarget = ""
         engine?.stop()
-        engine = null
         mp3?.stop()
         mp3 = null
         job?.cancel()
@@ -764,6 +760,8 @@ class KrespotPlayer(private val context: Context) {
 
     fun release() {
         stop()
+        engine?.teardown()
+        engine = null
         LicenseEndpoint.reset()
     }
 
@@ -861,7 +859,6 @@ class KrespotPlayer(private val context: Context) {
     private fun stopAudio() {
         generation++
         engine?.stop()
-        engine = null
         mp3?.stop()
         mp3 = null
         job?.cancel()
@@ -870,6 +867,8 @@ class KrespotPlayer(private val context: Context) {
 
     fun reset() {
         stop()
+        engine?.teardown()
+        engine = null
         _state.value = PlayerState()
         LicenseEndpoint.reset()
         log.i("reset, engine and state cleared")
