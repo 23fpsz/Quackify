@@ -483,14 +483,21 @@ class KrespotConnect(private val context: Context) {
             .orEmpty()
         val anchor = window.indexOfFirst { it.uri == track.uri }
         val prev = if (anchor > 0) window.take(anchor).takeLast(PREV_TRACKS_MAX) else emptyList()
-        val upcoming = LinkedHashMap<String, ClusterTrack>()
-        nextRows.filter { it.uri.isNotBlank() && it.uri != track.uri }.forEach { upcoming[it.uri] = it }
-        if (anchor >= 0) {
-            window.drop(anchor + 1)
-                .filter { it.isVisible && it.uri != track.uri }
-                .forEach { upcoming.putIfAbsent(it.uri, it) }
+        // The machine window is the queue: the caller only supplies rows the
+        // window does not know yet (a queue add that has not been echoed
+        // back), and rows are carried by identity, never deduped by uri -
+        // the same track can sit in the queue and in the context, and hidden
+        // iteration rows are what keep the machine's cycles intact on every
+        // other client.
+        val machine = if (anchor >= 0) window.drop(anchor + 1) else emptyList()
+        val machineIds = machine.mapTo(HashSet()) { it.uid.ifBlank { it.uri } }
+        val fresh = nextRows.filter {
+            it.uri.isNotBlank() && it.uri != track.uri &&
+                it.uid.ifBlank { it.uri } !in machineIds
         }
-        val next = upcoming.values.take(NEXT_TRACKS_MAX)
+        val next = (fresh + machine)
+            .filter { !it.isMeta || it.isVisible || it.isQueued }
+            .take(NEXT_TRACKS_MAX)
         val metadata = runCatching { JSONObject(track.raw) }.getOrElse { JSONObject() }
         if (metadata.length() == 0 && track.title.isNotBlank()) {
             metadata
@@ -554,6 +561,17 @@ class KrespotConnect(private val context: Context) {
 
     private fun trackNode(track: ClusterTrack): JSONObject {
         val metadata = runCatching { JSONObject(track.raw) }.getOrElse { JSONObject() }
+        if (metadata.length() == 0 && track.title.isNotBlank()) {
+            metadata
+                .put("title", track.title)
+                .put("artist_name", track.artistName)
+                .put("artist_uri", track.artistUri)
+                .put("album_title", track.albumTitle)
+                .put("album_uri", track.albumUri)
+                .put("image_url", track.imageUrl)
+                .put("duration", track.durationMs.toString())
+                .put("is_explicit", track.explicit.toString())
+        }
         return JSONObject()
             .put("uri", track.uri)
             .put("uid", track.uid)
@@ -738,13 +756,23 @@ class KrespotConnect(private val context: Context) {
         return response?.ok == true
     }
 
-    suspend fun setQueue(tracks: List<ClusterTrack>): Boolean {
+    suspend fun setQueue(nextRows: List<ClusterTrack>, prevRows: List<ClusterTrack> = emptyList()): Boolean {
         if (spclient.isBlank()) {
             log.w("queue: dealer not connected yet")
             return false
         }
         val revision = _cluster.value?.queueRevision.orEmpty()
-        val response = CommandClient.setQueue(context, spclient, deviceId, tracks, revision)
+        val response = CommandClient.setQueue(context, spclient, deviceId, nextRows, prevRows, revision)
+        return response?.ok == true
+    }
+
+    suspend fun clearQueue(nextRows: List<ClusterTrack>, prevRows: List<ClusterTrack> = emptyList()): Boolean {
+        if (spclient.isBlank()) {
+            log.w("clear queue: dealer not connected yet")
+            return false
+        }
+        val revision = _cluster.value?.queueRevision.orEmpty()
+        val response = CommandClient.clearQueue(context, spclient, deviceId, nextRows, prevRows, revision)
         return response?.ok == true
     }
 

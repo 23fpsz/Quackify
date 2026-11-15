@@ -31,6 +31,7 @@ fun ClusterTrack.asTrackItem(): TrackItem = TrackItem(
     title = title,
     artist = artistName,
     uri = uri,
+    uid = uid,
     imageUrl = imageUrl.takeIf { it.isNotBlank() },
     durationMs = durationMs,
     isExplicit = explicit,

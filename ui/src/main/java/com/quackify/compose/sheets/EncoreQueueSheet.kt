@@ -260,7 +260,7 @@ fun EncoreQueueSheet(
                         )
                     }
 
-                    itemsIndexed(nextFromContext) { _, track ->
+                    itemsIndexed(nextFromContext, key = { index, track -> "${track.uid.ifBlank { track.uri }}_$index" }) { _, track ->
                         QueueTrackRow(
                             track = track,
                             showDragHandle = false,
@@ -366,7 +366,7 @@ private fun QueueTrackRow(
 private fun List<TrackItem>.toQueueRows(): MutableList<EditableTrackItem> {
     val seen = HashMap<String, Int>()
     val rows = map { track ->
-        val base = track.uri.ifBlank { track.title }
+        val base = track.uid.ifBlank { track.uri.ifBlank { track.title } }
         val occurrence = seen.getOrDefault(base, 0)
         seen[base] = occurrence + 1
         EditableTrackItem("${base}_$occurrence", track)

@@ -527,11 +527,10 @@ private fun ShellLibrarySheets(
     }
 
     if (flags.queue) {
-        val queued = userQueue.filter { it.uri.isNotBlank() && it.title.isNotBlank() }
+        val queued = userQueue.filter { it.uri.isNotBlank() }
         val upcoming = queueFromContext
             .filter { it.uri.isNotBlank() }
-            .dropWhile { it.uri == currentTrackUri }
-            .filter { it.title.isNotBlank() }
+            .filterNot { it.uri == currentTrackUri }
         EncoreQueueSheet(
             currentTrackTitle = currentTrackTitle,
             currentTrackArtist = currentTrackArtist,
