@@ -468,7 +468,6 @@
     <string name="back_to">Back to %1$s</string>
     <string name="back_to_your_playlists">Back to your playlists</string>
     <string name="item_count">%1$d items</string>
-    <string name="connected_device_artist">%1$s • %2$s</string>
     <string name="connected_to_device">Connected to %1$s</string>
     <string name="connect_to_device">Connect to device</string>
     <string name="select_lines_limit">Select up to 5 lines (%1$d/5)</string>
