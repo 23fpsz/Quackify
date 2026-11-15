@@ -529,24 +529,44 @@ fun EncoreNowPlayingScreen(
                             .weight(LANDSCAPE_ARTWORK_PANE_WEIGHT)
                             .fillMaxHeight()
                             .then(artworkGestureModifier)
-                            .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
-                        contentAlignment = Alignment.Center
                     ) {
-                        NowPlayingArtworkCard(
-                            title = title,
-                            coverUrl = coverUrl,
-                            dominantColor = dynamicArtworkColor,
-                            backgroundColor = animatedDominantColor,
-                            canvasFilePath = canvasFilePath,
-                            isCanvasEnabled = canvasActive,
-                            videoActive = videoActive,
-                            videoQualities = videoQualities,
-                            onVideoQuality = onVideoQuality,
-                            onVideoSurface = onVideoSurface,
-                            onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
-                            modifier = Modifier
-                                .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
-                        )
+                        if (videoActive || canvasActive) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                NowPlayingArtworkCard(
+                                    title = title,
+                                    coverUrl = coverUrl,
+                                    dominantColor = dynamicArtworkColor,
+                                    backgroundColor = animatedDominantColor,
+                                    canvasFilePath = canvasFilePath,
+                                    isCanvasEnabled = canvasActive,
+                                    videoActive = videoActive,
+                                    videoQualities = videoQualities,
+                                    onVideoQuality = onVideoQuality,
+                                    onVideoSurface = onVideoSurface,
+                                    onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
+                                    modifier = Modifier
+                                        .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
+                                )
+                            }
+                        } else {
+                            SwipableTrackArtwork(
+                                currentTitle = title,
+                                currentCoverUrl = coverUrl,
+                                currentDominantColor = dynamicArtworkColor,
+                                cardBackgroundColor = animatedDominantColor,
+                                previousTrack = previousTrack,
+                                nextTrack = nextTrack,
+                                canSwipePrevious = canSkipPrevious,
+                                onSwipePrevious = onSkipToPreviousClick,
+                                onSwipeNext = onSkipNextClick,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
 
                     Column(
@@ -714,13 +734,13 @@ fun EncoreNowPlayingScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = animatedMediaPadding)
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (canvasActive && !videoActive) {
                                     Spacer(
                                         modifier = Modifier
+                                            .padding(horizontal = animatedMediaPadding)
                                             .fillMaxWidth()
                                             .aspectRatio(1.0f)
                                     )
@@ -739,6 +759,7 @@ fun EncoreNowPlayingScreen(
                                         onVideoSurface = onVideoSurface,
                                         onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                                         modifier = Modifier
+                                            .padding(horizontal = animatedMediaPadding)
                                             .fillMaxWidth()
                                             .height(animatedMediaHeight)
                                     )
@@ -1405,13 +1426,13 @@ private fun SwipableTrackArtwork(
                 )
             }
     ) {
-        val cardWidth = maxWidth
-        val cardWidthPx = with(LocalDensity.current) { cardWidth.toPx() }
+        val pageWidth = maxWidth
+        val pageWidthPx = with(LocalDensity.current) { pageWidth.toPx() }
         Row(
             modifier = Modifier
-                .requiredWidth(cardWidth * 3)
+                .requiredWidth(pageWidth * 3)
                 .fillMaxHeight()
-                .graphicsLayer { translationX = drag.value - cardWidthPx }
+                .graphicsLayer { translationX = drag.value - pageWidthPx }
         ) {
             SwipeTrackArtworkSlot(
                 title = previousTrack?.title.orEmpty(),
@@ -1419,7 +1440,7 @@ private fun SwipableTrackArtwork(
                 dominantColor = currentDominantColor,
                 backgroundColor = cardBackgroundColor,
                 modifier = Modifier
-                    .width(cardWidth)
+                    .width(pageWidth)
                     .fillMaxHeight()
             )
             SwipeTrackArtworkSlot(
@@ -1428,7 +1449,7 @@ private fun SwipableTrackArtwork(
                 dominantColor = currentDominantColor,
                 backgroundColor = cardBackgroundColor,
                 modifier = Modifier
-                    .width(cardWidth)
+                    .width(pageWidth)
                     .fillMaxHeight()
             )
             SwipeTrackArtworkSlot(
@@ -1437,7 +1458,7 @@ private fun SwipableTrackArtwork(
                 dominantColor = currentDominantColor,
                 backgroundColor = cardBackgroundColor,
                 modifier = Modifier
-                    .width(cardWidth)
+                    .width(pageWidth)
                     .fillMaxHeight()
             )
         }
@@ -1453,20 +1474,25 @@ private fun SwipeTrackArtworkSlot(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier
-            .padding(horizontal = 2.dp)
-            .shadow(elevation = 16.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
-            .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
-            .background(backgroundColor),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        EncoreArtworkImage(
-            imageUrl = coverUrl,
-            contentDescription = title.ifBlank { null },
-            fallbackColor = dominantColor,
-            requestSize = 640,
-            modifier = Modifier.fillMaxSize()
-        )
+        Box(
+            modifier = Modifier
+                .aspectRatio(1f)
+                .shadow(elevation = 16.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
+                .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
+                .background(backgroundColor),
+            contentAlignment = Alignment.Center
+        ) {
+            EncoreArtworkImage(
+                imageUrl = coverUrl,
+                contentDescription = title.ifBlank { null },
+                fallbackColor = dominantColor,
+                requestSize = 640,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
