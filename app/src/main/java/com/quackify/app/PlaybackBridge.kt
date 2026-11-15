@@ -1219,6 +1219,7 @@ class PlaybackBridge(private val context: Context) {
             if ((uri.startsWith("spotify:track:") || uri.startsWith("spotify:episode:")) && !bannedCachedUri(uri)) {
                 wanted++
                 player.prefetch(uri, connect.spclientHost)
+                player.warmTrack(uri, connect.spclientHost)
             }
         }
         if (wanted > 0) log.i("prefetch $wanted playlist row(s)")

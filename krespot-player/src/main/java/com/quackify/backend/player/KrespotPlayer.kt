@@ -268,6 +268,14 @@ class KrespotPlayer(private val context: Context) {
         manifests[trackUri] = scope.async { SourceResolver.manifest(context, spclient, trackUri) }
     }
 
+    /** Fire-and-forget full source warm for a visible row: manifest, seektable and CDN url. */
+    fun warmTrack(trackUri: String, spclient: String) {
+        if (trackUri.isBlank() || spclient.isBlank()) return
+        if (!trackUri.startsWith("spotify:track:")) return
+        if (sourceFor(trackUri) != null) return
+        warmDeferred(trackUri, spclient)
+    }
+
     fun prefetchAhead(
         tracks: List<com.quackify.backend.connect.cluster.ClusterTrack>,
         spclient: String,
