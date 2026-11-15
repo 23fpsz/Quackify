@@ -154,36 +154,32 @@ internal class AudioDrmCallback(
     }
 
     private fun licencePolicy(bytes: ByteArray): String = runCatching {
-        var canPlay = -1
-        var canPersist = -1
-        var canRenew = -1
-        var licenseDuration = -1L
-        var playbackDuration = -1L
-        var policy: ByteArray? = null
-        val root = Reader(bytes)
-        while (!root.done()) {
-            val (field, wire) = root.tag()
-            when {
-                field == 2 && wire == 2 -> policy = root.bytes()
-                else -> root.skip(wire)
-            }
-        }
-        policy?.let { raw ->
+        fun policyOf(raw: ByteArray, depth: Int = 0): Map<Int, Long>? {
+            if (depth > 4) return null
+            val values = mutableMapOf<Int, Long>()
+            val nested = mutableListOf<ByteArray>()
             val reader = Reader(raw)
             while (!reader.done()) {
                 val (field, wire) = reader.tag()
-                when {
-                    field == 1 && wire == 0 -> canPlay = reader.varint().toInt()
-                    field == 2 && wire == 0 -> canPersist = reader.varint().toInt()
-                    field == 3 && wire == 0 -> canRenew = reader.varint().toInt()
-                    field == 5 && wire == 0 -> playbackDuration = reader.varint()
-                    field == 6 && wire == 0 -> licenseDuration = reader.varint()
+                when (wire) {
+                    0 -> values[field] = reader.varint()
+                    2 -> nested.add(reader.bytes())
                     else -> reader.skip(wire)
                 }
             }
+            val looksLikePolicy = values.containsKey(1) && values.containsKey(2) &&
+                values[1] in 0L..1L && (values.containsKey(5) || values.containsKey(6))
+            if (looksLikePolicy) return values
+            for (child in nested) {
+                val found = policyOf(child, depth + 1)
+                if (found != null) return found
+            }
+            return null
         }
-        "play=$canPlay persist=$canPersist renew=$canRenew " +
-            "licenseDur=${licenseDuration}s playbackDur=${playbackDuration}s"
+        val policy = policyOf(bytes)
+            ?: return@runCatching "policy not found"
+        "play=${policy[1] ?: -1} persist=${policy[2] ?: -1} renew=${policy[3] ?: -1} " +
+            "rental=${policy[4] ?: -1}s playbackDur=${policy[5] ?: -1}s licenseDur=${policy[6] ?: -1}s"
     }.getOrElse { "policy unreadable" }
 }
 
