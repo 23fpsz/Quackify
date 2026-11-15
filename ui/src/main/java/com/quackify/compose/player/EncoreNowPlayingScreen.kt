@@ -86,7 +86,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -982,10 +981,17 @@ private fun Modifier.npvDismissDragGesture(
  * animation while vertical drags translate the whole player for
  * drag-to-dismiss.
  *
- * The axis is resolved manually, before any event is consumed. Vertical drags
- * are only claimed once the page can no longer scroll in that direction, so
- * dragging over the artwork scrolls the page like any other part of it and
- * only turns into a dismissal once the top is reached.
+ * The axis is resolved manually, before any event is consumed. Vertical
+ * drags are only claimed once the page can no longer scroll in that
+ * direction, so dragging over the artwork scrolls the page like any other
+ * part of it and only turns into a dismissal once the top is reached.
+ *
+ * The claim is re-evaluated on every move: the scroll may not sit at the
+ * top when the drag starts, but it reaches it as the finger keeps pulling
+ * down, and from that moment the player must track the finger 1:1 instead
+ * of staying frozen until the next gesture. Deltas are read with
+ * positionChangeIgnoreConsumed so an intermediate scroll consumer cannot
+ * zero them out mid-drag.
  */
 private fun Modifier.npvArtworkGesture(
     coroutineScope: CoroutineScope,
@@ -1014,15 +1020,16 @@ private fun Modifier.npvArtworkGesture(
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
             if (!change.pressed) break
 
-            val delta = change.positionChange()
+            val delta = change.positionChangeIgnoreConsumed()
             totalDragX += delta.x
             totalDragY += delta.y
 
-            if (axis == AXIS_UNDECIDED) {
-                if (totalDragY > DRAG_AXIS_SLOP_PX) {
-                    val pageAtTop = !scrollEnabled || scrollState.value <= 0
-                    axis = if (pageAtTop) AXIS_VERTICAL else AXIS_YIELD
-                } else if (totalDragY < -DRAG_AXIS_SLOP_PX || totalDragX.absoluteValue > DRAG_AXIS_SLOP_PX) {
+            val verticalBias = totalDragY.absoluteValue > totalDragX.absoluteValue
+            if (axis == AXIS_UNDECIDED || axis == AXIS_YIELD) {
+                val pageAtTop = !scrollEnabled || scrollState.value <= 0
+                if (totalDragY > DRAG_AXIS_SLOP_PX && verticalBias && pageAtTop) {
+                    axis = AXIS_VERTICAL
+                } else if (totalDragY < -DRAG_AXIS_SLOP_PX || totalDragX.absoluteValue > DRAG_AXIS_SLOP_PX && !verticalBias) {
                     axis = AXIS_YIELD
                 }
             }
