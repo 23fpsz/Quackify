@@ -699,7 +699,8 @@ internal fun ShellShowRoute(
                 onShowFollowToggle?.invoke(uri, show?.saved != true)
             }
         },
-        onMoreClick = { env.flags.isShowOptionsOpen = true }
+        onMoreClick = { env.flags.isShowOptionsOpen = true },
+        onRelatedShow = { uri -> onOpenShow?.invoke(uri) }
     )
 }
 
