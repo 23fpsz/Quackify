@@ -162,7 +162,6 @@ class MainActivity : ComponentActivity() {
     private var whatsNewLoading by mutableStateOf(false)
     private var whatsNewFailed by mutableStateOf(false)
     private var whatsNewFetch by mutableStateOf(0)
-    private var browseFetch by mutableStateOf(0)
     private var savedAccountsList by mutableStateOf<List<EncoreAuth.Account>>(emptyList())
     private var addingAccount by mutableStateOf(false)
     private var userProfileColorHex by mutableStateOf("")
