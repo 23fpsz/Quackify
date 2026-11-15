@@ -271,6 +271,8 @@
     <string name="songs">Songs</string>
     <string name="sort">Sort</string>
     <string name="sort_by">Sort by</string>
+    <string name="sorted_ascending">Sorted ascending</string>
+    <string name="sorted_descending">Sorted descending</string>
     <string name="sort_order">Sort order</string>
     <string name="sources">Sources</string>
     <string name="stop_audio_in">Stop audio in</string>
