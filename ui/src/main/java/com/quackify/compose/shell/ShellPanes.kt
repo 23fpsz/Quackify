@@ -768,6 +768,7 @@ internal fun ShellPlaylistPane(
             defaultColor = Color(0xFF144D3F)
         )
         EncorePlaylistScreen(
+            sortKey = activePlaylistUri,
             title = playlistDetail?.title?.takeIf { it.isNotBlank() } ?: activePlaylistTitle,
             description = playlistDetail?.description.orEmpty(),
             creator = playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: if (activePlaylistUri.startsWith("spotiduck:local:playlist:") || activePlaylistUri.isEmpty()) userDisplayName else "",
