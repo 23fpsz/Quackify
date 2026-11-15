@@ -95,7 +95,7 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
         ?: playbackState?.devices?.firstOrNull { it.name == effectiveConnectedDevice }
     val activeDeviceKind = activeDevice?.kind
 
-    if (!env.flags.isPlaylistEditMode && env.currentScreen != ShellScreen.ADD_TRACKS) {
+    if (!env.flags.isPlaylistEditMode && env.currentScreen != ShellScreen.ADD_TRACKS && !env.flags.isLogcatOpen) {
         ShellBottomBar(
             title = env.playerIdentity.title,
             artist = env.playerIdentity.artist,
@@ -167,7 +167,7 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
     val effectiveCanSeek = if (remoteCtl) playbackState?.remoteCanSeek ?: true else true
 
     ShellNowPlaying(
-        visible = env.isPlayerExpanded,
+        visible = env.isPlayerExpanded && !env.flags.isLogcatOpen,
         title = env.playerIdentity.title,
         artist = env.playerIdentity.artist,
         contextHeader = contextHeader,

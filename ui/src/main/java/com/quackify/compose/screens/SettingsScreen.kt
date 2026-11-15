@@ -13,6 +13,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,8 +64,11 @@ import androidx.core.content.pm.PackageInfoCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
+import android.widget.Toast
 import com.quackify.compose.R
 import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.core.log.DeviceInfo
+import com.quackify.backend.core.log.Logs
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
@@ -93,6 +99,7 @@ data class SettingsLocks(
     val otherVideos: Boolean = false,
 )
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit,
@@ -113,6 +120,7 @@ fun SettingsScreen(
     updateChecked: Boolean = false,
     onCheckUpdates: () -> Unit = {},
     onAppIconChange: (String) -> Unit = {},
+    onOpenLogcat: () -> Unit = {},
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
@@ -139,6 +147,16 @@ fun SettingsScreen(
     var appIcon by remember {
         mutableStateOf(clientPrefs.getString("appIcon", "default").orEmpty().ifBlank { "default" })
     }
+    if (clientPrefs.contains("debugLogging")) {
+        Logs.floor = if (clientPrefs.getBoolean("debugLogging", false)) Logs.Level.DEBUG else Logs.Level.INFO
+    }
+    var debugUnlocked by remember {
+        mutableStateOf(clientPrefs.getBoolean("debugUnlocked", false))
+    }
+    var debugLogging by remember {
+        mutableStateOf(clientPrefs.getBoolean("debugLogging", false))
+    }
+    var versionTaps by remember { mutableIntStateOf(0) }
     var widgetOptions by remember { mutableStateOf(WidgetOptionsStore.load(context)) }
     var category by remember { mutableStateOf<Int?>(null) }
 
@@ -173,6 +191,7 @@ fun SettingsScreen(
                     0 -> stringResource(R.string.general)
                     1 -> stringResource(R.string.personalization)
                     2 -> stringResource(R.string.more)
+                    3 -> stringResource(R.string.debug)
                     else -> stringResource(R.string.settings)
                 },
                 style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
@@ -226,6 +245,13 @@ fun SettingsScreen(
                             description = stringResource(R.string.playback_and_app_information),
                             onClick = { category = 2 }
                         )
+                        if (debugUnlocked) {
+                            SettingsCategoryRow(
+                                title = stringResource(R.string.debug),
+                                description = stringResource(R.string.developer_tools_and_diagnostics),
+                                onClick = { category = 3 }
+                            )
+                        }
                     }
                 }
 
@@ -451,6 +477,30 @@ fun SettingsScreen(
                         SettingsInfoRow(
                             title = stringResource(R.string.version),
                             value = version,
+                            modifier = Modifier.combinedClickable(
+                                onClick = {
+                                    if (!debugUnlocked) {
+                                        versionTaps++
+                                        if (versionTaps >= 5) {
+                                            debugUnlocked = true
+                                            clientPrefs.edit().putBoolean("debugUnlocked", true).apply()
+                                            Toast.makeText(context, R.string.debug_unlocked, Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                onLongClick = {
+                                    if (debugUnlocked || debugLogging) {
+                                        debugUnlocked = false
+                                        debugLogging = false
+                                        versionTaps = 0
+                                        clientPrefs.edit().putBoolean("debugUnlocked", false).apply()
+                                        clientPrefs.edit().putBoolean("debugLogging", false).apply()
+                                        Logs.floor = Logs.Level.INFO
+                                        if (category == 3) category = null
+                                        Toast.makeText(context, R.string.debug_disabled, Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            ),
                         )
                         val context = LocalContext.current
                         if (update != null) {
@@ -528,6 +578,57 @@ fun SettingsScreen(
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(120.dp))
+                    }
+                }
+
+                if (target == 3) {
+                    item {
+                        SettingsSectionHeader(title = stringResource(R.string.logging))
+                        SettingsToggleRow(
+                            title = stringResource(R.string.log_debug_infos),
+                            subtitle = stringResource(R.string.log_debug_infos_subtitle),
+                            isChecked = debugLogging,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                debugLogging = on
+                                clientPrefs.edit().putBoolean("debugLogging", on).apply()
+                                Logs.floor = if (on) Logs.Level.DEBUG else Logs.Level.INFO
+                                if (on) {
+                                    val logger = Logs.of(Logs.Module.MAIN)
+                                    DeviceInfo.collect(context).lines().forEach { logger.i(it) }
+                                }
+                            }
+                        )
+                    }
+                    item {
+                        SettingsSectionHeader(title = stringResource(R.string.tools))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(EncoreColors.Card)
+                                .clickable { onOpenLogcat() }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.open_logcat),
+                                    style = EncoreTheme.typography.bodyMediumBold
+                                )
+                                Text(
+                                    text = stringResource(R.string.open_logcat_subtitle),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
+                            Icon(
+                                painter = painterResource(R.drawable.encore_icon_chevron_right_24),
+                                contentDescription = null,
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }

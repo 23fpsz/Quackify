@@ -235,6 +235,7 @@ internal class ShellUiFlags {
     var isRenamePlaylistDialogOpen by mutableStateOf(false)
     var isCreatePlaylistOpen by mutableStateOf(false)
     var isContributorsOpen by mutableStateOf(false)
+    var isLogcatOpen by mutableStateOf(false)
 }
 
 internal class ShellActiveEntity {
