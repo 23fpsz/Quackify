@@ -25,6 +25,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
@@ -195,7 +196,12 @@ internal class AudioEngine(
             release()
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
             val encrypted = source.seektable.pssh.isNotBlank()
-            val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
+            // The song cache sits between ExoPlayer and the CDN: online reads
+            // seed it while streaming, offline reads come back from it, and
+            // the custom key (the track uri) survives CDN url rotation.
+            val factory = DefaultMediaSourceFactory(
+                SongCache.factory(context).setUpstreamDataSourceFactory(DefaultDataSource.Factory(context))
+            )
             if (encrypted) {
                 val callback = AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) }
                 var cachedManager: DrmSessionManager? = null
@@ -263,6 +269,9 @@ internal class AudioEngine(
         return MediaItem.Builder()
             .setMediaId(uri)
             .setUri(Uri.parse(source.url))
+            // The cache key is the track uri, not the resolved CDN url, so a
+            // re-resolved url still reads the copy already on disk.
+            .setCustomCacheKey(uri)
             .apply {
                 if (encrypted) {
                     setDrmConfiguration(

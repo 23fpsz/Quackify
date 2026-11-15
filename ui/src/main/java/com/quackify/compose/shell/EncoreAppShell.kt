@@ -327,7 +327,8 @@ fun EncoreAppShell(
         onRetryPlaylist,
         libraryItems,
         searchData,
-        nowPlayingArtistImageUrl
+        nowPlayingArtistImageUrl,
+        playbackState?.coverUrl
     ) {
         ShellNavController(
             nav = navState,
@@ -347,6 +348,12 @@ fun EncoreAppShell(
             searchData = searchData,
             nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
             currentArtist = { playbackState?.artist ?: local.artist },
+            nowPlayingCoverUrl = playbackState?.coverUrl?.takeIf { it.isNotBlank() },
+            nowPlayingAlbumUri = {
+                playbackState?.albumUri?.takeIf { it.isNotBlank() }
+                    ?: (playbackState?.queue.orEmpty() + playbackState?.queueFromContext.orEmpty())
+                        .firstOrNull { it.uri == playbackState?.trackUri }?.albumUri.orEmpty()
+            },
         )
     }
     var currentScreen by navController.nav::currentScreen
@@ -500,6 +507,7 @@ fun EncoreAppShell(
         ?: currentQueueRow?.albumUri.orEmpty()
     val resolvedArtistUri = playbackState?.artistUri?.takeIf { it.isNotBlank() }
         ?: currentQueueRow?.artistUri.orEmpty()
+    val currentAlbumName = currentQueueRow?.albumName.orEmpty()
 
     val openAlbum: (String, String, String) -> Unit = { title, artist, uri ->
         navController.openAlbum(context, title, artist, uri)
@@ -703,6 +711,7 @@ fun EncoreAppShell(
             connectedDevice = connectedDevice,
             resolvedAlbumUri = resolvedAlbumUri,
             resolvedArtistUri = resolvedArtistUri,
+            currentAlbumName = currentAlbumName,
             nowPlayingMonthlyListeners = nowPlayingMonthlyListeners,
             nowPlayingArtistBio = nowPlayingArtistBio,
             nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,

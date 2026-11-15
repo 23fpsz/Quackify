@@ -24,6 +24,8 @@ internal class ShellNavController(
     private val searchData: SearchResults?,
     private val nowPlayingArtistImageUrl: String?,
     private val currentArtist: () -> String,
+    private val nowPlayingCoverUrl: String?,
+    private val nowPlayingAlbumUri: () -> String,
     private val onAddTracksClosed: (() -> Unit)? = null,
 ) {
     var currentScreen
@@ -147,7 +149,11 @@ internal class ShellNavController(
         active.albumTitle = title
         active.albumArtist = artist
         active.albumUri = albumUriToLoad
+        // The now-playing cover is the artwork of the very album a track
+        // sheet opens, so it doubles as the fallback every other path
+        // (library, search) supplies through its own image field.
         active.albumCoverUrl = foundEntity?.imageUrl
+            ?: nowPlayingCoverUrl?.takeIf { albumUriToLoad == nowPlayingAlbumUri() }
 
         if (onLoadAlbum != null) onLoadAlbum.invoke(albumUriToLoad, title) else playerListener?.onLoadAlbum(albumUriToLoad, title, active.albumArtist)
 

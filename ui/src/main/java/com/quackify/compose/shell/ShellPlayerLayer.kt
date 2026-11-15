@@ -45,6 +45,7 @@ internal class ShellPlayerEnv(
     val connectedDevice: String,
     val resolvedAlbumUri: String,
     val resolvedArtistUri: String,
+    val currentAlbumName: String,
     val nowPlayingMonthlyListeners: String,
     val nowPlayingArtistBio: String,
     val nowPlayingArtistImageUrl: String?,
@@ -242,6 +243,7 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
                 imageUrl = env.currentCoverUrl.takeIf { it.isNotBlank() },
                 saved = env.isLiked,
                 albumUri = env.resolvedAlbumUri,
+                albumName = env.currentAlbumName,
                 artistUri = env.resolvedArtistUri,
             )
             env.flags.isTrackOptionsFromPlayer = true

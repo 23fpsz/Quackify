@@ -193,6 +193,11 @@ class KrespotPlayer(private val context: Context) {
         }
     }
 
+    /** Counts a played or warmed track against the offline song cache limit. */
+    fun cacheTouched(trackUri: String) {
+        SongCache.touch(trackUri, context)
+    }
+
     @Volatile
     var queuedNextUri: String = ""
         private set
@@ -219,6 +224,7 @@ class KrespotPlayer(private val context: Context) {
         val cached = sourceFor(track.uri)
         if (cached != null) {
             live.queueNext(track.uri, cached)
+            SongCache.touch(track.uri, context)
             queuedNextUri = track.uri
             queuedGainDb = file?.gainDb ?: 0.0
             log.i("queued next '${track.name}' from the warm source")
@@ -355,6 +361,7 @@ class KrespotPlayer(private val context: Context) {
                     prefetched = files,
                 ) ?: return@forEach
                 rememberSource(track.uri, source)
+                SongCache.touch(track.uri, context)
                 synchronized(deepWarmed) { deepWarmed.add(track.uri) }
                 log.i("deep warm '${track.title}' file=${source.fileId.take(8)}")
             }
@@ -522,6 +529,7 @@ class KrespotPlayer(private val context: Context) {
                     return@launch
                 }
                 rememberFile(track.uri, source.fileId)
+                SongCache.touch(track.uri, context)
                 if (id != generation) {
                     log.i("play was skipped while its source resolved")
                     return@launch
