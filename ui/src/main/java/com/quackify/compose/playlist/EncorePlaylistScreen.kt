@@ -69,6 +69,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -132,6 +133,9 @@ private val TRACK_SEARCH_FIELDS = SearchableFieldExtractor<TrackItem> {
 
 private const val PRELOAD_REMAINING_TRACKS = 25
 private const val SORT_LOAD_STALL = 3
+private const val SORT_PREFS = "quackify.client"
+private const val SORT_KEY_PREFIX = "playlistSort:"
+private const val SORT_DIR_KEY_SUFFIX = ":direction"
 
 enum class PlaylistSort(
     val labelRes: Int,
@@ -201,7 +205,8 @@ fun EncorePlaylistScreen(
     loadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
     loadFailed: Boolean = false,
-    onRetry: () -> Unit = {}
+    onRetry: () -> Unit = {},
+    sortKey: String = ""
 ) {
     var currentTitle by remember(title) { mutableStateOf(title) }
     val smoothHeaderColor by rememberSmoothColor(target = headerColor)
@@ -213,8 +218,13 @@ fun EncorePlaylistScreen(
     var searchQuery by remember { mutableStateOf("") }
     var isDownloaded by remember { mutableStateOf(false) }
     var isShuffle by remember { mutableStateOf(false) }
-    var sortOption by remember { mutableStateOf(PlaylistSort.CUSTOM) }
-    var sortDirection by remember { mutableStateOf(SortDirection.ASCENDING) }
+    val sortContext = LocalContext.current
+    val sortPreferences = remember(sortContext) {
+        com.quackify.backend.core.store.AppPrefs.prefs(sortContext, SORT_PREFS)
+    }
+    val storedSort = remember(sortKey) { readSort(sortPreferences, sortKey) }
+    var sortOption by remember(sortKey) { mutableStateOf(storedSort.first) }
+    var sortDirection by remember(sortKey) { mutableStateOf(storedSort.second) }
     var isSearchRevealed by remember { mutableStateOf(false) }
     val bottomPadding = rememberBottomPadding()
     val scope = rememberCoroutineScope()
@@ -1392,6 +1402,7 @@ fun EncorePlaylistScreen(
         onSortSelected = { selected, direction ->
             sortOption = selected
             sortDirection = direction
+            saveSort(sortPreferences, sortKey, selected, direction)
         },
         onDismiss = { isSortSheetOpen = false }
     )
@@ -1760,4 +1771,32 @@ private fun PlaylistEmptyCurationHeader(
             }
         }
     }
+}
+
+private fun readSort(
+    preferences: com.quackify.backend.core.store.AppPrefs.Prefs,
+    key: String,
+): Pair<PlaylistSort, SortDirection> {
+    if (key.isBlank()) return PlaylistSort.CUSTOM to SortDirection.ASCENDING
+    val stored = preferences.getString(SORT_KEY_PREFIX + key, "").orEmpty()
+    val option = PlaylistSort.values().firstOrNull { it.name == stored }
+        ?: return PlaylistSort.CUSTOM to SortDirection.ASCENDING
+    val storedDirection = preferences.getString(SORT_KEY_PREFIX + key + SORT_DIR_KEY_SUFFIX, "")
+        .orEmpty()
+    val direction = SortDirection.values().firstOrNull { it.name == storedDirection }
+        ?: option.defaultDirection
+    return option to direction
+}
+
+private fun saveSort(
+    preferences: com.quackify.backend.core.store.AppPrefs.Prefs,
+    key: String,
+    option: PlaylistSort,
+    direction: SortDirection,
+) {
+    if (key.isBlank()) return
+    preferences.edit()
+        .putString(SORT_KEY_PREFIX + key, option.name)
+        .putString(SORT_KEY_PREFIX + key + SORT_DIR_KEY_SUFFIX, direction.name)
+        .apply()
 }
