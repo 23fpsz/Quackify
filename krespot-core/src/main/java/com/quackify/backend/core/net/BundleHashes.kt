@@ -21,6 +21,8 @@
 package com.quackify.backend.core.net
 
 import android.content.Context
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.quackify.backend.core.log.Logs
@@ -129,10 +131,15 @@ object BundleHashes {
             if (found.isNotEmpty() && chunkMap.isNotEmpty()) break
         }
         log.i("${found.size} hashes in the base bundles, ${chunkMap.size} chunks mapped")
-        for ((name, hash) in chunkMap) {
-            if (!WANTED.containsMatchIn(name)) continue
-            val body = Net.get("$CDN$name.$hash.js", ua, "hash-chunk")?.body ?: continue
-            harvest(body, found)
+        coroutineScope {
+            val downloads = chunkMap.entries
+                .filter { WANTED.containsMatchIn(it.key) }
+                .map { (name, hash) ->
+                    async { Net.get("$CDN$name.$hash.js", ua, "hash-chunk")?.body }
+                }
+            downloads.forEach { download ->
+                download.await()?.let { harvest(it, found) }
+            }
         }
         return found
     }
