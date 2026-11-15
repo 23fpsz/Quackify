@@ -47,7 +47,7 @@ private const val MANIFEST_CACHE = 8
 
 private const val FILE_ID_CACHE = 64
 
-private const val SOURCE_CACHE = 8
+private const val SOURCE_CACHE = 16
 
 private const val DEEP_LOOKAHEAD = 1
 
@@ -171,6 +171,8 @@ class KrespotPlayer(private val context: Context) {
 
     private val sources = java.util.LinkedHashMap<String, AudioSource>()
 
+    private val resolving = java.util.concurrent.ConcurrentHashMap<String, Deferred<AudioSource?>>()
+
     @Volatile
     private var deepJob: Job? = null
 
@@ -219,7 +221,7 @@ class KrespotPlayer(private val context: Context) {
     fun queueNext(track: CommandTrack, spclient: String) {
         if (track.isDirect) return
         this.spclient = spclient
-        val live = engine ?: return
+        val live = engine?.takeIf { it.hasMedia } ?: return
         val askedFor = _state.value.trackUri
         if (askedFor.isBlank() || live.currentUri != askedFor) return
         if (queuedNextUri == track.uri) return
@@ -235,16 +237,7 @@ class KrespotPlayer(private val context: Context) {
             return
         }
         scope.launch {
-            val source = SourceResolver.resolve(
-                context,
-                spclient,
-                track.uri,
-                "",
-                0,
-                prefetched = manifestFor(track.uri),
-            ) ?: return@launch
-            rememberSource(track.uri, source)
-            rememberFile(track.uri, source.fileId)
+            val source = warmSource(track.uri, spclient) ?: return@launch
             val still = engine
             if (still !== live || still.currentUri != askedFor || _state.value.trackUri != askedFor) {
                 return@launch
@@ -273,6 +266,14 @@ class KrespotPlayer(private val context: Context) {
             }
         }
         manifests[trackUri] = scope.async { SourceResolver.manifest(context, spclient, trackUri) }
+    }
+
+    /** Fire-and-forget full source warm for a visible row: manifest, seektable and CDN url. */
+    fun warmTrack(trackUri: String, spclient: String) {
+        if (trackUri.isBlank() || spclient.isBlank()) return
+        if (!trackUri.startsWith("spotify:track:")) return
+        if (sourceFor(trackUri) != null) return
+        warmDeferred(trackUri, spclient)
     }
 
     fun prefetchAhead(
@@ -353,20 +354,7 @@ class KrespotPlayer(private val context: Context) {
             .take(DEEP_LOOKAHEAD)
             .forEach { track ->
                 if (sourceFor(track.uri) != null) return@forEach
-                val known = fileIds[track.uri]
-                val files = manifestFor(track.uri)
-                val file = files.firstOrNull()
-                if (known == null && file == null) return@forEach
-                if (file != null) rememberFile(track.uri, file.fileId)
-                val source = SourceResolver.resolve(
-                    context,
-                    spclient,
-                    track.uri,
-                    fileId = known ?: file?.fileId.orEmpty(),
-                    format = file?.format ?: 0,
-                    prefetched = files,
-                ) ?: return@forEach
-                rememberSource(track.uri, source)
+                val source = warmSource(track.uri, spclient) ?: return@forEach
                 SongCache.touch(track.uri, context)
                 synchronized(deepWarmed) { deepWarmed.add(track.uri) }
                 log.i("deep warm '${track.title}' file=${source.fileId.take(8)}")
@@ -386,6 +374,42 @@ class KrespotPlayer(private val context: Context) {
     }
 
     private fun sourceFor(trackUri: String): AudioSource? = synchronized(sources) { sources[trackUri] }
+
+    private suspend fun warmSource(
+        trackUri: String,
+        spclient: String,
+        hintFile: String = "",
+        hintFormat: Int = 0,
+    ): AudioSource? =
+        runCatching { warmDeferred(trackUri, spclient, hintFile, hintFormat).await() }.getOrNull()
+
+    private fun warmDeferred(
+        trackUri: String,
+        spclient: String,
+        hintFile: String = "",
+        hintFormat: Int = 0,
+    ): Deferred<AudioSource?> {
+        resolving[trackUri]?.let { return it }
+        val deferred = scope.async {
+            runCatching {
+                val known = hintFile.ifBlank { fileIds[trackUri].orEmpty() }
+                val fromKnown = known.takeIf { it.isNotBlank() }
+                    ?.let { SourceResolver.resolve(context, spclient, trackUri, it, hintFormat) }
+                fromKnown
+                    ?: SourceResolver.resolve(context, spclient, trackUri, "", 0, manifestFor(trackUri))
+            }.getOrNull()?.also { source ->
+                rememberSource(trackUri, source)
+                rememberFile(trackUri, source.fileId)
+            }
+        }
+        deferred.invokeOnCompletion { resolving.remove(trackUri, deferred) }
+        val racing = resolving.putIfAbsent(trackUri, deferred)
+        if (racing != null) {
+            deferred.cancel()
+            return racing
+        }
+        return deferred
+    }
 
     private suspend fun manifestFor(trackUri: String): List<AudioFile> {
         val pending = manifests[trackUri] ?: return emptyList()
@@ -437,14 +461,11 @@ class KrespotPlayer(private val context: Context) {
                 return@launch
             }
             if (sourceFor(uri) != null) return@launch
-            val source = runCatching {
-                SourceResolver.resolve(context, spclient, uri, fileId = file, format = format)
-            }.getOrNull()
+            val source = warmSource(uri, spclient, hintFile = file, hintFormat = format)
             if (source == null) {
                 log.i("resume: '${uri.takeLast(12)}' did not resolve, autoplay takes the cold path")
                 return@launch
             }
-            rememberSource(uri, source)
             log.i("resume: '${uri.takeLast(12)}' file=${source.fileId.take(8)} source warmed at ${at}ms")
         }
     }
@@ -467,7 +488,7 @@ class KrespotPlayer(private val context: Context) {
     }
 
     val positionMs: Long
-        get() = if (videoActive) video.positionMs else engine?.currentPositionMs
+        get() = if (videoActive) video.positionMs else engine?.takeIf { it.hasMedia }?.currentPositionMs
             ?: mp3?.currentPositionMs ?: _state.value.positionMs
 
     val durationMs: Long get() = _state.value.durationMs
@@ -482,12 +503,12 @@ class KrespotPlayer(private val context: Context) {
 
     val quality: String get() = _state.value.quality
 
-    val hasSource: Boolean get() = videoActive || engine != null || mp3 != null || job?.isActive == true
+    val hasSource: Boolean get() = videoActive || engine?.hasMedia == true || mp3 != null || job?.isActive == true
 
-    val hasQueuedNext: Boolean get() = !videoActive && mp3 == null && (engine?.hasQueuedNext ?: false)
+    val hasQueuedNext: Boolean get() = !videoActive && mp3 == null && (engine?.takeIf { it.hasMedia }?.hasQueuedNext ?: false)
 
     val currentUri: String
-        get() = engine?.currentUri ?: _state.value.trackUri
+        get() = engine?.takeIf { it.hasMedia }?.currentUri ?: _state.value.trackUri
 
     fun play(
         track: CommandTrack,
@@ -522,15 +543,7 @@ class KrespotPlayer(private val context: Context) {
         job = scope.launch {
             var player: AudioEngine? = null
             try {
-                val source = sourceFor(track.uri)
-                    ?: SourceResolver.resolve(
-                        context,
-                        spclient,
-                        track.uri,
-                        "",
-                        0,
-                        prefetched = manifestFor(track.uri),
-                    )?.also { rememberSource(track.uri, it) }
+                val source = sourceFor(track.uri) ?: warmSource(track.uri, spclient)
                 if (source == null) {
                     _events.emit(PlayerEvent.Failed("no source"))
                     return@launch
@@ -542,7 +555,8 @@ class KrespotPlayer(private val context: Context) {
                     return@launch
                 }
                 val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
-                player = AudioEngine(context, { spclient }, scope) { event ->
+                player = engine ?: AudioEngine(context, { spclient }, scope).also { engine = it }
+                player.onEvent = { event ->
                     if (id == generation) {
                         val drmRefused = (event as? PlayerEvent.Failed)?.message
                             ?.contains("DRM_LICENSE_ACQUISITION_FAILED") == true
@@ -576,7 +590,6 @@ class KrespotPlayer(private val context: Context) {
                     player.stop()
                     return@launch
                 }
-                engine = player
                 _state.value = PlayerState(
                     playing = !pendingPause,
                     paused = pendingPause,
@@ -600,10 +613,7 @@ class KrespotPlayer(private val context: Context) {
                 throw cancellation
             } catch (failure: Throwable) {
                 log.e("play failed ${failure.javaClass.simpleName}: ${failure.message}")
-                if (player != null && engine === player) {
-                    player.stop()
-                    engine = null
-                }
+                player?.stop()
                 val refusedSource = sourceFor(track.uri)
                 if (refusedSource != null &&
                     failure.message.orEmpty().contains("DRM_LICENSE_ACQUISITION_FAILED") &&
@@ -721,7 +731,7 @@ class KrespotPlayer(private val context: Context) {
             _state.update { it.copy(positionMs = ms) }
             return
         }
-        val engine = engine
+        val engine = engine?.takeIf { it.hasMedia }
         if (engine == null) {
             if (job?.isActive == true) {
                 pendingSeekMs = ms
@@ -748,7 +758,6 @@ class KrespotPlayer(private val context: Context) {
         deepJob?.cancel()
         deepTarget = ""
         engine?.stop()
-        engine = null
         mp3?.stop()
         mp3 = null
         job?.cancel()
@@ -759,6 +768,8 @@ class KrespotPlayer(private val context: Context) {
 
     fun release() {
         stop()
+        engine?.teardown()
+        engine = null
         LicenseEndpoint.reset()
     }
 
@@ -856,7 +867,6 @@ class KrespotPlayer(private val context: Context) {
     private fun stopAudio() {
         generation++
         engine?.stop()
-        engine = null
         mp3?.stop()
         mp3 = null
         job?.cancel()
@@ -865,6 +875,8 @@ class KrespotPlayer(private val context: Context) {
 
     fun reset() {
         stop()
+        engine?.teardown()
+        engine = null
         _state.value = PlayerState()
         LicenseEndpoint.reset()
         log.i("reset, engine and state cleared")

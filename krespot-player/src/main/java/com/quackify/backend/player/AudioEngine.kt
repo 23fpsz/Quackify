@@ -131,12 +131,23 @@ internal class AudioEngine(
     private val context: Context,
     private val spclient: () -> String,
     private val scope: CoroutineScope,
-    private val onEvent: (PlayerEvent) -> Unit,
 ) {
+
+    var onEvent: ((PlayerEvent) -> Unit)? = null
+
+    val hasMedia: Boolean get() = loaded
 
     private val main = Handler(Looper.getMainLooper())
 
     private var player: ExoPlayer? = null
+
+    private var mediaFactory: DefaultMediaSourceFactory? = null
+
+    @Volatile
+    private var drmManager: DrmSessionManager? = null
+
+    @Volatile
+    private var loaded = false
 
     @Volatile
     private var started = false
@@ -193,27 +204,10 @@ internal class AudioEngine(
         gainDb: Double,
     ): Boolean =
         withContext(Dispatchers.Main) {
-            release()
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
             val encrypted = source.seektable.pssh.isNotBlank()
-            // The song cache sits between ExoPlayer and the CDN: online reads
-            // seed it while streaming, offline reads come back from it, and
-            // the custom key (the track uri) survives CDN url rotation.
-            val factory = DefaultMediaSourceFactory(
-                SongCache.factory(context).setUpstreamDataSourceFactory(DefaultDataSource.Factory(context))
-            )
+            val factory = factoryFor()
             if (encrypted) {
-                val callback = AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) }
-                var cachedManager: DrmSessionManager? = null
-                factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { _: MediaItem ->
-                    val existing = cachedManager
-                    if (existing != null) return@DrmSessionManagerProvider existing
-                    DefaultDrmSessionManager.Builder()
-                        .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
-                        .setMultiSession(true)
-                        .build(callback)
-                        .also { cachedManager = it }
-                })
                 log.i("audio drm session asked for '${source.fileId.take(12)}'")
             } else {
                 log.i("clear content, no drm session asked")
@@ -223,19 +217,64 @@ internal class AudioEngine(
             announced = false
             lastItemUri = uri
             if (uri.isNotBlank()) itemDurations[uri] = totalMs
-            val created = ExoPlayer.Builder(context)
-                .setMediaSourceFactory(factory)
-                .build()
-            created.addListener(listener)
-            created.setMediaSource(factory.createMediaSource(itemFor(uri, source)))
-            player = created
-            created.prepare()
-            created.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
-            created.playWhenReady = autoplay
+            val fresh = factory.createMediaSource(itemFor(uri, source))
+            // The player instance survives track changes: swapping the media
+            // source keeps the renderers, the codec and the audio sink warm, so
+            // only the first play pays the ExoPlayer build cost.
+            val existing = player
+            if (existing == null) {
+                val created = ExoPlayer.Builder(context)
+                    .setMediaSourceFactory(factory)
+                    .build()
+                created.addListener(listener)
+                created.setMediaSource(fresh)
+                player = created
+                created.prepare()
+                created.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
+                created.playWhenReady = autoplay
+            } else {
+                existing.stop()
+                existing.setMediaSource(fresh)
+                existing.prepare()
+                existing.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
+                existing.playWhenReady = autoplay
+            }
             started = autoplay
-            log.i("audio engine ready '${source.fileId.take(12)}' ${totalMs}ms at ${fromMs}ms autoplay=$autoplay")
+            loaded = true
+            log.i("audio engine ready '${source.fileId.take(12)}' ${totalMs}ms at ${fromMs}ms " +
+                    "autoplay=$autoplay reused=${existing != null}"
+            )
             true
         }
+
+    private fun factoryFor(): DefaultMediaSourceFactory {
+        mediaFactory?.let { return it }
+        // The song cache sits between ExoPlayer and the CDN: online reads
+        // seed it while streaming, offline reads come back from it, and
+        // the custom key (the track uri) survives CDN url rotation.
+        val factory = DefaultMediaSourceFactory(
+            SongCache.factory(context).setUpstreamDataSourceFactory(DefaultDataSource.Factory(context))
+        )
+        factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { _: MediaItem ->
+            drmManagerFor()
+        })
+        mediaFactory = factory
+        return factory
+    }
+
+    private fun drmManagerFor(): DrmSessionManager {
+        drmManager?.let { return it }
+        synchronized(this) {
+            drmManager?.let { return it }
+            val callback = AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) }
+            val manager = DefaultDrmSessionManager.Builder()
+                .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                .setMultiSession(true)
+                .build(callback)
+            drmManager = manager
+            return manager
+        }
+    }
 
     fun queueNext(uri: String, source: AudioSource) {
         runOnMain {
@@ -304,7 +343,7 @@ internal class AudioEngine(
     fun seekTo(ms: Long) {
         lastPositionMs = ms
         runOnMain { player?.seekTo(ms) }
-        onEvent(PlayerEvent.Seeked(ms))
+        onEvent?.invoke(PlayerEvent.Seeked(ms))
     }
 
     fun duck(level: Float) {
@@ -328,13 +367,30 @@ internal class AudioEngine(
 
     fun stop() {
         started = false
+        loaded = false
+        durationMs = 0L
+        lastItemUri = ""
         progressJob?.cancel()
         progressJob = null
         runOnMain {
             player?.stop()
+            player?.clearMediaItems()
+        }
+    }
+
+    fun teardown() {
+        started = false
+        loaded = false
+        durationMs = 0L
+        lastItemUri = ""
+        progressJob?.cancel()
+        progressJob = null
+        runOnMain {
             player?.release()
             player = null
         }
+        mediaFactory = null
+        drmManager = null
     }
 
     private fun applyVolume() {
@@ -348,7 +404,7 @@ internal class AudioEngine(
                 val position = runOnMain { player?.currentPosition } ?: lastPositionMs
                 if (position >= 0L) {
                     lastPositionMs = position
-                    onEvent(PlayerEvent.Progress(position, durationMs))
+                    onEvent?.invoke(PlayerEvent.Progress(position, durationMs))
                 }
                 delay(PROGRESS_MS)
             }
@@ -360,7 +416,7 @@ internal class AudioEngine(
             val newUri = item?.mediaId.orEmpty()
             val auto = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
             if (auto && lastItemUri.isNotBlank()) {
-                onEvent(PlayerEvent.Ended(lastItemUri))
+                onEvent?.invoke(PlayerEvent.Ended(lastItemUri))
             }
             if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
                 announced = false
@@ -372,7 +428,7 @@ internal class AudioEngine(
                 val ready = runOnMain { player?.playbackState == Player.STATE_READY } ?: false
                 if (ready && !announced) {
                     announced = true
-                    onEvent(PlayerEvent.Started(newUri))
+                    onEvent?.invoke(PlayerEvent.Started(newUri))
                     if (started) startProgress()
                 }
             }
@@ -382,12 +438,12 @@ internal class AudioEngine(
             when (state) {
                 Player.STATE_READY -> if (!announced) {
                     announced = true
-                    onEvent(PlayerEvent.Started(lastItemUri))
+                    onEvent?.invoke(PlayerEvent.Started(lastItemUri))
                     if (started) startProgress()
                 }
                 Player.STATE_ENDED -> {
                     lastPositionMs = durationMs
-                    onEvent(PlayerEvent.Ended(lastItemUri))
+                    onEvent?.invoke(PlayerEvent.Ended(lastItemUri))
                     lastItemUri = ""
                 }
                 else -> Unit
@@ -400,18 +456,10 @@ internal class AudioEngine(
 
         override fun onPlayerError(error: PlaybackException) {
             log.e("audio playback failed ${error.errorCodeName}: ${error.message}")
-            onEvent(PlayerEvent.Failed("${error.errorCodeName}: ${error.message ?: "audio error"}"))
+            onEvent?.invoke(PlayerEvent.Failed("${error.errorCodeName}: ${error.message ?: "audio error"}"))
         }
     }
 
-    private fun release() {
-        progressJob?.cancel()
-        progressJob = null
-        runOnMain {
-            player?.release()
-            player = null
-        }
-    }
 
     private inline fun <T> runOnMain(crossinline block: () -> T?): T? {
         if (Looper.myLooper() == Looper.getMainLooper()) return block()
