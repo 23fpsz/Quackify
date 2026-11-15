@@ -17,6 +17,7 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.net.ConnectivityMonitor
 import com.quackify.app.widget.WidgetSync
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.shell.ComposePlaybackState
@@ -70,6 +71,9 @@ class PlaybackService : Service() {
     override fun onCreate() {
         super.onCreate()
         channel()
+        // A widget can bring the service up before any activity ran: make sure
+        // the process-wide watchdog (and with it the Net offline gate) is alive.
+        ConnectivityMonitor.ensureStarted(applicationContext)
         val bridge = PlaybackHost.ensure(this)
         PlaybackHost.markForeground()
         WidgetSync.start(this)

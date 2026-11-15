@@ -1,56 +1,42 @@
 package com.quackify.compose.util
 
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import com.quackify.backend.core.net.ConnectivityMonitor
 
 /**
- * Live network reachability for the shell's offline banner. Mirrors what the
- * is missing or has not validated its internet capability. The callback keeps
- * the state current while the composable is shown, and unregisters on leave.
+ * Shared backing state for every offline banner in the shell. It is written by
+ * the process-wide [ConnectivityMonitor] and read by all [rememberIsOffline]
+ * call sites, so the verdict survives any amount of recomposition — a screen
+ * coming and going, the mini player loading, the bottom bar being swapped —
+ * without the listener ever being dropped (the old per-composable callback
+ * silently stopped updating once the mini player loaded, which is how the
+ * "no offline banner" bug happened).
+ *
+ * The subscription is wired once per process and never unwired: the lambda
+ * only touches this file-level state, so there is nothing to leak, and the
+ * state can never go stale between screens.
  */
+private val offlineState = mutableStateOf(ConnectivityMonitor.isOffline())
+
+private var permanentListener: ((Boolean) -> Unit)? = null
+
 @Composable
 fun rememberIsOffline(): Boolean {
     val context = LocalContext.current
-    val manager = remember(context) {
-        context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-    }
-    var offline by remember { mutableStateOf(manager?.isOfflineNow() ?: false) }
-
-    DisposableEffect(manager) {
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                offline = manager?.isOfflineNow() ?: false
-            }
-
-            override fun onCapabilitiesChanged(
-                network: Network,
-                capabilities: NetworkCapabilities,
-            ) {
-                offline = !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-            }
-
-            override fun onLost(network: Network) {
-                offline = manager?.isOfflineNow() ?: true
-            }
+    DisposableEffect(Unit) {
+        if (permanentListener == null) {
+            ConnectivityMonitor.ensureStarted(context.applicationContext)
+            val listener: (Boolean) -> Unit = { offline -> offlineState.value = offline }
+            permanentListener = listener
+            ConnectivityMonitor.addListener(listener)
         }
-        manager?.registerDefaultNetworkCallback(callback)
-        onDispose { manager?.unregisterNetworkCallback(callback) }
+        // Fresh read on every (re)composition site in case the banner was
+        // not on screen while the verdict last flipped.
+        offlineState.value = ConnectivityMonitor.isOffline()
+        onDispose { }
     }
-    return offline
-}
-
-private fun ConnectivityManager.isOfflineNow(): Boolean {
-    val network = activeNetwork ?: return true
-    val caps = getNetworkCapabilities(network) ?: return true
-    return !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
-        !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    return offlineState.value
 }

@@ -44,6 +44,7 @@ import com.quackify.backend.model.UserProfile
 import com.quackify.compose.R
 import com.quackify.compose.components.SpotifyToastHost
 import com.quackify.compose.components.SpotifyToastState
+import com.quackify.compose.util.rememberIsOffline
 import com.quackify.compose.home.HomeShelf
 import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.home.RecommendationCard
@@ -419,6 +420,17 @@ fun EncoreAppShell(
         }
     }
 
+    /** Single funnel for every "add to queue" action so they all fire the
+     * Spotify-style confirmation toast from one place. */
+    val toast = remember { SpotifyToastState() }
+
+    /** The same network watchdog that drives the offline banner: user actions
+     * that would need to dial out (play, search, queue, skip) are refused at
+     * the funnel and answered with the Spotify toast instead. */
+    val offlineNow = rememberIsOffline()
+    val noInternetLabel = stringResource(R.string.no_internet_connection)
+    val offlineBlockedToast: () -> Unit = { toast.show(noInternetLabel) }
+
     val actions = ShellActions(
         flags = flags,
         local = local,
@@ -429,6 +441,8 @@ fun EncoreAppShell(
         artistTracks = artistTracks,
         searchQuery = { searchQueryNow },
         clipboard = clipboard,
+        offlineGate = { offlineNow },
+        onBlocked = offlineBlockedToast,
     )
 
     val pushCurrentState: () -> Unit = { navController.pushCurrentState() }
@@ -529,20 +543,21 @@ fun EncoreAppShell(
 
     val handleTrackOptions: (TrackItem) -> Unit = { track -> actions.openTrackOptions(track) }
 
-    /** Single funnel for every "add to queue" action so they all fire the
-     * Spotify-style confirmation toast from one place. */
-    val toast = remember { SpotifyToastState() }
     val addedToQueueLabel = stringResource(R.string.add_to_queue)
     val queueToastLabel = stringResource(R.string.queue)
     val handleQueueAdd: (String) -> Unit = { uri ->
-        playerListener?.onQueueAdd(uri)
-        toast.show(addedToQueueLabel, queueToastLabel) {
-            isPlayerExpanded = true
-            shellScope.launch {
-                // Let the player's reveal animation finish before the queue
-                // sheet slides in on top of it.
-                delay(440L)
-                if (isPlayerExpanded) flags.isQueueSheetOpen = true
+        if (offlineNow) {
+            offlineBlockedToast()
+        } else {
+            playerListener?.onQueueAdd(uri)
+            toast.show(addedToQueueLabel, queueToastLabel) {
+                isPlayerExpanded = true
+                shellScope.launch {
+                    // Let the player's reveal animation finish before the queue
+                    // sheet slides in on top of it.
+                    delay(440L)
+                    if (isPlayerExpanded) flags.isQueueSheetOpen = true
+                }
             }
         }
     }
@@ -838,7 +853,11 @@ fun EncoreAppShell(
                     browseCategories = browseCategories,
                     searchQuery = searchQuery,
                     onSearchQueryChange = onSearchQueryChange,
-                    onSearchSubmit = onSearchSubmit,
+                    onSearchSubmit = onSearchSubmit?.let { submit ->
+                        { query ->
+                            if (offlineNow) offlineBlockedToast() else submit(query)
+                        }
+                    },
                     onRetrySearch = onRetrySearch,
                     onClearRecentSearches = onClearRecentSearches,
                     onRemoveRecentSearch = onRemoveRecentSearch,

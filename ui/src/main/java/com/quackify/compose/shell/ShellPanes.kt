@@ -383,7 +383,10 @@ internal fun ShellAlbumPane(
     onAlbumOptions: () -> Unit,
     albumSaved: Boolean = false,
     onAlbumLikeToggle: () -> Unit = {},
-    onPlaybackOrigin: (PlaybackOrigin?) -> Unit = {}
+    onPlaybackOrigin: (PlaybackOrigin?) -> Unit = {},
+    /** Returns true (and fires the offline toast) when a play tap must be
+     * refused because there is no internet. */
+    offlineBlocked: () -> Boolean = { false },
 ) {
     androidx.compose.runtime.key(activeAlbumTitle, activeAlbumArtist) {
         val albumDominantColor by rememberDominantColor(
@@ -422,17 +425,19 @@ internal fun ShellAlbumPane(
             onBackClick = handleBack,
             onPlayPauseClick = handlePlayPause,
             onTrackSelect = { track ->
-                onPlaybackOrigin(PlaybackOrigin(ShellScreen.ALBUM, activeAlbumTitle))
-                if (playerListener != null) {
-                    if (track.uri.isNotEmpty()) {
-                        val index = albumTracks.orEmpty().indexOfFirst { it.uri == track.uri }
-                        if (index >= 0 && activeAlbumUri.startsWith("spotify:album:")) {
-                            playerListener.onPlayTrack(track.uri, activeAlbumUri, index)
+                if (!offlineBlocked()) {
+                    onPlaybackOrigin(PlaybackOrigin(ShellScreen.ALBUM, activeAlbumTitle))
+                    if (playerListener != null) {
+                        if (track.uri.isNotEmpty()) {
+                            val index = albumTracks.orEmpty().indexOfFirst { it.uri == track.uri }
+                            if (index >= 0 && activeAlbumUri.startsWith("spotify:album:")) {
+                                playerListener.onPlayTrack(track.uri, activeAlbumUri, index)
+                            } else {
+                                playerListener.onPlayUri(track.uri)
+                            }
                         } else {
-                            playerListener.onPlayUri(track.uri)
+                            playerListener.onTrackSelect(track.title, track.artist)
                         }
-                    } else {
-                        playerListener.onTrackSelect(track.title, track.artist)
                     }
                 }
             },

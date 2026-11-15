@@ -288,6 +288,7 @@ internal class ShellHosts(
         connectedDevice = connectedDevice,
         handleBack = handleBack,
         handleQueueAdd = handleQueueAdd,
+        blockedOffline = { actions.blockedOffline() },
         shareEntity = shareEntity,
         copyEntityLink = copyEntityLink,
         openPlaylist = openPlaylist,

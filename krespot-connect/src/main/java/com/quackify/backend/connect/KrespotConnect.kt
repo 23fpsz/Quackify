@@ -58,6 +58,7 @@ import com.quackify.backend.connect.state.StateReporter
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.auth.WebToken
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.net.ConnectivityMonitor
 import com.quackify.backend.core.webview.SilentTokenRefresh
 import org.json.JSONArray
 import org.json.JSONObject
@@ -141,9 +142,9 @@ class KrespotConnect(private val context: Context) {
         while (true) {
             val host = DealerHost.resolve(context)
             if (host == null) {
-                attempt++
-                log.w("apresolve returned no dealer, retry $attempt")
-                delay(backoff(attempt))
+                val next = attempt + 1
+                log.w("apresolve returned no dealer, retry $next")
+                attempt = redialBackoff(next)
                 continue
             }
             spclient = host.second
@@ -170,14 +171,27 @@ class KrespotConnect(private val context: Context) {
                 connected = false
                 attempt = 0
             }
-            attempt++
-            delay(backoff(attempt))
+            attempt = redialBackoff(attempt + 1)
         }
     }
 
     private fun backoff(attempt: Int): Long {
         val shift = (attempt - 1).coerceIn(0, 4)
         return (1000L shl shift).coerceAtMost(15_000L)
+    }
+
+    /** Waits out the dial backoff. While the watchdog says we are offline the
+     * wait ends the moment the network is back, so a returning connection
+     * redials immediately instead of sleeping the rest of the backoff — the
+     * reconnect path after a drop, with no app restart involved. Returns the
+     * attempt counter to keep dialling with (0 = redial right away). */
+    private suspend fun redialBackoff(attempt: Int): Int {
+        val wait = backoff(attempt)
+        if (!ConnectivityMonitor.isOffline()) {
+            delay(wait)
+            return attempt
+        }
+        return if (ConnectivityMonitor.awaitOnline(wait)) 0 else attempt
     }
 
     private suspend fun usableToken(): String {

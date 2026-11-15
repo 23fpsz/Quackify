@@ -63,6 +63,20 @@ private const val GOOGLE_ORIGIN = "https://accounts.google.com"
 
 private val LOGIN_PATH = Regex("^/(?:[a-zA-Z0-9]{2,8}(?:-[a-zA-Z0-9]{2,8})?/)?login/?$")
 
+/** One main-frame failure surfaced to the login screen's error view. */
+data class LoginWebError(
+    val id: Long,
+    val kind: Kind,
+    val description: String,
+    val failingUrl: String,
+) {
+    enum class Kind { OFFLINE, HTTP, SSL, GENERIC }
+
+    /** True when the failure looks like a missing/flaky connection, which the
+     * error view can auto-retry as soon as the network watchdog says we are back. */
+    val causedByNetwork: Boolean get() = kind == Kind.OFFLINE
+}
+
 class LoginWebViewHost(val context: Context, private val startUrl: String = LOGIN_URL) {
 
     val container: FrameLayout = FrameLayout(context)
@@ -78,6 +92,19 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
      * page to walk to now (see [goBack]). */
     @Volatile
     var onBackAvailableChanged: ((Boolean) -> Unit)? = null
+
+    /** Fired with a non-null [LoginWebError] when the main frame fails to load
+     * (no internet, HTTP error, bad certificate…) and with null as soon as a
+     * fresh navigation starts making progress again. The login screen renders
+     * its Spotify-style error view from this. */
+    @Volatile
+    var onError: ((LoginWebError?) -> Unit)? = null
+
+    private var errorSeq = 0L
+
+    /** The last URL the main frame started loading; what retry reloads. */
+    @Volatile
+    private var lastMainFrameUrl: String = startUrl
 
     private fun notifyPlayerReached(url: String?) {
         if (url == null || !url.startsWith(SPOTIFY_ORIGIN)) return
@@ -169,6 +196,12 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 log.i("onPageStarted $url")
+                if (url != null) {
+                    lastMainFrameUrl = url
+                    // A new navigation is under way: drop any error screen
+                    // currently covering the webview so progress is visible.
+                    onError?.invoke(null)
+                }
                 if (url == null) return
                 when {
                     url.startsWith(GOOGLE_ORIGIN) -> view?.evaluateJavascript(BrowserSpoof.GOOGLE_CONTENT, null)
@@ -206,9 +239,13 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 error: WebResourceError?,
             ) {
                 super.onReceivedError(view, request, error)
-                if (request?.isForMainFrame == true) {
-                    log.e("onReceivedError ${request.url} ${error?.errorCode} ${error?.description}")
-                }
+                if (request?.isForMainFrame != true) return
+                log.e("onReceivedError ${request.url} ${error?.errorCode} ${error?.description}")
+                reportError(
+                    kind = classify(error?.errorCode ?: WebViewClient.ERROR_UNKNOWN),
+                    description = error?.description?.toString().orEmpty(),
+                    url = request.url?.toString().orEmpty(),
+                )
             }
 
             override fun onReceivedHttpError(
@@ -217,13 +254,26 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 errorResponse: WebResourceResponse?,
             ) {
                 super.onReceivedHttpError(view, request, errorResponse)
-                if (request?.isForMainFrame == true) {
-                    log.e("onReceivedHttpError ${request.url} ${errorResponse?.statusCode}")
-                }
+                if (request?.isForMainFrame != true) return
+                log.e("onReceivedHttpError ${request.url} ${errorResponse?.statusCode}")
+                reportError(
+                    kind = LoginWebError.Kind.HTTP,
+                    description = "HTTP ${errorResponse?.statusCode ?: 0}",
+                    url = request.url?.toString().orEmpty(),
+                )
             }
 
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
                 log.e("onReceivedSslError ${error?.url} ${error?.primaryError}")
+                // Only the main frame gets the custom error view; a broken
+                // subresource keeps the previous behaviour (load cancelled).
+                if (error != null && error.url == webView.url) {
+                    reportError(
+                        kind = LoginWebError.Kind.SSL,
+                        description = "SSL ${error.primaryError}",
+                        url = error.url,
+                    )
+                }
                 super.onReceivedSslError(view, handler, error)
             }
         }
@@ -312,6 +362,37 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
         }
         log.i("load $url (from ${webView.url})")
         webView.loadUrl(url)
+    }
+
+    /** Reloads the last page the main frame was on — what the error view's
+     * retry button (and the auto-refresh once connectivity returns) calls. */
+    fun retryLoad() {
+        val target = lastMainFrameUrl.ifBlank { startUrl }
+        log.i("retryLoad $target")
+        onError?.invoke(null)
+        webView.loadUrl(target)
+    }
+
+    private fun reportError(kind: LoginWebError.Kind, description: String, url: String) {
+        val error = LoginWebError(
+            id = ++errorSeq,
+            kind = kind,
+            description = description,
+            failingUrl = url.ifBlank { lastMainFrameUrl },
+        )
+        onError?.invoke(error)
+    }
+
+    /** DNS/connect/timeout/io failures are treated as "offline" so the error
+     * view can refresh by itself the moment the network watchdog says we are
+     * back online; anything else becomes the generic failure screen. */
+    private fun classify(code: Int): LoginWebError.Kind = when (code) {
+        WebViewClient.ERROR_HOST_LOOKUP,
+        WebViewClient.ERROR_CONNECT,
+        WebViewClient.ERROR_TIMEOUT,
+        WebViewClient.ERROR_IO,
+        -> LoginWebError.Kind.OFFLINE
+        else -> LoginWebError.Kind.GENERIC
     }
 
     val isOnPlayer: Boolean

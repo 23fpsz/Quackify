@@ -40,6 +40,7 @@ import com.quackify.backend.api.Settings
 import com.quackify.backend.api.WhatsNew
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.net.ConnectivityMonitor
 import com.quackify.backend.core.net.Net
 import com.quackify.backend.core.net.Pathfinder
 import com.quackify.backend.core.webview.SilentTokenRefresh
@@ -162,6 +163,7 @@ class MainActivity : ComponentActivity() {
     private var whatsNewLoading by mutableStateOf(false)
     private var whatsNewFailed by mutableStateOf(false)
     private var whatsNewFetch by mutableStateOf(0)
+    private var browseFetch by mutableStateOf(0)
     private var savedAccountsList by mutableStateOf<List<EncoreAuth.Account>>(emptyList())
     private var addingAccount by mutableStateOf(false)
     private var userProfileColorHex by mutableStateOf("")
@@ -289,6 +291,10 @@ class MainActivity : ComponentActivity() {
             }
         }
         Library.onLibraryChanged = { Krespot.library.invalidate() }
+        // One process-wide connectivity watchdog: it powers the shell's offline
+        // banner, the Net offline gate (nothing is sent while offline), the
+        // dealer's instant redial and the reconnect recovery below.
+        ConnectivityMonitor.ensureStarted(applicationContext)
         setContent {
             EncoreAppTheme {
                 val context = LocalContext.current
@@ -360,7 +366,7 @@ class MainActivity : ComponentActivity() {
                         val scope = rememberCoroutineScope()
 
 
-                        LaunchedEffect(Unit) {
+                        LaunchedEffect(browseFetch) {
                             browseCategories = Browse.all(context)
                             log.i("browse categories: ${browseCategories.size}")
                         }
@@ -526,6 +532,12 @@ class MainActivity : ComponentActivity() {
                                 if (feed.isEmpty()) resumeSignal++
                                 if (libraryItems.isNullOrEmpty()) Krespot.library.invalidate()
                                 if (whatsNew.isEmpty()) whatsNewFetch++
+                                if (browseCategories.isEmpty()) browseFetch++
+                                // Refetch whatever entity screen was left open
+                                // with nothing on it when the connection died.
+                                if (playlistUri.isNotBlank() && playlistDetail == null) playlistFetch++
+                                if (albumUri.isNotBlank() && albumDetail == null) albumRetry++
+                                if (artistUri.isNotBlank() && artistDetail == null) artistRetry++
                             }
                         }
 

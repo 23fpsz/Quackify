@@ -44,6 +44,9 @@ internal class ShellSheetsEnv(
     val connectedDevice: String,
     val handleBack: () -> Unit,
     val handleQueueAdd: (String) -> Unit,
+    /** Returns true (and fires the offline toast) when a play/queue action
+     * must be refused because the network watchdog says we are offline. */
+    val blockedOffline: () -> Boolean = { false },
     val shareEntity: (String) -> Unit,
     val copyEntityLink: (String) -> Unit,
     val openPlaylist: (String, String) -> Unit,
@@ -386,11 +389,13 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         queueSourceContext = playbackState?.queueContextLabel?.takeIf { it.isNotBlank() }
             ?: playbackState?.contextLabel?.takeIf { it.isNotBlank() } ?: "",
         onQueueTrackSelect = { track ->
-            if (env.playerListener != null) {
-                if (track.uri.isNotEmpty()) {
-                    env.playerListener.onPlayUri(track.uri)
-                } else {
-                    env.playerListener.onTrackSelect(track.title, track.artist)
+            if (!env.blockedOffline()) {
+                if (env.playerListener != null) {
+                    if (track.uri.isNotEmpty()) {
+                        env.playerListener.onPlayUri(track.uri)
+                    } else {
+                        env.playerListener.onTrackSelect(track.title, track.artist)
+                    }
                 }
             }
         },

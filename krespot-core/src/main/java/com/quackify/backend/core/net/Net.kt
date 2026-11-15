@@ -48,7 +48,6 @@ private val log = Logs.of(Logs.Module.NET)
 
 private const val NETWORK_ATTEMPTS = 3
 private const val NETWORK_BACKOFF_MS = 700L
-
 object Net {
 
     @Volatile
@@ -244,6 +243,17 @@ object Net {
         return attempt(method, url, withBearer(headers, fresh), body, tag, bodyPreview)
     }
 
+    /** Local refusal used while offline: nothing is dialed, nothing is retried. */
+    private fun offlineRefusal(label: String, url: String): Response? {
+        log.w("$label blocked: device is offline, not sending ${short(url)}")
+        return null
+    }
+
+    private fun offlineBlobRefusal(label: String, url: String): Blob? {
+        log.w("$label blocked: device is offline, not sending ${short(url)}")
+        return null
+    }
+
     private suspend fun attempt(
         method: String,
         url: String,
@@ -254,6 +264,9 @@ object Net {
     ): Response? = withContext(Dispatchers.IO) {
         val id = counter.incrementAndGet()
         val label = if (tag.isBlank()) "#$id" else "#$id/$tag"
+        if (ConnectivityMonitor.isOffline()) {
+            return@withContext offlineRefusal(label, url)
+        }
         logRequest(label, method, url, headers, bodyPreview, if (bodyPreview == null) body?.size ?: 0 else 0)
 
         var attempt = 1
@@ -280,6 +293,12 @@ object Net {
             if (failure == null || !neverLeftTheDevice || attempt >= NETWORK_ATTEMPTS) {
                 return@withContext outcome.getOrNull()
             }
+            // The network died under us: stop retrying while the watchdog says
+            // there is nothing to talk to, the reconnect path will re-fire the
+            // fetches that matter once traffic is possible again.
+            if (ConnectivityMonitor.isOffline()) {
+                return@withContext offlineRefusal(label, url)
+            }
             val wait = attempt * NETWORK_BACKOFF_MS
             log.w("$label ${failure.javaClass.simpleName} on attempt $attempt/$NETWORK_ATTEMPTS, retrying in ${wait}ms"
             )
@@ -296,6 +315,9 @@ object Net {
     ): Blob? = withContext(Dispatchers.IO) {
         val id = counter.incrementAndGet()
         val label = if (tag.isBlank()) "#$id" else "#$id/$tag"
+        if (ConnectivityMonitor.isOffline()) {
+            return@withContext offlineBlobRefusal(label, url)
+        }
         log.i("$label → GET ${short(url)} ${headers.size} headers")
         val started = System.currentTimeMillis()
         val outcome = runCatching {
@@ -349,6 +371,9 @@ object Net {
     ): Blob? = withContext(Dispatchers.IO) {
         val id = counter.incrementAndGet()
         val label = if (tag.isBlank()) "#$id" else "#$id/$tag"
+        if (ConnectivityMonitor.isOffline()) {
+            return@withContext offlineBlobRefusal(label, url)
+        }
         log.i("$label → POST ${short(url)} body(${body.size}B binary)")
         if (enabled) headers.forEach { (k, v) -> log.i("$label   $k: ${redact(k, v)}") }
         val started = System.currentTimeMillis()

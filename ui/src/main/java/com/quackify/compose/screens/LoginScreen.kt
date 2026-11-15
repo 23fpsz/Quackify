@@ -21,13 +21,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,23 +38,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.auth.LoginFlow
+import com.quackify.backend.core.webview.LoginWebError
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
+import com.quackify.compose.util.rememberIsOffline
 import com.quackify.backend.core.webview.LOGIN_URL
 import com.quackify.backend.core.webview.LoginWebViewHost
 import com.quackify.backend.core.webview.PLAYER_URL
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import com.quackify.backend.core.log.Logs
-import androidx.compose.ui.res.stringResource
 import com.quackify.compose.R
 
 private val log = Logs.of(Logs.Module.LOGIN)
@@ -97,6 +105,7 @@ fun LoginScreen(
     }
     var splash by remember { mutableStateOf(false) }
     var canGoBack by remember { mutableStateOf(false) }
+    var webError by remember { mutableStateOf<LoginWebError?>(null) }
     val navSignal = remember { Channel<Unit>(Channel.CONFLATED) }
     val webAlpha by animateFloatAsState(
         targetValue = if (splash) 0f else 1f,
@@ -110,10 +119,12 @@ fun LoginScreen(
     DisposableEffect(Unit) {
         host.onPlayerReached = { navSignal.trySend(Unit) }
         host.onBackAvailableChanged = { canGoBack = it }
+        host.onError = { webError = it }
         canGoBack = host.goBackAvailable()
         onDispose {
             host.onPlayerReached = null
             host.onBackAvailableChanged = null
+            host.onError = null
             host.destroy()
         }
     }
@@ -128,6 +139,29 @@ fun LoginScreen(
     }
     BackHandler(enabled = canGoBack) {
         host.goBack()
+    }
+
+    // The network watchdog drives the error screen: while the failure looks
+    // like a dead connection the retry waits for the internet to come back,
+    // and the moment it does the page refreshes by itself.
+    val offline = rememberIsOffline()
+    var autoRetries by remember { mutableIntStateOf(0) }
+    LaunchedEffect(offline, webError) {
+        val error = webError ?: return@LaunchedEffect
+        if (!error.causedByNetwork || offline || autoRetries >= 3) return@LaunchedEffect
+        autoRetries++
+        log.i("webview failed while the network looks fine or just returned, auto-refresh #$autoRetries")
+        // Give the radio a beat to settle before redialing.
+        delay(800)
+        if (webError?.id == error.id) {
+            webError = null
+            host.retryLoad()
+        }
+    }
+    val retryWeb: () -> Unit = {
+        autoRetries = 0
+        webError = null
+        host.retryLoad()
     }
 
     LaunchedEffect(Unit) {
@@ -228,6 +262,21 @@ fun LoginScreen(
         ) {
             SplashScreen()
         }
+
+        val currentWebError = webError
+        AnimatedVisibility(
+            visible = currentWebError != null,
+            enter = fadeIn(tween(durationMillis = 240, easing = LinearOutSlowInEasing)),
+            exit = fadeOut(tween(durationMillis = 200, easing = FastOutLinearInEasing)),
+        ) {
+            if (currentWebError != null) {
+                LoginWebErrorScreen(
+                    error = currentWebError,
+                    onRetry = retryWeb,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
     }
 }
 
@@ -252,6 +301,79 @@ private fun WebViewUnavailableScreen(onRetry: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             Text(
                 text = stringResource(R.string.webview_missing_message),
+                style = EncoreTheme.typography.bodyMedium,
+                color = EncoreColors.TextSecondary,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(22.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(EncoreColors.Green)
+                    .clickable { onRetry() }
+                    .padding(horizontal = 28.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(R.string.retry),
+                    style = EncoreTheme.typography.marginalBold.copy(
+                        color = EncoreColors.PureBlack,
+                        letterSpacing = 1.2.sp,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The Spotify-styled error page drawn over the webview when the login page
+ * itself fails to load — no internet, an HTTP error or a broken certificate.
+ * Network-shaped failures refresh by themselves the moment the connection
+ * is back (see the auto-retry in [LoginScreen]); the button covers everything
+ * else.
+ */
+@Composable
+private fun LoginWebErrorScreen(
+    error: LoginWebError,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val network = error.causedByNetwork
+    Box(
+        modifier = modifier
+            .background(EncoreColors.Background)
+            .padding(horizontal = 32.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                painter = painterResource(
+                    if (network) R.drawable.encore_icon_cloud_off_24
+                    else R.drawable.encore_icon_ban_24
+                ),
+                contentDescription = null,
+                tint = EncoreColors.TextSecondary,
+                modifier = Modifier.size(48.dp),
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = stringResource(
+                    if (network) R.string.youre_offline else R.string.something_went_wrong
+                ),
+                style = EncoreTheme.typography.titleLarge,
+                color = EncoreColors.TextPrimary,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(
+                    if (network) {
+                        R.string.check_your_internet_connection_and_try_again
+                    } else {
+                        R.string.page_failed_to_load
+                    }
+                ),
                 style = EncoreTheme.typography.bodyMedium,
                 color = EncoreColors.TextSecondary,
                 textAlign = TextAlign.Center,

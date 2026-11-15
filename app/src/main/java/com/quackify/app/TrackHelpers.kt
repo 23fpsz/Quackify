@@ -96,7 +96,6 @@ import com.quackify.compose.shell.EncoreAppShell
 import com.quackify.compose.shell.PlaylistEditDraft
 import com.quackify.compose.shell.ShellDeepLink
 import com.quackify.compose.theme.EncoreAppTheme
-import com.quackify.compose.util.rememberIsOffline
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async

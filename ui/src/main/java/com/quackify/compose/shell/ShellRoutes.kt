@@ -380,7 +380,8 @@ internal fun ShellAlbumRoute(
                 onAlbumSavedToggle?.invoke(uri, albumSaved != true)
             }
         },
-        onPlaybackOrigin = { env.local.playbackOrigin = it }
+        onPlaybackOrigin = { env.local.playbackOrigin = it },
+        offlineBlocked = { env.actions.blockedOffline() }
     )
 }
 

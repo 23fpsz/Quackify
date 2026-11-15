@@ -21,10 +21,37 @@ internal class ShellActions(
     private val artistTracks: List<com.quackify.compose.screens.PopularTrack>?,
     private val searchQuery: () -> String,
     private val clipboard: ClipboardManager,
+    /** True while the network watchdog says there is no internet; actions that
+     * would need to dial out are refused before they start. */
+    private val offlineGate: () -> Boolean = { false },
+    /** Fired whenever one of those actions is refused, so the shell can toast. */
+    private val onBlocked: () -> Unit = {},
 ) {
     private val active get() = navController.active
 
+    /** Runs [action] unless we are offline; refuses with [onBlocked] then. */
+    private inline fun whenOnline(action: () -> Unit) {
+        if (offlineGate()) {
+            onBlocked()
+            return
+        }
+        action()
+    }
+
+    /** For panes and sheets that build their own play lambdas: returns true —
+     * firing the offline toast — when the action must be refused because the
+     * network watchdog says there is no internet. */
+    fun blockedOffline(): Boolean {
+        if (!offlineGate()) return false
+        onBlocked()
+        return true
+    }
+
     fun onTrackPlay(track: TrackItem) {
+        whenOnline { onTrackPlayInternal(track) }
+    }
+
+    private fun onTrackPlayInternal(track: TrackItem) {
         local.playbackOrigin = when (navController.currentScreen) {
             ShellScreen.SEARCH -> PlaybackOrigin(ShellScreen.SEARCH, searchQuery().trim())
             ShellScreen.PLAYLIST -> PlaybackOrigin(ShellScreen.PLAYLIST, active.playlistTitle)
@@ -69,13 +96,15 @@ internal class ShellActions(
     }
 
     fun playUriShortcut(uri: String, title: String) {
-        local.playbackOrigin = PlaybackOrigin(ShellScreen.HOME, "Recently played")
-        if (playerListener != null) {
-            playerListener.onPlayUri(uri)
-        } else {
-            local.trackTitle = title
-            local.isPlaying = true
-            local.progress = 0.05f
+        whenOnline {
+            local.playbackOrigin = PlaybackOrigin(ShellScreen.HOME, "Recently played")
+            if (playerListener != null) {
+                playerListener.onPlayUri(uri)
+            } else {
+                local.trackTitle = title
+                local.isPlaying = true
+                local.progress = 0.05f
+            }
         }
     }
 
@@ -84,15 +113,15 @@ internal class ShellActions(
     }
 
     fun skipNext() {
-        playerListener?.onSkipNext()
+        whenOnline { playerListener?.onSkipNext() }
     }
 
     fun skipPrevious() {
-        playerListener?.onSkipPrevious()
+        whenOnline { playerListener?.onSkipPrevious() }
     }
 
     fun skipToPreviousTrack() {
-        playerListener?.onSkipToPreviousTrack()
+        whenOnline { playerListener?.onSkipToPreviousTrack() }
     }
 
     fun openTrackOptions(track: TrackItem) {
