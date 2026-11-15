@@ -10,8 +10,10 @@ data class PlayStatsSnapshot(
     val loginStreak: Int = 0,
     val listenStreak: Int = 0,
     val topArtistName: String = "",
+    val topArtistUri: String = "",
     val topArtistPlays: Int = 0,
     val topPlaylistName: String = "",
+    val topPlaylistUri: String = "",
     val topPlaylistPlays: Int = 0,
 )
 
@@ -74,20 +76,23 @@ object PlayStats {
     }
 
     private fun snapshotOf(root: JSONObject): PlayStatsSnapshot {
-        fun top(section: String): Pair<String, Int> {
-            val nodes = root.optJSONObject(section) ?: return "" to 0
+        fun top(section: String): Triple<String, String, Int> {
+            val nodes = root.optJSONObject(section) ?: return Triple("", "", 0)
+            var bestUri = ""
             var bestName = ""
             var bestPlays = 0
             val keys = nodes.keys()
             while (keys.hasNext()) {
-                val node = nodes.optJSONObject(keys.next()) ?: continue
+                val key = keys.next()
+                val node = nodes.optJSONObject(key) ?: continue
                 val plays = node.optInt("plays")
                 if (plays > bestPlays) {
                     bestPlays = plays
                     bestName = node.optString("name")
+                    bestUri = if (key.startsWith("spotify:")) key else ""
                 }
             }
-            return bestName to bestPlays
+            return Triple(bestUri, bestName, bestPlays)
         }
         val topArtist = top("artists")
         val topPlaylist = top("playlists")
@@ -95,10 +100,12 @@ object PlayStats {
             totalMs = root.optLong("totalMs"),
             loginStreak = root.optInt("loginStreak"),
             listenStreak = root.optInt("listenStreak"),
-            topArtistName = topArtist.first,
-            topArtistPlays = topArtist.second,
-            topPlaylistName = topPlaylist.first,
-            topPlaylistPlays = topPlaylist.second,
+            topArtistName = topArtist.second,
+            topArtistUri = topArtist.first,
+            topArtistPlays = topArtist.third,
+            topPlaylistName = topPlaylist.second,
+            topPlaylistUri = topPlaylist.first,
+            topPlaylistPlays = topPlaylist.third,
         )
     }
 

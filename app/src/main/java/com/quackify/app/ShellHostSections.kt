@@ -3,10 +3,13 @@ package com.quackify.app
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import com.quackify.backend.api.Library
+import com.quackify.backend.api.Search
 import com.quackify.backend.library.Krespot
 import com.quackify.backend.model.ArtistDetail
+import com.quackify.backend.model.SearchKind
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.compose.home.HomeShelf
 import com.quackify.compose.home.QuickAccessItem
@@ -94,8 +97,29 @@ internal fun MainActivity.rememberHomeFeedData(): ShellHomeData {
     val historyEarlier = remember(playHistory, startOfYesterday) {
         playHistory.filter { it.playedAtMs in 1 until startOfYesterday }.map { it.item }
     }
-    val historyStats = remember(playStats, playHistory) {
-        buildHistoryStats(playStats, playHistory)
+    val statsPlaylistImages = remember { mutableStateMapOf<String, String>() }
+    val historyStats = remember(playStats, playHistory, homeArtistImages.size, statsPlaylistImages.size) {
+        buildHistoryStats(playStats, playHistory, statsPlaylistImages)
+    }
+    LaunchedEffect(historyStats) {
+        val playlistUri = historyStats.topPlaylistUri
+        if (playlistUri.startsWith("spotify:playlist:") && !statsPlaylistImages.containsKey(playlistUri)) {
+            val cover = runCatching {
+                Krespot.collections.collection(this@rememberHomeFeedData, playlistUri)?.imageUrl
+            }.getOrNull()?.takeIf { it.isNotBlank() }
+            if (cover != null) statsPlaylistImages[playlistUri] = cover
+        }
+        val artistUri = historyStats.topArtistUri
+        if (artistUri.startsWith("spotify:artist:") && homeArtistImages[artistUri].isNullOrBlank()) {
+            val cover = runCatching {
+                Search.section(
+                    this@rememberHomeFeedData,
+                    SearchKind.ARTIST,
+                    historyStats.topArtistName.substringBefore(", "),
+                ).firstOrNull { it.uri == artistUri }?.imageUrl
+            }.getOrNull()?.takeIf { it.isNotBlank() }
+            if (cover != null) homeArtistImages[artistUri] = cover
+        }
     }
     return ShellHomeData(
         quick = quick,
