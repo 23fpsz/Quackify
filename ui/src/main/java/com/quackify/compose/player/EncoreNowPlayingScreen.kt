@@ -64,6 +64,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +93,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -278,6 +280,12 @@ fun EncoreNowPlayingScreen(
     var isLyricsShareOpen by remember { mutableStateOf(false) }
 
     BackHandler(enabled = isLyricsFullscreen) { isLyricsFullscreen = false }
+
+    val view = LocalView.current
+    DisposableEffect(videoActive) {
+        view.keepScreenOn = videoActive
+        onDispose { view.keepScreenOn = false }
+    }
 
     if (videoFullscreen && videoActive) {
         BackHandler { onToggleVideoFullscreen(false) }
