@@ -4,10 +4,12 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -463,6 +465,10 @@ fun EncoreAppShell(
         }
     }
 
+    val handleOpenLogcat: () -> Unit = {
+        flags.isLogcatOpen = true
+    }
+
     var localIsPlaying by local::isPlaying
     var localTrackTitle by local::trackTitle
     var localArtist by local::artist
@@ -673,6 +679,7 @@ fun EncoreAppShell(
             handleTrackOptions = handleTrackOptions,
             handleTrackAddToQueue = handleTrackAddToQueue,
             handleOpenSettings = handleOpenSettings,
+            handleOpenLogcat = handleOpenLogcat,
             handlePodcastOpen = handlePodcastOpen,
             openArtist = openArtist,
             openAlbum = openAlbum,
@@ -1010,6 +1017,19 @@ fun EncoreAppShell(
         ShellPlayerLayer(env = hosts.player())
         ShellSheetsHost(env = hosts.sheets())
         ShellOverlaysHost(env = hosts.overlays())
+
+        AnimatedVisibility(
+            visible = flags.isLogcatOpen,
+            enter = fadeIn(tween(EncoreAnimation.ScreenEnterDuration, easing = EncoreAnimation.BoxInterpolator)) +
+                slideInVertically(tween(EncoreAnimation.ScreenEnterDuration, easing = EncoreAnimation.BoxInterpolator)) { it / 6 },
+            exit = fadeOut(tween(EncoreAnimation.ScreenExitDuration, easing = EncoreAnimation.BoxInterpolator)) +
+                slideOutVertically(tween(EncoreAnimation.ScreenExitDuration, easing = EncoreAnimation.BoxInterpolator)) { it / 8 }
+        ) {
+            com.quackify.compose.screens.LogcatScreen(
+                onBackClick = { flags.isLogcatOpen = false },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         SpotifyToastHost(
             state = toast,
