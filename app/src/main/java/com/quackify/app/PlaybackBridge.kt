@@ -688,6 +688,7 @@ class PlaybackBridge(private val context: Context) {
                     albumUri = track.albumUri,
                     artistUri = track.artistUri,
                     hasVideo = track.video,
+                    isEnhanced = enhancedCached(uri),
                 )
             }
         }
@@ -2047,6 +2048,7 @@ class PlaybackBridge(private val context: Context) {
                     albumUri = found.albumUri,
                     artistUri = found.artistUri,
                     hasVideo = found.video,
+                    isEnhanced = row.isEnhanced,
                 )
             }
         }
@@ -2216,6 +2218,13 @@ class PlaybackBridge(private val context: Context) {
     private fun clusterTrackFor(uri: String): ClusterTrack {
         val shown = decorated[uri]
         val sameShown = state.trackUri == uri
+        // The provider has to survive the local rebuild: the member PUT
+        // serialises it back to the cluster, and a queue row or a smart
+        // shuffle recommendation that goes out as plain "context" loses its
+        // badge (and its queue placement) on the next cluster read.
+        val provider = connect.cluster.value?.window()
+            ?.firstOrNull { it.uri == uri }?.provider.orEmpty()
+            .ifBlank { if (enhancedCached(uri)) "enhanced_recommendation" else "" }
         return ClusterTrack(
             uri = uri,
             uid = TrackUid.get(uri),
@@ -2233,6 +2242,7 @@ class PlaybackBridge(private val context: Context) {
                 ?: progress.durationMs.takeIf { it > 0L } ?: 0L,
             explicit = shown?.isExplicit ?: false,
             creativeId = "",
+            provider = provider,
         )
     }
 
@@ -3629,6 +3639,7 @@ class PlaybackBridge(private val context: Context) {
                     albumUri = track.albumUri,
                     artistUri = track.artistUri,
                     hasVideo = track.video,
+                    isEnhanced = enhancedCached(uri),
                 )
             }
             log.i("decorated ${rows.size} of ${uris.size} upcoming row(s)")
@@ -3639,6 +3650,21 @@ class PlaybackBridge(private val context: Context) {
     /** Lens-added rows reach the cluster without metadata; never play those blind. */
     private fun untitled(row: ClusterTrack): Boolean =
         row.title.isBlank() && decorated[row.uri] == null
+
+    /**
+     * Whether the row is one the enhance lens added, judged against the
+     * cluster window (and the local lens answer as a fallback for rows the
+     * server has not placed yet). Decoration refills metadata for lens rows
+     * the cluster delivers bare, so it has to carry the flag itself or the
+     * queue sheet loses the smart-shuffle marker the moment titles arrive.
+     */
+    private fun enhancedCached(uri: String): Boolean {
+        val window = connect.cluster.value?.window()
+        if (window != null && window.any { it.uri == uri }) {
+            return window.first { it.uri == uri }.isEnhanced
+        }
+        return enhancedQueue(enhancedFor).any { it.uri == uri && it.enhanced }
+    }
 
     private fun screenContext(uri: String): String {
         val cluster = connect.cluster.value
