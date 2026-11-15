@@ -151,7 +151,6 @@ class MainActivity : ComponentActivity() {
     private var episodeLoading by mutableStateOf(false)
     private var episodeFetch by mutableStateOf(0)
     private var browseUri by mutableStateOf("")
-    private var browseFetch by mutableStateOf(0)
     private var categoryUri by mutableStateOf("")
     private var folderUri by mutableStateOf("")
     private var folderFetch by mutableStateOf(0)
@@ -823,23 +822,22 @@ class MainActivity : ComponentActivity() {
                         }
 
                         LaunchedEffect(playback.trackUri, playback.title, playback.artistUri) {
-                            val now = playback
-                            val addable = now.trackUri.startsWith("spotify:track:") ||
-                                    now.trackUri.startsWith("spotify:episode:")
-                            if (!addable || now.title.isBlank()) {
+                            val addable = playback.trackUri.startsWith("spotify:track:") ||
+                                    playback.trackUri.startsWith("spotify:episode:")
+                            if (!addable || playback.title.isBlank()) {
                                 return@LaunchedEffect
                             }
-                            val cover = now.coverUrl.takeIf { it.isNotBlank() }
+                            val cover = playback.coverUrl.takeIf { it.isNotBlank() }
                             val head = playHistory.firstOrNull()?.item
-                            if (head?.uri == now.trackUri && head.title == now.title &&
-                                head.artistUri == now.artistUri && head.imageUrl == cover
+                            if (head?.uri == playback.trackUri && head.title == playback.title &&
+                                head.artistUri == playback.artistUri && head.imageUrl == cover
                             ) {
                                 return@LaunchedEffect
                             }
                             playHistory = recordNowPlaying(
-                                now.trackUri, now.title, now.artist, now.artistUri,
-                                now.albumUri, cover.orEmpty(), now.contextUri, now.contextLabel,
-                                now.explicit, playlistNames,
+                                playback.trackUri, playback.title, playback.artist, playback.artistUri,
+                                playback.albumUri, cover.orEmpty(), playback.contextUri, playback.contextLabel,
+                                playback.explicit, playlistNames,
                             )
                             playStats = PlayStats.snapshot(context)
                         }
@@ -1007,14 +1005,18 @@ class MainActivity : ComponentActivity() {
 
     private suspend fun loadMorePlaylistTracks(currentSize: Int): Pair<List<TrackItem>, Boolean>? {
         val page = Krespot.collections.collectionMore(applicationContext, playlistUri, currentSize)
-        if (page == null) return null
+            ?: return null
         log.i("playlist more '$playlistUri' -> ${page.rows.size} rows hasMore=${page.hasMore}")
         return page.rows.map { it.toTrackItem() } to page.hasMore
     }
 
     private suspend fun loadMoreAlbumTracks(currentSize: Int, coverUrl: String): Pair<List<TrackItem>, Boolean>? {
-        val page = Krespot.albums.albumMore(applicationContext, albumUri, currentSize, albumDetail?.imageUrl.orEmpty())
-        if (page == null) return null
+        val page = Krespot.albums.albumMore(
+            applicationContext,
+            albumUri,
+            currentSize,
+            albumDetail?.imageUrl.orEmpty()
+        ) ?: return null
         val rows = page.rows.map { it.toTrackItem() }
         log.i("album more '$albumUri' -> ${rows.size} rows hasMore=${page.hasMore}")
         return withSavedStates(applicationContext, rows) to page.hasMore
