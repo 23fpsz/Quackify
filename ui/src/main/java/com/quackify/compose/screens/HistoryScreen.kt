@@ -102,6 +102,9 @@ fun HistoryScreen(
 
     val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
     val sectionExpanded = remember { mutableStateMapOf<String, Boolean>() }
+    val todayEntries = remember(todayTracks) { groupByArtist(todayTracks) }
+    val yesterdayEntries = remember(yesterdayTracks) { groupByArtist(yesterdayTracks) }
+    val earlierEntries = remember(earlierTracks) { groupByArtist(earlierTracks) }
 
     Column(
         modifier = modifier
@@ -168,7 +171,7 @@ fun HistoryScreen(
                 }
                 historySection(
                     label = todayLabel,
-                    tracks = todayTracks,
+                    entries = todayEntries,
                     currentTrackTitle = currentTrackTitle,
                     isPlaying = isPlaying,
                     onTrackSelect = onTrackSelect,
@@ -183,7 +186,7 @@ fun HistoryScreen(
                 )
                 historySection(
                     label = yesterdayLabel,
-                    tracks = yesterdayTracks,
+                    entries = yesterdayEntries,
                     currentTrackTitle = currentTrackTitle,
                     isPlaying = isPlaying,
                     onTrackSelect = onTrackSelect,
@@ -198,7 +201,7 @@ fun HistoryScreen(
                 )
                 historySection(
                     label = earlierLabel,
-                    tracks = earlierTracks,
+                    entries = earlierEntries,
                     currentTrackTitle = currentTrackTitle,
                     isPlaying = isPlaying,
                     onTrackSelect = onTrackSelect,
@@ -225,7 +228,7 @@ fun HistoryScreen(
  * same artist collapsed behind an expandable header naming the artist.
  */
 private sealed interface HistoryEntry {
-    data class Single(val track: TrackItem) : HistoryEntry
+    data class Single(val track: TrackItem, val id: String) : HistoryEntry
 
     data class Group(
         val artist: String,
@@ -248,15 +251,16 @@ private fun groupByArtist(tracks: List<TrackItem>): List<HistoryEntry> {
         var j = i + 1
         while (j < tracks.size && artistKey(tracks[j]) == key) j++
         val run = tracks.subList(i, j)
+        val id = "$i-${head.artistUri.ifBlank { head.artist }}"
         out += if (run.size >= 2) {
             HistoryEntry.Group(
                 artist = head.artist,
                 imageUrl = head.imageUrl,
                 tracks = run.toList(),
-                id = "$i-${head.artistUri.ifBlank { head.artist }}",
+                id = id,
             )
         } else {
-            HistoryEntry.Single(head)
+            HistoryEntry.Single(head, id)
         }
         i = j
     }
@@ -265,7 +269,7 @@ private fun groupByArtist(tracks: List<TrackItem>): List<HistoryEntry> {
 
 private fun LazyListScope.historySection(
     label: String,
-    tracks: List<TrackItem>,
+    entries: List<HistoryEntry>,
     currentTrackTitle: String,
     isPlaying: Boolean,
     onTrackSelect: (TrackItem) -> Unit,
@@ -275,69 +279,69 @@ private fun LazyListScope.historySection(
     isExpanded: Boolean,
     onToggle: () -> Unit
 ) {
-    if (tracks.isEmpty()) return
+    if (entries.isEmpty()) return
     item(key = "section-$label") {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize()
+                .animateItem()
+                .clickable(onClick = onToggle)
+                .padding(top = 12.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onToggle)
-                    .padding(top = 12.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = label,
-                    style = EncoreTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    painter = painterResource(
-                        id = if (isExpanded) R.drawable.encore_icon_chevron_up_24
-                        else R.drawable.encore_icon_chevron_down_24
-                    ),
-                    contentDescription = if (isExpanded) "Collapse $label" else "Expand $label",
-                    tint = EncoreColors.TextSecondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            if (isExpanded) {
-                groupByArtist(tracks).forEach { entry ->
-                    when (entry) {
-                        is HistoryEntry.Single -> EncoreTrackRow(
-                            trackNumber = null,
-                            title = entry.track.title,
-                            artist = entry.track.artist,
-                            isExplicit = entry.track.isExplicit,
-                            imageUrl = entry.track.imageUrl,
-                            artistUri = entry.track.artistUri,
-                            isPlaying = isPlaying && entry.track.title == currentTrackTitle,
-                            onClick = { onTrackSelect(entry.track) },
-                            onMoreClick = { onTrackOptionsClick(entry.track) },
-                            onAddToQueue = { onTrackAddToQueue(entry.track) }
+            Text(
+                text = label,
+                style = EncoreTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                painter = painterResource(
+                    id = if (isExpanded) R.drawable.encore_icon_chevron_up_24
+                    else R.drawable.encore_icon_chevron_down_24
+                ),
+                contentDescription = if (isExpanded) "Collapse $label" else "Expand $label",
+                tint = EncoreColors.TextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+    if (isExpanded) {
+        entries.forEach { entry ->
+            when (entry) {
+                is HistoryEntry.Single -> item(key = "$label:row:${entry.id}") {
+                    EncoreTrackRow(
+                        trackNumber = null,
+                        title = entry.track.title,
+                        artist = entry.track.artist,
+                        isExplicit = entry.track.isExplicit,
+                        imageUrl = entry.track.imageUrl,
+                        artistUri = entry.track.artistUri,
+                        isPlaying = isPlaying && entry.track.title == currentTrackTitle,
+                        onClick = { onTrackSelect(entry.track) },
+                        onMoreClick = { onTrackOptionsClick(entry.track) },
+                        onAddToQueue = { onTrackAddToQueue(entry.track) },
+                        modifier = Modifier.animateItem()
+                    )
+                }
+                is HistoryEntry.Group -> item(key = "$label:group:${entry.id}") {
+                    val groupKey = "$label:${entry.id}"
+                    val expanded = expandedGroups[groupKey] == true
+                    Box(modifier = Modifier.animateItem()) {
+                        HistoryArtistGroup(
+                            group = entry,
+                            isExpanded = expanded,
+                            onToggle = {
+                                expandedGroups[groupKey] = !expanded
+                            },
+                            currentTrackTitle = currentTrackTitle,
+                            isPlaying = isPlaying,
+                            onTrackSelect = onTrackSelect,
+                            onTrackOptionsClick = onTrackOptionsClick,
+                            onTrackAddToQueue = onTrackAddToQueue
                         )
-                        is HistoryEntry.Group -> {
-                            val groupKey = "$label:${entry.id}"
-                            val expanded = expandedGroups[groupKey] == true
-                            HistoryArtistGroup(
-                                group = entry,
-                                isExpanded = expanded,
-                                onToggle = {
-                                    expandedGroups[groupKey] = !expanded
-                                },
-                                currentTrackTitle = currentTrackTitle,
-                                isPlaying = isPlaying,
-                                onTrackSelect = onTrackSelect,
-                                onTrackOptionsClick = onTrackOptionsClick,
-                                onTrackAddToQueue = onTrackAddToQueue
-                            )
-                        }
                     }
                 }
             }
