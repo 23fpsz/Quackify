@@ -44,9 +44,9 @@ import com.quackify.backend.core.log.Logs
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
-private const val LICENCE_SETTLE_MS = 900L
+private const val LICENCE_SETTLE_MS = 2_000L
 
-private const val LICENCE_SKIP_WINDOW_MS = 2_500L
+private const val LICENCE_SKIP_WINDOW_MS = 4_000L
 
 private const val MANIFEST_CACHE = 8
 
@@ -161,15 +161,20 @@ class KrespotPlayer(private val context: Context) {
 
     var onFocusDuck: ((Boolean) -> Unit)? = null
 
+    @Volatile
+    private var licenceRetrying = false
+
     init {
         LicenseGate.onOpen = {
             val track = refused
             if (track != null) {
                 refused = null
+                licenceRetrying = true
                 log.i("licence is back, retrying '${track.name.ifBlank { track.uri }}' " +
                         "from ${refusedFrom}ms"
                 )
                 play(track, spclient, refusedFrom)
+                licenceRetrying = false
             }
         }
     }
@@ -492,6 +497,7 @@ class KrespotPlayer(private val context: Context) {
         spclient: String,
         fromMs: Long = 0L,
     ) {
+        if (!licenceRetrying) LicenseGate.resetStrikes()
         val sinceLast = System.currentTimeMillis() - lastPlayAt
         licenceSettling = lastPlayAt > 0L && sinceLast < LICENCE_SKIP_WINDOW_MS
         lastPlayAt = System.currentTimeMillis()
@@ -610,7 +616,8 @@ class KrespotPlayer(private val context: Context) {
                 }
                 val refusedSource = sourceFor(track.uri)
                 if (refusedSource != null &&
-                    failure.message.orEmpty().contains("DRM_LICENSE_ACQUISITION_FAILED")
+                    failure.message.orEmpty().contains("DRM_LICENSE_ACQUISITION_FAILED") &&
+                    !LicenseGate.rateLimited
                 ) {
                     SourceResolver.blockFormat(refusedSource.format)
                     forgetSource(track.uri)

@@ -131,7 +131,9 @@ internal class AudioDrmCallback(
         }
         val body = response?.takeIf { it.ok }
         if (body == null) {
-            if (response?.code != 403) LicenseGate.hold(response?.retryAfterSeconds ?: 0L)
+            if (response?.code != 403) {
+                LicenseGate.hold(response?.code ?: 0, response?.retryAfterSeconds ?: 0L)
+            }
             throw IOException("audio licence ${response?.code ?: "failed"}")
         }
         LicenseGate.clear()
