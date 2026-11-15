@@ -3520,7 +3520,7 @@ class PlaybackBridge(private val context: Context) {
                 .filterNot { it.uri == anchor }
         }
         val previousRow = previousRowFor(anchor)
-        val nextRow = nextRowFor(anchor)
+        val nextRow = (queued.filter { it.uri != anchor } + upcoming).firstOrNull()
         val sparse = ((if (enhancedTail.isNotEmpty()) emptyList() else contextRows) + queued)
             .filter { it.title.isBlank() }.map { it.uri }
         val missing = (sparse + tailUris.filterNot { it in knownUpcoming } +
@@ -3550,40 +3550,6 @@ class PlaybackBridge(private val context: Context) {
 
     private fun rowItem(uri: String): TrackItem =
         decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri)
-
-    private fun nextRowFor(anchor: String): TrackItem? {
-        val cluster = connect.cluster.value
-        val contextUri = chainContext.ifBlank { cluster?.contextUri.orEmpty() }
-        val queuedUris = queuedTail.map { it.uri } + cluster?.queued.orEmpty().map { it.uri }
-        queuedUris.firstOrNull { it != anchor && !bannedCachedUri(it) }?.let { return rowItem(it) }
-        enhancedUpcoming(contextUri, anchor)
-            .firstOrNull { it.uri != anchor && !bannedCachedUri(it.uri) }
-            ?.let { return rowItem(it.uri) }
-        if (sessionQueueContext == contextUri && sessionQueue.isNotEmpty()) {
-            sessionQueue.firstOrNull { it != anchor && !bannedCachedUri(it) }?.let { return rowItem(it) }
-        }
-        val chain = chainFor()
-        val chainAt = rowOf(chain, anchor)
-        if (chainAt >= 0 && chainAt + 1 < chain.size) {
-            var row = chainAt + 1
-            while (row < chain.size && bannedCachedUri(chain[row])) row++
-            chain.getOrNull(row)?.takeIf { it != anchor }?.let { return rowItem(it) }
-        }
-        val window = cluster?.window() ?: return null
-        val at = window.indexOfFirst { it.uri == anchor }
-        if (at < 0) return null
-        var cursor = at + 1
-        while (cursor in window.indices &&
-            (!window[cursor].isVisible || untitled(window[cursor]) || bannedRow(window[cursor]))
-        ) cursor++
-        if (cursor !in window.indices && repeatContextOn(cluster)) {
-            cursor = window.indexOfFirst { it.isVisible }
-        }
-        return window.getOrNull(cursor)
-            ?.takeIf { it.isVisible && it.uri != anchor }
-            ?.asTrackItem()
-            ?.let { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
-    }
 
     private fun previousRowFor(anchor: String): TrackItem? {
         val chain = chainFor()
