@@ -113,6 +113,21 @@ fun PlaylistSortSheet(
 
                     if (isSelected) {
                         if (option.reversible) {
+                            Text(
+                                text = stringResource(
+                                    if (currentDirection == SortDirection.ASCENDING) {
+                                        R.string.sorted_ascending
+                                    } else {
+                                        R.string.sorted_descending
+                                    }
+                                ),
+                                style = EncoreTheme.typography.bodySmall.copy(
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = EncoreColors.Green.copy(alpha = 0.7f)
+                                )
+                            )
+                            Spacer(modifier = Modifier.size(6.dp))
                             Icon(
                                 painter = painterResource(
                                     id = if (currentDirection == SortDirection.ASCENDING) {
