@@ -279,7 +279,8 @@ fun EncoreNowPlayingScreen(
     lyrics: List<TimeSyncedLyric> = emptyList(),
     isLyricsUnderCoverEnabled: Boolean = true,
     previousTrack: TrackItem? = null,
-    nextTrack: TrackItem? = null
+    nextTrack: TrackItem? = null,
+    onSkipToPreviousClick: () -> Unit = {}
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
@@ -750,7 +751,7 @@ fun EncoreNowPlayingScreen(
                                         previousTrack = previousTrack,
                                         nextTrack = nextTrack,
                                         canSwipePrevious = canSkipPrevious,
-                                        onSwipePrevious = onSkipPreviousClick,
+                                        onSwipePrevious = onSkipToPreviousClick,
                                         onSwipeNext = onSkipNextClick,
                                         modifier = Modifier
                                             .fillMaxWidth()

@@ -162,6 +162,7 @@ interface ComposePlayerListener {
     fun onPlayPause() {}
     fun onSkipNext() {}
     fun onSkipPrevious() {}
+    fun onSkipToPreviousTrack() {}
     fun onSeek(positionMs: Long) {}
     fun onLikeToggle() {}
     fun onShuffleToggle() {}
