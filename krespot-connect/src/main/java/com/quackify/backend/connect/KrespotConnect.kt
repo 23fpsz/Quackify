@@ -769,6 +769,35 @@ class KrespotConnect(private val context: Context) {
         return response?.ok == true
     }
 
+    /**
+     * Re-reads the active context through the enhance lens so the state
+     * machine picks up the rows the smart shuffle signals just added; without
+     * it only this device knows about them.
+     */
+    suspend fun applyContextLens(targetDeviceId: String, contextUri: String): Boolean {
+        if (spclient.isBlank()) {
+            log.w("context lens: the dealer is not connected yet")
+            return false
+        }
+        val target = targetDeviceId.ifBlank { deviceId }
+        val response = CommandClient.updateContext(context, spclient, deviceId, target, contextUri, "enhance")
+        return response?.ok == true
+    }
+
+    /**
+     * Moves the target device to a row of its current state machine without
+     * replacing the machine, so the queue stays identical on every device.
+     */
+    suspend fun skipToRow(targetDeviceId: String, trackUri: String, trackUid: String): Boolean {
+        if (spclient.isBlank()) {
+            log.w("skip_to: the dealer is not connected yet")
+            return false
+        }
+        val target = targetDeviceId.ifBlank { deviceId }
+        val response = CommandClient.skipToTrack(context, spclient, deviceId, target, trackUri, trackUid)
+        return response?.ok == true
+    }
+
     /** Sets the repeat options on the target device (blank = this one). */    suspend fun setRepeatOn(
         targetDeviceId: String,
         repeatContext: Boolean,

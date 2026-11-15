@@ -42,6 +42,7 @@ object DebugSource {
     const val SEEK = "seek"
     const val PAUSE = "pause"
     const val RESUME = "resume"
+    const val MODIFY_CURRENT_STATE = "modify_current_state"
 }
 
 data class Snapshot(
