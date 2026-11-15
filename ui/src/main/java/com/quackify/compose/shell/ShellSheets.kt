@@ -93,6 +93,9 @@ internal fun ShellSheets(
     canvasAvailable: Boolean = false,
     isCanvasEnabled: Boolean = false,
     onCanvasToggle: () -> Unit = {},
+    lyricsUnderCoverAvailable: Boolean = false,
+    isLyricsUnderCoverEnabled: Boolean = true,
+    onLyricsUnderCoverToggle: () -> Unit = {},
     canvasResolution: Int = 1080,
     onCanvasResolution: (Int) -> Unit = {},
     onCanvasResolutionClick: () -> Unit = {},
@@ -173,6 +176,9 @@ internal fun ShellSheets(
         trackTasteExcluded = trackTasteExcluded,
         trackPlaysOverride = trackPlaysOverride,
         onToggleTasteExclusion = onToggleTasteExclusion,
+        lyricsUnderCoverAvailable = lyricsUnderCoverAvailable,
+        isLyricsUnderCoverEnabled = isLyricsUnderCoverEnabled,
+        onLyricsUnderCoverToggle = onLyricsUnderCoverToggle,
         playlistEntity = playlistEntity,
         playlistEditable = playlistEditable,
         playlistSaved = playlistSaved,
@@ -319,6 +325,9 @@ private fun ShellEntityOptionsSheets(
     trackTasteExcluded: Boolean?,
     trackPlaysOverride: Long?,
     onToggleTasteExclusion: (Boolean) -> Unit,
+    lyricsUnderCoverAvailable: Boolean,
+    isLyricsUnderCoverEnabled: Boolean,
+    onLyricsUnderCoverToggle: () -> Unit,
     playlistEntity: EntityOptions?,
     playlistEditable: Boolean,
     playlistSaved: Boolean?,
@@ -390,7 +399,10 @@ private fun ShellEntityOptionsSheets(
         isTasteExcluded = trackTasteExcluded,
         onToggleTasteExclusion = onToggleTasteExclusion,
         onRemoveFromPlaylist = onRemoveTrackFromPlaylist,
-        onSongRadio = onSongRadio
+        onSongRadio = onSongRadio,
+        lyricsUnderCoverAvailable = lyricsUnderCoverAvailable,
+        isLyricsUnderCoverEnabled = isLyricsUnderCoverEnabled,
+        onLyricsUnderCoverToggle = onLyricsUnderCoverToggle
     )
 
     EntityOptionsSheet(
