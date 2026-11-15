@@ -72,6 +72,9 @@ fun TrackOptionsSheet(
     onCanvasToggle: () -> Unit = {},
     canvasResolution: Int = 1080,
     onCanvasResolutionClick: () -> Unit = {},
+    lyricsUnderCoverAvailable: Boolean = false,
+    isLyricsUnderCoverEnabled: Boolean = true,
+    onLyricsUnderCoverToggle: () -> Unit = {},
     /** null while the taste-profile check is still loading (row hidden). */
     isTasteExcluded: Boolean? = null,
     onToggleTasteExclusion: (Boolean) -> Unit = {},
@@ -291,6 +294,19 @@ fun TrackOptionsSheet(
                     onClick = {
                         onDismiss()
                         onCanvasResolutionClick()
+                    }
+                )
+            }
+
+            if (lyricsUnderCoverAvailable) {
+                ContextMenuRowItem(
+                    title = if (isLyricsUnderCoverEnabled) stringResource(R.string.turn_off_lyrics_under_cover)
+                    else stringResource(R.string.turn_on_lyrics_under_cover),
+                    iconRes = R.drawable.encore_icon_mic_24,
+                    iconTint = if (isLyricsUnderCoverEnabled) EncoreColors.Green else EncoreColors.TextPrimary,
+                    onClick = {
+                        onDismiss()
+                        onLyricsUnderCoverToggle()
                     }
                 )
             }

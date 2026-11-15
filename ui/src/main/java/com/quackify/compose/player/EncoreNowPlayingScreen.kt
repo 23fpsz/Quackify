@@ -272,7 +272,8 @@ fun EncoreNowPlayingScreen(
     artistImageUrl: String? = null,
     isArtistFollowing: Boolean = false,
     onArtistFollowToggle: (Boolean) -> Unit = {},
-    lyrics: List<TimeSyncedLyric> = emptyList()
+    lyrics: List<TimeSyncedLyric> = emptyList(),
+    isLyricsUnderCoverEnabled: Boolean = true
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
@@ -315,7 +316,7 @@ fun EncoreNowPlayingScreen(
     }
 
     val effectiveIsLoading = isLoading
-    val effectiveLyricsVisible = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
+    val effectiveLyricsVisible = isLyricsUnderCoverEnabled && lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
 
     val lyricLineHeight by animateDpAsState(
         targetValue = if (effectiveLyricsVisible) 44.dp else 0.dp,

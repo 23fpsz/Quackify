@@ -151,6 +151,8 @@
     <string name="more_like_this">More Like This</string>
     <string name="more_options">More options</string>
     <string name="more_podcasts_like_this">More podcasts like this</string>
+    <string name="turn_off_lyrics_under_cover">Turn off lyrics under cover</string>
+    <string name="turn_on_lyrics_under_cover">Turn on lyrics under cover</string>
     <string name="most_replayed">Most replayed</string>
     <string name="move">Move</string>
     <string name="move_to_folder">Move to folder</string>
