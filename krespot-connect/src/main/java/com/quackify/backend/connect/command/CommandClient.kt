@@ -138,25 +138,36 @@ object CommandClient {
         return response
     }
 
+    /**
+     * set_queue the way the web player sends it: the full machine window the
+     * server just echoed back, prev_tracks verbatim, per-row metadata kept as
+     * the server wrote it (entity_uri, added_at, iteration, hidden), and
+     * is_queued stamped only on rows that really are queued. Rewriting
+     * metadata from local guesses desynchronised every other client's queue
+     * view from the server's own machine.
+     */
     suspend fun setQueue(
         context: Context,
         spclient: String,
         deviceId: String,
-        tracks: List<ClusterTrack>,
+        nextRows: List<ClusterTrack>,
+        prevRows: List<ClusterTrack>,
         queueRevision: String,
     ): Net.Response? {
         val next = JSONArray()
-        tracks.forEach { next.put(trackNode(it)) }
+        nextRows.forEach { next.put(trackNode(it)) }
+        val prev = JSONArray()
+        prevRows.forEach { prev.put(trackNode(it)) }
         val command = JSONObject()
             .put("next_tracks", next)
-            .put("prev_tracks", JSONArray())
+            .put("prev_tracks", prev)
             .put("queue_revision", queueRevision)
             .put("logging_params", JSONObject().put("command_id", commandId()))
             .put("endpoint", "set_queue")
         val url = "https://$spclient/connect-state/v1/player/command/from/$deviceId/to/$deviceId"
         val body = JSONObject().put("command", command).toString()
         val response = Net.postJson(url, body, ConnectHeaders.of(context), tag = "set_queue")
-        log.i("queue = ${tracks.size} tracks rev=${queueRevision.take(12)} -> ${response?.code ?: "no response"}")
+        log.i("queue = ${nextRows.size} next + ${prevRows.size} prev rev=${queueRevision.take(12)} -> ${response?.code ?: "no response"}")
         return response
     }
 
@@ -178,6 +189,27 @@ object CommandClient {
         val response = Net.postJson(url, body.toString(), ConnectHeaders.of(context), tag = "transfer")
         log.i("transfer to ${targetDeviceId.take(8)} restore=$restorePaused -> ${response?.code ?: "no response"}")
         return response
+    }
+
+    const val RESTORE_PAUSE = "pause"
+
+    /**
+     * Clear queue the way the web player does it: a transfer to self with
+     * restore_paused=pause resets the state machine first, then set_queue
+     * re-seats the cursor on the context rows with the prev window the server
+     * still holds. Anything less leaves the machine running with the queued
+     * rows still echoed to every other client.
+     */
+    suspend fun clearQueue(
+        context: Context,
+        spclient: String,
+        deviceId: String,
+        nextRows: List<ClusterTrack>,
+        prevRows: List<ClusterTrack>,
+        queueRevision: String,
+    ): Net.Response? {
+        transfer(context, spclient, deviceId, deviceId, RESTORE_PAUSE)
+        return setQueue(context, spclient, deviceId, nextRows, prevRows, queueRevision)
     }
 
     suspend fun volume(

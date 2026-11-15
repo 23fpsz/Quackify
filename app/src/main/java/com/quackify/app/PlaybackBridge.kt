@@ -661,18 +661,19 @@ class PlaybackBridge(private val context: Context) {
                     log.i("queue set: dropped ${uris.size - allowed.size} banned row(s)")
                 }
                 if (allowed.isEmpty()) return@launch
-                // The sheet hands back "queued rows + context rows". The
-                // context rows are the playlist window (fromContext), so
-                // anything else in the list is a queued row; rewriting both
-                // halves locally is what makes a clear or a swipe stick -
-                // the next render and the member PUT carry the reduced list
-                // instead of the server window re-adding every dropped row.
+                // The sheet hands back "queued rows + context rows" in queue
+                // order. Rows are matched against the server window by the
+                // machine's own markers (provider/is_queued), not by set
+                // membership, so a queued copy of a track that also sits in
+                // the context stays a queued row and keeps its slot.
+                val window = cluster.window()
+                val serverQueued = window.filter { it.isQueued }.map { it.uri }.toSet()
                 val contextUri = state.queueContext.ifBlank {
                     cluster.contextUri.ifBlank { chainContext }
                 }
-                val contextSet = cluster.fromContext.map { it.uri }.toSet()
-                val queuedUris = allowed.filter { it !in contextSet }
-                val contextUris = allowed.filter { it in contextSet }
+                val queuedUris = allowed.filter { it in serverQueued }
+                val contextUris = allowed.filterNot { it in serverQueued }
+                val hadQueued = cluster.queued.isNotEmpty() || queuedTail.isNotEmpty()
                 queuedTail = queuedUris.map { uri ->
                     queuedTail.firstOrNull { it.uri == uri }
                         ?: decorated[uri]
@@ -688,33 +689,19 @@ class PlaybackBridge(private val context: Context) {
                 if (contextUri.isNotBlank() && sessionQueueContext == contextUri) {
                     sessionQueue = sessionQueue.filter { it in allowed || it == state.trackUri }
                 }
-                writeQueue(allowed, cluster)
-                publishQueue(cluster)
-                if (player.hasSource && remoteTarget().isBlank()) {
-                    publishLocalFromEngine()
+                val clear = hadQueued && queuedUris.isEmpty()
+                val ok = if (clear) {
+                    clearQueue(cluster)
+                } else {
+                    writeQueue(allowed, cluster)
                 }
-                connect.refreshCluster()
-//                if (!writeQueue(allowed, cluster)) return@launch
-//                // Only rows the queue already owned stay queued tail rows; the
-//                // context rows a clear or remove leaves behind must keep their
-//                // context slot instead of being re-published as queued.
-//                val queuedSoFar = buildSet {
-//                    queuedTail.forEach { add(it.uri) }
-//                    state.queue.forEach { add(it.uri) }
-//                    cluster.queued.forEach { add(it.uri) }
-//                }
-//                val local = queuedTail.associateBy { it.uri }
-//                queuedTail = allowed.filter { it in queuedSoFar }
-//                    .map { local[it] ?: TrackItem(title = "", artist = "", uri = it) }
-//                if (connect.holdsStream && player.hasSource) {
-//                    // The server cluster still lists the pre-command queue, so
-//                    // reading it back would resurrect the removed rows. Publish
-//                    // the local state instead: the member PUT carries the new
-//                    // queue and its answer commits a fresh cluster for the UI.
-//                    publishLocalFromEngine()
-//                } else {
-//                    connect.refreshCluster(force = true)
-//                }
+                if (ok) {
+                    publishQueue(cluster)
+                    if (player.hasSource && remoteTarget().isBlank()) {
+                        publishLocalFromEngine()
+                    }
+                    connect.refreshCluster()
+                }
             }
         }
     }
@@ -726,9 +713,9 @@ class PlaybackBridge(private val context: Context) {
     }
 
     private suspend fun writeQueue(uris: List<String>, cluster: ClusterState): Boolean {
-        val known = (cluster.queued + cluster.fromContext).associateBy { it.uri }
+        val window = cluster.window()
         val missing = uris.filter { uri ->
-            known[uri] == null &&
+            window.none { it.uri == uri } &&
                 (decorated[uri] ?: queuedTail.firstOrNull { it.uri == uri })?.title.isNullOrBlank()
         }
         if (missing.isNotEmpty()) {
@@ -748,12 +735,27 @@ class PlaybackBridge(private val context: Context) {
                 )
             }
         }
-        val tracks = uris.mapNotNull { uri -> known[uri] ?: clusterRowFor(uri) }
-        if (tracks.size != uris.size) {
-            log.w("queue set: ${uris.size - tracks.size} of ${uris.size} rows have no metadata")
+        // Rows keep the machine's own metadata (uid, provider, iteration,
+        // hidden) so the set_queue the server receives mirrors the window it
+        // already owns; only the arrangement changes. Matching consumes the
+        // window rows in order because the same uri can sit in the queue and
+        // in the context as two different machine rows.
+        val pool = window.toMutableList()
+        val nextRows = uris.mapNotNull { uri ->
+            val at = pool.indexOfFirst { it.uri == uri }
+            if (at >= 0) pool.removeAt(at) else clusterRowFor(uri)
         }
-        val ok = connect.setQueue(tracks)
-        log.i("queue = ${tracks.size} rows ok=$ok")
+        if (nextRows.size != uris.size) {
+            log.w("queue set: ${uris.size - nextRows.size} of ${uris.size} rows have no metadata")
+        }
+        val anchor = window.indexOfFirst { it.uri == state.trackUri }
+        val prevRows = if (anchor > 0) {
+            window.take(anchor).takeLast(PREV_TRACKS_MAX)
+        } else {
+            cluster.prevTracks.reversed().takeLast(PREV_TRACKS_MAX)
+        }
+        val ok = connect.setQueue(nextRows, prevRows)
+        log.i("queue = ${nextRows.size} next + ${prevRows.size} prev rows ok=$ok")
         return ok
     }
 
@@ -1932,6 +1934,31 @@ class PlaybackBridge(private val context: Context) {
                 queueAddsInFlight.remove(uri)
             }
         }
+    }
+
+    /**
+     * Clear queue the way the web player does: a transfer to self with
+     * restore_paused=pause resets the machine, then set_queue re-seats the
+     * cursor on the context rows only. The server window's prev rows are sent
+     * back verbatim so the machine's history survives the reset.
+     */
+    private suspend fun clearQueue(cluster: ClusterState): Boolean {
+        val window = cluster.window()
+        val anchor = window.indexOfFirst { it.uri == state.trackUri }
+        val prevRows = if (anchor > 0) {
+            window.take(anchor).takeLast(PREV_TRACKS_MAX)
+        } else {
+            cluster.prevTracks.reversed().takeLast(PREV_TRACKS_MAX)
+        }
+        val nextRows = cluster.nextTracks.filterNot { it.isQueued }
+        val ok = connect.clearQueue(nextRows, prevRows)
+        log.i("queue cleared ok=$ok, ${nextRows.size} context row(s) kept")
+        if (ok) {
+            queuedTail = emptyList()
+            sessionQueue = nextRows.filter { it.isVisible }.map { it.uri }
+            sessionQueueContext = cluster.contextUri
+        }
+        return ok
     }
 
     private suspend fun onRemoteCommand(command: RemoteCommand) {
@@ -3687,12 +3714,15 @@ class PlaybackBridge(private val context: Context) {
         // arranged the last time the mode changed. But a server window that
         // predates the toggle still carries the old arrangement, so the
         // locally arranged order (just shuffled or restored) wins until a
-        // genuinely newer server window replaces it.
+        // genuinely newer server window replaces it. While another device
+        // holds the stream the server window is the queue, verbatim: the
+        // web player shows exactly what the machine says, reorder or hide.
+        val remotePlayer = remoteTarget().isNotBlank()
         val serverTracks = if (server && follows) {
             val rows = if (smartActive) cluster!!.fromContext else cluster!!.fromContext
                 .filterNot { it.isEnhanced }
                 .filterNot { bannedCachedUri(it.uri) }
-            if (shuffleActive && localOrder != null &&
+            if (!remotePlayer && shuffleActive && localOrder != null &&
                 rows.isNotEmpty() && rows.map { it.uri } != localOrder
             ) {
                 val orderIndex = localOrder.withIndex().associate { (i, uri) -> uri to i }
@@ -3719,13 +3749,17 @@ class PlaybackBridge(private val context: Context) {
             }.ifBlank { playlistLabelOf(context) }
         } else ""
         val queued = if (server) {
-            val onServer = cluster!!.queued.map { it.asTrackItem() }.filterNot { bannedCachedUri(it.uri) }
+            val onServer = cluster!!.queued
+                .map { it.asTrackItem() }
+                .filterNot { bannedCachedUri(it.uri) }
             val known = onServer.mapTo(HashSet()) { it.uri }
             (onServer + queuedTail.filterNot { it.uri in known })
                 .filterNot { bannedCachedUri(it.uri) }
                 .map { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
         } else {
-            queuedTail.filterNot { bannedCachedUri(it.uri) }
+            queuedTail
+                .map { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
+                .filterNot { bannedCachedUri(it.uri) }
         }
         val queuedUris = buildSet {
             if (server) cluster!!.queued.forEach { add(it.uri) }
@@ -4785,5 +4819,6 @@ class PlaybackBridge(private val context: Context) {
         const val GONE_READS = 2
         const val TRANSFER_FRESH_MS = 120_000L
         const val ENHANCED_TAIL_MAX = 80
+        const val PREV_TRACKS_MAX = 10
     }
 }
