@@ -87,6 +87,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -96,6 +97,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -1401,6 +1403,7 @@ private fun SwipableTrackArtwork(
     val hasNext = nextTrack != null
     val drag = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     LaunchedEffect(currentCoverUrl, currentTitle) {
         drag.snapTo(0f)
@@ -1412,9 +1415,16 @@ private fun SwipableTrackArtwork(
             .pointerInput(hasPrev, hasNext) {
                 val cardWidthPx = size.width.toFloat()
                 val flickVelocity = cardWidthPx * 1.5f
+                val commitDistancePx = cardWidthPx * SWIPE_COMMIT_FRACTION
                 val tracker = VelocityTracker()
+                var tickedNext = false
+                var tickedPrev = false
                 detectHorizontalDragGestures(
-                    onDragStart = { tracker.resetTracking() },
+                    onDragStart = {
+                        tracker.resetTracking()
+                        tickedNext = false
+                        tickedPrev = false
+                    },
                     onDragEnd = {
                         val velocity = tracker.calculateVelocity().x
                         tracker.resetTracking()
@@ -1423,6 +1433,9 @@ private fun SwipableTrackArtwork(
                             (offset < -cardWidthPx * SWIPE_COMMIT_FRACTION || velocity < -flickVelocity)
                         val commitPrev = hasPrev && offset > 0f &&
                             (offset > cardWidthPx * SWIPE_COMMIT_FRACTION || velocity > flickVelocity)
+                        if ((commitNext && !tickedNext) || (commitPrev && !tickedPrev)) {
+                            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                        }
                         if (commitNext) onSwipeNext()
                         if (commitPrev) onSwipePrevious()
                         scope.launch {
@@ -1456,6 +1469,22 @@ private fun SwipableTrackArtwork(
                             raw > cardWidthPx -> cardWidthPx
                             raw < -cardWidthPx -> -cardWidthPx
                             else -> raw
+                        }
+                        if (hasNext && clamped <= -commitDistancePx) {
+                            if (!tickedNext) {
+                                tickedNext = true
+                                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            }
+                        } else {
+                            tickedNext = false
+                        }
+                        if (hasPrev && clamped >= commitDistancePx) {
+                            if (!tickedPrev) {
+                                tickedPrev = true
+                                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            }
+                        } else {
+                            tickedPrev = false
                         }
                         scope.launch { drag.snapTo(clamped) }
                     }
