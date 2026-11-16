@@ -50,6 +50,8 @@ object LibraryPageSource {
     /** Search keystrokes mint cache keys without limit; stale ones are dropped, live ones capped. */
     private const val CACHE_KEYS = 16
 
+    private const val FOLDER_LIMIT = 500
+
     private data class Cached(val page: LibraryPage, val at: Long)
 
     private val cache = java.util.concurrent.ConcurrentHashMap<String, Cached>()
@@ -179,11 +181,37 @@ object LibraryPageSource {
         val snap = Rootlist.snapshot(context)
         val start = snap?.groupIndex(hash, end = false) ?: -1
         val end = snap?.groupIndex(hash, end = true) ?: -1
+        val inside = if (snap != null && start >= 0 && end > start) {
+            snap.entries.filter { it.index > start && it.index < end }
+        } else {
+            emptyList()
+        }
         if (snap == null || start < 0 || end <= start) {
             log.w("folder $uri markers start=$start end=$end among ${snap?.entries?.size ?: 0} rootlist entries")
-            return null
         }
-        val inside = snap.entries.filter { it.index > start && it.index < end }
+        val direct = children(context, uri)
+        val markers = inside.mapTo(HashSet()) { it.uri }
+        if (direct.isNotEmpty() && (markers.isEmpty() || direct.any { it.uri in markers })) {
+            val byUri = direct.associateBy { it.uri }
+            val ordered = ArrayList<ShelfItem>(direct.size)
+            val seen = HashSet<String>(direct.size)
+            inside.forEach { entry ->
+                val item = byUri[entry.uri]
+                if (item != null && seen.add(item.uri)) ordered += item
+            }
+            direct.forEach { item -> if (seen.add(item.uri)) ordered += item }
+            log.i("folder $uri -> ${ordered.size} item(s) from libraryV3 (folderUri), " +
+                    "${inside.size} row(s) in the rootlist window"
+            )
+            return LibraryPage(
+                items = ordered,
+                filters = emptyList(),
+                sort = "",
+                total = ordered.size,
+                offset = 0,
+                fetched = ordered.size,
+            )
+        }
         val byUri = HashMap<String, ShelfItem>()
         val wanted = inside.mapTo(HashSet()) { it.uri }
         var offset = 0
@@ -210,6 +238,21 @@ object LibraryPageSource {
             offset = 0,
             fetched = items.size,
         )
+    }
+
+    private suspend fun children(context: Context, folderUri: String): List<ShelfItem> {
+        val out = LinkedHashMap<String, ShelfItem>()
+        var offset = 0
+        var total = 0
+        while (offset < FOLDER_LIMIT) {
+            val page = page(context, folderUri = folderUri, offset = offset, flatten = false) ?: break
+            page.items.forEach { if (it.uri.isNotBlank()) out[it.uri] = it }
+            total = page.total
+            if (page.fetched <= 0 || out.size >= total) break
+            offset += page.fetched
+        }
+        log.i("folder $folderUri children ${out.size}/$total")
+        return out.values.toList()
     }
 
     private fun shelf(node: JSONObject?): ShelfItem? {
