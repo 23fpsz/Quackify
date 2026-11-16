@@ -216,10 +216,11 @@ fun EncoreMiniPlayer(
                                     alpha = (1f - alphaFraction).coerceIn(0.15f, 1f)
                                 }
                         ) {
+                            val deviceRow = !connectedDeviceName.isNullOrBlank()
                             Text(
                                 text = buildAnnotatedString {
                                     append(title)
-                                    if (artist.isNotBlank()) {
+                                    if (deviceRow && artist.isNotBlank()) {
                                         append(" \u2022 ")
                                         withStyle(SpanStyle(color = EncoreColors.TextSecondary)) {
                                             append(artist)
@@ -240,7 +241,25 @@ fun EncoreMiniPlayer(
                                         velocity = 30.dp
                                     )
                             )
-                            if (!connectedDeviceName.isNullOrBlank()) {
+                            if (!deviceRow) {
+                                if (artist.isNotBlank()) {
+                                    Text(
+                                        text = artist,
+                                        style = EncoreTheme.typography.bodySmall.copy(
+                                            color = EncoreColors.TextSecondary
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Clip,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .basicMarquee(
+                                                iterations = Int.MAX_VALUE,
+                                                initialDelayMillis = 2000,
+                                                velocity = 30.dp
+                                            )
+                                    )
+                                }
+                            } else {
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
