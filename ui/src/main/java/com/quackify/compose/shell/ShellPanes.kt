@@ -419,7 +419,15 @@ internal fun ShellAlbumPane(
                 albumDetail?.moreByArtist?.map { it.toArtistRelease() }.orEmpty()
             },
             onBackClick = handleBack,
-            onPlayPauseClick = handlePlayPause,
+            onPlayPauseClick = {
+                val first = albumTracks.orEmpty().firstOrNull { it.uri.isNotEmpty() }
+                if (!isPlaying && first != null && activeAlbumUri.startsWith("spotify:album:") && playerListener != null) {
+                    onPlaybackOrigin(PlaybackOrigin(ShellScreen.ALBUM, activeAlbumTitle))
+                    playerListener.onPlayTrack(first.uri, activeAlbumUri, 0)
+                } else {
+                    handlePlayPause()
+                }
+            },
             onTrackSelect = { track ->
                 if (!offlineBlocked()) {
                     onPlaybackOrigin(PlaybackOrigin(ShellScreen.ALBUM, activeAlbumTitle))
@@ -566,6 +574,7 @@ internal fun ShellArtistPane(
     currentContextUri: String,
     onBackClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
+    onPlayFirst: (() -> Unit)? = null,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit,
     onTrackLikeToggle: (TrackItem) -> Unit,
@@ -609,7 +618,13 @@ internal fun ShellArtistPane(
             loadFailed = artistFailed,
             onRetry = { onRetryArtist?.invoke() },
             onBackClick = onBackClick,
-            onPlayPauseClick = onPlayPauseClick,
+            onPlayPauseClick = {
+                if (!isPlaying && onPlayFirst != null) {
+                    onPlayFirst()
+                } else {
+                    onPlayPauseClick()
+                }
+            },
             onTrackSelect = onTrackSelect,
             onTrackOptionsClick = onTrackOptionsClick,
             onTrackLikeToggle = onTrackLikeToggle,
@@ -998,7 +1013,14 @@ internal fun ShellShowPane(
             onEpisodeClick = { episode -> onEpisodeClick(episode.uri) },
             onPlayEpisode = onPlayEpisode,
             onBackClick = onBack,
-            onPlayPauseClick = onPlayPause,
+            onPlayPauseClick = {
+                val first = show.episodes.firstOrNull()
+                if (!isPlaying && first != null) {
+                    onEpisodeClick(first.uri)
+                } else {
+                    onPlayPause()
+                }
+            },
             onLoadMore = onLoadMore,
             onMoreClick = onMoreClick,
             onRelatedClick = { card -> onRelatedShow(card.uri) }

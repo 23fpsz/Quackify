@@ -44,6 +44,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import com.quackify.compose.R
+import com.quackify.compose.components.matchesCurrentContext
 
 internal class ShellRouteEnv(
     val active: ShellActiveEntity,
@@ -285,7 +286,10 @@ internal fun ShellPlaylistRoute(
         onRetryPlaylist = onRetryPlaylist,
         currentTrackTitle = env.currentTrackTitle,
         currentTrackUri = env.playbackState?.trackUri.orEmpty(),
-        isPlaying = env.isPlaying,
+        isPlaying = env.isPlaying && matchesCurrentContext(
+            env.playbackState?.contextUri.orEmpty(),
+            env.active.playlistUri
+        ),
         currentContextUri = env.playbackState?.contextUri.orEmpty(),
         userDisplayName = env.userDisplayName,
         playerListener = env.playerListener,
@@ -367,7 +371,10 @@ internal fun ShellAlbumRoute(
         onRetryAlbum = onRetryAlbum,
         currentTrackTitle = env.currentTrackTitle,
         currentTrackUri = env.playbackState?.trackUri.orEmpty(),
-        isPlaying = env.isPlaying,
+        isPlaying = env.isPlaying && matchesCurrentContext(
+            env.playbackState?.contextUri.orEmpty(),
+            env.active.albumUri
+        ),
         currentContextUri = env.playbackState?.contextUri.orEmpty(),
         playerListener = env.playerListener,
         handleBack = env.handleBack,
@@ -422,10 +429,19 @@ internal fun ShellArtistRoute(
         onArtistUnban = onArtistUnban,
         currentTrackTitle = env.currentTrackTitle,
         currentTrackUri = env.playbackState?.trackUri.orEmpty(),
-        isPlaying = env.isPlaying,
+        isPlaying = env.isPlaying && matchesCurrentContext(
+            env.playbackState?.contextUri.orEmpty(),
+            env.active.artistUri
+        ),
         currentContextUri = env.playbackState?.contextUri.orEmpty(),
         onBackClick = env.handleBack,
         onPlayPauseClick = env.handlePlayPause,
+        onPlayFirst = {
+            val first = artistTracks?.firstOrNull { it.track.uri.isNotEmpty() }?.track
+            if (first != null) {
+                env.playerListener?.onPlayTrack(first.uri, env.active.artistUri, 0)
+            }
+        },
         onTrackSelect = env.handleTrackPlay,
         onTrackOptionsClick = env.handleTrackOptions,
         onTrackLikeToggle = { onArtistTrackLikeToggle?.invoke(it) },
@@ -691,7 +707,10 @@ internal fun ShellShowRoute(
         show = show,
         loading = loading,
         retryUri = env.active.showUri,
-        isPlaying = env.isPlaying,
+        isPlaying = env.isPlaying && matchesCurrentContext(
+            env.playbackState?.contextUri.orEmpty(),
+            env.active.showUri
+        ),
         currentTrackTitle = env.currentTrackTitle,
         currentTrackUri = env.playbackState?.trackUri.orEmpty(),
         currentContextUri = env.playbackState?.contextUri.orEmpty(),
