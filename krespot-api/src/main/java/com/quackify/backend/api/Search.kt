@@ -40,6 +40,7 @@ object Search {
 
     private const val FULL_LIMIT = 50
     private const val SUGGEST_LIMIT = 16
+    private const val RECENT_LIMIT = 10
 
     private fun sectionFilters(): JSONArray = JSONArray().put("GENERIC").put("VIDEO_CONTENT")
 
@@ -128,7 +129,7 @@ object Search {
 
     suspend fun recent(context: Context): List<SearchHit> {
         val variables = JSONObject()
-            .put("limit", FULL_LIMIT)
+            .put("limit", RECENT_LIMIT)
             .put("includeAuthors", false)
             .put("includeEpisodeContentRatingsV2", false)
             .toString()

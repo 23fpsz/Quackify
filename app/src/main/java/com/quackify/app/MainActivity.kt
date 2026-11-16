@@ -145,7 +145,6 @@ class MainActivity : ComponentActivity() {
     private var searchFailed by mutableStateOf(false)
     private var searchFetch by mutableStateOf(0)
     private var searchDataFor by mutableStateOf("")
-    private var recentSearches by mutableStateOf<List<RecentSearches.Entry>>(emptyList())
     private var showUri by mutableStateOf("")
     private var showLoading by mutableStateOf(false)
     private var showFetch by mutableStateOf(0)
@@ -203,6 +202,7 @@ class MainActivity : ComponentActivity() {
     private var searchData by mutableStateOf<SearchResults?>(null)
     private var searchHits by mutableStateOf<List<SearchHit>>(emptyList())
     private val searchSavedOverrides = mutableStateMapOf<String, Boolean>()
+    private val recentsSynced = java.util.concurrent.atomic.AtomicBoolean(false)
     private var submittedSearchQuery by mutableStateOf<String?>(null)
     private var showDetail by mutableStateOf<ShowDetail?>(null)
     private var episodeDetail by mutableStateOf<EpisodeDetail?>(null)
@@ -262,7 +262,7 @@ class MainActivity : ComponentActivity() {
         Pathfinder.silentRefresh = { context, reason -> SilentTokenRefresh.refresh(context, reason) }
         playHistory = PlayHistory.all(applicationContext)
         playStats = PlayStats.snapshot(applicationContext)
-        recentSearches = RecentSearches.all(applicationContext)
+        RecentSearches.refresh(applicationContext)
         savedAccountsList = EncoreAuth.savedAccounts(applicationContext)
         userProfileColorHex = EncoreAuth.account(applicationContext)?.colorHex.orEmpty()
         canvasEnabled = clientPrefs.getBoolean("canvasNpvEnabled", true)
@@ -909,8 +909,17 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        val updates = rememberUpdateController()
+                        LaunchedEffect(searchTerm, offlineNow) {
+                            if (searchTerm.isNotBlank() || offlineNow) return@LaunchedEffect
+                            if (!recentsSynced.compareAndSet(false, true)) return@LaunchedEffect
+                            val remote = Search.recent(context)
+                            if (remote.isNotEmpty()) {
+                                RecentSearches.merge(context, remote)
+                                log.i("reconciled ${remote.size} recent searches with the account")
+                            }
+                        }
 
+                        val updates = rememberUpdateController()
                         UpdateEffects(updates)
 
                         ShellSection(
@@ -1385,6 +1394,10 @@ class MainActivity : ComponentActivity() {
             activity.refreshUnread()
         }
         val home = rememberHomeFeedData()
+        val recents by RecentSearches.observe().collectAsState()
+        LaunchedEffect(activeAccountId) {
+            RecentSearches.refresh(context)
+        }
         val nowPlaying = rememberNowPlayingData(canvasAllowed = settingsSwitches.canvas)
         val splashUrls = remember(feed) {
             feed.asSequence()
@@ -1777,7 +1790,6 @@ class MainActivity : ComponentActivity() {
             onSearchSubmit = { query ->
                 RecentSearches.recordQuery(context, query)
                 submittedSearchQuery = query
-                recentSearches = RecentSearches.all(context)
             },
             searchSuggestionHits = searchHits,
             browseCategories = browseCategories,
@@ -1791,8 +1803,8 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             },
-            searchRecent = remember(recentSearches) {
-                recentSearches.map { entry ->
+            searchRecent = remember(recents) {
+                recents.map { entry ->
                     SearchHistoryItem(
                         title = entry.title,
                         subtitle = entry.subtitle,
@@ -1811,13 +1823,14 @@ class MainActivity : ComponentActivity() {
             searchData = searchData,
             onClearRecentSearches = {
                 RecentSearches.clear(context)
-                recentSearches = emptyList()
                 log.i("cleared the recent searches on this device")
             },
             onRemoveRecentSearch = { item ->
                 RecentSearches.remove(context, item.uri.ifBlank { item.title })
-                recentSearches = RecentSearches.all(context)
                 log.i("removed '${item.title}' from the recent searches")
+            },
+            onPromoteRecentSearch = { item ->
+                RecentSearches.promote(context, item.uri.ifBlank { item.title })
             },
             onRecordRecentSearch = { hit ->
                 RecentSearches.record(context, hit)
@@ -1826,7 +1839,6 @@ class MainActivity : ComponentActivity() {
                     RecentSearches.remove(context, submitted)
                 }
                 submittedSearchQuery = null
-                recentSearches = RecentSearches.all(context)
             },
             onLoadSearchSection = { kind, offset ->
                 Search.section(context, kind, searchTerm, offset)
@@ -1949,6 +1961,7 @@ class MainActivity : ComponentActivity() {
             onLogout = {
                 log.i("logout tapped")
                 PlaybackHost.reset(context)
+                RecentSearches.clear(context)
                 EncoreAuth.logout(context)
                 Krespot.library.invalidate()
                 val remaining = EncoreAuth.savedAccounts(context)
@@ -1983,6 +1996,7 @@ class MainActivity : ComponentActivity() {
                         Krespot.library.invalidate()
                         recreate()
                     } else {
+                        RecentSearches.clear(context)
                         EncoreAuth.logout(context)
                         Krespot.library.invalidate()
                         onSignedOut()

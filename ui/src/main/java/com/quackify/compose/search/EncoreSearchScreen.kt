@@ -189,6 +189,7 @@ fun EncoreSearchScreen(
     onRetry: () -> Unit = {},
     onClearRecent: () -> Unit = {},
     onRemoveRecent: (SearchHistoryItem) -> Unit = {},
+    onPromoteRecent: (SearchHistoryItem) -> Unit = {},
     onRecordRecent: (SearchHit) -> Unit = {},
     onLoadSection: (suspend (SearchKind, Int) -> List<SearchHit>)? = null,
     onToggleSaved: (uri: String, currentlySaved: Boolean) -> Unit = { _, _ -> },
@@ -617,12 +618,13 @@ fun EncoreSearchScreen(
                     )
                 }
 
-                items(recentSearches.distinctBy { it.uri }, key = { it.uri.ifBlank { it.title } }) { searchItem ->
+                items(recentSearches.distinctBy { it.uri.ifBlank { it.title } }, key = { it.uri.ifBlank { it.title } }) { searchItem ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
                                 suggestionsPinned = false
+                                onPromoteRecent(searchItem)
                                 when (searchItem.kind) {
                                     SearchKind.TRACK -> playFromSearch(
                                         TrackItem(
