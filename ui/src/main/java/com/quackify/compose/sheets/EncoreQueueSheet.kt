@@ -25,7 +25,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -77,7 +76,6 @@ fun EncoreQueueSheet(
     onDismissRequest: () -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onRemoveFromQueue: (TrackItem) -> Unit = {},
-    onClearQueue: () -> Unit = {},
     onReorderQueue: (List<TrackItem>) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -145,16 +143,7 @@ fun EncoreQueueSheet(
                     style = EncoreTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
 
-                if (userQueue.isNotEmpty()) {
-                    TextButton(onClick = onClearQueue) {
-                        Text(
-                            text = stringResource(R.string.clear_queue),
-                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.Green)
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.size(40.dp))
-                }
+                Spacer(modifier = Modifier.size(40.dp))
             }
 
             LazyColumn(

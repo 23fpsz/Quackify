@@ -409,10 +409,6 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
                 env.playerListener?.onQueueSet(remaining)
             }
         },
-        onClearQueue = {
-            val context = playbackState?.queueFromContext.orEmpty()
-            env.playerListener?.onQueueSet(context.map { it.uri })
-        },
         onReorderQueue = { reordered ->
             val hidden = playbackState?.queue.orEmpty()
                 .filter { it.uri.isBlank() || it.title.isBlank() }

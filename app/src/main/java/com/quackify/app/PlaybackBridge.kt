@@ -316,6 +316,8 @@ class PlaybackBridge(private val context: Context) {
 
     @Volatile
     private var queuedTail: List<TrackItem> = emptyList()
+    private var promotedContext: Set<String> = emptySet()
+    private var promotedContextFor: String = ""
 
     @Volatile
     private var pendingShuffle: Boolean? = null
@@ -670,9 +672,15 @@ class PlaybackBridge(private val context: Context) {
                     log.i("queue set: dropped ${uris.size - allowed.size} banned row(s)")
                 }
                 if (allowed.isEmpty()) return@launch
+                val promoted = state.queueFromContext.map { it.uri }.filter { it.isNotBlank() }
                 if (!writeQueue(allowed, cluster)) return@launch
                 val local = queuedTail.associateBy { it.uri }
                 queuedTail = allowed.map { local[it] ?: TrackItem(title = "", artist = "", uri = it) }
+                if (promoted.isNotEmpty()) {
+                    promotedContext = promotedContext + promoted
+                    promotedContextFor = cluster.contextUri
+                    log.i("queue: ${promoted.size} context row(s) queued, their context copies get skipped")
+                }
                 publishQueue(cluster)
                 connect.refreshCluster()
             }
@@ -4829,7 +4837,10 @@ class PlaybackBridge(private val context: Context) {
         playingUri(cluster, navigatorState())
 
     private fun targetFrom(cluster: ClusterState, offset: Int): QueueTarget? =
-        targetFrom(cluster, offset, navigatorState())
+        targetFrom(cluster, offset, navigatorState(), promotedContextOrEmpty(cluster))
+
+    private fun promotedContextOrEmpty(cluster: ClusterState): Set<String> =
+        if (cluster.contextUri == promotedContextFor) promotedContext else emptySet()
 
     private fun navigatorState(): QueueNavigatorState = QueueNavigatorState(
         engineUri = player.state.value.trackUri,

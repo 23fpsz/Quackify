@@ -17,13 +17,19 @@ fun playingUri(cluster: ClusterState, state: QueueNavigatorState): String {
     return cluster.track.uri
 }
 
-fun targetFrom(cluster: ClusterState, offset: Int, state: QueueNavigatorState): QueueTarget? {
+fun targetFrom(
+    cluster: ClusterState,
+    offset: Int,
+    state: QueueNavigatorState,
+    skipContext: Set<String> = emptySet(),
+): QueueTarget? {
     val window = cluster.window()
     val anchor = cluster.anchorOf(playingUri(cluster, state))
     var seen = -1
     for (position in (anchor + 1) until window.size) {
         val row = window[position]
         if (!row.isVisible) continue
+        if (!row.isQueued && row.uri in skipContext) continue
         seen++
         if (seen != offset) continue
         return QueueTarget(row, if (row.isQueued) -1 else cluster.indexOf(position), anchor)

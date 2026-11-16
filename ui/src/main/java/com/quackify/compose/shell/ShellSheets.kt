@@ -139,7 +139,6 @@ internal fun ShellSheets(
     onDeviceVisible: (Boolean) -> Unit,
     onQueueTrackSelect: (TrackItem) -> Unit,
     onRemoveFromQueue: (TrackItem) -> Unit,
-    onClearQueue: () -> Unit,
     onReorderQueue: (List<TrackItem>) -> Unit,
     onSleepTimerSelected: (SleepTimerOption) -> Unit,
     onRemoveTrackFromPlaylist: (() -> Unit)? = null,
@@ -262,7 +261,6 @@ internal fun ShellSheets(
         onDeviceVisible = onDeviceVisible,
         onQueueTrackSelect = onQueueTrackSelect,
         onRemoveFromQueue = onRemoveFromQueue,
-        onClearQueue = onClearQueue,
         onReorderQueue = onReorderQueue,
         onSleepTimerSelected = onSleepTimerSelected,
     )
@@ -489,7 +487,6 @@ private fun ShellLibrarySheets(
     onDeviceVisible: (Boolean) -> Unit,
     onQueueTrackSelect: (TrackItem) -> Unit,
     onRemoveFromQueue: (TrackItem) -> Unit,
-    onClearQueue: () -> Unit,
     onReorderQueue: (List<TrackItem>) -> Unit,
     onSleepTimerSelected: (SleepTimerOption) -> Unit,
 ) {
@@ -541,7 +538,6 @@ private fun ShellLibrarySheets(
             onDismissRequest = onDismissQueue,
             onTrackSelect = onQueueTrackSelect,
             onRemoveFromQueue = onRemoveFromQueue,
-            onClearQueue = onClearQueue,
             onReorderQueue = onReorderQueue
         )
     }
