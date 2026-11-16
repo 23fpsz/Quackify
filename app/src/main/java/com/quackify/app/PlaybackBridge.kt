@@ -2979,6 +2979,15 @@ class PlaybackBridge(private val context: Context) {
     }
 
     private suspend fun playTrack(uri: String, contextUri: String, hint: Int) {
+        if ((contextUri.isBlank() || contextUri == uri) && collectionContext(uri)) {
+            val first = runCatching { rowsOf(uri).firstOrNull() }.getOrNull()
+            if (!first.isNullOrBlank() && first != uri) {
+                log.i("playTrack '$uri' is a collection, starting at '${first.takeLast(12)}'")
+                captureChain(uri)
+                playTrack(first, uri, 0)
+                return
+            }
+        }
         val banCandidates = buildList {
             if (contextUri.startsWith("spotify:artist:")) add(contextUri)
             artistUriOf(uri).takeIf { it.isNotBlank() }?.let(::add)
@@ -3879,8 +3888,12 @@ class PlaybackBridge(private val context: Context) {
             ?.let { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
     }
 
+    private fun collectionContext(uri: String): Boolean =
+        uri.startsWith("spotify:collection:") ||
+            (uri.startsWith("spotify:user:") && uri.endsWith(":collection"))
+
     private fun playlistLabelOf(contextUri: String): String {
-        if (contextUri == "spotify:collection:tracks" || contextUri == "spotify:user:@me:collection") {
+        if (collectionContext(contextUri)) {
             return "Liked Songs"
         }
         if (!contextUri.startsWith("spotify:playlist:")) return ""

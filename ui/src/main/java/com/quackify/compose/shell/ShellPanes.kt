@@ -797,7 +797,9 @@ internal fun ShellPlaylistPane(
                         onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
                         val firstTrack = playlistTracks
                             ?.firstOrNull { it.uri.startsWith("spotify:track:") }
-                        if (firstTrack != null && activePlaylistUri.startsWith("spotify:playlist:")) {
+                        if (firstTrack != null &&
+                            (activePlaylistUri.startsWith("spotify:playlist:") || isCollectionUri(activePlaylistUri))
+                        ) {
                             playerListener.onPlayTrack(firstTrack.uri, activePlaylistUri, 0)
                         } else {
                             playerListener.onPlayUri(activePlaylistUri)
@@ -815,7 +817,9 @@ internal fun ShellPlaylistPane(
                 if (playerListener != null) {
                     if (track.uri.isNotEmpty()) {
                         val index = playlistTracks.orEmpty().indexOfFirst { it.uri == track.uri }
-                        if (index >= 0 && activePlaylistUri.startsWith("spotify:playlist:")) {
+                        if (index >= 0 &&
+                            (activePlaylistUri.startsWith("spotify:playlist:") || isCollectionUri(activePlaylistUri))
+                        ) {
                             playerListener.onPlayTrack(track.uri, activePlaylistUri, index)
                         } else {
                             playerListener.onPlayUri(track.uri)
