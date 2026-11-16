@@ -19,7 +19,6 @@ import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.player.EncoreNowPlayingScreen
 import com.quackify.compose.player.TimeSyncedLyric
-import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreAnimation
 
 /** The screen itself only fades: the artwork carries the movement. */
@@ -58,10 +57,7 @@ internal fun ShellNowPlaying(
     connectedDevice: String,
     coverUrl: String,
     lyrics: List<TimeSyncedLyric> = emptyList(),
-    isLyricsUnderCoverEnabled: Boolean = true,
     lyricsPreview: Boolean = true,
-    previousTrack: TrackItem? = null,
-    nextTrack: TrackItem? = null,
     canvasFilePath: String? = null,
     isCanvasAllowed: Boolean = true,
     isCanvasEnabled: Boolean = false,
@@ -84,7 +80,6 @@ internal fun ShellNowPlaying(
     onPlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
-    onSkipToPreviousClick: () -> Unit = {},
     onPreviousSwipe: () -> Unit = onSkipPrevious,
     onLike: () -> Unit,
     onShuffle: () -> Unit,
@@ -129,10 +124,7 @@ internal fun ShellNowPlaying(
             connectedDeviceName = connectedDevice,
             coverUrl = coverUrl,
             lyrics = lyrics,
-            isLyricsUnderCoverEnabled = isLyricsUnderCoverEnabled,
             showLyricsPreview = lyricsPreview,
-            previousTrack = previousTrack,
-            nextTrack = nextTrack,
             canvasFilePath = canvasFilePath,
             isCanvasAllowed = isCanvasAllowed,
             isCanvasEnabled = isCanvasEnabled,
@@ -155,7 +147,6 @@ internal fun ShellNowPlaying(
             onPlayPauseClick = onPlayPause,
             onSkipNextClick = onSkipNext,
             onSkipPreviousClick = onSkipPrevious,
-            onSkipToPreviousClick = onSkipToPreviousClick,
             onSwipePreviousClick = onPreviousSwipe,
             onLikeClick = onLike,
             onShuffleClick = onShuffle,

@@ -120,10 +120,6 @@ internal class ShellActions(
         whenOnline { playerListener?.onSkipPrevious() }
     }
 
-    fun skipToPreviousTrack() {
-        whenOnline { playerListener?.onSkipToPreviousTrack() }
-    }
-
     fun previousSwipe() {
         playerListener?.onPreviousSwipe()
     }

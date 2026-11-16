@@ -136,8 +136,6 @@ data class ComposePlaybackState(
     val devices: List<ConnectDevice> = emptyList(),
     val queue: List<TrackItem> = emptyList(),
     val queueFromContext: List<TrackItem> = emptyList(),
-    val previousTrack: TrackItem? = null,
-    val nextTrack: TrackItem? = null,
     val queueContext: String = "",
     val queueContextLabel: String = "",
     val contextUri: String = "",
@@ -162,8 +160,6 @@ interface ComposePlayerListener {
     fun onPlayPause() {}
     fun onSkipNext() {}
     fun onSkipPrevious() {}
-    fun onSkipToPreviousTrack() {}
-
     /** Swiping back always lands on the previous track, never restarts the current one. */
     fun onPreviousSwipe() { onSkipPrevious() }
     fun onSeek(positionMs: Long) {}

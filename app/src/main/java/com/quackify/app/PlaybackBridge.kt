@@ -465,10 +465,6 @@ class PlaybackBridge(private val context: Context) {
             scope.launch { skipTo(next = false) }
         }
 
-        override fun onSkipToPreviousTrack() {
-            scope.launch { skipTo(next = false, force = true) }
-        }
-
         override fun onPreviousSwipe() {
             scope.launch { skipTo(next = false, force = true) }
         }
@@ -4012,18 +4008,14 @@ class PlaybackBridge(private val context: Context) {
                 tailRowsFilled)
                 .filterNot { it.uri == anchor }
         }
-        val previousRow = previousRowFor(anchor)
-        val nextRow = (queued.filter { it.uri != anchor } + upcoming).firstOrNull()
         val sparse = ((if (enhancedTail.isNotEmpty()) emptyList() else contextRows) + queued)
             .filter { it.title.isBlank() }.map { it.uri }
-        val missing = (sparse + tailUris.filterNot { it in knownUpcoming } +
-            listOfNotNull(previousRow, nextRow).filter { it.title.isBlank() }.map { it.uri })
+        val missing = (sparse + tailUris.filterNot { it in knownUpcoming })
             .filterNot { decorated.containsKey(it) || it in undecoratable }
             .distinct()
         if (missing.isNotEmpty()) scheduleDecorate(missing)
         if (queued == state.queue && upcoming == state.queueFromContext &&
-            context == state.queueContext && label == state.queueContextLabel &&
-            previousRow == state.previousTrack && nextRow == state.nextTrack
+            context == state.queueContext && label == state.queueContextLabel
         ) {
             return
         }
@@ -4032,32 +4024,11 @@ class PlaybackBridge(private val context: Context) {
             queueFromContext = upcoming,
             queueContext = context,
             queueContextLabel = label,
-            previousTrack = previousRow,
-            nextTrack = nextRow,
         )
         log.i("queue ${queued.size} queued + ${upcoming.size} next from " +
                 "'${label.ifBlank { context.ifBlank { "?" } }}' " +
                 "${if (server) "the server" else "the list on screen"}"
         )
-    }
-
-    private fun rowItem(uri: String): TrackItem =
-        decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri)
-
-    private fun previousRowFor(anchor: String): TrackItem? {
-        val chain = chainFor()
-        val chainAt = rowOf(chain, anchor)
-        if (chainAt > 0 && chain[chainAt - 1] != anchor) {
-            return rowItem(chain[chainAt - 1])
-        }
-        val cluster = connect.cluster.value ?: return null
-        val window = cluster.window()
-        var cursor = cluster.anchorOf(anchor) - 1
-        while (cursor in window.indices && !window[cursor].isVisible) cursor--
-        return window.getOrNull(cursor)
-            ?.takeIf { it.isVisible && it.uri != anchor }
-            ?.asTrackItem()
-            ?.let { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
     }
 
     private fun playlistLabelOf(contextUri: String): String {
