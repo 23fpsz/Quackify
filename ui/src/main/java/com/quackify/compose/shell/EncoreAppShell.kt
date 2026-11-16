@@ -273,6 +273,8 @@ fun EncoreAppShell(
     isCanvasAllowed: Boolean = true,
     isCanvasEnabled: Boolean = false,
     onCanvasToggle: ((Boolean) -> Unit)? = null,
+    isNpvLyricsEnabled: Boolean = true,
+    onNpvLyricsToggle: ((Boolean) -> Unit)? = null,
     canvasResolution: Int = 1080,
     onCanvasResolution: ((Int) -> Unit)? = null,
     artistDetail: ArtistDetail? = null,
@@ -576,6 +578,7 @@ fun EncoreAppShell(
         ?: currentQueueRow?.albumUri.orEmpty()
     val resolvedArtistUri = playbackState?.artistUri?.takeIf { it.isNotBlank() }
         ?: currentQueueRow?.artistUri.orEmpty()
+    val currentAlbumName = currentQueueRow?.albumName.orEmpty()
 
     val openAlbum: (String, String, String) -> Unit = { title, artist, uri ->
         navController.openAlbum(context, title, artist, uri)
@@ -635,6 +638,8 @@ fun EncoreAppShell(
     val handleSkipNext: () -> Unit = { actions.skipNext() }
 
     val handleSkipPrevious: () -> Unit = { actions.skipPrevious() }
+
+    val handleSkipToPreviousTrack: () -> Unit = { actions.skipToPreviousTrack() }
 
     val handlePreviousSwipe: () -> Unit = { actions.previousSwipe() }
 
@@ -783,6 +788,7 @@ fun EncoreAppShell(
             connectedDevice = connectedDevice,
             resolvedAlbumUri = resolvedAlbumUri,
             resolvedArtistUri = resolvedArtistUri,
+            currentAlbumName = currentAlbumName,
             nowPlayingMonthlyListeners = nowPlayingMonthlyListeners,
             nowPlayingArtistBio = nowPlayingArtistBio,
             nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
@@ -791,12 +797,15 @@ fun EncoreAppShell(
             canvasFilePath = canvasFilePath,
             isCanvasAllowed = isCanvasAllowed,
             isCanvasEnabled = isCanvasEnabled,
+            isNpvLyricsEnabled = isNpvLyricsEnabled,
             videoFullscreen = videoFullscreen,
             playbackOrigin = playbackOrigin,
             handleSkipNext = handleSkipNext,
             handleSkipPrevious = handleSkipPrevious,
+            handleSkipToPreviousTrack = handleSkipToPreviousTrack,
             handlePreviousSwipe = handlePreviousSwipe,
             onCanvasToggle = onCanvasToggle,
+            onNpvLyricsToggle = onNpvLyricsToggle,
             onToggleVideoFullscreen = onToggleVideoFullscreen,
             onArtistFollowToggle = onArtistFollowToggle,
             onAddToPlaylist = onAddToPlaylist,

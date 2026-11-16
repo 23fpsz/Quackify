@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -29,6 +30,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +50,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -77,6 +80,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -92,7 +96,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -131,6 +134,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import com.quackify.compose.theme.EncoreTheme
+import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.util.rememberDominantColor
 import androidx.compose.ui.res.stringResource
 
@@ -287,7 +291,11 @@ fun EncoreNowPlayingScreen(
     isArtistFollowing: Boolean = false,
     onArtistFollowToggle: (Boolean) -> Unit = {},
     lyrics: List<TimeSyncedLyric> = emptyList(),
+    isLyricsUnderCoverEnabled: Boolean = true,
     showLyricsPreview: Boolean = true,
+    previousTrack: TrackItem? = null,
+    nextTrack: TrackItem? = null,
+    onSkipToPreviousClick: () -> Unit = {}
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
@@ -338,7 +346,9 @@ fun EncoreNowPlayingScreen(
     }
 
     val effectiveIsLoading = isLoading
-    val effectiveLyricsVisible = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
+    val lyricsAvailable = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
+    val syncedLyricLineVisible = isLyricsUnderCoverEnabled && lyricsAvailable
+    val effectiveLyricsVisible = lyricsAvailable
     val previewLyricVisible = effectiveLyricsVisible && showLyricsPreview
 
     val lyricLineHeight by animateDpAsState(
@@ -464,7 +474,7 @@ fun EncoreNowPlayingScreen(
         canSwipePrevious = canSkipPrevious,
         onSwipePrevious = {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            onSwipePreviousClick()
+            onSkipToPreviousClick()
         },
         onSwipeNext = {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -570,21 +580,65 @@ fun EncoreNowPlayingScreen(
                             .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        NowPlayingArtworkCard(
-                            title = title,
-                            coverUrl = coverUrl,
-                            dominantColor = dynamicArtworkColor,
-                            backgroundColor = animatedDominantColor,
-                            canvasFilePath = canvasFilePath,
-                            isCanvasEnabled = canvasActive,
-                            videoActive = videoActive,
-                            videoQualities = videoQualities,
-                            onVideoQuality = onVideoQuality,
-                            onVideoSurface = onVideoSurface,
-                            onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
-                            modifier = Modifier
-                                .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
-                        )
+                        if (videoActive || canvasActive) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                NowPlayingArtworkCard(
+                                    title = title,
+                                    coverUrl = coverUrl,
+                                    dominantColor = dynamicArtworkColor,
+                                    backgroundColor = animatedDominantColor,
+                                    canvasFilePath = canvasFilePath,
+                                    isCanvasEnabled = canvasActive,
+                                    videoActive = videoActive,
+                                    videoQualities = videoQualities,
+                                    onVideoQuality = onVideoQuality,
+                                    onVideoSurface = onVideoSurface,
+                                    onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
+                                    modifier = Modifier
+                                        .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
+                                )
+                            }
+                        } else {
+                            ArtworkPeek(
+                                url = nextTrack?.imageUrl.orEmpty(),
+                                dominantColor = dynamicArtworkColor,
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .graphicsLayer {
+                                        translationX = artworkOffsetX.value + size.width
+                                    }
+                            )
+                            ArtworkPeek(
+                                url = previousTrack?.imageUrl.orEmpty(),
+                                dominantColor = dynamicArtworkColor,
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .graphicsLayer {
+                                        translationX = artworkOffsetX.value - size.width
+                                    }
+                            )
+                            NowPlayingArtworkCard(
+                                title = title,
+                                coverUrl = coverUrl,
+                                dominantColor = dynamicArtworkColor,
+                                backgroundColor = animatedDominantColor,
+                                canvasFilePath = canvasFilePath,
+                                isCanvasEnabled = canvasActive,
+                                videoActive = videoActive,
+                                videoQualities = videoQualities,
+                                onVideoQuality = onVideoQuality,
+                                onVideoSurface = onVideoSurface,
+                                onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
+                                modifier = Modifier
+                                    .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
+                                    .graphicsLayer { translationX = artworkOffsetX.value }
+                            )
+                        }
                     }
 
                     Column(
@@ -691,7 +745,7 @@ fun EncoreNowPlayingScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         NowPlayingLyricsCard(
-                            visible = effectiveLyricsVisible,
+                            visible = lyricsAvailable,
                             lyrics = lyrics,
                             activeIndex = activeLyricIndex,
                             dominantColor = dynamicArtworkColor,
@@ -701,7 +755,7 @@ fun EncoreNowPlayingScreen(
                         )
 
                         if (!effectiveIsLoading && artist.isNotBlank()) {
-                            if (effectiveLyricsVisible) {
+                            if (lyricsAvailable) {
                                 Spacer(modifier = Modifier.height(EncoreSpacers.Base))
                             }
 
@@ -749,9 +803,9 @@ fun EncoreNowPlayingScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.weight(topSpacerWeight.coerceAtLeast(0.01f)))
+                        Spacer(modifier = Modifier.weight(topSpacerWeight.coerceAtLeast(0.01f)))
 
-                            Box(
+                        Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = animatedMediaPadding)
@@ -762,10 +816,48 @@ fun EncoreNowPlayingScreen(
                                 if (canvasActive && !videoActive) {
                                     Spacer(
                                         modifier = Modifier
+                                            .padding(horizontal = animatedMediaPadding)
                                             .fillMaxWidth()
                                             .aspectRatio(1.0f)
                                     )
+                                } else if (videoActive) {
+                                    NowPlayingArtworkCard(
+                                        title = title,
+                                        coverUrl = coverUrl,
+                                        dominantColor = dynamicArtworkColor,
+                                        backgroundColor = animatedDominantColor,
+                                        canvasFilePath = canvasFilePath,
+                                        isCanvasEnabled = canvasActive,
+                                        videoActive = true,
+                                        videoFullBleed = true,
+                                        videoQualities = videoQualities,
+                                        onVideoQuality = onVideoQuality,
+                                        onVideoSurface = onVideoSurface,
+                                        onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
+                                        modifier = Modifier
+                                            .padding(horizontal = animatedMediaPadding)
+                                            .fillMaxWidth()
+                                            .height(animatedMediaHeight)
+                                    )
                                 } else {
+                                    ArtworkPeek(
+                                        url = nextTrack?.imageUrl.orEmpty(),
+                                        dominantColor = dynamicArtworkColor,
+                                        modifier = Modifier
+                                            .matchParentSize()
+                                            .graphicsLayer {
+                                                translationX = artworkOffsetX.value + size.width
+                                            }
+                                    )
+                                    ArtworkPeek(
+                                        url = previousTrack?.imageUrl.orEmpty(),
+                                        dominantColor = dynamicArtworkColor,
+                                        modifier = Modifier
+                                            .matchParentSize()
+                                            .graphicsLayer {
+                                                translationX = artworkOffsetX.value - size.width
+                                            }
+                                    )
                                     NowPlayingArtworkCard(
                                         title = title,
                                         coverUrl = coverUrl,
@@ -774,7 +866,6 @@ fun EncoreNowPlayingScreen(
                                         canvasFilePath = canvasFilePath,
                                         isCanvasEnabled = canvasActive,
                                         videoActive = videoActive,
-                                        videoFullBleed = videoActive,
                                         videoQualities = videoQualities,
                                         onVideoQuality = onVideoQuality,
                                         onVideoSurface = onVideoSurface,
@@ -782,6 +873,7 @@ fun EncoreNowPlayingScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(animatedMediaHeight)
+                                            .graphicsLayer { translationX = artworkOffsetX.value }
                                     )
                                 }
                             }
@@ -903,7 +995,7 @@ fun EncoreNowPlayingScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             NowPlayingLyricsCard(
-                                visible = effectiveLyricsVisible && canvasControlsShown,
+                                visible = lyricsAvailable && canvasControlsShown,
                                 lyrics = lyrics,
                                 activeIndex = activeLyricIndex,
                                 dominantColor = dynamicArtworkColor,
@@ -918,7 +1010,7 @@ fun EncoreNowPlayingScreen(
                                     exit = fadeOut(tween(200)) + shrinkVertically(tween(300))
                                 ) {
                                     Column {
-                                        if (effectiveLyricsVisible) {
+                                        if (lyricsAvailable) {
                                             Spacer(modifier = Modifier.height(EncoreSpacers.Base))
                                         }
 
@@ -1031,12 +1123,19 @@ private fun Modifier.npvDismissDragGesture(
  * animation while vertical drags translate the whole player for
  * drag-to-dismiss.
  *
- * The axis is resolved manually, before any event is consumed. Vertical drags
- * are only claimed once the page can no longer scroll in that direction, so
- * dragging over the artwork scrolls the page like any other part of it and
- * only turns into a dismissal once the top is reached. Horizontal drags move
- * the artwork aside; releasing past the commit point (or on a fast fling)
- * sends it off and skips, otherwise it springs back.
+ * The axis is resolved manually, before any event is consumed. Vertical
+ * drags are only claimed once the page can no longer scroll in that
+ * direction, so dragging over the artwork scrolls the page like any other
+ * part of it and only turns into a dismissal once the top is reached.
+ * Horizontal drags move the artwork aside; releasing past the commit point
+ * (or on a fast fling) sends it off and skips, otherwise it springs back.
+ *
+ * The claim is re-evaluated on every move: the scroll may not sit at the
+ * top when the drag starts, but it reaches it as the finger keeps pulling
+ * down, and from that moment the player must track the finger 1:1 instead
+ * of staying frozen until the next gesture. Deltas are read with
+ * positionChangeIgnoreConsumed so an intermediate scroll consumer cannot
+ * zero them out mid-drag.
  */
 private fun Modifier.npvArtworkGesture(
     coroutineScope: CoroutineScope,
@@ -1071,8 +1170,6 @@ private fun Modifier.npvArtworkGesture(
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
             if (!change.pressed) break
 
-            // Deltas are read with positionChangeIgnoreConsumed so an
-            // intermediate scroll consumer cannot zero them out mid-drag.
             val delta = change.positionChangeIgnoreConsumed()
             totalDragX += delta.x
             totalDragY += delta.y
@@ -1240,6 +1337,30 @@ private fun NowPlayingHeaderRow(
  * video (when the track has one) and the CANVAS toggle pill.
  * Reference: revised_template_page_layout.xml (@id/track_carousel) -> bounds [63,308][1017,1262] (24dp margins)
  */
+@Composable
+private fun ArtworkPeek(
+    url: String,
+    dominantColor: Color,
+    modifier: Modifier = Modifier
+) {
+    if (url.isBlank()) return
+    val corner = RoundedCornerShape(EncoreCornerRadii.Larger2)
+    Box(
+        modifier = modifier
+            .shadow(elevation = 16.dp, shape = corner)
+            .clip(corner)
+            .background(dominantColor)
+    ) {
+        EncoreArtworkImage(
+            imageUrl = url,
+            contentDescription = null,
+            fallbackColor = dominantColor,
+            requestSize = 640,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
 @Composable
 private fun NowPlayingArtworkCard(
     title: String,
