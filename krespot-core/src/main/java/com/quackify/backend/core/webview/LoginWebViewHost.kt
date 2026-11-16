@@ -58,8 +58,6 @@ const val PLAYER_URL = "https://open.spotify.com/"
 
 private val log = Logs.of(Logs.Module.WEBVIEW)
 private const val SPOTIFY_ORIGIN = "https://open.spotify.com"
-private const val ACCOUNTS_ORIGIN = "https://accounts.spotify.com"
-private const val GOOGLE_ORIGIN = "https://accounts.google.com"
 
 private val LOGIN_PATH = Regex("^/(?:[a-zA-Z0-9]{2,8}(?:-[a-zA-Z0-9]{2,8})?/)?login/?$")
 
@@ -84,6 +82,8 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     val webView: WebView = buildWebView(context, container)
 
     private var tokenResult: CompletableDeferred<String>? = null
+
+    private val nativeUa: String = WebSettings.getDefaultUserAgent(context)
 
     @Volatile
     var onPlayerReached: (() -> Unit)? = null
@@ -183,7 +183,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     }
 
     init {
-        log.i("init ua=${EncoreAuth.DESKTOP_UA}")
+        log.i("init ua=native, desktop only on the player")
         container.addView(
             webView,
             FrameLayout.LayoutParams(
@@ -203,9 +203,9 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                     onError?.invoke(null)
                 }
                 if (url == null) return
-                when {
-                    url.startsWith(GOOGLE_ORIGIN) -> view?.evaluateJavascript(BrowserSpoof.GOOGLE_CONTENT, null)
-                    !url.startsWith(ACCOUNTS_ORIGIN) -> view?.evaluateJavascript(BrowserSpoof.CONTENT, null)
+                applyUserAgent(view, url)
+                if (url.startsWith(SPOTIFY_ORIGIN)) {
+                    view?.evaluateJavascript(BrowserSpoof.CONTENT, null)
                 }
             }
 
@@ -220,6 +220,14 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 )
                 notifyPlayerReached(url)
                 notifyBackAvailable()
+                if (url != null && isPlayerUrl(url) && view != null &&
+                    view.settings.userAgentString != EncoreAuth.DESKTOP_UA
+                ) {
+                    log.i("player reached with the native user-agent, upgrading to desktop")
+                    applyUserAgent(view, url)
+                    view.reload()
+                    return
+                }
                 if (url != null && isLoginPageUrl(url)) {
                     log.d("classic login pill fallback injected")
                     view?.evaluateJavascript(ClassicLoginButton.CONTENT, null)
@@ -297,9 +305,8 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                         super.onPageStarted(v, url, favicon)
                         log.i("popup.onPageStarted $url")
                         if (url == null) return
-                        if (url.startsWith(GOOGLE_ORIGIN)) {
-                            v?.evaluateJavascript(BrowserSpoof.GOOGLE_CONTENT, null)
-                        } else if (!url.startsWith(ACCOUNTS_ORIGIN) && !url.startsWith(SPOTIFY_ORIGIN)) {
+                        applyUserAgent(v, url)
+                        if (url.startsWith(SPOTIFY_ORIGIN)) {
                             v?.evaluateJavascript(BrowserSpoof.CONTENT, null)
                         }
                     }
@@ -356,6 +363,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     }
 
     fun load(url: String) {
+        applyUserAgent(webView, url)
         if (webView.url == url) {
             log.i("load skipped, already at $url")
             return
@@ -369,6 +377,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     fun retryLoad() {
         val target = lastMainFrameUrl.ifBlank { startUrl }
         log.i("retryLoad $target")
+        applyUserAgent(webView, target)
         onError?.invoke(null)
         webView.loadUrl(target)
     }
@@ -520,6 +529,16 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
 
     suspend fun readSessionToken(): String? = readSession()?.token
 
+    private fun isPlayerUrl(url: String?): Boolean = url?.startsWith(SPOTIFY_ORIGIN) == true
+
+    private fun applyUserAgent(view: WebView?, url: String?) {
+        if (view == null || url == null) return
+        val target = if (isPlayerUrl(url)) EncoreAuth.DESKTOP_UA else nativeUa
+        if (view.settings.userAgentString == target) return
+        log.i("user-agent ${if (target == nativeUa) "native" else "desktop"} for $url")
+        view.settings.userAgentString = target
+    }
+
     private suspend fun evalString(js: String): String? = suspendCancellableCoroutine { cont ->
         webView.evaluateJavascript(js) { raw ->
             val value = runCatching { JSONTokener(raw).nextValue() as? String }.getOrNull()
@@ -550,8 +569,6 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
         log.i("installSpoofScripts supported=$supported")
         if (!supported) return
         runCatching {
-            WebViewCompat.addDocumentStartJavaScript(view, BrowserSpoof.CONTENT, setOf(ACCOUNTS_ORIGIN))
-            WebViewCompat.addDocumentStartJavaScript(view, BrowserSpoof.GOOGLE_CONTENT, setOf(GOOGLE_ORIGIN))
             WebViewCompat.addDocumentStartJavaScript(view, BrowserSpoof.CONTENT, setOf(SPOTIFY_ORIGIN))
         }.onFailure { log.e("installSpoofScripts failed", it) }
     }
@@ -626,7 +643,6 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 manager.setAcceptThirdPartyCookies(view, true)
             }
             view.settings.apply {
-                userAgentString = EncoreAuth.DESKTOP_UA
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
