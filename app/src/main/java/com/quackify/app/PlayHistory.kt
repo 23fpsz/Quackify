@@ -83,11 +83,21 @@ object PlayHistory {
             track
         }
 
-        val previousPlays = previous.firstOrNull { sameSong(it.item, track) }?.plays ?: 0
-        val next = (
-                listOf(PlayedTrack(enriched, playedAtMs, previousPlays + 1)) +
-                        previous
-                ).take(LIMIT)
+        // A replay on the same day moves the row to the top with the play
+        // count bumped, instead of stacking a second row for the same song
+        // under "Today" - the history is a per-day diary, not a play log.
+        val replayIndex = previous.indexOfFirst { sameSong(it.item, track) && sameDay(it.playedAtMs, playedAtMs) }
+        val next = if (replayIndex >= 0) {
+            val replay = previous[replayIndex].copy(
+                item = enriched,
+                playedAtMs = playedAtMs,
+                plays = previous[replayIndex].plays + 1,
+            )
+            (listOf(replay) + previous.filterIndexed { i, _ -> i != replayIndex }).take(LIMIT)
+        } else {
+            val previousPlays = previous.firstOrNull { sameSong(it.item, track) }?.plays ?: 0
+            (listOf(PlayedTrack(enriched, playedAtMs, previousPlays + 1)) + previous).take(LIMIT)
+        }
 
         write(context, next)
 
