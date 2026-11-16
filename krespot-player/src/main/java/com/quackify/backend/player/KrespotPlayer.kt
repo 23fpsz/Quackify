@@ -636,7 +636,7 @@ class KrespotPlayer(private val context: Context) {
                     }
                 }
                 player = engine?.also { it.onEvent = sink }
-                    ?: AudioEngine(context, { spclient }, scope, sink).also { engine = it }
+                    ?: AudioEngine(context, scope, sink).also { engine = it }
                 val startAt = if (pendingSeekMs >= 0L) pendingSeekMs.also { pendingSeekMs = -1L } else fromMs
                 val ready = player.prepare(source, track.uri, startAt, autoplay = !pendingPause, file?.gainDb ?: 0.0)
                 if (!ready || id != generation) {

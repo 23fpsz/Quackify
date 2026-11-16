@@ -266,19 +266,19 @@ internal object LicenseEndpoint {
     @Volatile
     private var expiresAt: Long = 0L
 
-    suspend fun of(context: Context, spclient: String): String {
-        val host = spclient.ifBlank { RESOLVE_HOST }
+    suspend fun of(context: Context): String {
+        val host = RESOLVE_HOST
         val now = System.currentTimeMillis() / 1000L
         cached.takeIf { it.isNotBlank() && now < expiresAt }?.let { return it }
         stored(context, host, now)?.let { return it }
         val url = "https://$host/melody/v1/license_url?$LICENSE_QUERY"
         val response = Net.get(url, PlayerHeaders.of(context), tag = "license-url")
         val json = response?.takeIf { it.ok }?.json()
-        val uri = json?.optString("uri").orEmpty()
+        val uri = json?.optString("uri").orEmpty().trimStart('/')
         val resolved = when {
             uri.startsWith("http") -> uri
             uri.isNotBlank() -> "https://$host/$uri"
-            else -> "https://$host/$LICENSE_PATH"
+            else -> "https://$host/${LICENSE_PATH.trimStart('/')}"
         }
         val expires = json?.optLong("expires", 0L) ?: 0L
         expiresAt = if (expires > now) expires else now + ENDPOINT_FALLBACK_SECONDS
@@ -291,6 +291,15 @@ internal object LicenseEndpoint {
     fun reset() {
         cached = ""
         expiresAt = 0L
+    }
+
+    fun invalidate(context: Context) {
+        reset()
+        SecureStore.prefs(context).edit()
+            .remove(KEY_HOST)
+            .remove(KEY_URL)
+            .remove(KEY_EXP)
+            .apply()
     }
 
     private fun stored(context: Context, host: String, now: Long): String? {

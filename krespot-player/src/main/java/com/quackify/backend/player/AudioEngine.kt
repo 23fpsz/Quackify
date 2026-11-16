@@ -131,6 +131,7 @@ internal class AudioDrmCallback(
         }
         val body = response?.takeIf { it.ok }
         if (body == null) {
+            LicenseEndpoint.invalidate(context)
             if (response?.code != 403) {
                 LicenseGate.hold(response?.code ?: 0, response?.retryAfterSeconds ?: 0L)
             }
@@ -185,7 +186,6 @@ internal class AudioDrmCallback(
 
 internal class AudioEngine(
     private val context: Context,
-    private val spclient: () -> String,
     private val scope: CoroutineScope,
     var onEvent: (PlayerEvent) -> Unit,
 ) {
@@ -305,7 +305,7 @@ internal class AudioEngine(
         val manager = DefaultDrmSessionManager.Builder()
             .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
             .setMultiSession(true)
-            .build(AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) })
+            .build(AudioDrmCallback(context) { LicenseEndpoint.of(context) })
         factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { manager })
         drmManager = manager
         kit = factory
