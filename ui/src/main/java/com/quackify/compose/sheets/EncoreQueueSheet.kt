@@ -62,8 +62,8 @@ import androidx.compose.ui.res.stringResource
 
 /**
  * - stringResource(R.string.now_playing) item with animated Encore equalizer indicator
- * - stringResource(R.string.next_in_queue) with dismiss action and reordering handles
- * - "Next from: [Context]" with upcoming queue items
+ * - one flat upcoming list (queued rows then context rows) where every row drags
+ * - "Next from: [Context]" header for the whole upcoming list
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,7 +84,8 @@ fun EncoreQueueSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val listState = rememberLazyListState()
     val haptics = LocalHapticFeedback.current
-    val queueRows = remember(userQueue) { userQueue.toQueueRows() }
+    val queueRows = remember(userQueue, nextFromContext) { (userQueue + nextFromContext).toQueueRows() }
+    val originalOrder = remember(userQueue, nextFromContext) { (userQueue + nextFromContext).map { it.uri } }
     val currentOnReorder by rememberUpdatedState(onReorderQueue)
     val reorderState = rememberReorderableLazyListState(
         listState = listState,
@@ -101,7 +102,7 @@ fun EncoreQueueSheet(
         },
         onDragEnd = {
             val tracks = queueRows.map { it.track }
-            if (tracks != userQueue) currentOnReorder(tracks)
+            if (tracks.map { it.uri } != originalOrder) currentOnReorder(tracks)
         }
     )
 
@@ -213,7 +214,12 @@ fun EncoreQueueSheet(
                 if (queueRows.isNotEmpty()) {
                     item {
                         Text(
-                            text = stringResource(R.string.next_in_queue),
+                            text = when {
+                                nextFromContext.isNotEmpty() && queueSourceContext.isNotBlank() ->
+                                    "Next from: $queueSourceContext"
+                                userQueue.isNotEmpty() -> stringResource(R.string.next_in_queue)
+                                else -> stringResource(R.string.next_up)
+                            },
                             style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
                             modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
                         )
@@ -243,28 +249,6 @@ fun EncoreQueueSheet(
 
                     item {
                         Spacer(modifier = Modifier.height(EncoreSpacers.Base))
-                    }
-                }
-
-                if (nextFromContext.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = if (queueSourceContext.isBlank()) {
-                                stringResource(R.string.next_up)
-                            } else {
-                                "Next from: $queueSourceContext"
-                            },
-                            style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextSecondary),
-                            modifier = Modifier.padding(horizontal = EncoreSpacers.Base, vertical = EncoreSpacers.Tighter)
-                        )
-                    }
-
-                    itemsIndexed(nextFromContext, key = { index, track -> "${track.uid.ifBlank { track.uri }}_$index" }) { _, track ->
-                        QueueTrackRow(
-                            track = track,
-                            showDragHandle = false,
-                            onSelect = { onTrackSelect(track) }
-                        )
                     }
                 }
             }

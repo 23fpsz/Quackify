@@ -402,11 +402,11 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             }
         },
         onRemoveFromQueue = { track ->
-            val queue = playbackState?.queue.orEmpty()
-            val context = playbackState?.queueFromContext.orEmpty()
-            val remaining = queue.filterNot { it.uri == track.uri }.map { it.uri }
-            if (remaining.size != queue.size) {
-                env.playerListener?.onQueueSet(remaining + context.map { it.uri })
+            val upcoming = playbackState?.queue.orEmpty().filter { it.uri.isNotBlank() } +
+                playbackState?.queueFromContext.orEmpty()
+            val remaining = upcoming.filterNot { it.uri == track.uri }.map { it.uri }
+            if (remaining.size != upcoming.size) {
+                env.playerListener?.onQueueSet(remaining)
             }
         },
         onClearQueue = {
@@ -414,10 +414,10 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             env.playerListener?.onQueueSet(context.map { it.uri })
         },
         onReorderQueue = { reordered ->
-            val queue = playbackState?.queue.orEmpty()
-            val context = playbackState?.queueFromContext.orEmpty()
-            val hidden = queue.filter { it.uri.isBlank() || it.title.isBlank() }.map { it.uri }
-            env.playerListener?.onQueueSet(reordered.map { it.uri } + hidden + context.map { it.uri })
+            val hidden = playbackState?.queue.orEmpty()
+                .filter { it.uri.isBlank() || it.title.isBlank() }
+                .map { it.uri }
+            env.playerListener?.onQueueSet(reordered.map { it.uri }.filter { it.isNotBlank() } + hidden)
         },
         onSleepTimerSelected = { option ->
             local.sleepTimer = if (option == SleepTimerOption.OFF) null else option
