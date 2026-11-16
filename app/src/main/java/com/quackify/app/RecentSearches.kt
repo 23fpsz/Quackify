@@ -51,7 +51,7 @@ object RecentSearches {
         val text = query.trim()
         if (text.isEmpty()) return
         val key = QUERY_PREFIX + text.lowercase()
-        val next = listOf(key) + keys(context).filterNot { it == key || isSameQuery(it, text) }
+        val next = listOf(key) + keys(context).filterNot { it == key || isSameQuery(it, text) || isTypingOf(it, text) }
         write(context, next.take(LIMIT), cache(context))
     }
 
@@ -160,6 +160,13 @@ object RecentSearches {
         if (!storedKey.startsWith(QUERY_PREFIX)) return false
         val text = storedKey.removePrefix(QUERY_PREFIX)
         return text.equals(target.trim().removePrefix(QUERY_PREFIX), ignoreCase = true)
+    }
+
+    private fun isTypingOf(storedKey: String, target: String): Boolean {
+        if (!storedKey.startsWith(QUERY_PREFIX)) return false
+        val stored = storedKey.removePrefix(QUERY_PREFIX)
+        val text = target.trim().removePrefix(QUERY_PREFIX).lowercase()
+        return stored.startsWith(text) || text.startsWith(stored)
     }
 
     private fun encode(hit: SearchHit): JSONObject = JSONObject()

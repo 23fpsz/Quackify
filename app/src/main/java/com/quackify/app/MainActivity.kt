@@ -911,6 +911,8 @@ class MainActivity : ComponentActivity() {
                             searchLoading = false
                             if (searched.first != null) {
                                 log.i("searched '$term'")
+                                RecentSearches.recordQuery(context, term)
+                                submittedSearchQuery = term
                             }
                         }
 
@@ -1836,9 +1838,11 @@ class MainActivity : ComponentActivity() {
             },
             onPromoteRecentSearch = { item ->
                 RecentSearches.promote(context, item.uri.ifBlank { item.title })
+                log.i("promoted '${item.title}' in the recent searches")
             },
             onRecordRecentSearch = { hit ->
                 RecentSearches.record(context, hit)
+                log.i("recorded '${hit.title}' in the recent searches")
                 val submitted = submittedSearchQuery
                 if (submitted != null && searchTerm.trim() == submitted) {
                     RecentSearches.remove(context, submitted)
