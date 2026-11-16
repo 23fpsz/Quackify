@@ -88,7 +88,6 @@ internal class ShellPlayerEnv(
 internal fun BoxScope.ShellPlayerLayer(
     env: ShellPlayerEnv,
     docked: Boolean = false,
-    landscapeDual: Boolean = false,
 ) {
     val bottomBarModifier = Modifier.align(Alignment.BottomCenter)
     val playbackState = env.playbackState
@@ -108,10 +107,8 @@ internal fun BoxScope.ShellPlayerLayer(
         ?: playbackState?.devices?.firstOrNull { it.name == effectiveConnectedDevice }
     val activeDeviceKind = activeDevice?.kind
 
-    // The dual-view pane is the player alone - the nav bar and mini player
-    // already live in the content pane on the left.
     if (!env.flags.isPlaylistEditMode && env.currentScreen != ShellScreen.ADD_TRACKS &&
-        !env.flags.isLogcatOpen && !landscapeDual
+        !env.flags.isLogcatOpen
     ) {
         ShellBottomBar(
             title = env.playerIdentity.title,
@@ -173,7 +170,6 @@ internal fun BoxScope.ShellPlayerLayer(
             env = env,
             visible = env.isPlayerExpanded && !env.flags.isLogcatOpen,
             docked = false,
-            landscapeDual = landscapeDual,
             modifier = Modifier
         )
     }
@@ -195,7 +191,6 @@ private fun NowPlayingScreenLayer(
     env: ShellPlayerEnv,
     visible: Boolean,
     docked: Boolean,
-    landscapeDual: Boolean = false,
     modifier: Modifier
 ) {
     val playbackState = env.playbackState
@@ -226,7 +221,6 @@ private fun NowPlayingScreenLayer(
     ShellNowPlaying(
         visible = visible,
         docked = docked,
-        landscapeDual = landscapeDual,
         modifier = modifier,
         title = env.playerIdentity.title,
         artist = env.playerIdentity.artist,

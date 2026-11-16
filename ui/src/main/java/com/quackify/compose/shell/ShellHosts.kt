@@ -320,8 +320,6 @@ internal class ShellHosts(
         canvasFilePath = canvasFilePath,
         isCanvasAllowed = isCanvasAllowed,
         isCanvasEnabled = isCanvasEnabled,
-        isNpvLyricsEnabled = isNpvLyricsEnabled,
-        onNpvLyricsToggle = onNpvLyricsToggle,
         canvasResolution = canvasResolution,
         setLocalDevice = setLocalDevice,
         handleOpenSettings = handleOpenSettings,
