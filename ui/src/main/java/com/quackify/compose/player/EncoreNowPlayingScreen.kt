@@ -106,6 +106,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.quackify.compose.R
 import com.quackify.compose.shell.ChapterMarker
 import com.quackify.compose.components.CanvasVideoPlayer
@@ -300,20 +306,34 @@ fun EncoreNowPlayingScreen(
     }
 
     if (videoFullscreen && videoActive) {
-        BackHandler { onToggleVideoFullscreen(false) }
-        VideoFullscreenLayout(
-            videoQualities = videoQualities,
-            onVideoQuality = onVideoQuality,
-            onVideoSurface = onVideoSurface,
-            progress = progress,
-            durationMs = durationMs,
-            currentPositionMs = currentPositionMs,
-            onSeek = onSeek,
-            isLoading = isLoading,
-            canSeek = canSeek,
-            chapters = chapters,
-            onExit = { onToggleVideoFullscreen(false) }
-        )
+        Dialog(
+            onDismissRequest = { onToggleVideoFullscreen(false) },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            val dialogView = LocalView.current
+            LaunchedEffect(dialogView) {
+                val window = (dialogView.parent as? DialogWindowProvider)?.window ?: return@LaunchedEffect
+                val controller = WindowCompat.getInsetsController(window, dialogView)
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            }
+            VideoFullscreenLayout(
+                videoQualities = videoQualities,
+                onVideoQuality = onVideoQuality,
+                onVideoSurface = onVideoSurface,
+                progress = progress,
+                durationMs = durationMs,
+                currentPositionMs = currentPositionMs,
+                onSeek = onSeek,
+                isLoading = isLoading,
+                canSeek = canSeek,
+                chapters = chapters,
+                onExit = { onToggleVideoFullscreen(false) }
+            )
+        }
         return
     }
 
