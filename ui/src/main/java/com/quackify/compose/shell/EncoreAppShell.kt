@@ -888,6 +888,9 @@ fun EncoreAppShell(
         val splitGap = LocalConfiguration.current.screenWidthDp * SPLIT_PLAYER_GAP_FRACTION
         val contentFraction = if (splitPlayer) 1f - splitFraction - SPLIT_PLAYER_GAP_FRACTION else 1f
         val paneShape = RoundedCornerShape(SPLIT_PLAYER_CORNER_DP.dp)
+        val landscapeDualPlayer = !splitPlayer &&
+            LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE &&
+            isPlayerExpanded && !flags.isLogcatOpen
         val screenHost: @Composable () -> Unit = {
             ShellScreenSlot(currentScreen) { screen ->
                 when (screen) {
@@ -1135,6 +1138,36 @@ fun EncoreAppShell(
                         .background(EncoreColors.Background)
                 ) {
                     ShellDockedPlayer(env = hosts.player())
+                }
+            }
+        } else if (landscapeDualPlayer) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .consumeWindowInsets(WindowInsets.systemBars)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(contentFraction)
+                        .fillMaxHeight()
+                        .clip(paneShape)
+                        .background(EncoreColors.Background)
+                ) {
+                    screenHost()
+                    ShellPlayerLayer(env = hosts.player(), docked = true)
+                }
+                Spacer(modifier = Modifier.width(splitGap.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(splitFraction)
+                        .fillMaxHeight()
+                        .clip(paneShape)
+                        .background(EncoreColors.Background)
+                ) {
+                    DualViewPlayerPane(modifier = Modifier.fillMaxSize()) {
+                        ShellPlayerLayer(env = hosts.player(), landscapeDual = true)
+                    }
                 }
             }
         } else {

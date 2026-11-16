@@ -29,6 +29,7 @@ private const val NowPlayingRevealFadeMs = 160
 internal fun ShellNowPlaying(
     visible: Boolean,
     docked: Boolean = false,
+    landscapeDual: Boolean = false,
     modifier: Modifier = Modifier,
     title: String,
     artist: String,
@@ -174,6 +175,8 @@ internal fun ShellNowPlaying(
     if (docked) {
         if (!visible) return
         DockedPlayerPane(modifier = modifier) { surface() }
+    } else if (landscapeDual) {
+        DualViewPlayerPane(modifier = modifier) { surface() }
     } else {
         AnimatedVisibility(
             visible = visible,
@@ -189,6 +192,36 @@ internal fun ShellNowPlaying(
             )
         ) {
             surface()
+        }
+    }
+}
+
+/**
+ * Right pane of the landscape dual view: the expanded now playing screen sits
+ * beside the app content instead of covering it. The screen is measured with
+ * the pane's own size so the portrait arrangement (artwork on top, controls
+ * below) fits the tall narrow pane.
+ */
+@Composable
+internal fun DualViewPlayerPane(modifier: Modifier, content: @Composable () -> Unit) {
+    BoxWithConstraints(modifier = modifier) {
+        val base = LocalConfiguration.current
+        val paneWidth = maxWidth.value.toInt().coerceAtLeast(1)
+        val paneHeight = maxHeight.value.toInt().coerceAtLeast(1)
+        val paneConfiguration = remember(base, paneWidth, paneHeight) {
+            Configuration(base).apply {
+                screenWidthDp = paneWidth
+                screenHeightDp = paneHeight
+                smallestScreenWidthDp = minOf(paneWidth, paneHeight)
+                orientation = if (paneWidth > paneHeight) {
+                    Configuration.ORIENTATION_LANDSCAPE
+                } else {
+                    Configuration.ORIENTATION_PORTRAIT
+                }
+            }
+        }
+        CompositionLocalProvider(LocalConfiguration provides paneConfiguration) {
+            content()
         }
     }
 }

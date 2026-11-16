@@ -88,6 +88,7 @@ internal class ShellPlayerEnv(
 internal fun BoxScope.ShellPlayerLayer(
     env: ShellPlayerEnv,
     docked: Boolean = false,
+    landscapeDual: Boolean = false,
 ) {
     val bottomBarModifier = Modifier.align(Alignment.BottomCenter)
     val playbackState = env.playbackState
@@ -108,7 +109,7 @@ internal fun BoxScope.ShellPlayerLayer(
     val activeDeviceKind = activeDevice?.kind
 
     if (!env.flags.isPlaylistEditMode && env.currentScreen != ShellScreen.ADD_TRACKS &&
-        !env.flags.isLogcatOpen
+        !env.flags.isLogcatOpen && !landscapeDual
     ) {
         ShellBottomBar(
             title = env.playerIdentity.title,
@@ -170,6 +171,7 @@ internal fun BoxScope.ShellPlayerLayer(
             env = env,
             visible = env.isPlayerExpanded && !env.flags.isLogcatOpen,
             docked = false,
+            landscapeDual = landscapeDual,
             modifier = Modifier
         )
     }
@@ -191,6 +193,7 @@ private fun NowPlayingScreenLayer(
     env: ShellPlayerEnv,
     visible: Boolean,
     docked: Boolean,
+    landscapeDual: Boolean = false,
     modifier: Modifier
 ) {
     val playbackState = env.playbackState
@@ -221,6 +224,7 @@ private fun NowPlayingScreenLayer(
     ShellNowPlaying(
         visible = visible,
         docked = docked,
+        landscapeDual = landscapeDual,
         modifier = modifier,
         title = env.playerIdentity.title,
         artist = env.playerIdentity.artist,
