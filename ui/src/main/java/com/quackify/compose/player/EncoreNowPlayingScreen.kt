@@ -12,11 +12,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -93,8 +90,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -145,14 +140,8 @@ private const val SNAP_BACK_FLING_VELOCITY = -100f
 private const val DISMISS_FLING_VELOCITY = 350f
 private const val DISMISS_THRESHOLD_DP = 96f
 private const val AXIS_UNDECIDED = 0
-private const val AXIS_HORIZONTAL = 1
 private const val AXIS_VERTICAL = 2
 private const val AXIS_YIELD = 3
-
-/** Artwork swipe-to-skip: commit past this share of the artwork, or on a fast fling. */
-private const val SWIPE_COMMIT_FRACTION = 0.28f
-private const val SWIPE_FLING_VELOCITY = 320f
-private const val SWIPE_OUT_MS = 170
 
 /** Reveal choreography: the artwork lands first, then the rest follows. */
 private const val REVEAL_MS = 420
@@ -330,8 +319,6 @@ fun EncoreNowPlayingScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val playerOffsetY = remember { Animatable(0f) }
-    val artworkOffsetX = remember { Animatable(0f) }
-    val haptics = LocalHapticFeedback.current
     val scrollState = rememberScrollState()
     val reveal = rememberRevealProgress()
 
@@ -465,21 +452,10 @@ fun EncoreNowPlayingScreen(
     val artworkGestureModifier = Modifier.npvArtworkGesture(
         coroutineScope = coroutineScope,
         playerOffsetY = playerOffsetY,
-        offsetX = artworkOffsetX,
         scrollState = scrollState,
         scrollEnabled = !effectiveIsLoading,
         dismissThresholdPx = dismissThresholdPx,
         dismissEnabled = !docked,
-        swipeEnabled = !effectiveIsLoading && !videoActive,
-        canSwipePrevious = canSkipPrevious,
-        onSwipePrevious = {
-            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            onSkipToPreviousClick()
-        },
-        onSwipeNext = {
-            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            onSkipNextClick()
-        },
         onDismiss = dismissPlayer,
         onSnapBack = snapBackPlayer
     )
@@ -541,9 +517,7 @@ fun EncoreNowPlayingScreen(
             CanvasVideoPlayer(
                 filePath = canvasFilePath,
                 zoom = CANVAS_ZOOM,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { translationX = artworkOffsetX.value }
+                modifier = Modifier.fillMaxSize()
             )
             Box(
                 modifier = Modifier
@@ -576,9 +550,6 @@ fun EncoreNowPlayingScreen(
                             .weight(LANDSCAPE_ARTWORK_PANE_WEIGHT)
                             .fillMaxHeight()
                             .then(artworkGestureModifier)
-                            .graphicsLayer { translationX = artworkOffsetX.value }
-                            .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
-                        contentAlignment = Alignment.Center
                     ) {
                         if (videoActive || canvasActive) {
                             Box(
@@ -604,40 +575,25 @@ fun EncoreNowPlayingScreen(
                                 )
                             }
                         } else {
-                            ArtworkPeek(
-                                url = nextTrack?.imageUrl.orEmpty(),
-                                dominantColor = dynamicArtworkColor,
+                            Box(
                                 modifier = Modifier
-                                    .matchParentSize()
-                                    .graphicsLayer {
-                                        translationX = artworkOffsetX.value + size.width
-                                    }
-                            )
-                            ArtworkPeek(
-                                url = previousTrack?.imageUrl.orEmpty(),
-                                dominantColor = dynamicArtworkColor,
-                                modifier = Modifier
-                                    .matchParentSize()
-                                    .graphicsLayer {
-                                        translationX = artworkOffsetX.value - size.width
-                                    }
-                            )
-                            NowPlayingArtworkCard(
-                                title = title,
-                                coverUrl = coverUrl,
-                                dominantColor = dynamicArtworkColor,
-                                backgroundColor = animatedDominantColor,
-                                canvasFilePath = canvasFilePath,
-                                isCanvasEnabled = canvasActive,
-                                videoActive = videoActive,
-                                videoQualities = videoQualities,
-                                onVideoQuality = onVideoQuality,
-                                onVideoSurface = onVideoSurface,
-                                onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
-                                modifier = Modifier
-                                    .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
-                                    .graphicsLayer { translationX = artworkOffsetX.value }
-                            )
+                                    .fillMaxSize()
+                                    .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                SwipableTrackArtwork(
+                                    currentTitle = title,
+                                    currentCoverUrl = coverUrl,
+                                    currentDominantColor = dynamicArtworkColor,
+                                    cardBackgroundColor = animatedDominantColor,
+                                    previousTrack = previousTrack,
+                                    nextTrack = nextTrack,
+                                    canSwipePrevious = canSkipPrevious,
+                                    onSwipePrevious = onSkipToPreviousClick,
+                                    onSwipeNext = onSkipNextClick,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
 
@@ -808,8 +764,6 @@ fun EncoreNowPlayingScreen(
                         Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = animatedMediaPadding)
-                                    .graphicsLayer { translationX = artworkOffsetX.value }
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -840,40 +794,19 @@ fun EncoreNowPlayingScreen(
                                             .height(animatedMediaHeight)
                                     )
                                 } else {
-                                    ArtworkPeek(
-                                        url = nextTrack?.imageUrl.orEmpty(),
-                                        dominantColor = dynamicArtworkColor,
-                                        modifier = Modifier
-                                            .matchParentSize()
-                                            .graphicsLayer {
-                                                translationX = artworkOffsetX.value + size.width
-                                            }
-                                    )
-                                    ArtworkPeek(
-                                        url = previousTrack?.imageUrl.orEmpty(),
-                                        dominantColor = dynamicArtworkColor,
-                                        modifier = Modifier
-                                            .matchParentSize()
-                                            .graphicsLayer {
-                                                translationX = artworkOffsetX.value - size.width
-                                            }
-                                    )
-                                    NowPlayingArtworkCard(
-                                        title = title,
-                                        coverUrl = coverUrl,
-                                        dominantColor = dynamicArtworkColor,
-                                        backgroundColor = animatedDominantColor,
-                                        canvasFilePath = canvasFilePath,
-                                        isCanvasEnabled = canvasActive,
-                                        videoActive = videoActive,
-                                        videoQualities = videoQualities,
-                                        onVideoQuality = onVideoQuality,
-                                        onVideoSurface = onVideoSurface,
-                                        onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
+                                    SwipableTrackArtwork(
+                                        currentTitle = title,
+                                        currentCoverUrl = coverUrl,
+                                        currentDominantColor = dynamicArtworkColor,
+                                        cardBackgroundColor = animatedDominantColor,
+                                        previousTrack = previousTrack,
+                                        nextTrack = nextTrack,
+                                        canSwipePrevious = canSkipPrevious,
+                                        onSwipePrevious = onSkipToPreviousClick,
+                                        onSwipeNext = onSkipNextClick,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(animatedMediaHeight)
-                                            .graphicsLayer { translationX = artworkOffsetX.value }
                                     )
                                 }
                             }
@@ -1119,16 +1052,14 @@ private fun Modifier.npvDismissDragGesture(
 }
 
 /**
- * Artwork gestures: horizontal drags perform the swipe-to-skip track
- * animation while vertical drags translate the whole player for
- * drag-to-dismiss.
+ * Artwork gestures: vertical drags translate the whole player for
+ * drag-to-dismiss while horizontal drags are yielded to the swipe
+ * carousel that owns the artwork row.
  *
  * The axis is resolved manually, before any event is consumed. Vertical
  * drags are only claimed once the page can no longer scroll in that
  * direction, so dragging over the artwork scrolls the page like any other
  * part of it and only turns into a dismissal once the top is reached.
- * Horizontal drags move the artwork aside; releasing past the commit point
- * (or on a fast fling) sends it off and skips, otherwise it springs back.
  *
  * The claim is re-evaluated on every move: the scroll may not sit at the
  * top when the drag starts, but it reaches it as the finger keeps pulling
@@ -1140,18 +1071,13 @@ private fun Modifier.npvDismissDragGesture(
 private fun Modifier.npvArtworkGesture(
     coroutineScope: CoroutineScope,
     playerOffsetY: Animatable<Float, AnimationVector1D>,
-    offsetX: Animatable<Float, AnimationVector1D>,
     scrollState: ScrollState,
     scrollEnabled: Boolean,
     dismissThresholdPx: Float,
     dismissEnabled: Boolean,
-    swipeEnabled: Boolean,
-    canSwipePrevious: Boolean,
-    onSwipePrevious: () -> Unit,
-    onSwipeNext: () -> Unit,
     onDismiss: () -> Unit,
     onSnapBack: () -> Unit
-): Modifier = pointerInput(dismissThresholdPx, scrollEnabled, dismissEnabled, swipeEnabled, canSwipePrevious) {
+): Modifier = pointerInput(dismissThresholdPx, scrollEnabled, dismissEnabled) {
     var axis = AXIS_UNDECIDED
     var totalDragX = 0f
     var totalDragY = 0f
@@ -1174,25 +1100,17 @@ private fun Modifier.npvArtworkGesture(
             totalDragX += delta.x
             totalDragY += delta.y
 
-            if (axis == AXIS_UNDECIDED) {
-                val horizontal = totalDragX.absoluteValue > DRAG_AXIS_SLOP_PX &&
-                    totalDragX.absoluteValue > totalDragY.absoluteValue
-                if (horizontal) {
-                    axis = if (swipeEnabled) AXIS_HORIZONTAL else AXIS_YIELD
-                } else if (totalDragY > DRAG_AXIS_SLOP_PX) {
-                    val pageAtTop = !scrollEnabled || scrollState.value <= 0
-                    axis = if (pageAtTop && dismissEnabled) AXIS_VERTICAL else AXIS_YIELD
-                } else if (totalDragY < -DRAG_AXIS_SLOP_PX) {
+            val verticalBias = totalDragY.absoluteValue > totalDragX.absoluteValue
+            if (axis == AXIS_UNDECIDED || axis == AXIS_YIELD) {
+                val pageAtTop = !scrollEnabled || scrollState.value <= 0
+                if (totalDragY > DRAG_AXIS_SLOP_PX && verticalBias && pageAtTop && dismissEnabled) {
+                    axis = AXIS_VERTICAL
+                } else if (totalDragY < -DRAG_AXIS_SLOP_PX || totalDragX.absoluteValue > DRAG_AXIS_SLOP_PX && !verticalBias) {
                     axis = AXIS_YIELD
                 }
             }
 
             when (axis) {
-                AXIS_HORIZONTAL -> {
-                    change.consume()
-                    velocityTracker.addPosition(change.uptimeMillis, change.position)
-                    coroutineScope.launch { offsetX.snapTo(totalDragX) }
-                }
                 AXIS_VERTICAL -> {
                     change.consume()
                     velocityTracker.addPosition(change.uptimeMillis, change.position)
@@ -1213,40 +1131,6 @@ private fun Modifier.npvArtworkGesture(
                         velocity.y > DISMISS_FLING_VELOCITY -> onDismiss()
                         playerOffsetY.value > dismissThresholdPx -> onDismiss()
                         else -> onSnapBack()
-                    }
-                }
-                AXIS_HORIZONTAL -> {
-                    val width = size.width.toFloat()
-                    val dragged = offsetX.value
-                    val goingNext = if (dragged.absoluteValue > 1f) dragged < 0f else velocity.x < 0f
-                    if (goingNext || canSwipePrevious) {
-                        val committed = dragged.absoluteValue > width * SWIPE_COMMIT_FRACTION ||
-                            velocity.x.absoluteValue > SWIPE_FLING_VELOCITY
-                        if (committed) {
-                            val out = if (goingNext) -width else width
-                            offsetX.animateTo(
-                                out,
-                                tween(durationMillis = SWIPE_OUT_MS, easing = FastOutLinearInEasing)
-                            )
-                            if (goingNext) onSwipeNext() else onSwipePrevious()
-                            offsetX.snapTo(0f)
-                        } else {
-                            offsetX.animateTo(
-                                0f,
-                                spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            )
-                        }
-                    } else {
-                        offsetX.animateTo(
-                            0f,
-                            spring(
-                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                stiffness = Spring.StiffnessMediumLow
-                            )
-                        )
                     }
                 }
             }
@@ -1337,30 +1221,6 @@ private fun NowPlayingHeaderRow(
  * video (when the track has one) and the CANVAS toggle pill.
  * Reference: revised_template_page_layout.xml (@id/track_carousel) -> bounds [63,308][1017,1262] (24dp margins)
  */
-@Composable
-private fun ArtworkPeek(
-    url: String,
-    dominantColor: Color,
-    modifier: Modifier = Modifier
-) {
-    if (url.isBlank()) return
-    val corner = RoundedCornerShape(EncoreCornerRadii.Larger2)
-    Box(
-        modifier = modifier
-            .shadow(elevation = 16.dp, shape = corner)
-            .clip(corner)
-            .background(dominantColor)
-    ) {
-        EncoreArtworkImage(
-            imageUrl = url,
-            contentDescription = null,
-            fallbackColor = dominantColor,
-            requestSize = 640,
-            modifier = Modifier.fillMaxSize()
-        )
-    }
-}
-
 @Composable
 private fun NowPlayingArtworkCard(
     title: String,
@@ -1517,6 +1377,157 @@ private fun NowPlayingArtworkCard(
                     modifier = Modifier.fillMaxSize()
                 )
             }
+        }
+    }
+}
+
+private const val SWIPE_COMMIT_FRACTION = 0.3f
+private const val SWIPE_SETTLE_MS = 240
+
+@Composable
+private fun SwipableTrackArtwork(
+    currentTitle: String,
+    currentCoverUrl: String?,
+    currentDominantColor: Color,
+    cardBackgroundColor: Color,
+    previousTrack: TrackItem?,
+    nextTrack: TrackItem?,
+    canSwipePrevious: Boolean,
+    onSwipePrevious: () -> Unit,
+    onSwipeNext: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hasPrev = canSwipePrevious && previousTrack != null
+    val hasNext = nextTrack != null
+    val drag = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(currentCoverUrl, currentTitle) {
+        drag.snapTo(0f)
+    }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .clipToBounds()
+            .pointerInput(hasPrev, hasNext) {
+                val cardWidthPx = size.width.toFloat()
+                val flickVelocity = cardWidthPx * 1.5f
+                val tracker = VelocityTracker()
+                detectHorizontalDragGestures(
+                    onDragStart = { tracker.resetTracking() },
+                    onDragEnd = {
+                        val velocity = tracker.calculateVelocity().x
+                        tracker.resetTracking()
+                        val offset = drag.value
+                        val commitNext = hasNext && offset < 0f &&
+                            (offset < -cardWidthPx * SWIPE_COMMIT_FRACTION || velocity < -flickVelocity)
+                        val commitPrev = hasPrev && offset > 0f &&
+                            (offset > cardWidthPx * SWIPE_COMMIT_FRACTION || velocity > flickVelocity)
+                        if (commitNext) onSwipeNext()
+                        if (commitPrev) onSwipePrevious()
+                        scope.launch {
+                            drag.animateTo(
+                                targetValue = 0f,
+                                animationSpec = tween(
+                                    durationMillis = SWIPE_SETTLE_MS,
+                                    easing = FastOutSlowInEasing
+                                )
+                            )
+                        }
+                    },
+                    onDragCancel = {
+                        scope.launch {
+                            drag.animateTo(
+                                targetValue = 0f,
+                                animationSpec = tween(
+                                    durationMillis = SWIPE_SETTLE_MS,
+                                    easing = FastOutSlowInEasing
+                                )
+                            )
+                        }
+                    },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        val raw = drag.value + amount
+                        val clamped = when {
+                            raw > 0f && !hasPrev -> 0f
+                            raw < 0f && !hasNext -> 0f
+                            raw > cardWidthPx -> cardWidthPx
+                            raw < -cardWidthPx -> -cardWidthPx
+                            else -> raw
+                        }
+                        scope.launch { drag.snapTo(clamped) }
+                    }
+                )
+            }
+    ) {
+        val pageWidth = maxWidth
+        val pageWidthPx = with(LocalDensity.current) { pageWidth.toPx() }
+        Row(
+            modifier = Modifier
+                .requiredWidth(pageWidth * 3)
+                .fillMaxHeight()
+                .graphicsLayer { translationX = drag.value - pageWidthPx }
+        ) {
+            SwipeTrackArtworkSlot(
+                title = previousTrack?.title.orEmpty(),
+                coverUrl = previousTrack?.imageUrl,
+                dominantColor = currentDominantColor,
+                backgroundColor = cardBackgroundColor,
+                modifier = Modifier
+                    .width(pageWidth)
+                    .fillMaxHeight()
+            )
+            SwipeTrackArtworkSlot(
+                title = currentTitle,
+                coverUrl = currentCoverUrl,
+                dominantColor = currentDominantColor,
+                backgroundColor = cardBackgroundColor,
+                modifier = Modifier
+                    .width(pageWidth)
+                    .fillMaxHeight()
+            )
+            SwipeTrackArtworkSlot(
+                title = nextTrack?.title.orEmpty(),
+                coverUrl = nextTrack?.imageUrl,
+                dominantColor = currentDominantColor,
+                backgroundColor = cardBackgroundColor,
+                modifier = Modifier
+                    .width(pageWidth)
+                    .fillMaxHeight()
+            )
+        }
+    }
+}
+
+@Composable
+private fun SwipeTrackArtworkSlot(
+    title: String,
+    coverUrl: String?,
+    dominantColor: Color,
+    backgroundColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .aspectRatio(1f)
+                .shadow(elevation = 16.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
+                .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
+                .background(backgroundColor),
+            contentAlignment = Alignment.Center
+        ) {
+            EncoreArtworkImage(
+                imageUrl = coverUrl,
+                contentDescription = title.ifBlank { null },
+                fallbackColor = dominantColor,
+                requestSize = 640,
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
