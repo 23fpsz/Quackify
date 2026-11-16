@@ -16,7 +16,6 @@ import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.ShowDetail
 import com.quackify.compose.playlist.TrackItem
-import com.quackify.compose.player.LyricsOptions
 import com.quackify.compose.sheets.EntityOptions
 import com.quackify.compose.sheets.SleepTimerOption
 import kotlinx.coroutines.CoroutineScope
@@ -75,6 +74,8 @@ internal class ShellSheetsEnv(
     val canvasFilePath: String?,
     val isCanvasAllowed: Boolean,
     val isCanvasEnabled: Boolean,
+    val isNpvLyricsEnabled: Boolean = true,
+    val onNpvLyricsToggle: ((Boolean) -> Unit)? = null,
     val canvasResolution: Int,
     val setLocalDevice: (String) -> Unit,
     val handleOpenSettings: () -> Unit,
@@ -265,8 +266,8 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         isCanvasEnabled = env.isCanvasEnabled,
         onCanvasToggle = { env.onCanvasToggle?.invoke(!env.isCanvasEnabled) },
         lyricsUnderCoverAvailable = flags.isTrackOptionsFromPlayer,
-        isLyricsUnderCoverEnabled = LyricsOptions.enabled,
-        onLyricsUnderCoverToggle = { LyricsOptions.setEnabled(env.context, !LyricsOptions.enabled) },
+        isLyricsUnderCoverEnabled = env.isNpvLyricsEnabled,
+        onLyricsUnderCoverToggle = { env.onNpvLyricsToggle?.invoke(!env.isNpvLyricsEnabled) },
         canvasResolution = env.canvasResolution,
         onCanvasResolution = { res -> env.onCanvasResolution?.invoke(res) },
         onDismissProfile = { flags.isProfileDrawerOpen = false },

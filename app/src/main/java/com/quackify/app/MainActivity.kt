@@ -196,6 +196,7 @@ class MainActivity : ComponentActivity() {
     private var addTracksFetch by mutableStateOf(0)
     private var sawOffline by mutableStateOf(false)
     private var canvasEnabled by mutableStateOf(true)
+    private var npvLyricsEnabled by mutableStateOf(true)
 
     internal var feed by mutableStateOf<List<HomeSection>>(emptyList())
     private var homeChips by mutableStateOf<List<HomeChip>>(emptyList())
@@ -265,6 +266,7 @@ class MainActivity : ComponentActivity() {
         savedAccountsList = EncoreAuth.savedAccounts(applicationContext)
         userProfileColorHex = EncoreAuth.account(applicationContext)?.colorHex.orEmpty()
         canvasEnabled = clientPrefs.getBoolean("canvasNpvEnabled", true)
+        npvLyricsEnabled = clientPrefs.getBoolean("npvLyricsEnabled", true)
         com.quackify.compose.player.LyricsOptions.load(applicationContext)
         syncLauncherIcon(applicationContext)
         canvasResolution = clientPrefs.getInt("canvasResolution", 1080)
@@ -1499,6 +1501,11 @@ class MainActivity : ComponentActivity() {
             canvasEnabled = on
             clientPrefs.edit().putBoolean("canvasNpvEnabled", on).apply()
             bridge.setCanvas(on)
+        },
+        isNpvLyricsEnabled = npvLyricsEnabled,
+        onNpvLyricsToggle = { on ->
+            npvLyricsEnabled = on
+            clientPrefs.edit().putBoolean("npvLyricsEnabled", on).apply()
         },
         canvasResolution = canvasResolution,
         onCanvasResolution = { height ->
