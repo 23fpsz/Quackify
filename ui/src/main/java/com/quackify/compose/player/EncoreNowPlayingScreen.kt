@@ -1468,7 +1468,7 @@ private fun SwipableTrackArtwork(
             modifier = Modifier
                 .requiredWidth(pageWidth * 3)
                 .fillMaxHeight()
-                .graphicsLayer { translationX = drag.value - pageWidthPx }
+                .graphicsLayer { translationX = drag.value }
         ) {
             SwipeTrackArtworkSlot(
                 title = previousTrack?.title.orEmpty(),
