@@ -878,6 +878,12 @@ fun EncoreAppShell(
         val splitGap = LocalConfiguration.current.screenWidthDp * SPLIT_PLAYER_GAP_FRACTION
         val contentFraction = if (splitPlayer) 1f - splitFraction - SPLIT_PLAYER_GAP_FRACTION else 1f
         val paneShape = RoundedCornerShape(SPLIT_PLAYER_CORNER_DP.dp)
+        // Landscape but too narrow for the tablet split: while the player is
+        // expanded it becomes a dual view - content on the left, player on
+        // the right - so nothing covers anything on small screens.
+        val landscapeDualPlayer = !splitPlayer &&
+            LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE &&
+            isPlayerExpanded && !flags.isLogcatOpen
         val screenHost: @Composable () -> Unit = {
             ShellScreenSlot(currentScreen) { screen ->
                 when (screen) {
@@ -1124,6 +1130,41 @@ fun EncoreAppShell(
                         .background(EncoreColors.Background)
                 ) {
                     ShellDockedPlayer(env = hosts.player())
+                }
+            }
+        } else if (landscapeDualPlayer) {
+            // Landscape on a small screen: the fullscreen player becomes the
+            // right pane of a dual view instead of covering the app - the
+            // content stays reachable on the left. The pane reuses the split
+            // layout's width maths so the player keeps a readable width no
+            // matter how narrow the window is.
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .consumeWindowInsets(WindowInsets.systemBars)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(contentFraction)
+                        .fillMaxHeight()
+                        .clip(paneShape)
+                        .background(EncoreColors.Background)
+                ) {
+                    screenHost()
+                    ShellPlayerLayer(env = hosts.player(), docked = true)
+                }
+                Spacer(modifier = Modifier.width(splitGap.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(splitFraction)
+                        .fillMaxHeight()
+                        .clip(paneShape)
+                        .background(EncoreColors.Background)
+                ) {
+                    DualViewPlayerPane(modifier = Modifier.fillMaxSize()) {
+                        ShellPlayerLayer(env = hosts.player(), landscapeDual = true)
+                    }
                 }
             }
         } else {

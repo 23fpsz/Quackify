@@ -265,8 +265,11 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         isCanvasEnabled = env.isCanvasEnabled,
         onCanvasToggle = { env.onCanvasToggle?.invoke(!env.isCanvasEnabled) },
         lyricsUnderCoverAvailable = flags.isTrackOptionsFromPlayer,
-        isLyricsUnderCoverEnabled = LyricsOptions.enabled,
-        onLyricsUnderCoverToggle = { LyricsOptions.setEnabled(env.context, !LyricsOptions.enabled) },
+        // The row is about the synced lyric line under the cover only: it
+        // writes the preview flag, never the master lyrics switch - turning
+        // the line off must not take the whole lyrics feature down with it.
+        isLyricsUnderCoverEnabled = LyricsOptions.preview,
+        onLyricsUnderCoverToggle = { LyricsOptions.setPreview(env.context, !LyricsOptions.preview) },
         canvasResolution = env.canvasResolution,
         onCanvasResolution = { res -> env.onCanvasResolution?.invoke(res) },
         onDismissProfile = { flags.isProfileDrawerOpen = false },

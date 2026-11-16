@@ -81,7 +81,11 @@ internal class ShellPlayerEnv(
  * EncoreAppShell so that composable stays under the JIT method-size limit.
  */
 @Composable
-internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv, docked: Boolean = false) {
+internal fun BoxScope.ShellPlayerLayer(
+    env: ShellPlayerEnv,
+    docked: Boolean = false,
+    landscapeDual: Boolean = false,
+) {
     val bottomBarModifier = Modifier.align(Alignment.BottomCenter)
     val playbackState = env.playbackState
     val progressState = env.progressState
@@ -100,7 +104,11 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv, docked: Boolean = fa
         ?: playbackState?.devices?.firstOrNull { it.name == effectiveConnectedDevice }
     val activeDeviceKind = activeDevice?.kind
 
-    if (!env.flags.isPlaylistEditMode && env.currentScreen != ShellScreen.ADD_TRACKS && !env.flags.isLogcatOpen) {
+    // The dual-view pane is the player alone - the nav bar and mini player
+    // already live in the content pane on the left.
+    if (!env.flags.isPlaylistEditMode && env.currentScreen != ShellScreen.ADD_TRACKS &&
+        !env.flags.isLogcatOpen && !landscapeDual
+    ) {
         ShellBottomBar(
             title = env.playerIdentity.title,
             artist = env.playerIdentity.artist,
@@ -161,6 +169,7 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv, docked: Boolean = fa
             env = env,
             visible = env.isPlayerExpanded && !env.flags.isLogcatOpen,
             docked = false,
+            landscapeDual = landscapeDual,
             modifier = Modifier
         )
     }
@@ -182,6 +191,7 @@ private fun NowPlayingScreenLayer(
     env: ShellPlayerEnv,
     visible: Boolean,
     docked: Boolean,
+    landscapeDual: Boolean = false,
     modifier: Modifier
 ) {
     val playbackState = env.playbackState
@@ -212,6 +222,7 @@ private fun NowPlayingScreenLayer(
     ShellNowPlaying(
         visible = visible,
         docked = docked,
+        landscapeDual = landscapeDual,
         modifier = modifier,
         title = env.playerIdentity.title,
         artist = env.playerIdentity.artist,
@@ -234,7 +245,10 @@ private fun NowPlayingScreenLayer(
                 env.onArtistFollowToggle?.invoke(env.resolvedArtistUri, follow)
             }
         },
-        lyrics = if (LyricsOptions.enabled) env.nowPlayingLyrics else emptyList(),
+        // The full lyrics list flows unconditionally - the master switch lives
+        // in Settings; the under-cover toggle below only kills the preview
+        // line, not the lyrics feature (fullscreen lyrics included).
+        lyrics = env.nowPlayingLyrics,
         lyricsPreview = LyricsOptions.preview,
         canvasFilePath = env.canvasFilePath,
         isCanvasAllowed = env.isCanvasAllowed,
