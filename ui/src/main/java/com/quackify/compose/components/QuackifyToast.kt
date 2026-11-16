@@ -62,25 +62,25 @@ private val TOAST_ACTION_SPACING = 8.dp
 private val TOAST_STACK_SPACING = 6.dp
 
 /** Spotify's in-app toast surface, white like the real snackbar. */
-private val SpotifyToastBackground = Color(0xFFFFFFFF)
+private val QuackifyToastBackground = Color(0xFFFFFFFF)
 
-private val SpotifyToastTextColor = Color(0xFF191414)
+private val QuackifyToastTextColor = Color(0xFF191414)
 
 /** Spotify renders snackbar actions in their signature green. */
-private val SpotifyToastActionColor = Color(0xFF1DB954)
+private val QuackifyToastActionColor = Color(0xFF1DB954)
 
 /** A tappable action rendered next to the toast message. */
-class SpotifyToastAction(
+class QuackifyToastAction(
     val label: String,
     val onClick: () -> Unit,
 )
 
 /** One stacked toast: identity, message, optional action and how many times
  * the same message was shown back to back. */
-data class SpotifyToastEntry(
+data class QuackifyToastEntry(
     val id: Long,
     val message: String,
-    val action: SpotifyToastAction?,
+    val action: QuackifyToastAction?,
     val count: Int,
 )
 
@@ -92,8 +92,8 @@ data class SpotifyToastEntry(
  * up, the next arrival drops the top-most one even if its time has not run
  * out yet.
  */
-class SpotifyToastState {
-    var entries by mutableStateOf<List<SpotifyToastEntry>>(emptyList())
+class QuackifyToastState {
+    var entries by mutableStateOf<List<QuackifyToastEntry>>(emptyList())
         private set
 
     private var nextId = 0L
@@ -111,11 +111,11 @@ class SpotifyToastState {
             return
         }
         val action = if (actionLabel != null && onAction != null) {
-            SpotifyToastAction(actionLabel, onAction)
+            QuackifyToastAction(actionLabel, onAction)
         } else {
             null
         }
-        val fresh = SpotifyToastEntry(nextId++, text, action, 1)
+        val fresh = QuackifyToastEntry(nextId++, text, action, 1)
         val stacked = listOf(fresh) + entries
         entries = if (stacked.size > TOAST_MAX_STACK) {
             stacked.dropLast(stacked.size - TOAST_MAX_STACK)
@@ -134,7 +134,7 @@ class SpotifyToastState {
 }
 
 @Composable
-fun rememberSpotifyToastState(): SpotifyToastState = remember { SpotifyToastState() }
+fun rememberQuackifyToastState(): QuackifyToastState = remember { QuackifyToastState() }
 
 /**
  * Spotify-style toast stack: white bars with dark text floating above the
@@ -145,8 +145,8 @@ fun rememberSpotifyToastState(): SpotifyToastState = remember { SpotifyToastStat
  * the full screen width, landscape rows hug their content.
  */
 @Composable
-fun SpotifyToastHost(
-    state: SpotifyToastState,
+fun QuackifyToastHost(
+    state: QuackifyToastState,
     modifier: Modifier = Modifier,
 ) {
     val isLandscape =
@@ -159,7 +159,7 @@ fun SpotifyToastHost(
         userScrollEnabled = false,
     ) {
         items(state.entries, key = { it.id }) { entry ->
-            SpotifyToastRow(
+            QuackifyToastRow(
                 entry = entry,
                 state = state,
                 isLandscape = isLandscape,
@@ -170,9 +170,9 @@ fun SpotifyToastHost(
 }
 
 @Composable
-private fun SpotifyToastRow(
-    entry: SpotifyToastEntry,
-    state: SpotifyToastState,
+private fun QuackifyToastRow(
+    entry: QuackifyToastEntry,
+    state: QuackifyToastState,
     isLandscape: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -212,7 +212,7 @@ private fun SpotifyToastRow(
                 )
             }
             .background(
-                SpotifyToastBackground,
+                QuackifyToastBackground,
                 if (isLandscape) RoundedCornerShape(12.dp) else RoundedCornerShape(6.dp)
             )
             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -225,7 +225,7 @@ private fun SpotifyToastRow(
         ) {
             Text(
                 text = entry.message,
-                color = SpotifyToastTextColor,
+                color = QuackifyToastTextColor,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = if (isLandscape) TextAlign.Center else TextAlign.Start,
@@ -237,7 +237,7 @@ private fun SpotifyToastRow(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "x${entry.count}",
-                    color = SpotifyToastTextColor.copy(alpha = 0.6f),
+                    color = QuackifyToastTextColor.copy(alpha = 0.6f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -249,7 +249,7 @@ private fun SpotifyToastRow(
             Spacer(modifier = Modifier.width(TOAST_ACTION_SPACING))
             Text(
                 text = currentAction.label,
-                color = SpotifyToastActionColor,
+                color = QuackifyToastActionColor,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,

@@ -58,8 +58,8 @@ import com.quackify.backend.model.SearchResults
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.UserProfile
 import com.quackify.compose.R
-import com.quackify.compose.components.SpotifyToastHost
-import com.quackify.compose.components.SpotifyToastState
+import com.quackify.compose.components.QuackifyToastHost
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.util.rememberIsOffline
 import com.quackify.compose.home.HomeShelf
 import com.quackify.compose.home.QuickAccessItem
@@ -473,7 +473,7 @@ fun EncoreAppShell(
 
     /** Single funnel for every "add to queue" action so they all fire the
      * Spotify-style confirmation toast from one place. */
-    val toast = remember { SpotifyToastState() }
+    val toast = remember { QuackifyToastState() }
 
     /** The same network watchdog that drives the offline banner: user actions
      * that would need to dial out (play, search, queue, skip) are refused at
@@ -1157,7 +1157,7 @@ fun EncoreAppShell(
             )
         }
 
-        SpotifyToastHost(
+        QuackifyToastHost(
             state = toast,
             modifier = Modifier
                 .align(if (splitPlayer) Alignment.BottomStart else Alignment.BottomCenter)
