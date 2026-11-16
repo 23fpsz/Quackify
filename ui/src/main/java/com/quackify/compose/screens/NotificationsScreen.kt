@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
@@ -284,13 +283,5 @@ private fun relativeTime(iso: String): String {
         minutes < 60 -> "${minutes}m ago"
         minutes < 60 * 24 -> "${minutes / 60}h ago"
         else -> "${minutes / (60 * 24)}d ago"
-    }
-}
-
-@Preview
-@Composable
-fun PreviewNotificationsScreen() {
-    EncoreAppTheme {
-        NotificationsScreen(onBackClick = {})
     }
 }

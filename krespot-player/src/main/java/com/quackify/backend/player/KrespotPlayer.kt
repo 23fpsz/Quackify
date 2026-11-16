@@ -26,6 +26,7 @@ import android.view.Surface
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -42,6 +43,10 @@ import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
 
 private val log = Logs.of(Logs.Module.PLAYER)
+
+private const val LICENCE_SETTLE_MS = 2_000L
+
+private const val LICENCE_SKIP_WINDOW_MS = 4_000L
 
 private const val MANIFEST_CACHE = 8
 
@@ -109,6 +114,21 @@ class KrespotPlayer(private val context: Context) {
     private var generation = 0
 
     @Volatile
+    private var lastPlayAt = 0L
+
+    @Volatile
+    private var licenceSettling = false
+
+    @Volatile
+    private var engineIdle = true
+
+    @Volatile
+    private var licencePending: CommandTrack? = null
+
+    @Volatile
+    private var licenceFrom = 0L
+
+    @Volatile
     private var pausedByFocus = false
 
     @Volatile
@@ -150,15 +170,21 @@ class KrespotPlayer(private val context: Context) {
 
     var onFocusDuck: ((Boolean) -> Unit)? = null
 
+    @Volatile
+    private var licenceRetrying = false
+
     init {
         LicenseGate.onOpen = {
-            val track = refused
+            val track = licencePending ?: refused
             if (track != null) {
                 refused = null
+                licencePending = null
+                licenceRetrying = true
                 log.i("licence is back, retrying '${track.name.ifBlank { track.uri }}' " +
                         "from ${refusedFrom}ms"
                 )
-                play(track, spclient, refusedFrom)
+                play(track, spclient, if (licenceFrom > 0L) licenceFrom else refusedFrom)
+                licenceRetrying = false
             }
         }
     }
@@ -503,7 +529,8 @@ class KrespotPlayer(private val context: Context) {
 
     val quality: String get() = _state.value.quality
 
-    val hasSource: Boolean get() = videoActive || engine?.hasMedia == true || mp3 != null || job?.isActive == true
+    val hasSource: Boolean
+        get() = videoActive || (engine?.hasMedia == true && !engineIdle) || mp3 != null || job?.isActive == true
 
     val hasQueuedNext: Boolean get() = !videoActive && mp3 == null && (engine?.takeIf { it.hasMedia }?.hasQueuedNext ?: false)
 
@@ -515,6 +542,10 @@ class KrespotPlayer(private val context: Context) {
         spclient: String,
         fromMs: Long = 0L,
     ) {
+        if (!licenceRetrying) LicenseGate.resetStrikes()
+        val sinceLast = System.currentTimeMillis() - lastPlayAt
+        licenceSettling = lastPlayAt > 0L && sinceLast < LICENCE_SKIP_WINDOW_MS
+        lastPlayAt = System.currentTimeMillis()
         if (track.isDirect) {
             playDirect(track)
             return
@@ -551,33 +582,52 @@ class KrespotPlayer(private val context: Context) {
                 }
                 rememberFile(track.uri, source.fileId)
                 SongCache.touch(track.uri, context)
+                if (licenceSettling) {
+                    log.i("licence deferred, the user is still skipping")
+                    delay(LICENCE_SETTLE_MS)
+                    if (id != generation) {
+                        log.i("licence skipped, playback moved on before settling")
+                        return@launch
+                    }
+                }
                 if (id != generation) {
                     log.i("play was skipped while its source resolved")
                     return@launch
                 }
                 val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
-                player = engine ?: AudioEngine(context, { spclient }, scope).also { engine = it }
-                player.onEvent = { event ->
+                val sink: (PlayerEvent) -> Unit = { event ->
                     if (id == generation) {
-                        val drmRefused = (event as? PlayerEvent.Failed)?.message
-                            ?.contains("DRM_LICENSE_ACQUISITION_FAILED") == true
-                        if (drmRefused) {
+                        val failed = (event as? PlayerEvent.Failed)?.message
+                            ?.takeIf { it.contains("DRM_LICENSE_ACQUISITION_FAILED") }
+                        if (failed != null) {
+                            // A queued track may already have taken the slot by
+                            // the time the licence for the previous one comes
+                            // back refused; retrying the stale track would loop
+                            // the same two rows, so whatever is waiting is the
+                            // one to keep.
                             val movedTo = _state.value.trackUri == queuedNextUri
                             val waiting = if (movedTo) queuedNextTrack ?: track else track
                             val refusedSource = sourceFor(waiting.uri)
-                            if (LicenseGate.remainingMs() > 0L) {
+                            if (refusedSource != null && !LicenseGate.rateLimited) {
+                                SourceResolver.blockFormat(refusedSource.format)
+                                forgetSource(waiting.uri)
+                                log.w("the licence refused format ${refusedSource.format}, trying the next one")
+                                scope.launch {
+                                    if (id == generation) play(waiting, spclient)
+                                }
+                            } else if (refusedSource != null) {
+                                log.w("the licence is rate limited, keeping format ${refusedSource.format}")
+                                licencePending = waiting
+                                licenceFrom = if (movedTo) 0L else fromMs
+                            } else if (LicenseGate.remainingMs() > 0L) {
                                 refused = waiting
                                 refusedFrom = if (movedTo) 0L else player?.currentPositionMs ?: 0L
                                 log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
                                         "keeping '${waiting.name.ifBlank { waiting.uri }}' for a retry"
                                 )
                             } else {
-                                if (refusedSource != null) SourceResolver.blockFormat(refusedSource.format)
-                                forgetSource(waiting.uri)
-                                log.w("the licence refused format ${refusedSource?.format ?: "?"}, trying the next one")
-                                scope.launch {
-                                    if (id == generation) play(waiting, spclient)
-                                }
+                                mirror(event, player?.durationMs ?: totalMs)
+                                if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                             }
                         } else {
                             mirror(event, player?.durationMs ?: totalMs)
@@ -585,6 +635,8 @@ class KrespotPlayer(private val context: Context) {
                         }
                     }
                 }
+                player = engine?.also { it.onEvent = sink }
+                    ?: AudioEngine(context, { spclient }, scope, sink).also { engine = it }
                 val startAt = if (pendingSeekMs >= 0L) pendingSeekMs.also { pendingSeekMs = -1L } else fromMs
                 val ready = player.prepare(source, track.uri, startAt, autoplay = !pendingPause, file?.gainDb ?: 0.0)
                 if (!ready || id != generation) {
@@ -597,6 +649,8 @@ class KrespotPlayer(private val context: Context) {
                     }
                     return@launch
                 }
+                engine = player
+                engineIdle = false
                 _state.value = PlayerState(
                     playing = !pendingPause,
                     paused = pendingPause,
@@ -621,10 +675,11 @@ class KrespotPlayer(private val context: Context) {
             } catch (failure: Throwable) {
                 log.e("play failed ${failure.javaClass.simpleName}: ${failure.message}")
                 player?.stop()
+                if (player != null && engine === player) engineIdle = true
                 val refusedSource = sourceFor(track.uri)
                 if (refusedSource != null &&
                     failure.message.orEmpty().contains("DRM_LICENSE_ACQUISITION_FAILED") &&
-                    LicenseGate.remainingMs() <= 0L
+                    !LicenseGate.rateLimited
                 ) {
                     SourceResolver.blockFormat(refusedSource.format)
                     forgetSource(track.uri)
@@ -635,6 +690,8 @@ class KrespotPlayer(private val context: Context) {
                 if (LicenseGate.remainingMs() > 0L) {
                     refused = track
                     refusedFrom = fromMs
+                    licencePending = track
+                    licenceFrom = fromMs
                     log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
                             "keeping '${track.name.ifBlank { track.uri }}' for a retry"
                     )
@@ -770,6 +827,7 @@ class KrespotPlayer(private val context: Context) {
         deepJob?.cancel()
         deepTarget = ""
         engine?.stop()
+        engineIdle = true
         mp3?.stop()
         mp3 = null
         job?.cancel()
@@ -780,7 +838,7 @@ class KrespotPlayer(private val context: Context) {
 
     fun release() {
         stop()
-        engine?.teardown()
+        engine?.release()
         engine = null
         LicenseEndpoint.reset()
     }
@@ -887,7 +945,7 @@ class KrespotPlayer(private val context: Context) {
 
     fun reset() {
         stop()
-        engine?.teardown()
+        engine?.release()
         engine = null
         _state.value = PlayerState()
         LicenseEndpoint.reset()

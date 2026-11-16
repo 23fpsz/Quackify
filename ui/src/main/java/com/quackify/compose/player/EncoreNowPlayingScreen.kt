@@ -12,8 +12,11 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -90,6 +93,8 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -100,7 +105,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -141,8 +145,14 @@ private const val SNAP_BACK_FLING_VELOCITY = -100f
 private const val DISMISS_FLING_VELOCITY = 350f
 private const val DISMISS_THRESHOLD_DP = 96f
 private const val AXIS_UNDECIDED = 0
+private const val AXIS_HORIZONTAL = 1
 private const val AXIS_VERTICAL = 2
 private const val AXIS_YIELD = 3
+
+/** Artwork swipe-to-skip: commit past this share of the artwork, or on a fast fling. */
+private const val SWIPE_COMMIT_FRACTION = 0.28f
+private const val SWIPE_FLING_VELOCITY = 320f
+private const val SWIPE_OUT_MS = 170
 
 /** Reveal choreography: the artwork lands first, then the rest follows. */
 private const val REVEAL_MS = 420
@@ -234,6 +244,8 @@ fun EncoreNowPlayingScreen(
     onPlayPauseClick: () -> Unit,
     onSkipNextClick: () -> Unit,
     onSkipPreviousClick: () -> Unit,
+    onSwipePreviousClick: () -> Unit = onSkipPreviousClick,
+    docked: Boolean = false,
     onLikeClick: () -> Unit,
     onShuffleClick: () -> Unit,
     onRepeatClick: () -> Unit,
@@ -280,6 +292,7 @@ fun EncoreNowPlayingScreen(
     onArtistFollowToggle: (Boolean) -> Unit = {},
     lyrics: List<TimeSyncedLyric> = emptyList(),
     isLyricsUnderCoverEnabled: Boolean = true,
+    showLyricsPreview: Boolean = true,
     previousTrack: TrackItem? = null,
     nextTrack: TrackItem? = null,
     onSkipToPreviousClick: () -> Unit = {}
@@ -317,6 +330,8 @@ fun EncoreNowPlayingScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val playerOffsetY = remember { Animatable(0f) }
+    val artworkOffsetX = remember { Animatable(0f) }
+    val haptics = LocalHapticFeedback.current
     val scrollState = rememberScrollState()
     val reveal = rememberRevealProgress()
 
@@ -333,9 +348,11 @@ fun EncoreNowPlayingScreen(
     val effectiveIsLoading = isLoading
     val lyricsAvailable = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
     val syncedLyricLineVisible = isLyricsUnderCoverEnabled && lyricsAvailable
+    val effectiveLyricsVisible = lyricsAvailable
+    val previewLyricVisible = effectiveLyricsVisible && showLyricsPreview
 
     val lyricLineHeight by animateDpAsState(
-        targetValue = if (syncedLyricLineVisible) 44.dp else 0.dp,
+        targetValue = if (previewLyricVisible) 44.dp else 0.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -343,7 +360,7 @@ fun EncoreNowPlayingScreen(
         label = "lyricLineHeight"
     )
     val lyricBottomSpacerHeight by animateDpAsState(
-        targetValue = if (syncedLyricLineVisible) 28.dp else 0.dp,
+        targetValue = if (previewLyricVisible) 28.dp else 0.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -352,7 +369,7 @@ fun EncoreNowPlayingScreen(
     )
 
     val artworkPushUpOffset by animateDpAsState(
-        targetValue = if (syncedLyricLineVisible) 0.dp else 40.dp,
+        targetValue = if (previewLyricVisible) 0.dp else 40.dp,
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -378,7 +395,10 @@ fun EncoreNowPlayingScreen(
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dismissThresholdPx = with(density) { DISMISS_THRESHOLD_DP.dp.toPx() }
     val videoTopHeight = (configuration.screenWidthDp * 9f / 16f).dp
-    val artworkSide = (configuration.screenWidthDp - 48).dp
+    val artworkSide = minOf(
+        configuration.screenWidthDp - 48,
+        (configuration.screenHeightDp * 0.55f).toInt()
+    ).coerceAtLeast(120).dp
     val mediaTransition = tween<Dp>(350, easing = EncoreAnimation.DecelerateInterpolator)
     val animatedMediaHeight by animateDpAsState(
         targetValue = if (videoActive) videoTopHeight else artworkSide,
@@ -430,20 +450,36 @@ fun EncoreNowPlayingScreen(
         }
     }
 
-    val headerDragModifier = Modifier.npvDismissDragGesture(
-        coroutineScope = coroutineScope,
-        playerOffsetY = playerOffsetY,
-        dismissThresholdPx = dismissThresholdPx,
-        onDismiss = dismissPlayer,
-        onSnapBack = snapBackPlayer
-    )
+    val headerDragModifier = if (docked) {
+        Modifier
+    } else {
+        Modifier.npvDismissDragGesture(
+            coroutineScope = coroutineScope,
+            playerOffsetY = playerOffsetY,
+            dismissThresholdPx = dismissThresholdPx,
+            onDismiss = dismissPlayer,
+            onSnapBack = snapBackPlayer
+        )
+    }
 
     val artworkGestureModifier = Modifier.npvArtworkGesture(
         coroutineScope = coroutineScope,
         playerOffsetY = playerOffsetY,
+        offsetX = artworkOffsetX,
         scrollState = scrollState,
         scrollEnabled = !effectiveIsLoading,
         dismissThresholdPx = dismissThresholdPx,
+        dismissEnabled = !docked,
+        swipeEnabled = !effectiveIsLoading && !videoActive,
+        canSwipePrevious = canSkipPrevious,
+        onSwipePrevious = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onSwipePreviousClick()
+        },
+        onSwipeNext = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onSkipNextClick()
+        },
         onDismiss = dismissPlayer,
         onSnapBack = snapBackPlayer
     )
@@ -505,7 +541,9 @@ fun EncoreNowPlayingScreen(
             CanvasVideoPlayer(
                 filePath = canvasFilePath,
                 zoom = CANVAS_ZOOM,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { translationX = artworkOffsetX.value }
             )
             Box(
                 modifier = Modifier
@@ -538,6 +576,9 @@ fun EncoreNowPlayingScreen(
                             .weight(LANDSCAPE_ARTWORK_PANE_WEIGHT)
                             .fillMaxHeight()
                             .then(artworkGestureModifier)
+                            .graphicsLayer { translationX = artworkOffsetX.value }
+                            .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         if (videoActive || canvasActive) {
                             Box(
@@ -594,6 +635,7 @@ fun EncoreNowPlayingScreen(
                         NowPlayingHeaderRow(
                             resolvedContextTitle = resolvedContextTitle,
                             contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                            showCollapse = !docked,
                             onCollapseClick = onCollapseClick,
                             onMoreClick = onMoreClick,
                             dominantColor = animatedDominantColor,
@@ -604,8 +646,8 @@ fun EncoreNowPlayingScreen(
 
                         NowPlayingSyncedLyricLine(
                             lyricText = activeLyricLine,
-                            visible = syncedLyricLineVisible,
-                            height = if (syncedLyricLineVisible) 44.dp else 0.dp,
+                            visible = previewLyricVisible,
+                            height = if (previewLyricVisible) 44.dp else 0.dp,
                             onOpenLyrics = { isLyricsFullscreen = true }
                         )
 
@@ -616,7 +658,7 @@ fun EncoreNowPlayingScreen(
                             onSwitch = onSwitchVideo
                         )
 
-                        if (syncedLyricLineVisible) {
+                        if (previewLyricVisible) {
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
@@ -738,6 +780,7 @@ fun EncoreNowPlayingScreen(
                                 NowPlayingHeaderRow(
                                     resolvedContextTitle = resolvedContextTitle,
                                     contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                                    showCollapse = !docked,
                                     onCollapseClick = onCollapseClick,
                                     onMoreClick = onMoreClick,
                                     dominantColor = animatedDominantColor,
@@ -750,6 +793,8 @@ fun EncoreNowPlayingScreen(
                         Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .padding(horizontal = animatedMediaPadding)
+                                    .graphicsLayer { translationX = artworkOffsetX.value }
                                     .revealAt(reveal, REVEAL_ARTWORK_DELAY_MS / REVEAL_MS.toFloat()),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -808,7 +853,7 @@ fun EncoreNowPlayingScreen(
                             if (!videoActive) {
                                 NowPlayingSyncedLyricLine(
                                     lyricText = activeLyricLine,
-                                    visible = syncedLyricLineVisible,
+                                    visible = previewLyricVisible,
                                     height = lyricLineHeight,
                                     onOpenLyrics = { isLyricsFullscreen = true }
                                 )
@@ -1046,6 +1091,8 @@ private fun Modifier.npvDismissDragGesture(
  * drags are only claimed once the page can no longer scroll in that
  * direction, so dragging over the artwork scrolls the page like any other
  * part of it and only turns into a dismissal once the top is reached.
+ * Horizontal drags move the artwork aside; releasing past the commit point
+ * (or on a fast fling) sends it off and skips, otherwise it springs back.
  *
  * The claim is re-evaluated on every move: the scroll may not sit at the
  * top when the drag starts, but it reaches it as the finger keeps pulling
@@ -1057,12 +1104,18 @@ private fun Modifier.npvDismissDragGesture(
 private fun Modifier.npvArtworkGesture(
     coroutineScope: CoroutineScope,
     playerOffsetY: Animatable<Float, AnimationVector1D>,
+    offsetX: Animatable<Float, AnimationVector1D>,
     scrollState: ScrollState,
     scrollEnabled: Boolean,
     dismissThresholdPx: Float,
+    dismissEnabled: Boolean,
+    swipeEnabled: Boolean,
+    canSwipePrevious: Boolean,
+    onSwipePrevious: () -> Unit,
+    onSwipeNext: () -> Unit,
     onDismiss: () -> Unit,
     onSnapBack: () -> Unit
-): Modifier = pointerInput(dismissThresholdPx, scrollEnabled) {
+): Modifier = pointerInput(dismissThresholdPx, scrollEnabled, dismissEnabled, swipeEnabled, canSwipePrevious) {
     var axis = AXIS_UNDECIDED
     var totalDragX = 0f
     var totalDragY = 0f
@@ -1085,17 +1138,25 @@ private fun Modifier.npvArtworkGesture(
             totalDragX += delta.x
             totalDragY += delta.y
 
-            val verticalBias = totalDragY.absoluteValue > totalDragX.absoluteValue
-            if (axis == AXIS_UNDECIDED || axis == AXIS_YIELD) {
-                val pageAtTop = !scrollEnabled || scrollState.value <= 0
-                if (totalDragY > DRAG_AXIS_SLOP_PX && verticalBias && pageAtTop) {
-                    axis = AXIS_VERTICAL
-                } else if (totalDragY < -DRAG_AXIS_SLOP_PX || totalDragX.absoluteValue > DRAG_AXIS_SLOP_PX && !verticalBias) {
+            if (axis == AXIS_UNDECIDED) {
+                val horizontal = totalDragX.absoluteValue > DRAG_AXIS_SLOP_PX &&
+                    totalDragX.absoluteValue > totalDragY.absoluteValue
+                if (horizontal) {
+                    axis = if (swipeEnabled) AXIS_HORIZONTAL else AXIS_YIELD
+                } else if (totalDragY > DRAG_AXIS_SLOP_PX) {
+                    val pageAtTop = !scrollEnabled || scrollState.value <= 0
+                    axis = if (pageAtTop && dismissEnabled) AXIS_VERTICAL else AXIS_YIELD
+                } else if (totalDragY < -DRAG_AXIS_SLOP_PX) {
                     axis = AXIS_YIELD
                 }
             }
 
             when (axis) {
+                AXIS_HORIZONTAL -> {
+                    change.consume()
+                    velocityTracker.addPosition(change.uptimeMillis, change.position)
+                    coroutineScope.launch { offsetX.snapTo(totalDragX) }
+                }
                 AXIS_VERTICAL -> {
                     change.consume()
                     velocityTracker.addPosition(change.uptimeMillis, change.position)
@@ -1118,6 +1179,40 @@ private fun Modifier.npvArtworkGesture(
                         else -> onSnapBack()
                     }
                 }
+                AXIS_HORIZONTAL -> {
+                    val width = size.width.toFloat()
+                    val dragged = offsetX.value
+                    val goingNext = if (dragged.absoluteValue > 1f) dragged < 0f else velocity.x < 0f
+                    if (goingNext || canSwipePrevious) {
+                        val committed = dragged.absoluteValue > width * SWIPE_COMMIT_FRACTION ||
+                            velocity.x.absoluteValue > SWIPE_FLING_VELOCITY
+                        if (committed) {
+                            val out = if (goingNext) -width else width
+                            offsetX.animateTo(
+                                out,
+                                tween(durationMillis = SWIPE_OUT_MS, easing = FastOutLinearInEasing)
+                            )
+                            if (goingNext) onSwipeNext() else onSwipePrevious()
+                            offsetX.snapTo(0f)
+                        } else {
+                            offsetX.animateTo(
+                                0f,
+                                spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            )
+                        }
+                    } else {
+                        offsetX.animateTo(
+                            0f,
+                            spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            )
+                        )
+                    }
+                }
             }
             axis = AXIS_UNDECIDED
         }
@@ -1132,6 +1227,7 @@ private fun Modifier.npvArtworkGesture(
 private fun NowPlayingHeaderRow(
     resolvedContextTitle: String,
     contextSubtitle: String?,
+    showCollapse: Boolean = true,
     onCollapseClick: () -> Unit,
     onMoreClick: () -> Unit,
     dominantColor: Color,
@@ -1146,14 +1242,18 @@ private fun NowPlayingHeaderRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        EncoreIconButton(
-            iconRes = R.drawable.encore_icon_chevron_down_24,
-            contentDescription = stringResource(R.string.collapse_player),
-            onClick = onCollapseClick,
-            tint = ink,
-            size = 48.dp,
-            iconSize = 24.dp
-        )
+        if (showCollapse) {
+            EncoreIconButton(
+                iconRes = R.drawable.encore_icon_chevron_down_24,
+                contentDescription = stringResource(R.string.collapse_player),
+                onClick = onCollapseClick,
+                tint = ink,
+                size = 48.dp,
+                iconSize = 24.dp
+            )
+        } else {
+            Spacer(modifier = Modifier.size(48.dp))
+        }
 
         Column(
             modifier = Modifier
@@ -1361,7 +1461,7 @@ private fun NowPlayingArtworkCard(
     }
 }
 
-private const val SWIPE_COMMIT_FRACTION = 0.3f
+private const val SWIPE_CARD_COMMIT_FRACTION = 0.3f
 private const val SWIPE_SETTLE_MS = 240
 
 @Composable
@@ -1400,9 +1500,9 @@ private fun SwipableTrackArtwork(
                         tracker.resetTracking()
                         val offset = drag.value
                         val commitNext = hasNext && offset < 0f &&
-                            (offset < -cardWidthPx * SWIPE_COMMIT_FRACTION || velocity < -flickVelocity)
+                            (offset < -cardWidthPx * SWIPE_CARD_COMMIT_FRACTION || velocity < -flickVelocity)
                         val commitPrev = hasPrev && offset > 0f &&
-                            (offset > cardWidthPx * SWIPE_COMMIT_FRACTION || velocity > flickVelocity)
+                            (offset > cardWidthPx * SWIPE_CARD_COMMIT_FRACTION || velocity > flickVelocity)
                         if (commitNext) onSwipeNext()
                         if (commitPrev) onSwipePrevious()
                         scope.launch {
@@ -2472,76 +2572,4 @@ private fun formatTime(ms: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return String.format("%d:%02d", minutes, seconds)
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewEncoreNowPlayingScreen() {
-    EncoreAppTheme {
-        var isPlaying by remember { mutableStateOf(true) }
-        var isLiked by remember { mutableStateOf(true) }
-        var isShuffle by remember { mutableStateOf(false) }
-        var isRepeat by remember { mutableStateOf(true) }
-
-        EncoreNowPlayingScreen(
-            title = "Starboy",
-            artist = "The Weeknd, Daft Punk",
-            albumOrPlaylistContext = "Today's Top Hits",
-            isPlaying = isPlaying,
-            progress = 0.35f,
-            durationMs = 230000L,
-            currentPositionMs = 80000L,
-            isLiked = isLiked,
-            isShuffle = isShuffle,
-            isRepeat = isRepeat,
-            connectedDeviceName = "Living Room Speaker",
-            onCollapseClick = {},
-            onPlayPauseClick = { isPlaying = !isPlaying },
-            onSkipNextClick = {},
-            onSkipPreviousClick = {},
-            onLikeClick = { isLiked = !isLiked },
-            onShuffleClick = { isShuffle = !isShuffle },
-            onRepeatClick = { isRepeat = !isRepeat },
-            onSeek = {},
-            onMoreClick = {},
-            onQueueClick = {},
-            onDeviceClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212, widthDp = 800, heightDp = 360)
-@Composable
-fun PreviewEncoreNowPlayingScreenLandscape() {
-    EncoreAppTheme {
-        var isPlaying by remember { mutableStateOf(true) }
-        var isLiked by remember { mutableStateOf(true) }
-        var isShuffle by remember { mutableStateOf(false) }
-        var isRepeat by remember { mutableStateOf(true) }
-
-        EncoreNowPlayingScreen(
-            title = "Starboy",
-            artist = "The Weeknd, Daft Punk",
-            albumOrPlaylistContext = "Today's Top Hits",
-            isPlaying = isPlaying,
-            progress = 0.35f,
-            durationMs = 230000L,
-            currentPositionMs = 80000L,
-            isLiked = isLiked,
-            isShuffle = isShuffle,
-            isRepeat = isRepeat,
-            connectedDeviceName = "Living Room Speaker",
-            onCollapseClick = {},
-            onPlayPauseClick = { isPlaying = !isPlaying },
-            onSkipNextClick = {},
-            onSkipPreviousClick = {},
-            onLikeClick = { isLiked = !isLiked },
-            onShuffleClick = { isShuffle = !isShuffle },
-            onRepeatClick = { isRepeat = !isRepeat },
-            onSeek = {},
-            onMoreClick = {},
-            onQueueClick = {},
-            onDeviceClick = {}
-        )
-    }
 }

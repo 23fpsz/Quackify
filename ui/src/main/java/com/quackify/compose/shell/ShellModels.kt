@@ -163,6 +163,9 @@ interface ComposePlayerListener {
     fun onSkipNext() {}
     fun onSkipPrevious() {}
     fun onSkipToPreviousTrack() {}
+
+    /** Swiping back always lands on the previous track, never restarts the current one. */
+    fun onPreviousSwipe() { onSkipPrevious() }
     fun onSeek(positionMs: Long) {}
     fun onLikeToggle() {}
     fun onShuffleToggle() {}

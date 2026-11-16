@@ -118,7 +118,7 @@ internal fun ShellEntitySheets(
         } else {
             EncoreCreateNameDialog(
                 isOpen = true,
-                title = if (draft.mode == FolderMode.CREATE) "Give your folder a name" else stringResource(R.string.rename_folder),
+                title = if (draft.mode == FolderMode.CREATE) stringResource(R.string.name_your_folder) else stringResource(R.string.rename_folder),
                 initialName = if (draft.mode == FolderMode.CREATE) stringResource(R.string.new_folder) else draft.title,
                 confirmLabel = if (draft.mode == FolderMode.CREATE) stringResource(R.string.create) else stringResource(R.string.save),
                 cancelLabel = stringResource(R.string.cancel),

@@ -183,7 +183,7 @@ fun PlaylistContributorsSheet(
                                         .padding(vertical = 24.dp)
                                 )
                                 else -> LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                                    items(searchResults, key = { it.uri }) { hit ->
+                                    items(searchResults.distinctBy { it.uri }, key = { it.uri }) { hit ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -324,7 +324,7 @@ fun PlaylistContributorsSheet(
                                 }
                             }
                         }
-                        items(members, key = { it.uri }) { member ->
+                        items(members.distinctBy { it.uri }, key = { it.uri }) { member ->
                             ContributorRow(
                                 member = member,
                                 isAdmin = isAdmin,
@@ -522,40 +522,5 @@ private fun ContributorSearchBox(
                     .clickable(onClick = onClose)
             )
         }
-    }
-}
-
-@androidx.compose.ui.tooling.preview.Preview
-@Composable
-fun PreviewPlaylistContributorsSheet() {
-    EncoreAppTheme {
-        PlaylistContributorsSheet(
-            isOpen = true,
-            onDismiss = {},
-            permissions = PlaylistPermissions(
-                uri = "spotify:playlist:preview",
-                members = listOf(
-                    PlaylistMember(
-                        userId = "owner",
-                        uri = "spotify:user:owner",
-                        name = "Malrusez",
-                        isOwner = true,
-                        permissionLevel = "CONTRIBUTOR"
-                    ),
-                    PlaylistMember(
-                        userId = "friend",
-                        uri = "spotify:user:friend",
-                        name = "BRIB0",
-                        permissionLevel = "CONTRIBUTOR"
-                    )
-                ),
-                canAdministratePermissions = true
-            ),
-            loading = false,
-            onAddContributor = {},
-            onRemoveAsContributor = {},
-            onRemoveFromPlaylist = {},
-            onOpenProfile = { _, _ -> }
-        )
     }
 }

@@ -76,7 +76,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -123,6 +122,7 @@ data class TrackItem(
     val hasVideo: Boolean = false,
     val isEnhanced: Boolean = false,
     val plays: Long = 0L,
+    val addedAt: Long = 0L,
 )
 
 private val trackSearchEngine = GenericSearchEngine<TrackItem>(maxResult = Int.MAX_VALUE)
@@ -268,7 +268,13 @@ fun EncorePlaylistScreen(
                 }
             }
             PlaylistSort.RECENTLY_ADDED -> {
-                if (sortDirection == SortDirection.DESCENDING) {
+                if (base.any { it.addedAt > 0L }) {
+                    if (sortDirection == SortDirection.DESCENDING) {
+                        base.sortedByDescending { it.addedAt }
+                    } else {
+                        base.sortedBy { it.addedAt }
+                    }
+                } else if (sortDirection == SortDirection.DESCENDING) {
                     base.reversed()
                 } else {
                     base

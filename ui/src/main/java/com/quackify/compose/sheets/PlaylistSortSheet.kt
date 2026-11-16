@@ -34,8 +34,8 @@ import androidx.compose.ui.res.stringResource
 
 /**
  * - sort_filter_bottom_sheet_layout.xml
- * - Options: Custom order, Title, Artist, Album, Recently added
- * - Active option highlighted in Encore Green with direction arrow (for reversible) or checkmark (for non-reversible)
+ * - Options: Title, Artist, Album, Recently added (no selection means the playlist's own order)
+ * - Tapping the active option clears it; the arrow toggles the direction on its own
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,18 +86,17 @@ fun PlaylistSortSheet(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            PlaylistSort.values().forEach { option ->
+            PlaylistSort.values().filter { it != PlaylistSort.CUSTOM }.forEach { option ->
                 val isSelected = option == currentSort
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            val newDirection = if (isSelected && option.reversible) {
-                                currentDirection.toggle()
+                            if (isSelected) {
+                                onSortSelected(PlaylistSort.CUSTOM, SortDirection.ASCENDING)
                             } else {
-                                option.defaultDirection
+                                onSortSelected(option, option.defaultDirection)
                             }
-                            onSortSelected(option, newDirection)
                         }
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -114,6 +113,21 @@ fun PlaylistSortSheet(
 
                     if (isSelected) {
                         if (option.reversible) {
+                            Text(
+                                text = stringResource(
+                                    if (currentDirection == SortDirection.ASCENDING) {
+                                        R.string.sorted_ascending
+                                    } else {
+                                        R.string.sorted_descending
+                                    }
+                                ),
+                                style = EncoreTheme.typography.bodySmall.copy(
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = EncoreColors.Green.copy(alpha = 0.7f)
+                                )
+                            )
+                            Spacer(modifier = Modifier.size(6.dp))
                             Icon(
                                 painter = painterResource(
                                     id = if (currentDirection == SortDirection.ASCENDING) {
@@ -122,16 +136,30 @@ fun PlaylistSortSheet(
                                         R.drawable.encore_icon_arrow_down_24
                                     }
                                 ),
-                                contentDescription = if (currentDirection == SortDirection.ASCENDING) "Sorted ascending" else "Sorted descending",
+                                contentDescription = stringResource(
+                                    if (currentDirection == SortDirection.ASCENDING) {
+                                        R.string.sorted_ascending
+                                    } else {
+                                        R.string.sorted_descending
+                                    }
+                                ),
                                 tint = EncoreColors.Green,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .clickable { onSortSelected(option, currentDirection.toggle()) }
+                                    .padding(6.dp)
+                                    .size(20.dp)
                             )
                         } else {
                             Icon(
-                                painter = painterResource(id = R.drawable.encore_icon_check_24),
+                                painter = painterResource(R.drawable.encore_icon_check_24),
                                 contentDescription = stringResource(R.string.selected),
                                 tint = EncoreColors.Green,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .clickable { onSortSelected(PlaylistSort.CUSTOM, SortDirection.ASCENDING) }
+                                    .padding(6.dp)
+                                    .size(20.dp)
                             )
                         }
                     }

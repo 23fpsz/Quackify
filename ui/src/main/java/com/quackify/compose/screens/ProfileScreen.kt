@@ -412,34 +412,3 @@ private fun ProfileContextCardItem(
         }
     }
 }
-
-@androidx.compose.ui.tooling.preview.Preview
-@Composable
-fun PreviewEncoreProfileScreen() {
-    EncoreAppTheme {
-        EncoreProfileScreen(
-            profile = UserProfile(
-                uri = "spotify:user:preview",
-                name = "Duck User",
-                followersCount = 5,
-                followingCount = 4,
-                recentlyPlayedArtists = emptyList(),
-                colorHex = "",
-                isCurrentUser = true
-            ),
-            topContent = null,
-            contexts = emptyList(),
-            loading = false,
-            loadFailed = false,
-            onRetry = {},
-            onBackClick = {},
-            currentTrackUri = "",
-            isPlaying = false,
-            onFollowStatsClick = {},
-            onArtistClick = { _, _ -> },
-            onTrackSelect = {},
-            onTrackOptionsClick = {},
-            onContextClick = {}
-        )
-    }
-}

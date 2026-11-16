@@ -34,7 +34,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
@@ -359,17 +358,5 @@ fun ContextMenuRowItem(
             modifier = Modifier.weight(1f)
         )
         trailing?.invoke()
-    }
-}
-
-@Preview
-@Composable
-fun PreviewTrackOptionsSheet() {
-    EncoreAppTheme {
-        TrackOptionsSheet(
-            track = TrackItem("Starboy", "The Weeknd, Daft Punk", true),
-            isOpen = true,
-            onDismiss = {}
-        )
     }
 }

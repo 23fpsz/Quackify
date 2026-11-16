@@ -466,7 +466,11 @@ class PlaybackBridge(private val context: Context) {
         }
 
         override fun onSkipToPreviousTrack() {
-            scope.launch { skipTo(next = false, forcePrevious = true) }
+            scope.launch { skipTo(next = false, force = true) }
+        }
+
+        override fun onPreviousSwipe() {
+            scope.launch { skipTo(next = false, force = true) }
         }
 
         override fun onSeek(positionMs: Long) {
@@ -1233,6 +1237,34 @@ class PlaybackBridge(private val context: Context) {
 
     private fun pendingActive(): Boolean =
         pendingTrack.isNotBlank() && System.currentTimeMillis() - pendingAt < PENDING_MS
+
+    /**
+     * Warms what a swipe back lands on: the row before the current one, or the
+     * track this session really played last when shuffling. The manifest is
+     * resolved now, so the gesture finds it cached instead of paying for a
+     * round trip after it ends.
+     */
+    private fun prefetchBehind(contextUri: String, currentUri: String) {
+        if (contextUri.isBlank() || currentUri.isBlank()) return
+        if (chainContext == contextUri && chainRows.size > 1) {
+            val at = chainRows.indexOf(currentUri)
+            if (at > 0) prefetchRow(chainRows[at - 1])
+        }
+        val cluster = connect.cluster.value
+        if (cluster != null && shuffleOn(cluster)) {
+            val back = synchronized(shuffleOrderLock) {
+                playedInShuffle.lastOrNull { it != currentUri }
+            }
+            if (back != null) prefetchRow(back)
+        }
+    }
+
+    private fun prefetchRow(uri: String) {
+        if (!uri.startsWith("spotify:track:") && !uri.startsWith("spotify:episode:")) return
+        if (player.hasSourceFor(uri)) return
+        if (bannedCachedUri(uri)) return
+        player.prefetch(uri, connect.spclientHost)
+    }
 
     /** Speculative manifests for playlist rows, so a tap skips that round trip. */
     fun prefetchUris(uris: List<String>) {
@@ -2694,7 +2726,7 @@ class PlaybackBridge(private val context: Context) {
         return at.takeIf { it > 0L }
     }
 
-    private suspend fun skipTo(next: Boolean, forcePrevious: Boolean = false) {
+    private suspend fun skipTo(next: Boolean, force: Boolean = false) {
         val cluster = connect.cluster.value
         val active = cluster?.activeDevice
         val remote = active != null && active.id != deviceId
@@ -2709,7 +2741,7 @@ class PlaybackBridge(private val context: Context) {
             log.w("skip: '${active.name}' refused the $what, leaving the stream where it is")
             return
         }
-        skipLocal(forward = next, forcePrevious = forcePrevious)
+        skipLocal(forward = next, force = force)
     }
 
     private fun applyReplaceState(command: PlaybackCommand) {
@@ -2811,9 +2843,9 @@ class PlaybackBridge(private val context: Context) {
         }
     }
 
-    private suspend fun skipLocal(forward: Boolean, forcePrevious: Boolean = false) {
+    private suspend fun skipLocal(forward: Boolean, force: Boolean = false) {
         if (!forward) {
-            if (forcePrevious) skipToPreviousTrack() else previous()
+            previous(force)
             return
         }
         val cluster = connect.cluster.value ?: run {
@@ -3016,9 +3048,9 @@ class PlaybackBridge(private val context: Context) {
         log.w("skip: the cluster still names '${state.trackUri.takeLast(12)}' after ${SKIP_TRIES} reads")
     }
 
-    private suspend fun previous() {
+    private suspend fun previous(force: Boolean = false) {
         val loaded = player.positionMs
-        if (player.hasSource && loaded > RESTART_MS) {
+        if (!force && player.hasSource && loaded > RESTART_MS) {
             log.i("previous: at ${loaded}ms, restarting the track instead")
             player.seekTo(0L)
             return
@@ -3547,6 +3579,7 @@ class PlaybackBridge(private val context: Context) {
                 connect.spclientHost,
                 cluster.track.uri
             )
+            prefetchBehind(cluster.contextUri, cluster.track.uri)
         }
         if (cluster.activeDeviceId.isNotBlank() && cluster.activeDeviceId != activeSeen) {
             activeSeen = cluster.activeDeviceId

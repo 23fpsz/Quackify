@@ -124,6 +124,10 @@ internal class ShellActions(
         whenOnline { playerListener?.onSkipToPreviousTrack() }
     }
 
+    fun previousSwipe() {
+        playerListener?.onPreviousSwipe()
+    }
+
     fun openTrackOptions(track: TrackItem) {
         local.trackForOptions = track
         flags.isTrackOptionsFromPlayer = false

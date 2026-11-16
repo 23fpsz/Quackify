@@ -154,7 +154,7 @@ fun ArtistShelfSheet(
                 contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 24.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                items(rows, key = { it.uri }) { row ->
+                items(rows.distinctBy { it.uri }, key = { it.uri }) { row ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

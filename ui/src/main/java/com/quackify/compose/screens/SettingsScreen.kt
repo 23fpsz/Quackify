@@ -55,7 +55,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
@@ -73,6 +72,7 @@ import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.player.LyricsOptions
 import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import com.quackify.compose.widget.WidgetBackgroundStyle
@@ -124,6 +124,8 @@ fun SettingsScreen(
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
+    var lyricsEnabled by remember { mutableStateOf(LyricsOptions.enabled) }
+    var lyricsPreview by remember { mutableStateOf(LyricsOptions.preview) }
     val account = remember { EncoreAuth.account(context) }
     val version = remember {
         runCatching {
@@ -283,6 +285,30 @@ fun SettingsScreen(
                             isChecked = switches.otherVideos,
                             enabled = !locks.otherVideos && !loading,
                             onCheckedChange = onToggleOtherVideos
+                        )
+                    }
+
+                    item {
+                        SettingsSectionHeader(title = stringResource(R.string.lyrics))
+                        SettingsToggleRow(
+                            title = stringResource(R.string.lyrics_show),
+                            subtitle = stringResource(R.string.lyrics_show_desc),
+                            isChecked = lyricsEnabled,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                lyricsEnabled = on
+                                LyricsOptions.setEnabled(context, on)
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = stringResource(R.string.lyrics_preview),
+                            subtitle = stringResource(R.string.lyrics_preview_desc),
+                            isChecked = lyricsPreview,
+                            enabled = lyricsEnabled,
+                            onCheckedChange = { on ->
+                                lyricsPreview = on
+                                LyricsOptions.setPreview(context, on)
+                            }
                         )
                     }
 
@@ -968,13 +994,5 @@ private fun SettingsInfoRow(
             text = value,
             style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
         )
-    }
-}
-
-@Preview
-@Composable
-fun PreviewSettingsScreen() {
-    EncoreAppTheme {
-        SettingsScreen(onBackClick = {})
     }
 }

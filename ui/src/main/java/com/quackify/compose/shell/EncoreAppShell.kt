@@ -1,6 +1,7 @@
 package com.quackify.compose.shell
 
 import android.content.ClipboardManager
+import android.content.res.Configuration
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -12,14 +13,27 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
@@ -70,6 +84,41 @@ import com.quackify.compose.theme.rememberBottomPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
+
+private const val SPLIT_PLAYER_MIN_WIDTH_DP = 600
+
+internal const val SPLIT_PLAYER_GAP_FRACTION = 0.009f
+
+private const val SPLIT_PLAYER_CORNER_DP = 14
+
+private const val SPLIT_PLAYER_PANE_WIDTH_DP = 340
+
+private const val SPLIT_PLAYER_MIN_FRACTION = 0.3f
+
+private const val SPLIT_PLAYER_MAX_FRACTION = 0.46f
+
+/**
+ * Any landscape window wide enough for two columns keeps the now playing
+ * screen docked as a side pane next to the app instead of collapsing it into
+ * a mini player.
+ */
+@Composable
+internal fun isSplitPlayerLayout(): Boolean {
+    val configuration = LocalConfiguration.current
+    return configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
+        configuration.screenWidthDp >= SPLIT_PLAYER_MIN_WIDTH_DP
+}
+
+/**
+ * The pane keeps a readable width on phones (where 30% would be too narrow)
+ * while staying at 30% on tablets.
+ */
+@Composable
+internal fun splitPlayerWidthFraction(): Float {
+    val width = LocalConfiguration.current.screenWidthDp.coerceAtLeast(1)
+    return (SPLIT_PLAYER_PANE_WIDTH_DP.toFloat() / width)
+        .coerceIn(SPLIT_PLAYER_MIN_FRACTION, SPLIT_PLAYER_MAX_FRACTION)
+}
 
 @Composable
 internal fun ShellScreenSlot(
@@ -592,6 +641,8 @@ fun EncoreAppShell(
 
     val handleSkipToPreviousTrack: () -> Unit = { actions.skipToPreviousTrack() }
 
+    val handlePreviousSwipe: () -> Unit = { actions.previousSwipe() }
+
     val homeLabel = stringResource(R.string.home)
     val searchLabel = stringResource(R.string.search)
     val yourLibraryLabel = stringResource(R.string.your_library)
@@ -752,6 +803,7 @@ fun EncoreAppShell(
             handleSkipNext = handleSkipNext,
             handleSkipPrevious = handleSkipPrevious,
             handleSkipToPreviousTrack = handleSkipToPreviousTrack,
+            handlePreviousSwipe = handlePreviousSwipe,
             onCanvasToggle = onCanvasToggle,
             onNpvLyricsToggle = onNpvLyricsToggle,
             onToggleVideoFullscreen = onToggleVideoFullscreen,
@@ -830,226 +882,265 @@ fun EncoreAppShell(
             onCreatePlaylist = onCreatePlaylist,
             playlistDescription = playlistDetail?.description.orEmpty(),
         )
-        ShellScreenSlot(currentScreen) { screen ->
-            when (screen) {
-                ShellScreen.HOME -> ShellHomeRoute(
-                    env = hosts.route(),
-                    quickAccessItems = homeQuickAccessItems,
-                    recommendations = homeRecommendations,
-                    shelves = homeShelves,
-                    chips = homeChips,
-                    selectedFacet = homeFacet,
-                    greeting = homeGreeting,
-                    loading = homeLoading,
-                    libraryItems = libraryItems,
-                    notifications = notifications,
-                    onHomeFacetSelected = onHomeFacetSelected,
-                    onOpenHistory = onOpenHistory,
-                )
-
-                ShellScreen.SEARCH -> ShellSearchRoute(
-                    env = hosts.route(),
-                    searchResults = searchResults,
-                    searchData = searchData,
-                    searchRecent = searchRecent,
-                    searchSuggestions = searchSuggestions,
-                    searchSuggestionHits = searchSuggestionHits,
-                    searchLoading = searchLoading,
-                    searchFailed = searchFailed,
-                    searchSavedOverrides = searchSavedOverrides,
-                    browseCategories = browseCategories,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = onSearchQueryChange,
-                    onSearchSubmit = onSearchSubmit?.let { submit ->
+        val splitPlayer = isSplitPlayerLayout()
+        val splitFraction = splitPlayerWidthFraction()
+        val splitGap = LocalConfiguration.current.screenWidthDp * SPLIT_PLAYER_GAP_FRACTION
+        val contentFraction = if (splitPlayer) 1f - splitFraction - SPLIT_PLAYER_GAP_FRACTION else 1f
+        val paneShape = RoundedCornerShape(SPLIT_PLAYER_CORNER_DP.dp)
+        val screenHost: @Composable () -> Unit = {
+            ShellScreenSlot(currentScreen) { screen ->
+                when (screen) {
+                    ShellScreen.HOME -> ShellHomeRoute(
+                        env = hosts.route(),
+                        quickAccessItems = homeQuickAccessItems,
+                        recommendations = homeRecommendations,
+                        shelves = homeShelves,
+                        chips = homeChips,
+                        selectedFacet = homeFacet,
+                        greeting = homeGreeting,
+                        loading = homeLoading,
+                        libraryItems = libraryItems,
+                        notifications = notifications,
+                        onHomeFacetSelected = onHomeFacetSelected,
+                        onOpenHistory = onOpenHistory,
+                    )
+    
+                    ShellScreen.SEARCH -> ShellSearchRoute(
+                        env = hosts.route(),
+                        searchResults = searchResults,
+                        searchData = searchData,
+                        searchRecent = searchRecent,
+                        searchSuggestions = searchSuggestions,
+                        searchSuggestionHits = searchSuggestionHits,
+                        searchLoading = searchLoading,
+                        searchFailed = searchFailed,
+                        searchSavedOverrides = searchSavedOverrides,
+                        browseCategories = browseCategories,
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = onSearchQueryChange,
+                        onSearchSubmit = onSearchSubmit?.let { submit ->
                         { query ->
                             if (offlineNow) offlineBlockedToast() else submit(query)
                         }
                     },
-                    onRetrySearch = onRetrySearch,
-                    onClearRecentSearches = onClearRecentSearches,
-                    onRemoveRecentSearch = onRemoveRecentSearch,
-                    onRecordRecentSearch = onRecordRecentSearch,
-                    onToggleSaved = onToggleSaved,
-                    onLoadSearchSection = onLoadSearchSection,
-                    onOpenBrowse = onOpenBrowse,
-                    onOpenCategory = onOpenCategory,
-                )
-
-                ShellScreen.LIBRARY -> ShellLibraryRoute(
-                    env = hosts.route(),
-                    libraryItems = libraryItems,
-                    libraryLoading = libraryLoading,
-                )
-
-                ShellScreen.PLAYLIST -> ShellPlaylistRoute(
-                    env = hosts.route(),
-                    playlistDetail = playlistDetail,
-                    playlistTracks = playlistTracks,
-                    playlistLoading = playlistLoading,
-                    playlistHasMore = playlistHasMore,
-                    playlistLoadingMore = playlistLoadingMore,
-                    onLoadMorePlaylistTracks = onLoadMorePlaylistTracks,
-                    onRetryPlaylist = onRetryPlaylist,
-                    playlistSaved = playlistSaved,
-                    playlistRecommendations = playlistRecommendations,
-                    recommendationsLoading = recommendationsLoading,
-                    onRefreshRecommendations = onRefreshRecommendations,
-                    onAddRecommended = onAddRecommended,
-                    onSavePlaylistOrder = onSavePlaylistOrder,
-                    onEditPlaylistDetails = onEditPlaylistDetails,
-                    onDeletePlaylist = onDeletePlaylist,
-                    onTogglePlaylistSaved = onTogglePlaylistSaved,
-                    playlistPermissions = playlistPermissions,
-                    onLoadPlaylistContributors = onLoadPlaylistContributors,
-                    onPlaylistTrackLikeToggle = onPlaylistTrackLikeToggle,
-                    onEditPlaylist = onEditPlaylist,
-                    onAddTracksOpen = onAddTracksOpen,
-                )
-
-                ShellScreen.ALBUM -> ShellAlbumRoute(
-                    env = hosts.route(),
-                    albumDetail = albumDetail,
-                    albumTracks = albumTracks,
-                    albumLoading = albumLoading,
-                    albumFailed = albumFailed,
-                    albumHasMore = albumHasMore,
-                    albumLoadingMore = albumLoadingMore,
-                    onLoadMoreAlbumTracks = onLoadMoreAlbumTracks,
-                    onRetryAlbum = onRetryAlbum,
-                    onAlbumTrackLikeToggle = onAlbumTrackLikeToggle,
-                    albumSaved = albumSaved,
-                    onAlbumSavedToggle = onAlbumSavedToggle,
-                )
-
-                ShellScreen.ARTIST -> ShellArtistRoute(
-                    env = hosts.route(),
-                    artistDetail = artistDetail,
-                    artistTracks = artistTracks,
-                    artistReleases = artistReleases,
-                    artistMonthlyListeners = artistMonthlyListeners,
-                    artistLoading = artistLoading,
-                    artistFailed = artistFailed,
-                    onRetryArtist = onRetryArtist,
-                    artistFollowed = artistFollowed,
-                    artistBanned = artistBanned,
-                    onArtistUnban = onArtistUnban,
-                    onArtistFollowToggle = onArtistFollowToggle,
-                    onArtistTrackLikeToggle = onArtistTrackLikeToggle,
-                )
-
-                ShellScreen.CATEGORY -> ShellCategoryRoute(
-                    env = hosts.route(),
-                    categoryShelves = categoryShelves,
-                    homeQuickAccessItems = homeQuickAccessItems,
-                    homeRecommendations = homeRecommendations,
-                    libraryItems = libraryItems,
-                )
-
-                ShellScreen.SETTINGS -> ShellSettingsRoute(
-                    env = hosts.route(),
-                    switches = settingsSwitches,
-                    locks = settingsLocks,
-                    product = settingsProduct,
-                    country = settingsCountry,
-                    loading = settingsLoading,
-                    onToggleSetting = onToggleSetting,
-                    onAppIconChange = onAppIconChange,
-                    update = appUpdate,
-                    updateChecking = updateChecking,
-                    updateChecked = updateChecked,
-                    onCheckUpdates = onCheckUpdates,
-                    onLogout = onLogout,
-                )
-
-                ShellScreen.NOTIFICATIONS -> ShellNotificationsRoute(
-                    env = hosts.route(),
-                    notifications = notifications,
-                    loading = notificationsLoading,
-                    loadFailed = notificationsFailed,
-                    onRefresh = onRefreshWhatsNew,
-                    onLoadPlaylist = onLoadPlaylist,
-                    onOpenEpisode = onOpenEpisode,
-                )
-
-                ShellScreen.ACTIVITY -> ShellActivityRoute(
-                    env = hosts.route(),
-                    notifications = activityFeed,
-                    loading = activityLoading,
-                    loadFailed = activityFailed,
-                    self = activitySelf,
-                    onRetry = onRetryActivity,
-                    onLeave = onLeaveActivity,
-                )
-
-                ShellScreen.HISTORY -> ShellHistoryRoute(
-                    env = hosts.route(),
-                    todayTracks = historyToday,
-                    yesterdayTracks = historyYesterday,
-                    earlierTracks = historyEarlier,
-                    stats = historyStats,
-                    loading = historyLoading,
-                )
-
-                ShellScreen.ADD_TRACKS -> ShellAddTracksRoute(
-                    env = hosts.route(),
-                    songs = addTracksSongs,
-                    episodes = addTracksEpisodes,
-                    recent = addTracksRecent,
-                    liked = addTracksLiked,
-                    loading = addTracksLoading,
-                    onAddTrack = onAddTrack,
-                    searchData = searchData,
-                    searchLoading = searchLoading,
-                    onSearchQueryChange = onSearchQueryChange,
-                )
-
-                ShellScreen.BROWSE -> ShellBrowseRoute(
-                    env = hosts.route(),
-                    page = browsePage,
-                    onOpenBrowse = onOpenBrowse,
-                    onOpenShow = onOpenShow,
-                    onLoadMore = onLoadMoreBrowse,
-                )
-
-                ShellScreen.SHOW -> ShellShowRoute(
-                    env = hosts.route(),
-                    show = showDetail,
-                    loading = showLoading,
-                    onOpenShow = onOpenShow,
-                    onLoadMore = onLoadMoreEpisodes,
-                    onShowFollowToggle = onShowFollowToggle,
-                )
-
-                ShellScreen.EPISODE -> ShellEpisodeRoute(
-                    env = hosts.route(),
-                    episode = episodeDetail,
-                    loading = episodeLoading,
-                    onOpenEpisode = onOpenEpisode,
-                )
-
-                ShellScreen.FOLDER -> ShellFolderRoute(
-                    env = hosts.route(),
-                    items = folderItems,
-                    loading = folderLoading,
-                    onLoadPlaylist = onLoadPlaylist,
-                )
-
-                ShellScreen.PROFILE -> ShellProfileRoute(
-                    env = hosts.route(),
-                    profile = profile,
-                    topContent = profileTop,
-                    topContentUnavailable = profileTopUnavailable,
-                    contexts = profileContexts,
-                    loading = profileLoading,
-                    loadFailed = profileFailed,
-                    onRetry = onRetryProfile,
-                    onLoadProfileFollows = onLoadProfileFollows,
-                )
+                        onRetrySearch = onRetrySearch,
+                        onClearRecentSearches = onClearRecentSearches,
+                        onRemoveRecentSearch = onRemoveRecentSearch,
+                        onRecordRecentSearch = onRecordRecentSearch,
+                        onToggleSaved = onToggleSaved,
+                        onLoadSearchSection = onLoadSearchSection,
+                        onOpenBrowse = onOpenBrowse,
+                        onOpenCategory = onOpenCategory,
+                    )
+    
+                    ShellScreen.LIBRARY -> ShellLibraryRoute(
+                        env = hosts.route(),
+                        libraryItems = libraryItems,
+                        libraryLoading = libraryLoading,
+                    )
+    
+                    ShellScreen.PLAYLIST -> ShellPlaylistRoute(
+                        env = hosts.route(),
+                        playlistDetail = playlistDetail,
+                        playlistTracks = playlistTracks,
+                        playlistLoading = playlistLoading,
+                        playlistHasMore = playlistHasMore,
+                        playlistLoadingMore = playlistLoadingMore,
+                        onLoadMorePlaylistTracks = onLoadMorePlaylistTracks,
+                        onRetryPlaylist = onRetryPlaylist,
+                        playlistSaved = playlistSaved,
+                        playlistRecommendations = playlistRecommendations,
+                        recommendationsLoading = recommendationsLoading,
+                        onRefreshRecommendations = onRefreshRecommendations,
+                        onAddRecommended = onAddRecommended,
+                        onSavePlaylistOrder = onSavePlaylistOrder,
+                        onEditPlaylistDetails = onEditPlaylistDetails,
+                        onDeletePlaylist = onDeletePlaylist,
+                        onTogglePlaylistSaved = onTogglePlaylistSaved,
+                        playlistPermissions = playlistPermissions,
+                        onLoadPlaylistContributors = onLoadPlaylistContributors,
+                        onPlaylistTrackLikeToggle = onPlaylistTrackLikeToggle,
+                        onEditPlaylist = onEditPlaylist,
+                        onAddTracksOpen = onAddTracksOpen,
+                    )
+    
+                    ShellScreen.ALBUM -> ShellAlbumRoute(
+                        env = hosts.route(),
+                        albumDetail = albumDetail,
+                        albumTracks = albumTracks,
+                        albumLoading = albumLoading,
+                        albumFailed = albumFailed,
+                        albumHasMore = albumHasMore,
+                        albumLoadingMore = albumLoadingMore,
+                        onLoadMoreAlbumTracks = onLoadMoreAlbumTracks,
+                        onRetryAlbum = onRetryAlbum,
+                        onAlbumTrackLikeToggle = onAlbumTrackLikeToggle,
+                        albumSaved = albumSaved,
+                        onAlbumSavedToggle = onAlbumSavedToggle,
+                    )
+    
+                    ShellScreen.ARTIST -> ShellArtistRoute(
+                        env = hosts.route(),
+                        artistDetail = artistDetail,
+                        artistTracks = artistTracks,
+                        artistReleases = artistReleases,
+                        artistMonthlyListeners = artistMonthlyListeners,
+                        artistLoading = artistLoading,
+                        artistFailed = artistFailed,
+                        onRetryArtist = onRetryArtist,
+                        artistFollowed = artistFollowed,
+                        artistBanned = artistBanned,
+                        onArtistUnban = onArtistUnban,
+                        onArtistFollowToggle = onArtistFollowToggle,
+                        onArtistTrackLikeToggle = onArtistTrackLikeToggle,
+                    )
+    
+                    ShellScreen.CATEGORY -> ShellCategoryRoute(
+                        env = hosts.route(),
+                        categoryShelves = categoryShelves,
+                        homeQuickAccessItems = homeQuickAccessItems,
+                        homeRecommendations = homeRecommendations,
+                        libraryItems = libraryItems,
+                    )
+    
+                    ShellScreen.SETTINGS -> ShellSettingsRoute(
+                        env = hosts.route(),
+                        switches = settingsSwitches,
+                        locks = settingsLocks,
+                        product = settingsProduct,
+                        country = settingsCountry,
+                        loading = settingsLoading,
+                        onToggleSetting = onToggleSetting,
+                        onAppIconChange = onAppIconChange,
+                        update = appUpdate,
+                        updateChecking = updateChecking,
+                        updateChecked = updateChecked,
+                        onCheckUpdates = onCheckUpdates,
+                        onLogout = onLogout,
+                    )
+    
+                    ShellScreen.NOTIFICATIONS -> ShellNotificationsRoute(
+                        env = hosts.route(),
+                        notifications = notifications,
+                        loading = notificationsLoading,
+                        loadFailed = notificationsFailed,
+                        onRefresh = onRefreshWhatsNew,
+                        onLoadPlaylist = onLoadPlaylist,
+                        onOpenEpisode = onOpenEpisode,
+                    )
+    
+                    ShellScreen.ACTIVITY -> ShellActivityRoute(
+                        env = hosts.route(),
+                        notifications = activityFeed,
+                        loading = activityLoading,
+                        loadFailed = activityFailed,
+                        self = activitySelf,
+                        onRetry = onRetryActivity,
+                        onLeave = onLeaveActivity,
+                    )
+    
+                    ShellScreen.HISTORY -> ShellHistoryRoute(
+                        env = hosts.route(),
+                        todayTracks = historyToday,
+                        yesterdayTracks = historyYesterday,
+                        earlierTracks = historyEarlier,
+                        stats = historyStats,
+                        loading = historyLoading,
+                    )
+    
+                    ShellScreen.ADD_TRACKS -> ShellAddTracksRoute(
+                        env = hosts.route(),
+                        songs = addTracksSongs,
+                        episodes = addTracksEpisodes,
+                        recent = addTracksRecent,
+                        liked = addTracksLiked,
+                        loading = addTracksLoading,
+                        onAddTrack = onAddTrack,
+                        searchData = searchData,
+                        searchLoading = searchLoading,
+                        onSearchQueryChange = onSearchQueryChange,
+                    )
+    
+                    ShellScreen.BROWSE -> ShellBrowseRoute(
+                        env = hosts.route(),
+                        page = browsePage,
+                        onOpenBrowse = onOpenBrowse,
+                        onOpenShow = onOpenShow,
+                        onLoadMore = onLoadMoreBrowse,
+                    )
+    
+                    ShellScreen.SHOW -> ShellShowRoute(
+                        env = hosts.route(),
+                        show = showDetail,
+                        loading = showLoading,
+                        onOpenShow = onOpenShow,
+                        onLoadMore = onLoadMoreEpisodes,
+                        onShowFollowToggle = onShowFollowToggle,
+                    )
+    
+                    ShellScreen.EPISODE -> ShellEpisodeRoute(
+                        env = hosts.route(),
+                        episode = episodeDetail,
+                        loading = episodeLoading,
+                        onOpenEpisode = onOpenEpisode,
+                    )
+    
+                    ShellScreen.FOLDER -> ShellFolderRoute(
+                        env = hosts.route(),
+                        items = folderItems,
+                        loading = folderLoading,
+                        onLoadPlaylist = onLoadPlaylist,
+                    )
+    
+                    ShellScreen.PROFILE -> ShellProfileRoute(
+                        env = hosts.route(),
+                        profile = profile,
+                        topContent = profileTop,
+                        topContentUnavailable = profileTopUnavailable,
+                        contexts = profileContexts,
+                        loading = profileLoading,
+                        loadFailed = profileFailed,
+                        onRetry = onRetryProfile,
+                        onLoadProfileFollows = onLoadProfileFollows,
+                    )
+                }
             }
         }
 
-
-        ShellPlayerLayer(env = hosts.player())
+        if (splitPlayer) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .consumeWindowInsets(WindowInsets.systemBars)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(contentFraction)
+                        .fillMaxHeight()
+                        .clip(paneShape)
+                        .background(EncoreColors.Background)
+                ) {
+                    screenHost()
+                    ShellPlayerLayer(env = hosts.player(), docked = true)
+                }
+                Spacer(modifier = Modifier.width(splitGap.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(splitFraction)
+                        .fillMaxHeight()
+                        .clip(paneShape)
+                        .background(EncoreColors.Background)
+                ) {
+                    ShellDockedPlayer(env = hosts.player())
+                }
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+                screenHost()
+                ShellPlayerLayer(env = hosts.player())
+            }
+        }
         ShellSheetsHost(env = hosts.sheets())
         ShellOverlaysHost(env = hosts.overlays())
 
@@ -1069,7 +1160,8 @@ fun EncoreAppShell(
         SpotifyToastHost(
             state = toast,
             modifier = Modifier
-                .align(Alignment.BottomCenter)
+                .align(if (splitPlayer) Alignment.BottomStart else Alignment.BottomCenter)
+                .fillMaxWidth(contentFraction)
                 .padding(bottom = rememberBottomPadding())
         )
 

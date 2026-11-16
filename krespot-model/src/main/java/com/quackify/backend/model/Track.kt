@@ -38,6 +38,7 @@ data class TrackRow(
     val discNumber: Int = 1,
     val trackNumber: Int = 0,
     val video: Boolean = false,
+    val addedAt: Long = 0L,
 )
 
 data class TrackItem(
@@ -54,4 +55,5 @@ data class TrackItem(
     val discNumber: Int = 1,
     val trackNumber: Int = 0,
     val hasVideo: Boolean = false,
+    val addedAt: Long = 0L,
 )

@@ -194,7 +194,7 @@ fun EncoreCategoryScreen(
                 }
             }
 
-            items(effectiveShelves, key = { it.title }) { shelf ->
+            items(effectiveShelves.distinctBy { it.title }, key = { it.title }) { shelf ->
                 Column(modifier = Modifier.padding(top = 18.dp)) {
                     Text(
                         text = shelf.title,
@@ -222,7 +222,7 @@ fun EncoreCategoryScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(shelf.items, key = { it.title + it.uri }) { item ->
+                        items(shelf.items.distinctBy { it.uri + it.title }, key = { it.title + it.uri }) { item ->
                             Column(
                                 modifier = Modifier
                                     .width(148.dp)
@@ -327,7 +327,7 @@ fun EncoreCategoryScreen(
                     }
                 }
 
-                items(effectiveSubgenres.chunked(2), key = { pair -> pair.joinToString { it.title } }) { rowPair ->
+                items(effectiveSubgenres.distinctBy { it.title }.chunked(2), key = { pair -> pair.joinToString { it.title } }) { rowPair ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

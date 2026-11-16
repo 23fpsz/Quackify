@@ -42,7 +42,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.quackify.compose.R
@@ -372,27 +371,4 @@ private fun List<TrackItem>.toQueueRows(): MutableList<EditableTrackItem> {
         EditableTrackItem("${base}_$occurrence", track)
     }
     return mutableStateListOf<EditableTrackItem>().apply { addAll(rows) }
-}
-
-@Preview
-@Composable
-fun PreviewEncoreQueueSheet() {
-    EncoreAppTheme {
-        EncoreQueueSheet(
-            currentTrackTitle = "Starboy",
-            currentTrackArtist = "The Weeknd, Daft Punk",
-            queueSourceContext = "Today's Top Hits",
-            userQueue = listOf(
-                TrackItem("Blinding Lights", "The Weeknd"),
-                TrackItem("Save Your Tears", "The Weeknd")
-            ),
-            nextFromContext = listOf(
-                TrackItem("Espresso", "Sabrina Carpenter", true),
-                TrackItem("Birds of a Feather", "Billie Eilish"),
-                TrackItem("Good Luck, Babe!", "Chappell Roan")
-            ),
-            onDismissRequest = {},
-            onTrackSelect = {}
-        )
-    }
 }

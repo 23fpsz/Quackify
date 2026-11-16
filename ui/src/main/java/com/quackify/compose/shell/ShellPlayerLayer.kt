@@ -1,6 +1,11 @@
 package com.quackify.compose.shell
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -8,12 +13,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.player.LyricsOptions
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.CoroutineScope
+
 
 internal class ShellPlayerEnv(
     val flags: ShellUiFlags,
@@ -61,6 +69,7 @@ internal class ShellPlayerEnv(
     val handleSkipNext: () -> Unit,
     val handleSkipPrevious: () -> Unit,
     val handleSkipToPreviousTrack: () -> Unit,
+    val handlePreviousSwipe: () -> Unit,
     val onCanvasToggle: ((Boolean) -> Unit)?,
     val onNpvLyricsToggle: ((Boolean) -> Unit)?,
     val onToggleVideoFullscreen: ((Boolean) -> Unit)?,
@@ -76,7 +85,7 @@ internal class ShellPlayerEnv(
  * EncoreAppShell so that composable stays under the JIT method-size limit.
  */
 @Composable
-internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
+internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv, docked: Boolean = false) {
     val bottomBarModifier = Modifier.align(Alignment.BottomCenter)
     val playbackState = env.playbackState
     val progressState = env.progressState
@@ -146,11 +155,49 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
             onSkipNext = env.handleSkipNext,
             onSkipPrevious = env.handleSkipPrevious,
             hasTrack = env.playerIdentity.trackLoaded,
-            showMiniPlayer = env.playerIdentity.trackLoaded,
+            showMiniPlayer = env.playerIdentity.trackLoaded && !docked,
             modifier = bottomBarModifier
         )
     }
 
+    if (!docked) {
+        NowPlayingScreenLayer(
+            env = env,
+            visible = env.isPlayerExpanded && !env.flags.isLogcatOpen,
+            docked = false,
+            modifier = Modifier
+        )
+    }
+}
+
+@Composable
+internal fun ShellDockedPlayer(env: ShellPlayerEnv, modifier: Modifier = Modifier) {
+    if (!env.playerIdentity.trackLoaded) return
+    NowPlayingScreenLayer(
+        env = env,
+        visible = !env.flags.isLogcatOpen,
+        docked = true,
+        modifier = modifier.fillMaxSize()
+    )
+}
+
+@Composable
+private fun NowPlayingScreenLayer(
+    env: ShellPlayerEnv,
+    visible: Boolean,
+    docked: Boolean,
+    modifier: Modifier
+) {
+    val playbackState = env.playbackState
+    val progressState = env.progressState
+    val currentProgress = progressState?.progress ?: env.local.progress
+    val currentPositionMs = progressState?.positionMs ?: env.local.positionMs
+    val durationMs = progressState?.durationMs ?: 0L
+    val nowPlayingDominantColor by rememberDominantColor(
+        imageUrl = env.currentCoverUrl,
+        fallbackSeed = env.currentTrackTitle + env.currentArtist,
+        defaultColor = Color(0xFF432371)
+    )
     val bridgeContextLabel = playbackState?.queueContextLabel?.takeIf { it.isNotBlank() }
         ?: playbackState?.contextLabel?.takeIf { it.isNotBlank() }
         ?: ""
@@ -167,7 +214,9 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
     val effectiveCanSeek = if (remoteCtl) playbackState?.remoteCanSeek ?: true else true
 
     ShellNowPlaying(
-        visible = env.isPlayerExpanded && !env.flags.isLogcatOpen,
+        visible = visible,
+        docked = docked,
+        modifier = modifier,
         title = env.playerIdentity.title,
         artist = env.playerIdentity.artist,
         contextHeader = contextHeader,
@@ -189,7 +238,8 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
                 env.onArtistFollowToggle?.invoke(env.resolvedArtistUri, follow)
             }
         },
-        lyrics = env.nowPlayingLyrics,
+        lyrics = if (LyricsOptions.enabled) env.nowPlayingLyrics else emptyList(),
+        lyricsPreview = LyricsOptions.preview,
         previousTrack = playbackState?.previousTrack,
         nextTrack = playbackState?.nextTrack,
         canvasFilePath = env.canvasFilePath,
@@ -226,6 +276,7 @@ internal fun BoxScope.ShellPlayerLayer(env: ShellPlayerEnv) {
         onSkipNext = env.handleSkipNext,
         onSkipPrevious = env.handleSkipPrevious,
         onSkipToPreviousClick = env.handleSkipToPreviousTrack,
+        onPreviousSwipe = env.handlePreviousSwipe,
         onLike = {
             val playingTrack = TrackItem(
                 title = env.currentTrackTitle,

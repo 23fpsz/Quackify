@@ -24,7 +24,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
@@ -150,7 +149,13 @@ fun LibrarySortSheet(
                                         R.drawable.encore_icon_arrow_down_24
                                     }
                                 ),
-                                contentDescription = if (currentDirection == SortDirection.ASCENDING) "Sorted ascending" else "Sorted descending",
+                                contentDescription = stringResource(
+                                    if (currentDirection == SortDirection.ASCENDING) {
+                                        R.string.sorted_ascending
+                                    } else {
+                                        R.string.sorted_descending
+                                    }
+                                ),
                                 tint = EncoreColors.Green,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -168,19 +173,5 @@ fun LibrarySortSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
-    }
-}
-
-@Preview
-@Composable
-fun PreviewLibrarySortSheet() {
-    EncoreAppTheme {
-        LibrarySortSheet(
-            isOpen = true,
-            currentSort = LibrarySortOption.RECENTS,
-            currentDirection = SortDirection.DESCENDING,
-            onSortSelected = { _, _ -> },
-            onDismiss = {}
-        )
     }
 }

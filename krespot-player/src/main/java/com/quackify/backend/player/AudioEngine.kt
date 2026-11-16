@@ -32,7 +32,6 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
-import androidx.media3.exoplayer.drm.DrmSessionManager
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
 import androidx.media3.exoplayer.drm.ExoMediaDrm
 import androidx.media3.exoplayer.drm.FrameworkMediaDrm
@@ -56,6 +55,64 @@ private val log = Logs.of(Logs.Module.PLAYER)
 
 private const val PROGRESS_MS = 500L
 
+internal object DrmLevel {
+
+    private const val PROP_SECURITY_LEVEL = "securityLevel"
+
+    @Volatile
+    var applied = "auto"
+
+    fun provider(): ExoMediaDrm.Provider = ExoMediaDrm.Provider { uuid ->
+        val drm = FrameworkMediaDrm.newInstance(uuid)
+        val forced = runCatching {
+            drm.setPropertyString(PROP_SECURITY_LEVEL, "L3")
+            drm.getPropertyString(PROP_SECURITY_LEVEL)
+        }.getOrElse { "L1" }
+        applied = forced
+        log.i("drm security level '$forced' for ${uuid.toString().take(8)}")
+        drm
+    }
+}
+
+private fun shape(bytes: ByteArray, depth: Int = 0, limit: Int = 3): String = runCatching {
+    val out = StringBuilder()
+    val reader = Reader(bytes)
+    var count = 0
+    while (!reader.done() && count < 24) {
+        count++
+        val (field, wire) = reader.tag()
+        when (wire) {
+            0 -> out.append("$field=").append(reader.varint()).append(' ')
+            1 -> {
+                reader.skip(1)
+                out.append("$field! ").append(' ')
+            }
+            2 -> {
+                val raw = reader.bytes()
+                val nested = raw.isNotEmpty() && raw.size > 4 && looksNested(raw)
+                if (depth < limit && nested) {
+                    out.append("$field{").append(shape(raw, depth + 1, limit)).append("} ")
+                } else {
+                    out.append("$field#").append(raw.size).append(' ')
+                }
+            }
+            5 -> {
+                reader.skip(5)
+                out.append("$field~ ")
+            }
+            else -> return@runCatching out.append("$field?wire$wire").toString().trim()
+        }
+    }
+    out.toString().trim()
+}.getOrElse { "shape unreadable ${it.message}" }
+
+private fun looksNested(raw: ByteArray): Boolean {
+    val head = raw[0].toInt() and 255
+    val field = head ushr 3
+    val wire = head and 7
+    return field in 1..15 && wire in 0..5 && wire != 3 && wire != 4
+}
+
 internal class AudioDrmCallback(
     private val context: Context,
     private val licenseUrl: suspend () -> String,
@@ -74,11 +131,14 @@ internal class AudioDrmCallback(
         }
         val body = response?.takeIf { it.ok }
         if (body == null) {
-            if (response?.code != 403) LicenseGate.hold(response?.retryAfterSeconds ?: 0L)
+            if (response?.code != 403) {
+                LicenseGate.hold(response?.code ?: 0, response?.retryAfterSeconds ?: 0L)
+            }
             throw IOException("audio licence ${response?.code ?: "failed"}")
         }
         LicenseGate.clear()
-        log.i("audio licence ${body.bytes.size}B ${licencePolicy(body.bytes)}")
+        log.i("audio licence ${body.bytes.size}B level=${DrmLevel.applied} ${licencePolicy(body.bytes)}")
+        log.i("audio licence shape ${shape(body.bytes)}")
         return MediaDrmCallback.Response(body.bytes)
     }
 
@@ -94,36 +154,32 @@ internal class AudioDrmCallback(
     }
 
     private fun licencePolicy(bytes: ByteArray): String = runCatching {
-        var canPlay = -1
-        var canPersist = -1
-        var canRenew = -1
-        var licenseDuration = -1L
-        var playbackDuration = -1L
-        var policy: ByteArray? = null
-        val root = Reader(bytes)
-        while (!root.done()) {
-            val (field, wire) = root.tag()
-            when {
-                field == 2 && wire == 2 -> policy = root.bytes()
-                else -> root.skip(wire)
-            }
-        }
-        policy?.let { raw ->
+        fun policyOf(raw: ByteArray, depth: Int = 0): Map<Int, Long>? {
+            if (depth > 4) return null
+            val values = mutableMapOf<Int, Long>()
+            val nested = mutableListOf<ByteArray>()
             val reader = Reader(raw)
             while (!reader.done()) {
                 val (field, wire) = reader.tag()
-                when {
-                    field == 1 && wire == 0 -> canPlay = reader.varint().toInt()
-                    field == 2 && wire == 0 -> canPersist = reader.varint().toInt()
-                    field == 3 && wire == 0 -> canRenew = reader.varint().toInt()
-                    field == 5 && wire == 0 -> playbackDuration = reader.varint()
-                    field == 6 && wire == 0 -> licenseDuration = reader.varint()
+                when (wire) {
+                    0 -> values[field] = reader.varint()
+                    2 -> nested.add(reader.bytes())
                     else -> reader.skip(wire)
                 }
             }
+            val looksLikePolicy = values.containsKey(1) && values.containsKey(2) &&
+                values[1] in 0L..1L && (values.containsKey(5) || values.containsKey(6))
+            if (looksLikePolicy) return values
+            for (child in nested) {
+                val found = runCatching { policyOf(child, depth + 1) }.getOrNull()
+                if (found != null) return found
+            }
+            return null
         }
-        "play=$canPlay persist=$canPersist renew=$canRenew " +
-            "licenseDur=${licenseDuration}s playbackDur=${playbackDuration}s"
+        val policy = policyOf(bytes)
+            ?: return@runCatching "policy not found"
+        "play=${policy[1] ?: -1} persist=${policy[2] ?: -1} renew=${policy[3] ?: -1} " +
+            "rental=${policy[4] ?: -1}s playbackDur=${policy[5] ?: -1}s licenseDur=${policy[6] ?: -1}s"
     }.getOrElse { "policy unreadable" }
 }
 
@@ -131,9 +187,12 @@ internal class AudioEngine(
     private val context: Context,
     private val spclient: () -> String,
     private val scope: CoroutineScope,
+    var onEvent: (PlayerEvent) -> Unit,
 ) {
 
-    var onEvent: ((PlayerEvent) -> Unit)? = null
+    private var kit: DefaultMediaSourceFactory? = null
+
+    private val licensedFiles = java.util.LinkedHashSet<String>()
 
     val hasMedia: Boolean get() = loaded
 
@@ -141,10 +200,7 @@ internal class AudioEngine(
 
     private var player: ExoPlayer? = null
 
-    private var mediaFactory: DefaultMediaSourceFactory? = null
-
-    @Volatile
-    private var drmManager: DrmSessionManager? = null
+    private var drmManager: DefaultDrmSessionManager? = null
 
     @Volatile
     private var loaded = false
@@ -205,76 +261,58 @@ internal class AudioEngine(
     ): Boolean =
         withContext(Dispatchers.Main) {
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
-            val encrypted = source.seektable.pssh.isNotBlank()
-            val factory = factoryFor()
-            if (encrypted) {
-                log.i("audio drm session asked for '${source.fileId.take(12)}'")
-            } else {
-                log.i("clear content, no drm session asked")
-            }
+            val factory = ensureKit()
+            val reused = !licensedFiles.add(source.fileId)
+            log.i(
+                if (reused) "licence reused for '${source.fileId.take(12)}' and its ${licensedFiles.size} sibling(s)"
+                else "audio drm session asked for '${source.fileId.take(12)}'"
+            )
             gainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
             durationMs = totalMs
             announced = false
             lastItemUri = uri
             if (uri.isNotBlank()) itemDurations[uri] = totalMs
-            val fresh = factory.createMediaSource(itemFor(uri, source))
             // The player instance survives track changes: swapping the media
             // source keeps the renderers, the codec and the audio sink warm, so
             // only the first play pays the ExoPlayer build cost.
-            val existing = player
-            if (existing == null) {
-                val created = ExoPlayer.Builder(context)
-                    .setMediaSourceFactory(factory)
-                    .build()
-                created.addListener(listener)
-                created.setMediaSource(fresh)
-                player = created
-                created.prepare()
-                created.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
-                created.playWhenReady = autoplay
-            } else {
-                existing.stop()
-                existing.setMediaSource(fresh)
-                existing.prepare()
-                existing.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
-                existing.playWhenReady = autoplay
-            }
+            val live = player ?: ExoPlayer.Builder(context)
+                .setMediaSourceFactory(factory)
+                .build()
+                .also {
+                    it.addListener(listener)
+                    player = it
+                }
+            live.setMediaSource(factory.createMediaSource(itemFor(uri, source)))
+            live.prepare()
+            live.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
+            live.playWhenReady = autoplay
             started = autoplay
             loaded = true
             log.i("audio engine ready '${source.fileId.take(12)}' ${totalMs}ms at ${fromMs}ms " +
-                    "autoplay=$autoplay reused=${existing != null}"
+                    "autoplay=$autoplay reused=${player !== live}"
             )
             true
         }
 
-    private fun factoryFor(): DefaultMediaSourceFactory {
-        mediaFactory?.let { return it }
+    private fun ensureKit(): DefaultMediaSourceFactory {
+        kit?.let { return it }
         // The song cache sits between ExoPlayer and the CDN: online reads
         // seed it while streaming, offline reads come back from it, and
         // the custom key (the track uri) survives CDN url rotation.
         val factory = DefaultMediaSourceFactory(
             SongCache.factory(context).setUpstreamDataSourceFactory(DefaultDataSource.Factory(context))
         )
-        factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { _: MediaItem ->
-            drmManagerFor()
-        })
-        mediaFactory = factory
+        val manager = DefaultDrmSessionManager.Builder()
+            .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
+            .setMultiSession(true)
+            .build(AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) })
+        factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { manager })
+        drmManager = manager
+        kit = factory
+        log.i("drm kit built, one player and one session manager for the whole run")
         return factory
     }
 
-    private fun drmManagerFor(): DrmSessionManager {
-        drmManager?.let { return it }
-        synchronized(this) {
-            drmManager?.let { return it }
-            val callback = AudioDrmCallback(context) { LicenseEndpoint.of(context, spclient()) }
-            val manager = DefaultDrmSessionManager.Builder()
-                .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
-                .setMultiSession(true)
-                .build(callback)
-            drmManager = manager
-            return manager
-        }
-    }
 
     fun queueNext(uri: String, source: AudioSource) {
         runOnMain {
@@ -372,13 +410,10 @@ internal class AudioEngine(
         lastItemUri = ""
         progressJob?.cancel()
         progressJob = null
-        runOnMain {
-            player?.stop()
-            player?.clearMediaItems()
-        }
+        runOnMain { player?.stop() }
     }
 
-    fun teardown() {
+    fun release() {
         started = false
         loaded = false
         durationMs = 0L
@@ -388,9 +423,11 @@ internal class AudioEngine(
         runOnMain {
             player?.release()
             player = null
+            drmManager?.release()
+            drmManager = null
+            kit = null
+            licensedFiles.clear()
         }
-        mediaFactory = null
-        drmManager = null
     }
 
     private fun applyVolume() {
@@ -459,7 +496,6 @@ internal class AudioEngine(
             onEvent?.invoke(PlayerEvent.Failed("${error.errorCodeName}: ${error.message ?: "audio error"}"))
         }
     }
-
 
     private inline fun <T> runOnMain(crossinline block: () -> T?): T? {
         if (Looper.myLooper() == Looper.getMainLooper()) return block()

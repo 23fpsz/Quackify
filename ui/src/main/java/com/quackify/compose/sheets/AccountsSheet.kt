@@ -25,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.backend.core.auth.EncoreAuth
@@ -207,24 +206,5 @@ fun AccountsSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
-    }
-}
-
-@Preview
-@Composable
-fun PreviewAccountsSheet() {
-    EncoreAppTheme {
-        AccountsSheet(
-            isOpen = true,
-            onDismiss = {},
-            accounts = listOf(
-                EncoreAuth.Account(id = "a1", name = "Duck User", email = "duck@quackify.app"),
-                EncoreAuth.Account(id = "a2", name = stringResource(R.string.second_account)),
-            ),
-            activeAccountId = "a1",
-            onSwitchAccount = {},
-            onAddAccount = {},
-            onRemoveAccount = {}
-        )
     }
 }

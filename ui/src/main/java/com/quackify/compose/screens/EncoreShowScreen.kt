@@ -45,7 +45,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
@@ -309,7 +308,7 @@ fun EncoreShowScreen(
                 }
             }
 
-            items(episodes, key = { it.uri }) { episode ->
+            items(episodes.distinctBy { it.uri }, key = { it.uri }) { episode ->
                 EpisodeListRow(
                     episode = episode,
                     isCurrent = matchesCurrent(episode.uri, currentTrackUri, episode.title, currentTrackTitle),
@@ -347,7 +346,7 @@ fun EncoreShowScreen(
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            items(related, key = { it.uri }) { card ->
+                            items(related.distinctBy { it.uri }, key = { it.uri }) { card ->
                                 RelatedShowCard(card = card, onClick = { onRelatedClick(card) })
                             }
                         }
@@ -534,54 +533,4 @@ private fun episodeSubtitle(episode: EpisodeRow): String {
     formatDuration(episode.durationMs).takeIf { it.isNotBlank() }?.let(parts::add)
     if (episode.video) parts += stringResource(R.string.video)
     return parts.joinToString(" • ")
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewEncoreShowScreen() {
-    EncoreAppTheme {
-        EncoreShowScreen(
-            showName = "The Mindset Mentor",
-            publisher = "Rob Dial",
-            description = "The Mindset Mentor™ podcast is designed for anyone desiring motivation, direction, " +
-                "and focus in life.",
-            imageUrl = null,
-            headerColor = Color(0xFF1B4A3A),
-            rating = 4.9,
-            ratingCount = 44557,
-            episodes = listOf(
-                EpisodeRow(
-                    uri = "spotify:episode:1",
-                    title = "How to Be Respected",
-                    description = "",
-                    releaseDate = "October 28, 2026",
-                    durationMs = 964362,
-                    imageUrl = "",
-                    colorHex = "",
-                    explicit = true,
-                    playable = true,
-                    video = false,
-                    played = false,
-                    positionMs = 0L,
-                ),
-                EpisodeRow(
-                    uri = "spotify:episode:2",
-                    title = "How to Not get Triggered",
-                    description = "",
-                    releaseDate = "October 26, 2026",
-                    durationMs = 1080000,
-                    imageUrl = "",
-                    colorHex = "",
-                    explicit = false,
-                    playable = true,
-                    video = false,
-                    played = true,
-                    positionMs = 0L,
-                ),
-            ),
-            total = 1961,
-            onBackClick = {},
-            onPlayPauseClick = {},
-        )
-    }
 }

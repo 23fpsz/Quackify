@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
@@ -297,7 +296,7 @@ fun EncoreHomeScreen(
             }
         }
 
-        items(shelfSections, key = { it.id }) { shelf ->
+        items(shelfSections.distinctBy { it.id }, key = { it.id }) { shelf ->
             when {
                 shelf.artists.isNotEmpty() -> ArtistShelfSection(
                     title = shelf.title,
@@ -505,7 +504,7 @@ private fun ShelfSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(cards, key = { it.uri }) { card ->
+            items(cards.distinctBy { it.uri }, key = { it.uri }) { card ->
                 Column(
                     modifier = Modifier
                         .width(148.dp)
@@ -605,7 +604,7 @@ private fun ArtistShelfSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(artists, key = { it.uri }) { artist ->
+            items(artists.distinctBy { it.uri }, key = { it.uri }) { artist ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -737,18 +736,4 @@ private fun getGreeting(name: String, feedGreeting: String = ""): String {
     }
     val who = name.trim()
     return if (who.isBlank()) base else "$base, $who"
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun PreviewEncoreHomeScreen() {
-    EncoreAppTheme {
-        EncoreHomeScreen(
-            onPlaylistClick = { _, _ -> },
-            onProfileClick = {},
-            onNotificationsClick = {},
-            onHistoryClick = {},
-            onSettingsClick = {}
-        )
-    }
 }

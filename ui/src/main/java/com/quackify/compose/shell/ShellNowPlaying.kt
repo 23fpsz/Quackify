@@ -1,11 +1,20 @@
 package com.quackify.compose.shell
 
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.player.EncoreNowPlayingScreen
@@ -19,6 +28,8 @@ private const val NowPlayingRevealFadeMs = 160
 @Composable
 internal fun ShellNowPlaying(
     visible: Boolean,
+    docked: Boolean = false,
+    modifier: Modifier = Modifier,
     title: String,
     artist: String,
     contextHeader: String,
@@ -48,6 +59,7 @@ internal fun ShellNowPlaying(
     coverUrl: String,
     lyrics: List<TimeSyncedLyric> = emptyList(),
     isLyricsUnderCoverEnabled: Boolean = true,
+    lyricsPreview: Boolean = true,
     previousTrack: TrackItem? = null,
     nextTrack: TrackItem? = null,
     canvasFilePath: String? = null,
@@ -73,6 +85,7 @@ internal fun ShellNowPlaying(
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
     onSkipToPreviousClick: () -> Unit = {},
+    onPreviousSwipe: () -> Unit = onSkipPrevious,
     onLike: () -> Unit,
     onShuffle: () -> Unit,
     onRepeat: () -> Unit,
@@ -85,20 +98,9 @@ internal fun ShellNowPlaying(
     onArtistClick: () -> Unit = {},
     onArtistLongClick: (() -> Unit)? = null,
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(
-            animationSpec = tween(durationMillis = NowPlayingRevealFadeMs)
-        ),
-        exit = slideOutVertically(
-            targetOffsetY = { fullHeight -> fullHeight },
-            animationSpec = tween(
-                durationMillis = EncoreAnimation.NowPlayingExitDuration,
-                easing = EncoreAnimation.DecelerateInterpolator
-            )
-        )
-    ) {
+    val surface: @Composable () -> Unit = {
         EncoreNowPlayingScreen(
+            docked = docked,
             title = title,
             artist = artist,
             contextHeaderTitle = contextHeader,
@@ -128,6 +130,7 @@ internal fun ShellNowPlaying(
             coverUrl = coverUrl,
             lyrics = lyrics,
             isLyricsUnderCoverEnabled = isLyricsUnderCoverEnabled,
+            showLyricsPreview = lyricsPreview,
             previousTrack = previousTrack,
             nextTrack = nextTrack,
             canvasFilePath = canvasFilePath,
@@ -153,6 +156,7 @@ internal fun ShellNowPlaying(
             onSkipNextClick = onSkipNext,
             onSkipPreviousClick = onSkipPrevious,
             onSkipToPreviousClick = onSkipToPreviousClick,
+            onSwipePreviousClick = onPreviousSwipe,
             onLikeClick = onLike,
             onShuffleClick = onShuffle,
             onRepeatClick = onRepeat,
@@ -165,5 +169,57 @@ internal fun ShellNowPlaying(
             onArtistClick = onArtistClick,
             onArtistLongClick = onArtistLongClick
         )
+    }
+
+    if (docked) {
+        if (!visible) return
+        DockedPlayerPane(modifier = modifier) { surface() }
+    } else {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(
+                animationSpec = tween(durationMillis = NowPlayingRevealFadeMs)
+            ),
+            exit = slideOutVertically(
+                targetOffsetY = { fullHeight -> fullHeight },
+                animationSpec = tween(
+                    durationMillis = EncoreAnimation.NowPlayingExitDuration,
+                    easing = EncoreAnimation.DecelerateInterpolator
+                )
+            )
+        ) {
+            surface()
+        }
+    }
+}
+
+/**
+ * Side pane of the tablet split layout: the now playing screen is measured
+ * with the pane's own size so it keeps its portrait arrangement instead of
+ * inheriting the tablet's landscape window metrics.
+ */
+@Composable
+private fun DockedPlayerPane(modifier: Modifier, content: @Composable () -> Unit) {
+    BoxWithConstraints(modifier = modifier) {
+        val base = LocalConfiguration.current
+        val paneWidth = maxWidth.value.toInt().coerceAtLeast(1)
+        val paneHeight = maxHeight.value.toInt().coerceAtLeast(1)
+        val paneConfiguration = remember(base, paneWidth, paneHeight) {
+            Configuration(base).apply {
+                screenWidthDp = paneWidth
+                screenHeightDp = paneHeight
+                smallestScreenWidthDp = minOf(paneWidth, paneHeight)
+                orientation = if (paneWidth > paneHeight) {
+                    Configuration.ORIENTATION_LANDSCAPE
+                } else {
+                    Configuration.ORIENTATION_PORTRAIT
+                }
+            }
+        }
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            CompositionLocalProvider(LocalConfiguration provides paneConfiguration) {
+                content()
+            }
+        }
     }
 }
