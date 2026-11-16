@@ -474,7 +474,7 @@ fun EncoreNowPlayingScreen(
         canSwipePrevious = canSkipPrevious,
         onSwipePrevious = {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            onSwipePreviousClick()
+            onSkipToPreviousClick()
         },
         onSwipeNext = {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -604,25 +604,40 @@ fun EncoreNowPlayingScreen(
                                 )
                             }
                         } else {
-                            Box(
+                            ArtworkPeek(
+                                url = nextTrack?.imageUrl.orEmpty(),
+                                dominantColor = dynamicArtworkColor,
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(start = 24.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                SwipableTrackArtwork(
-                                    currentTitle = title,
-                                    currentCoverUrl = coverUrl,
-                                    currentDominantColor = dynamicArtworkColor,
-                                    cardBackgroundColor = animatedDominantColor,
-                                    previousTrack = previousTrack,
-                                    nextTrack = nextTrack,
-                                    canSwipePrevious = canSkipPrevious,
-                                    onSwipePrevious = onSkipToPreviousClick,
-                                    onSwipeNext = onSkipNextClick,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                                    .matchParentSize()
+                                    .graphicsLayer {
+                                        translationX = artworkOffsetX.value + size.width
+                                    }
+                            )
+                            ArtworkPeek(
+                                url = previousTrack?.imageUrl.orEmpty(),
+                                dominantColor = dynamicArtworkColor,
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .graphicsLayer {
+                                        translationX = artworkOffsetX.value - size.width
+                                    }
+                            )
+                            NowPlayingArtworkCard(
+                                title = title,
+                                coverUrl = coverUrl,
+                                dominantColor = dynamicArtworkColor,
+                                backgroundColor = animatedDominantColor,
+                                canvasFilePath = canvasFilePath,
+                                isCanvasEnabled = canvasActive,
+                                videoActive = videoActive,
+                                videoQualities = videoQualities,
+                                onVideoQuality = onVideoQuality,
+                                onVideoSurface = onVideoSurface,
+                                onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
+                                modifier = Modifier
+                                    .aspectRatio(if (videoActive) 16f / 9f else 1.0f)
+                                    .graphicsLayer { translationX = artworkOffsetX.value }
+                            )
                         }
                     }
 
@@ -825,19 +840,40 @@ fun EncoreNowPlayingScreen(
                                             .height(animatedMediaHeight)
                                     )
                                 } else {
-                                    SwipableTrackArtwork(
-                                        currentTitle = title,
-                                        currentCoverUrl = coverUrl,
-                                        currentDominantColor = dynamicArtworkColor,
-                                        cardBackgroundColor = animatedDominantColor,
-                                        previousTrack = previousTrack,
-                                        nextTrack = nextTrack,
-                                        canSwipePrevious = canSkipPrevious,
-                                        onSwipePrevious = onSkipToPreviousClick,
-                                        onSwipeNext = onSkipNextClick,
+                                    ArtworkPeek(
+                                        url = nextTrack?.imageUrl.orEmpty(),
+                                        dominantColor = dynamicArtworkColor,
+                                        modifier = Modifier
+                                            .matchParentSize()
+                                            .graphicsLayer {
+                                                translationX = artworkOffsetX.value + size.width
+                                            }
+                                    )
+                                    ArtworkPeek(
+                                        url = previousTrack?.imageUrl.orEmpty(),
+                                        dominantColor = dynamicArtworkColor,
+                                        modifier = Modifier
+                                            .matchParentSize()
+                                            .graphicsLayer {
+                                                translationX = artworkOffsetX.value - size.width
+                                            }
+                                    )
+                                    NowPlayingArtworkCard(
+                                        title = title,
+                                        coverUrl = coverUrl,
+                                        dominantColor = dynamicArtworkColor,
+                                        backgroundColor = animatedDominantColor,
+                                        canvasFilePath = canvasFilePath,
+                                        isCanvasEnabled = canvasActive,
+                                        videoActive = videoActive,
+                                        videoQualities = videoQualities,
+                                        onVideoQuality = onVideoQuality,
+                                        onVideoSurface = onVideoSurface,
+                                        onToggleVideoFullscreen = { onToggleVideoFullscreen(true) },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(animatedMediaHeight)
+                                            .graphicsLayer { translationX = artworkOffsetX.value }
                                     )
                                 }
                             }
@@ -1302,6 +1338,30 @@ private fun NowPlayingHeaderRow(
  * Reference: revised_template_page_layout.xml (@id/track_carousel) -> bounds [63,308][1017,1262] (24dp margins)
  */
 @Composable
+private fun ArtworkPeek(
+    url: String,
+    dominantColor: Color,
+    modifier: Modifier = Modifier
+) {
+    if (url.isBlank()) return
+    val corner = RoundedCornerShape(EncoreCornerRadii.Larger2)
+    Box(
+        modifier = modifier
+            .shadow(elevation = 16.dp, shape = corner)
+            .clip(corner)
+            .background(dominantColor)
+    ) {
+        EncoreArtworkImage(
+            imageUrl = url,
+            contentDescription = null,
+            fallbackColor = dominantColor,
+            requestSize = 640,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Composable
 private fun NowPlayingArtworkCard(
     title: String,
     coverUrl: String?,
@@ -1457,157 +1517,6 @@ private fun NowPlayingArtworkCard(
                     modifier = Modifier.fillMaxSize()
                 )
             }
-        }
-    }
-}
-
-private const val SWIPE_CARD_COMMIT_FRACTION = 0.3f
-private const val SWIPE_SETTLE_MS = 240
-
-@Composable
-private fun SwipableTrackArtwork(
-    currentTitle: String,
-    currentCoverUrl: String?,
-    currentDominantColor: Color,
-    cardBackgroundColor: Color,
-    previousTrack: TrackItem?,
-    nextTrack: TrackItem?,
-    canSwipePrevious: Boolean,
-    onSwipePrevious: () -> Unit,
-    onSwipeNext: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val hasPrev = canSwipePrevious && previousTrack != null
-    val hasNext = nextTrack != null
-    val drag = remember { Animatable(0f) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(currentCoverUrl, currentTitle) {
-        drag.snapTo(0f)
-    }
-
-    BoxWithConstraints(
-        modifier = modifier
-            .clipToBounds()
-            .pointerInput(hasPrev, hasNext) {
-                val cardWidthPx = size.width.toFloat()
-                val flickVelocity = cardWidthPx * 1.5f
-                val tracker = VelocityTracker()
-                detectHorizontalDragGestures(
-                    onDragStart = { tracker.resetTracking() },
-                    onDragEnd = {
-                        val velocity = tracker.calculateVelocity().x
-                        tracker.resetTracking()
-                        val offset = drag.value
-                        val commitNext = hasNext && offset < 0f &&
-                            (offset < -cardWidthPx * SWIPE_CARD_COMMIT_FRACTION || velocity < -flickVelocity)
-                        val commitPrev = hasPrev && offset > 0f &&
-                            (offset > cardWidthPx * SWIPE_CARD_COMMIT_FRACTION || velocity > flickVelocity)
-                        if (commitNext) onSwipeNext()
-                        if (commitPrev) onSwipePrevious()
-                        scope.launch {
-                            drag.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(
-                                    durationMillis = SWIPE_SETTLE_MS,
-                                    easing = FastOutSlowInEasing
-                                )
-                            )
-                        }
-                    },
-                    onDragCancel = {
-                        scope.launch {
-                            drag.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(
-                                    durationMillis = SWIPE_SETTLE_MS,
-                                    easing = FastOutSlowInEasing
-                                )
-                            )
-                        }
-                    },
-                    onHorizontalDrag = { change, amount ->
-                        change.consume()
-                        tracker.addPosition(change.uptimeMillis, change.position)
-                        val raw = drag.value + amount
-                        val clamped = when {
-                            raw > 0f && !hasPrev -> 0f
-                            raw < 0f && !hasNext -> 0f
-                            raw > cardWidthPx -> cardWidthPx
-                            raw < -cardWidthPx -> -cardWidthPx
-                            else -> raw
-                        }
-                        scope.launch { drag.snapTo(clamped) }
-                    }
-                )
-            }
-    ) {
-        val pageWidth = maxWidth
-        val pageWidthPx = with(LocalDensity.current) { pageWidth.toPx() }
-        Row(
-            modifier = Modifier
-                .requiredWidth(pageWidth * 3)
-                .fillMaxHeight()
-                .graphicsLayer { translationX = drag.value }
-        ) {
-            SwipeTrackArtworkSlot(
-                title = previousTrack?.title.orEmpty(),
-                coverUrl = previousTrack?.imageUrl,
-                dominantColor = currentDominantColor,
-                backgroundColor = cardBackgroundColor,
-                modifier = Modifier
-                    .width(pageWidth)
-                    .fillMaxHeight()
-            )
-            SwipeTrackArtworkSlot(
-                title = currentTitle,
-                coverUrl = currentCoverUrl,
-                dominantColor = currentDominantColor,
-                backgroundColor = cardBackgroundColor,
-                modifier = Modifier
-                    .width(pageWidth)
-                    .fillMaxHeight()
-            )
-            SwipeTrackArtworkSlot(
-                title = nextTrack?.title.orEmpty(),
-                coverUrl = nextTrack?.imageUrl,
-                dominantColor = currentDominantColor,
-                backgroundColor = cardBackgroundColor,
-                modifier = Modifier
-                    .width(pageWidth)
-                    .fillMaxHeight()
-            )
-        }
-    }
-}
-
-@Composable
-private fun SwipeTrackArtworkSlot(
-    title: String,
-    coverUrl: String?,
-    dominantColor: Color,
-    backgroundColor: Color,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .aspectRatio(1f)
-                .shadow(elevation = 16.dp, shape = RoundedCornerShape(EncoreCornerRadii.Larger2))
-                .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
-                .background(backgroundColor),
-            contentAlignment = Alignment.Center
-        ) {
-            EncoreArtworkImage(
-                imageUrl = coverUrl,
-                contentDescription = title.ifBlank { null },
-                fallbackColor = dominantColor,
-                requestSize = 640,
-                modifier = Modifier.fillMaxSize()
-            )
         }
     }
 }
