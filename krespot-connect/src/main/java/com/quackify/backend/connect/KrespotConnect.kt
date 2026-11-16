@@ -502,21 +502,14 @@ class KrespotConnect(private val context: Context) {
         } else if (anchor > 0) {
             window.take(anchor).takeLast(PREV_TRACKS_MAX)
         } else emptyList()
-        // The machine window is the queue: the caller only supplies rows the
-        // window does not know yet (a queue add that has not been echoed
-        // back), and rows are carried by identity, never deduped by uri -
-        // the same track can sit in the queue and in the context, and hidden
-        // iteration rows are what keep the machine's cycles intact on every
-        // other client.
-        val machine = if (anchor >= 0) window.drop(anchor + 1) else emptyList()
-        val machineIds = machine.mapTo(HashSet()) { it.uid.ifBlank { it.uri } }
-        val fresh = nextRows.filter {
-            it.uri.isNotBlank() && it.uri != track.uri &&
-                it.uid.ifBlank { it.uri } !in machineIds
+        val upcoming = LinkedHashMap<String, ClusterTrack>()
+        nextRows.filter { it.uri.isNotBlank() && it.uri != track.uri }.forEach { upcoming[it.uri] = it }
+        if (anchor >= 0) {
+            window.drop(anchor + 1)
+                .filter { it.isVisible && it.uri != track.uri }
+                .forEach { upcoming.putIfAbsent(it.uri, it) }
         }
-        val next = (fresh + machine)
-            .filter { !it.isMeta || it.isVisible || it.isQueued }
-            .take(NEXT_TRACKS_MAX)
+        val next = upcoming.values.take(NEXT_TRACKS_MAX)
         val metadata = runCatching { JSONObject(track.raw) }.getOrElse { JSONObject() }
         if (metadata.length() == 0 && track.title.isNotBlank()) {
             metadata
