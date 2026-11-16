@@ -56,6 +56,7 @@ import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.matchesCurrent
+import com.quackify.compose.components.matchesCurrentContext
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.backend.model.CityStat
 import com.quackify.backend.model.ShelfItem
@@ -151,8 +152,11 @@ fun EncoreArtistScreen(
     isFollowing: Boolean = false,
     onFollowToggle: (Boolean) -> Unit = {},
     isBanned: Boolean = false,
-    onUnbanClick: () -> Unit = {}
+    onUnbanClick: () -> Unit = {},
+    contextUri: String = "",
+    currentContextUri: String = ""
 ) {
+    val rowBelongsToThisArtist = matchesCurrentContext(currentContextUri, contextUri)
     val density = LocalDensity.current
     var isShuffle by remember { mutableStateOf(false) }
     val bottomPadding = rememberBottomPadding()
@@ -484,7 +488,7 @@ fun EncoreArtistScreen(
                 val track = popTrack.track
                 val isBanned = com.quackify.compose.bans.ArtistBans.isBanned(track.artistUri)
                 val isCurrentTrack =
-                    matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
+                    rowBelongsToThisArtist && matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                 SwipeToQueueBox(
                     onAddToQueue = onTrackAddToQueue?.takeIf { !isBanned }?.let { handler -> { handler(track) } }
                 ) {

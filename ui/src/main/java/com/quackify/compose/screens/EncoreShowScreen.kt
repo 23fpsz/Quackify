@@ -54,6 +54,7 @@ import com.quackify.compose.components.InlineLoadingDots
 import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
 import com.quackify.compose.components.matchesCurrent
+import com.quackify.compose.components.matchesCurrentContext
 import com.quackify.backend.model.EpisodeRow
 import com.quackify.backend.model.ShowCard
 import com.quackify.compose.format.formatCount
@@ -92,7 +93,10 @@ fun EncoreShowScreen(
     onPlayPauseClick: () -> Unit,
     onMoreClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    contextUri: String = "",
+    currentContextUri: String = "",
 ) {
+    val rowBelongsToThisShow = matchesCurrentContext(currentContextUri, contextUri)
     var descriptionExpanded by remember { mutableStateOf(false) }
     var descriptionOverflows by remember { mutableStateOf(false) }
     val smoothHeaderColor by rememberSmoothColor(target = headerColor)
@@ -272,7 +276,8 @@ fun EncoreShowScreen(
                             isPlaying = isPlaying,
                             onClick = {
                                 val current = episodes.firstOrNull {
-                                    matchesCurrent(it.uri, currentTrackUri, it.title, currentTrackTitle)
+                                    rowBelongsToThisShow &&
+                                        matchesCurrent(it.uri, currentTrackUri, it.title, currentTrackTitle)
                                 }
                                 if (current != null) onPlayPauseClick()
                                 else episodes.firstOrNull()?.let(onPlayEpisode) ?: onPlayPauseClick()
@@ -311,7 +316,8 @@ fun EncoreShowScreen(
             items(episodes.distinctBy { it.uri }, key = { it.uri }) { episode ->
                 EpisodeListRow(
                     episode = episode,
-                    isCurrent = matchesCurrent(episode.uri, currentTrackUri, episode.title, currentTrackTitle),
+                    isCurrent = rowBelongsToThisShow &&
+                        matchesCurrent(episode.uri, currentTrackUri, episode.title, currentTrackTitle),
                     isPlaying = isPlaying,
                     onClick = { onEpisodeClick(episode) },
                     onPlayClick = { onPlayEpisode(episode) },

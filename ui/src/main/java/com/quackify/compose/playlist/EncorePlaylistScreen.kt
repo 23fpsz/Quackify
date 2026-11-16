@@ -83,6 +83,7 @@ import com.quackify.backend.model.PlaylistMember
 import com.quackify.compose.R
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.matchesCurrent
+import com.quackify.compose.components.matchesCurrentContext
 import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreFastScroll
 import com.quackify.compose.components.EncoreHeartButton
@@ -206,9 +207,12 @@ fun EncorePlaylistScreen(
     onLoadMore: () -> Unit = {},
     loadFailed: Boolean = false,
     onRetry: () -> Unit = {},
-    sortKey: String = ""
+    sortKey: String = "",
+    contextUri: String = "",
+    currentContextUri: String = ""
 ) {
     var currentTitle by remember(title) { mutableStateOf(title) }
+    val rowBelongsToThisList = matchesCurrentContext(currentContextUri, contextUri)
     val smoothHeaderColor by rememberSmoothColor(target = headerColor)
     var currentDescription by remember(description) { mutableStateOf(description) }
     var isEditMode by remember { mutableStateOf(false) }
@@ -530,7 +534,7 @@ fun EncorePlaylistScreen(
                     }
                 } else {
                     itemsIndexed(displayedTracks) { _, track ->
-                        val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
+                        val isCurrentTrack = rowBelongsToThisList && matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                         EncoreTrackRow(
                             trackNumber = null,
                             title = track.title,
@@ -1128,7 +1132,7 @@ fun EncorePlaylistScreen(
                     }
                 }
                 itemsIndexed(displayedTracks) { _, track ->
-                    val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
+                    val isCurrentTrack = rowBelongsToThisList && matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                     EncoreTrackRow(
                         trackNumber = null,
                         title = track.title,

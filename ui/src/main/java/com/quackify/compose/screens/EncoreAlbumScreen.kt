@@ -58,6 +58,7 @@ import androidx.compose.ui.zIndex
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.matchesCurrent
+import com.quackify.compose.components.matchesCurrentContext
 import com.quackify.compose.components.EncoreFastScroll
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
@@ -129,8 +130,11 @@ fun EncoreAlbumScreen(
     hasMore: Boolean = false,
     loadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
-    onRetry: () -> Unit = {}
+    onRetry: () -> Unit = {},
+    contextUri: String = "",
+    currentContextUri: String = ""
 ) {
+    val rowBelongsToThisAlbum = matchesCurrentContext(currentContextUri, contextUri)
     val density = LocalDensity.current
     var isDownloaded by remember { mutableStateOf(false) }
     var isShuffle by remember { mutableStateOf(false) }
@@ -487,7 +491,8 @@ fun EncoreAlbumScreen(
                     }
 
                     itemsIndexed(disc.tracks) { index, track ->
-                        val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
+                        val isCurrentTrack =
+                            rowBelongsToThisAlbum && matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                         AlbumTrackRow(
                             trackNumber = index + 1,
                             track = track,
@@ -517,7 +522,8 @@ fun EncoreAlbumScreen(
                 }
             } else {
                 itemsIndexed(tracks) { index, track ->
-                    val isCurrentTrack = matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
+                    val isCurrentTrack =
+                        rowBelongsToThisAlbum && matchesCurrent(track.uri, currentTrackUri, track.title, currentTrackTitle)
                     AlbumTrackRow(
                         trackNumber = index + 1,
                         track = track,
