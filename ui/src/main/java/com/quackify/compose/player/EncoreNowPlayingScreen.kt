@@ -2240,6 +2240,7 @@ private fun NowPlayingLyricsCard(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 val lyricsListState = rememberLazyListState()
+                val lyricFontSize = 19.sp
                 LaunchedEffect(activeIndex, lyrics.size) {
                     if (lyrics.isEmpty()) return@LaunchedEffect
                     lyricsListState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
@@ -2256,8 +2257,8 @@ private fun NowPlayingLyricsCard(
                         Text(
                             text = lyric.text,
                             style = EncoreTheme.typography.titleMedium.copy(
-                                fontSize = 18.sp,
-                                lineHeight = 30.sp,
+                                fontSize = if (isActive) lyricFontSize * 1.02f else lyricFontSize,
+                                lineHeight = 31.sp,
                                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
                                 color = when {
                                     isActive -> ink.copy(alpha = 0.95f)
