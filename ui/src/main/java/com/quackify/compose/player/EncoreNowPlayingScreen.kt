@@ -482,6 +482,13 @@ fun EncoreNowPlayingScreen(
         onSnapBack = snapBackPlayer
     )
 
+    val artworkSwipeModifier = npvSwipeToSkip(
+        canSwipePrevious = canSkipPrevious,
+        canSwipeNext = nextTrack != null,
+        onSwipePrevious = onSkipToPreviousClick,
+        onSwipeNext = onSkipNextClick
+    )
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -493,17 +500,25 @@ fun EncoreNowPlayingScreen(
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var consumed = false
                     var dragDistance = 0f
+                    var dragX = 0f
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Final)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (change.isConsumed) consumed = true
-                        dragDistance += change.positionChangeIgnoreConsumed().getDistance()
+                        val delta = change.positionChangeIgnoreConsumed()
+                        dragDistance += delta.getDistance()
+                        dragX += delta.x
                         if (canvasImmersive && !canvasControlsRevealed && dragDistance > viewConfiguration.touchSlop) {
                             canvasControlsRevealed = true
                         }
                         if (!change.pressed) break
                     }
-                    if (canvasImmersive && !consumed && dragDistance <= viewConfiguration.touchSlop) {
+                    val swipeThreshold = size.width.toFloat() * SWIPE_COMMIT_FRACTION
+                    if (canvasImmersive && !consumed && dragX < -swipeThreshold && nextTrack != null) {
+                        onSkipNextClick()
+                    } else if (canvasImmersive && !consumed && dragX > swipeThreshold && canSkipPrevious) {
+                        onSkipToPreviousClick()
+                    } else if (canvasImmersive && !consumed && dragDistance <= viewConfiguration.touchSlop) {
                         canvasControlsRevealed = !canvasControlsRevealed
                     }
                 }
@@ -588,6 +603,7 @@ fun EncoreNowPlayingScreen(
                                     canvasFilePath = canvasFilePath,
                                     isCanvasEnabled = canvasActive,
                                     videoActive = videoActive,
+                                    gestureModifier = if (canvasActive && !videoActive) artworkSwipeModifier else Modifier,
                                     videoQualities = videoQualities,
                                     onVideoQuality = onVideoQuality,
                                     onVideoSurface = onVideoSurface,
@@ -1405,6 +1421,45 @@ private fun NowPlayingArtworkCard(
 
 private const val SWIPE_COMMIT_FRACTION = 0.3f
 private const val SWIPE_SETTLE_MS = 240
+
+@Composable
+private fun npvSwipeToSkip(
+    canSwipePrevious: Boolean,
+    canSwipeNext: Boolean,
+    onSwipePrevious: () -> Unit,
+    onSwipeNext: () -> Unit
+): Modifier {
+    val haptics = LocalHapticFeedback.current
+    return Modifier.pointerInput(canSwipePrevious, canSwipeNext) {
+        val threshold = (size.width * SWIPE_COMMIT_FRACTION).coerceAtLeast(40f)
+        val flick = size.width * 1.5f
+        val tracker = VelocityTracker()
+        var total = 0f
+        detectHorizontalDragGestures(
+            onDragStart = {
+                total = 0f
+                tracker.resetTracking()
+            },
+            onDragCancel = { total = 0f },
+            onHorizontalDrag = { change, amount ->
+                change.consume()
+                tracker.addPosition(change.uptimeMillis, change.position)
+                total += amount
+            },
+            onDragEnd = {
+                val velocity = tracker.calculateVelocity().x
+                tracker.resetTracking()
+                val next = canSwipeNext && total < 0f && (total < -threshold || velocity < -flick)
+                val previous = canSwipePrevious && total > 0f && (total > threshold || velocity > flick)
+                if (next || previous) {
+                    haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    if (next) onSwipeNext() else onSwipePrevious()
+                }
+                total = 0f
+            }
+        )
+    }
+}
 
 @Composable
 private fun SwipableTrackArtwork(
