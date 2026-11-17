@@ -56,6 +56,7 @@ import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.Credits
 import com.quackify.backend.model.EpisodeDetail
+import com.quackify.backend.model.EpisodeTranscript
 import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.HomeSection
 import com.quackify.backend.model.PlaylistChoice
@@ -84,6 +85,8 @@ import com.quackify.compose.home.toTrackItem
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.library.LibraryItemType
 import com.quackify.compose.player.TimeSyncedLyric
+import com.quackify.compose.player.TranscriptLine
+import com.quackify.compose.player.TranscriptWordSpan
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.ArtistRelease
@@ -246,6 +249,7 @@ class MainActivity : ComponentActivity() {
     internal var nowPlayingArtist by mutableStateOf<ArtistDetail?>(null)
     internal var nowPlayingArtistFollowed by mutableStateOf<Boolean?>(null)
     internal var nowPlayingLyrics by mutableStateOf<TrackLyrics?>(null)
+    internal var nowPlayingTranscript by mutableStateOf<EpisodeTranscript?>(null)
     internal var canvasFile by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -1519,6 +1523,18 @@ class MainActivity : ComponentActivity() {
         nowPlayingLyrics = remember(nowPlayingLyrics) {
             nowPlayingLyrics?.lines?.map {
                 TimeSyncedLyric(it.startTimeMs, it.text)
+            }.orEmpty()
+        },
+        nowPlayingTranscript = remember(nowPlayingTranscript) {
+            nowPlayingTranscript?.lines?.map { line ->
+                TranscriptLine(
+                    startMs = line.startMs,
+                    text = line.text,
+                    speaker = line.speaker,
+                    words = line.words.map { span ->
+                        TranscriptWordSpan(span.startMs, span.startChar, span.endChar)
+                    },
+                )
             }.orEmpty()
         },
         canvasFilePath = canvasFile,

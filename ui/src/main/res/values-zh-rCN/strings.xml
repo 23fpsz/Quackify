@@ -11,6 +11,7 @@
     <string name="shuffle">随机播放</string>
     <string name="queue">播放队列</string>
     <string name="lyrics">歌词</string>
+    <string name="transcript">文字稿</string>
     <string name="more">更多</string>
     <string name="done">完成</string>
     <string name="cancel">取消</string>
@@ -307,6 +308,7 @@
     <string name="change">更改</string>
     <string name="check">检查</string>
     <string name="close_lyrics">关闭歌词</string>
+    <string name="close_transcript">关闭文字稿</string>
     <string name="close_search">关闭搜索</string>
     <string name="collapse_player">收起播放器</string>
     <string name="collapse_queue">收起队列</string>
@@ -342,6 +344,7 @@
     <string name="exit_search">退出搜索</string>
     <string name="exit_select_mode">退出选择模式</string>
     <string name="expand_lyrics">展开歌词</string>
+    <string name="expand_transcript">展开文字稿</string>
     <string name="find_in_playlist">在歌单中查找</string>
     <string name="find_titles_you_ll_love">找到你会喜欢的歌曲</string>
     <string name="folder">文件夹</string>

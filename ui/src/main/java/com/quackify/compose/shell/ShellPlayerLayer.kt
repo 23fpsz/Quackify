@@ -18,6 +18,7 @@ import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.player.LyricsOptions
 import com.quackify.compose.player.TimeSyncedLyric
+import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.CoroutineScope
@@ -59,6 +60,7 @@ internal class ShellPlayerEnv(
     val nowPlayingArtistImageUrl: String?,
     val nowPlayingArtistFollowed: Boolean?,
     val nowPlayingLyrics: List<TimeSyncedLyric>,
+    val nowPlayingTranscript: List<TranscriptLine>,
     val canvasFilePath: String?,
     val isCanvasAllowed: Boolean,
     val isCanvasEnabled: Boolean,
@@ -251,6 +253,7 @@ private fun NowPlayingScreenLayer(
         // in Settings; the under-cover toggle below only kills the preview
         // line, not the lyrics feature (fullscreen lyrics included).
         lyrics = env.nowPlayingLyrics,
+        transcript = env.nowPlayingTranscript,
         lyricsPreview = LyricsOptions.preview,
         previousTrack = playbackState?.previousTrack,
         nextTrack = playbackState?.nextTrack,

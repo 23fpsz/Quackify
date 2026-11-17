@@ -9,6 +9,7 @@ import com.quackify.backend.api.Library
 import com.quackify.backend.api.Search
 import com.quackify.backend.library.Krespot
 import com.quackify.backend.model.ArtistDetail
+import com.quackify.backend.model.EpisodeTranscript
 import com.quackify.backend.model.SearchKind
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.compose.home.HomeShelf
@@ -44,6 +45,7 @@ private class NowPlayingWriters(
     val setArtist: (ArtistDetail?) -> Unit,
     val setArtistFollowed: (Boolean?) -> Unit,
     val setLyrics: (TrackLyrics?) -> Unit,
+    val setTranscript: (EpisodeTranscript?) -> Unit,
     val setCanvasFile: (String?) -> Unit,
 )
 
@@ -140,6 +142,7 @@ internal fun MainActivity.rememberNowPlayingData(
         setArtist = { nowPlayingArtist = it },
         setArtistFollowed = { nowPlayingArtistFollowed = it },
         setLyrics = { nowPlayingLyrics = it },
+        setTranscript = { nowPlayingTranscript = it },
         setCanvasFile = { canvasFile = it },
     )
     val playback = PlaybackHost.bridge?.state
@@ -180,6 +183,14 @@ internal fun MainActivity.rememberNowPlayingData(
             return@LaunchedEffect
         }
         writers.setLyrics(Krespot.lyrics.lyrics(this@rememberNowPlayingData, uri))
+    }
+    LaunchedEffect(playback?.trackUri) {
+        val uri = playback?.trackUri.orEmpty()
+        if (!uri.startsWith("spotify:episode:")) {
+            writers.setTranscript(null)
+            return@LaunchedEffect
+        }
+        writers.setTranscript(Krespot.transcripts.transcript(this@rememberNowPlayingData, uri))
     }
     LaunchedEffect(playback?.trackUri, canvasAllowed, canvasResolution) {
         writers.setCanvasFile(null)

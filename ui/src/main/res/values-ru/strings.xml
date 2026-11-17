@@ -11,6 +11,7 @@
     <string name="shuffle">Перемешать</string>
     <string name="queue">Очередь</string>
     <string name="lyrics">Текст песни</string>
+    <string name="transcript">Расшифровка</string>
     <string name="more">Ещё</string>
     <string name="done">Готово</string>
     <string name="cancel">Отмена</string>
@@ -313,6 +314,7 @@
     <string name="change">Изменить</string>
     <string name="check">Проверить</string>
     <string name="close_lyrics">Закрыть текст песни</string>
+    <string name="close_transcript">Закрыть расшифровку</string>
     <string name="close_search">Закрыть поиск</string>
     <string name="collapse_player">Свернуть плеер</string>
     <string name="collapse_queue">Свернуть очередь</string>
@@ -348,6 +350,7 @@
     <string name="exit_search">Выйти из поиска</string>
     <string name="exit_select_mode">Выйти из режима выбора</string>
     <string name="expand_lyrics">Развернуть текст песни</string>
+    <string name="expand_transcript">Развернуть расшифровку</string>
     <string name="find_in_playlist">Найти в плейлисте</string>
     <string name="find_titles_you_ll_love">Найдите треки, которые Вам понравятся</string>
     <string name="folder">Папка</string>

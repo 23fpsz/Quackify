@@ -11,6 +11,7 @@
     <string name="shuffle">Zufällig</string>
     <string name="queue">Warteschlange</string>
     <string name="lyrics">Songtext</string>
+    <string name="transcript">Transkript</string>
     <string name="more">Mehr</string>
     <string name="done">Fertig</string>
     <string name="cancel">Abbrechen</string>
@@ -307,6 +308,7 @@
     <string name="change">Ändern</string>
     <string name="check">Prüfen</string>
     <string name="close_lyrics">Songtexte schließen</string>
+    <string name="close_transcript">Transkript schließen</string>
     <string name="close_search">Suche schließen</string>
     <string name="collapse_player">Player einklappen</string>
     <string name="collapse_queue">Warteschlange einklappen</string>
@@ -342,6 +344,7 @@
     <string name="exit_search">Suche verlassen</string>
     <string name="exit_select_mode">Auswahlmodus verlassen</string>
     <string name="expand_lyrics">Songtexte erweitern</string>
+    <string name="expand_transcript">Transkript ausklappen</string>
     <string name="find_in_playlist">In Playlist suchen</string>
     <string name="find_titles_you_ll_love">Finde Titel, die Du lieben wirst</string>
     <string name="folder">Ordner</string>

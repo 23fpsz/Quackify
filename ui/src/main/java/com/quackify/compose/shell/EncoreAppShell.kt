@@ -67,6 +67,7 @@ import com.quackify.compose.home.RecommendationCard
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.library.LibraryItemType
 import com.quackify.compose.player.TimeSyncedLyric
+import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.ArtistRelease
@@ -270,6 +271,7 @@ fun EncoreAppShell(
     nowPlayingArtistImageUrl: String? = null,
     nowPlayingArtistFollowed: Boolean? = null,
     nowPlayingLyrics: List<TimeSyncedLyric> = emptyList(),
+    nowPlayingTranscript: List<TranscriptLine> = emptyList(),
     canvasFilePath: String? = null,
     isCanvasAllowed: Boolean = true,
     isCanvasEnabled: Boolean = false,
@@ -795,6 +797,7 @@ fun EncoreAppShell(
             nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
             nowPlayingArtistFollowed = nowPlayingArtistFollowed,
             nowPlayingLyrics = nowPlayingLyrics,
+            nowPlayingTranscript = nowPlayingTranscript,
             canvasFilePath = canvasFilePath,
             isCanvasAllowed = isCanvasAllowed,
             isCanvasEnabled = isCanvasEnabled,

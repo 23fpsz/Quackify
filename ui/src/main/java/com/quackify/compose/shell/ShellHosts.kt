@@ -17,6 +17,7 @@ import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.player.TimeSyncedLyric
+import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.sheets.LibrarySortOption
 import com.quackify.compose.sheets.SortDirection
@@ -88,6 +89,7 @@ internal class ShellHosts(
     val nowPlayingArtistImageUrl: String?,
     val nowPlayingArtistFollowed: Boolean?,
     val nowPlayingLyrics: List<TimeSyncedLyric>,
+    val nowPlayingTranscript: List<TranscriptLine> = emptyList(),
     val canvasFilePath: String?,
     val isCanvasAllowed: Boolean,
     val isCanvasEnabled: Boolean,
@@ -250,6 +252,7 @@ internal class ShellHosts(
         nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
         nowPlayingArtistFollowed = nowPlayingArtistFollowed,
         nowPlayingLyrics = nowPlayingLyrics,
+        nowPlayingTranscript = nowPlayingTranscript,
         canvasFilePath = canvasFilePath,
         isCanvasAllowed = isCanvasAllowed,
         isCanvasEnabled = isCanvasEnabled,
