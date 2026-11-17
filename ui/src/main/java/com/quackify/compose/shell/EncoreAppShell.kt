@@ -69,7 +69,6 @@ import com.quackify.compose.library.LibraryItemType
 import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.playlist.TrackItem
-import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.ArtistRelease
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.EncoreNotification
@@ -204,9 +203,10 @@ fun EncoreAppShell(
     videoFullscreen: Boolean = false,
     onToggleVideoFullscreen: ((Boolean) -> Unit)? = null,
     onAppIconChange: ((String) -> Unit)? = null,
-    appUpdate: AppUpdate? = null,
     updateChecking: Boolean = false,
     updateChecked: Boolean = false,
+    updateError: String? = null,
+    updateVersion: String? = null,
     onCheckUpdates: (() -> Unit)? = null,
     onHomeEntered: () -> Unit = {},
     browsePage: BrowsePage? = null,
@@ -1020,9 +1020,10 @@ fun EncoreAppShell(
                         loading = settingsLoading,
                         onToggleSetting = onToggleSetting,
                         onAppIconChange = onAppIconChange,
-                        update = appUpdate,
                         updateChecking = updateChecking,
                         updateChecked = updateChecked,
+                        updateError = updateError,
+                        updateVersion = updateVersion,
                         onCheckUpdates = onCheckUpdates,
                         onLogout = onLogout,
                     )

@@ -25,7 +25,6 @@ import com.quackify.compose.library.EncoreLibraryScreen
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.library.LibraryItemType
 import com.quackify.compose.playlist.TrackItem
-import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.ArtistRelease
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.EncoreCategoryScreen
@@ -517,9 +516,10 @@ internal fun ShellSettingsRoute(
     loading: Boolean,
     onToggleSetting: ((String, Boolean) -> Unit)?,
     onAppIconChange: ((String) -> Unit)?,
-    update: AppUpdate?,
     updateChecking: Boolean,
     updateChecked: Boolean,
+    updateError: String?,
+    updateVersion: String?,
     onCheckUpdates: (() -> Unit)?,
     onLogout: (() -> Unit)?,
 ) {
@@ -534,9 +534,10 @@ internal fun ShellSettingsRoute(
         onToggleSetting = onToggleSetting,
         onAppIconChange = { onAppIconChange?.invoke(it) },
         onOpenLogcat = env.handleOpenLogcat,
-        update = update,
         updateChecking = updateChecking,
         updateChecked = updateChecked,
+        updateError = updateError,
+        updateVersion = updateVersion,
         onCheckUpdates = { onCheckUpdates?.invoke() }
     )
 }

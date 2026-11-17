@@ -420,6 +420,7 @@
     <string name="gapless_warning">Gapless is not optimised yet and may use a lot of license key quota.</string>
     <string name="checking">Checking…</string>
     <string name="up_to_date">Up to date</string>
+    <string name="update_check_failed">Check failed</string>
     <string name="not_signed_in">Not signed in</string>
     <string name="copyright">© 2026 Quackify Team</string>
     <string name="link_copied">Link copied</string>

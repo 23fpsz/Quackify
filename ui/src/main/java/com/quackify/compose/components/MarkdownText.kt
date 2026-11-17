@@ -39,7 +39,7 @@ private sealed class Block {
     data class Heading(val level: Int, val text: AnnotatedString) : Block()
     data class Paragraph(val text: AnnotatedString, val hasLinks: Boolean) : Block()
     data class ListItem(val marker: String, val text: AnnotatedString) : Block()
-    data class Quote(val text: AnnotatedString) : Block()
+    data class Quote(val label: String?, val text: AnnotatedString) : Block()
     data class Code(val lines: List<String>) : Block()
     data object Rule : Block()
 }
@@ -120,8 +120,12 @@ private fun parseBlocks(markdown: String): List<Block> {
 
     fun flushQuote() {
         if (quote.isEmpty()) return
+        var label: String? = null
+        if (quote.first().matches(Regex("\\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)]"))) {
+            label = quote.removeFirst().removePrefix("[!").removeSuffix("]")
+        }
         val (text, _) = parseInline(quote.joinToString(" ").trim())
-        if (text.isNotEmpty()) blocks.add(Block.Quote(text))
+        if (text.isNotEmpty() || label != null) blocks.add(Block.Quote(label, text))
         quote = mutableListOf()
     }
 
@@ -190,24 +194,25 @@ private fun parseBlocks(markdown: String): List<Block> {
 }
 
 @Composable
-fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
+fun MarkdownText(markdown: String, modifier: Modifier = Modifier, compact: Boolean = false) {
     val context = LocalContext.current
     val blocks = remember(markdown) { parseBlocks(markdown) }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp)) {
         blocks.forEach { block ->
             when (block) {
                 is Block.Heading -> Text(
                     text = block.text,
-                    style = when (block.level) {
-                        1 -> EncoreTheme.typography.titleLarge
-                        2 -> EncoreTheme.typography.titleMedium
-                        else -> EncoreTheme.typography.titleSmall
+                    style = when {
+                        block.level == 1 && !compact -> EncoreTheme.typography.titleLarge
+                        block.level <= 2 -> EncoreTheme.typography.titleMedium
+                        block.level <= 3 && !compact -> EncoreTheme.typography.titleSmall
+                        else -> EncoreTheme.typography.bodyMedium
                     }.copy(fontWeight = FontWeight.Bold, color = EncoreColors.TextPrimary)
                 )
                 is Block.Paragraph -> if (block.hasLinks) {
                     ClickableText(
                         text = block.text,
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary),
+                        style = bodyStyle(compact),
                         onClick = { offset ->
                             block.text.getStringAnnotations(TAG_URL, offset, offset).firstOrNull()?.let { url ->
                                 runCatching {
@@ -221,35 +226,46 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
                 } else {
                     Text(
                         text = block.text,
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary)
+                        style = bodyStyle(compact),
                     )
                 }
                 is Block.ListItem -> Row {
                     Text(
                         text = block.marker,
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
-                        modifier = Modifier.width(24.dp)
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                        modifier = Modifier.width(22.dp)
                     )
                     Text(
                         text = block.text,
-                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary)
+                        style = bodyStyle(compact),
                     )
                 }
                 is Block.Quote -> Row {
                     Column(
                         modifier = Modifier
                             .width(3.dp)
-                            .height(24.dp)
+                            .height(if (block.label != null) 40.dp else 24.dp)
                             .background(EncoreColors.Green, RoundedCornerShape(2.dp))
                     ) {}
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = block.text,
-                        style = EncoreTheme.typography.bodyMedium.copy(
-                            color = EncoreColors.TextSecondary,
-                            fontStyle = FontStyle.Italic
+                    Column {
+                        if (block.label != null) {
+                            Text(
+                                text = block.label,
+                                style = EncoreTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = EncoreColors.Green
+                                )
+                            )
+                        }
+                        Text(
+                            text = block.text,
+                            style = EncoreTheme.typography.bodySmall.copy(
+                                color = EncoreColors.TextSecondary,
+                                fontStyle = FontStyle.Italic
+                            )
                         )
-                    )
+                    }
                 }
                 is Block.Code -> Column(
                     modifier = Modifier
@@ -264,7 +280,7 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
                             text = it,
                             style = TextStyle(
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 color = EncoreColors.TextPrimary
                             )
                         )
@@ -274,4 +290,11 @@ fun MarkdownText(markdown: String, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+@Composable
+private fun bodyStyle(compact: Boolean) = if (compact) {
+    EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextPrimary)
+} else {
+    EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextPrimary)
 }

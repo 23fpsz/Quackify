@@ -95,7 +95,6 @@ import com.quackify.compose.playlist.EncorePlaylistScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.ActivityScreen
 import com.quackify.compose.screens.ArtistRelease
-import com.quackify.compose.screens.AppUpdate
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.HistoryScreen
@@ -222,9 +221,10 @@ internal fun ShellSettingsPane(
     onToggleSetting: ((String, Boolean) -> Unit)?,
     onAppIconChange: (String) -> Unit = {},
     onOpenLogcat: () -> Unit = {},
-    update: AppUpdate? = null,
     updateChecking: Boolean = false,
     updateChecked: Boolean = false,
+    updateError: String? = null,
+    updateVersion: String? = null,
     onCheckUpdates: () -> Unit = {},
 ) {
     SettingsScreen(
@@ -242,9 +242,10 @@ internal fun ShellSettingsPane(
         onToggleShowPlaylists = { onToggleSetting?.invoke("showPublishedPlaylists", !it) },
         onAppIconChange = onAppIconChange,
         onOpenLogcat = onOpenLogcat,
-        update = update,
         updateChecking = updateChecking,
         updateChecked = updateChecked,
+        updateError = updateError,
+        updateVersion = updateVersion,
         onCheckUpdates = onCheckUpdates
     )
 }

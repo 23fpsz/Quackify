@@ -115,9 +115,10 @@ fun SettingsScreen(
     onToggleOtherVideos: (Boolean) -> Unit = {},
     onToggleShowFollows: (Boolean) -> Unit = {},
     onToggleShowPlaylists: (Boolean) -> Unit = {},
-    update: AppUpdate? = null,
     updateChecking: Boolean = false,
     updateChecked: Boolean = false,
+    updateError: String? = null,
+    updateVersion: String? = null,
     onCheckUpdates: () -> Unit = {},
     onAppIconChange: (String) -> Unit = {},
     onOpenLogcat: () -> Unit = {},
@@ -528,40 +529,6 @@ fun SettingsScreen(
                                 }
                             ),
                         )
-                        val context = LocalContext.current
-                        if (update != null) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(EncoreColors.Card)
-                                    .clickable {
-                                        runCatching {
-                                            context.startActivity(
-                                                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(update.url))
-                                            )
-                                        }
-                                    }
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = stringResource(R.string.update_available),
-                                        style = EncoreTheme.typography.bodyMediumBold
-                                    )
-                                    Text(
-                                        text = update.version,
-                                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
-                                    )
-                                }
-                                Text(
-                                    text = stringResource(R.string.download),
-                                    style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Green)
-                                )
-                            }
-                        }
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -575,6 +542,8 @@ fun SettingsScreen(
                                 Text(
                                     text = when {
                                         updateChecking -> "Checking\u2026"
+                                        updateError != null -> stringResource(R.string.update_check_failed)
+                                        updateVersion != null -> stringResource(R.string.update_available)
                                         updateChecked -> stringResource(R.string.up_to_date)
                                         else -> "\u2014"
                                     },

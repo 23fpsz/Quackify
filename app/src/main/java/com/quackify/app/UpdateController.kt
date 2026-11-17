@@ -32,6 +32,9 @@ internal class UpdateController {
     var checked by mutableStateOf(false)
         internal set
 
+    var error by mutableStateOf<String?>(null)
+        internal set
+
     var prompt by mutableStateOf<AppUpdate?>(null)
         internal set
 
@@ -84,27 +87,39 @@ internal class UpdateController {
         if (!manual && now - lastCheckAt < 30 * 60_000L) return
         lastCheckAt = now
         checking = true
-        val found = withContext(Dispatchers.IO) {
-            runCatching { UpdateChecker.check(context) }.getOrNull()
+        error = null
+        val result = withContext(Dispatchers.IO) {
+            runCatching { UpdateChecker.check(context) }
         }
         checking = false
         checked = true
+        val found = result.getOrNull()
         appUpdate = found
+        result.exceptionOrNull()?.let { failure ->
+            error = failure.message ?: failure.javaClass.simpleName
+            log.w("update check failed ${failure.message}")
+        }
         if (found == null) {
-            if (manual) {
+            if (manual && error == null) {
                 Toast.makeText(context, "No new updates yet", Toast.LENGTH_SHORT).show()
             }
             return
         }
-        if (!manual && AppPrefs.prefs(context, CLIENT_PREFS)
-                .getLong("updateSnoozeUntil", 0L) > now
-        ) return
+        if (!manual) {
+            val snoozedUntil = AppPrefs.prefs(context, CLIENT_PREFS)
+                .getLong("updateSnoozeUntil", 0L)
+            if (snoozedUntil > now) {
+                log.i("update found but snoozed for another ${(snoozedUntil - now) / 60000}min")
+                return
+            }
+        }
         phase = UpdateInstallPhase.Idle
         prompt = found
     }
 
     suspend fun install(context: android.content.Context) {
-        val target = prompt ?: return
+        val target = prompt ?: appUpdate ?: return
+        prompt = target
         phase = UpdateInstallPhase.Downloading
         downloadedMb = 0f
         totalMb = 0f
@@ -136,17 +151,9 @@ internal fun rememberUpdateController(): UpdateController = remember { UpdateCon
 @Composable
 internal fun UpdateEffects(controller: UpdateController) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    LaunchedEffect(controller.fetchTick) {
-        if (controller.fetchTick == 0) return@LaunchedEffect
-        controller.checking = true
-        controller.appUpdate = withContext(Dispatchers.IO) {
-            runCatching { UpdateChecker.check(context) }.getOrNull()
-        }
-        controller.checking = false
-        controller.checked = true
-    }
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) { UpdateInstaller.cleanup(context) }
+        controller.onHomeEntered()
         while (isActive) {
             delay(30 * 60 * 1000L)
             controller.timerTick++
@@ -162,7 +169,16 @@ internal fun UpdateEffects(controller: UpdateController) {
         if (controller.installTick == 0) return@LaunchedEffect
         controller.install(context)
     }
-    if (controller.prompt != null) {
+    var dialogVisible by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    LaunchedEffect(controller.prompt) {
+        if (controller.prompt == null) {
+            dialogVisible = false
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(1500)
+        dialogVisible = true
+    }
+    if (dialogVisible && controller.prompt != null) {
         UpdateDialog(
             update = controller.prompt!!,
             currentVersion = UpdateChecker.currentVersion(context).orEmpty(),

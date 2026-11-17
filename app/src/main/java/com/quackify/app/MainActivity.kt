@@ -310,6 +310,8 @@ class MainActivity : ComponentActivity() {
             EncoreAppTheme {
                 val context = LocalContext.current
                 var loggedIn by remember { mutableStateOf(EncoreAuth.isLoggedIn(context)) }
+                val updates = rememberUpdateController()
+                UpdateEffects(updates)
 
 
                 if (loggedIn) {
@@ -943,9 +945,6 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        val updates = rememberUpdateController()
-                        UpdateEffects(updates)
-
                         ShellSection(
                             bridge = bridge,
                             account = account,
@@ -1439,9 +1438,10 @@ class MainActivity : ComponentActivity() {
                 deeplink = pendingLink?.let { ShellDeepLink(it.kind, it.uri, it.query) },
                 onDeeplinkConsumed = { pendingLink = null },
                 onDeeplinkSearch = { q -> if (searchTerm == q) searchFetch++ else searchTerm = q },
-                appUpdate = updates.appUpdate,
                 updateChecking = updates.checking,
                 updateChecked = updates.checked,
+                updateError = updates.error,
+                updateVersion = updates.appUpdate?.version,
                 onCheckUpdates = updates::requestManualCheck,
                 onHomeEntered = updates::onHomeEntered,
                 userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
