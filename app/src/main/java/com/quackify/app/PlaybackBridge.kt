@@ -1,6 +1,9 @@
 package com.quackify.app
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -748,6 +751,10 @@ class PlaybackBridge(private val context: Context) {
         log.i("start device=" + deviceId)
         (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
             ?.registerAudioDeviceCallback(localOutputWatcher, Handler(Looper.getMainLooper()))
+        context.applicationContext.registerReceiver(
+            noisyReceiver,
+            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+        )
         autoplayOnStartup = com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .getBoolean(AUTOPLAY_ON_STARTUP_PREF, false)
         autoplayPending = true
@@ -929,6 +936,12 @@ class PlaybackBridge(private val context: Context) {
         sleepEndOfTrackArmed = false
         sleepArmedTrackUri = ""
         connect.holdsStream = false
+        runCatching { context.applicationContext.unregisterReceiver(noisyReceiver) }
+            .onFailure { log.w("noisy receiver unregister failed ${it.javaClass.simpleName}") }
+        runCatching {
+            (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
+                ?.unregisterAudioDeviceCallback(localOutputWatcher)
+        }
         runCatching {
             runBlocking { withTimeoutOrNull(2_000L) { connect.unregister() } }
         }.onFailure { log.w("unregister on stop failed ${it.javaClass.simpleName}") }
@@ -971,6 +984,12 @@ class PlaybackBridge(private val context: Context) {
 
     fun reset() {
         log.i("reset, dropping the device state of the previous session")
+        runCatching { context.applicationContext.unregisterReceiver(noisyReceiver) }
+            .onFailure { log.w("noisy receiver unregister failed ${it.javaClass.simpleName}") }
+        runCatching {
+            (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
+                ?.unregisterAudioDeviceCallback(localOutputWatcher)
+        }
         dealer?.cancel()
         dealer = null
         deviceWatch?.cancel()
@@ -3274,9 +3293,12 @@ class PlaybackBridge(private val context: Context) {
         if (player.hasSource) return
         val duration = progress.durationMs
         if (duration <= 0L) return
-        val next = (progress.positionMs + REMOTE_TICK_MS).coerceAtMost(duration)
-        if (next == progress.positionMs) return
-        progress.set(next, duration)
+        val snapshot = cluster
+        if (snapshot != null && !snapshot.isPlaying) return
+        val next = snapshot?.positionNow() ?: progress.positionMs + REMOTE_TICK_MS
+        val clamped = next.coerceIn(0L, duration)
+        if (clamped == progress.positionMs) return
+        progress.set(clamped, duration)
     }
 
     /**
@@ -3691,6 +3713,15 @@ class PlaybackBridge(private val context: Context) {
     private fun localOutputKind(): DeviceKind =
         if (localOutputLabel().isBlank()) DeviceKind.PHONE else DeviceKind.HEADPHONES
 
+    private var externalOutputSeen = false
+
+    private val noisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(receiverContext: Context, intent: Intent) {
+            if (state.controllingRemote) return
+            scope.launch { pauseOnOutputLost() }
+        }
+    }
+
     private val localOutputWatcher = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
             refreshLocalOutput()
@@ -3703,9 +3734,9 @@ class PlaybackBridge(private val context: Context) {
 
     private fun refreshLocalOutput() {
         if (state.controllingRemote) return
-        val wasExternal = state.connectedDevice.isNotBlank()
         val label = localOutputLabel()
         val kind = localOutputKind()
+        if (label.isNotBlank()) externalOutputSeen = true
         if (state.connectedDevice == label &&
             state.devices.firstOrNull { it.local }?.kind == kind
         ) return
@@ -3715,7 +3746,10 @@ class PlaybackBridge(private val context: Context) {
                 if (it.local) it.copy(kind = kind) else it
             }
         )
-        if (wasExternal && label.isBlank()) scope.launch { pauseOnOutputLost() }
+        if (label.isBlank() && externalOutputSeen) {
+            externalOutputSeen = false
+            scope.launch { pauseOnOutputLost() }
+        }
     }
 
     private suspend fun pauseOnOutputLost() {
