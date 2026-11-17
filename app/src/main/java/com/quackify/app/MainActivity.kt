@@ -204,7 +204,7 @@ class MainActivity : ComponentActivity() {
     private var searchData by mutableStateOf<SearchResults?>(null)
     private var searchHits by mutableStateOf<List<SearchHit>>(emptyList())
     private val searchSavedOverrides = mutableStateMapOf<String, Boolean>()
-    private val recentsSynced = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var recentsSyncedAccount by mutableStateOf<String?>(null)
     private var submittedSearchQuery by mutableStateOf<String?>(null)
     private var showDetail by mutableStateOf<ShowDetail?>(null)
     private var episodeDetail by mutableStateOf<EpisodeDetail?>(null)
@@ -916,10 +916,17 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        LaunchedEffect(searchTerm, offlineNow) {
-                            if (searchTerm.isNotBlank() || offlineNow) return@LaunchedEffect
-                            if (!recentsSynced.compareAndSet(false, true)) return@LaunchedEffect
-                            val remote = Search.recent(context)
+                        LaunchedEffect(searchTerm, offlineNow, loggedIn, activeAccountId) {
+                            if (searchTerm.isNotBlank() || offlineNow || !loggedIn) return@LaunchedEffect
+                            if (recentsSyncedAccount == activeAccountId) return@LaunchedEffect
+                            var remote = Search.recent(context)
+                            var attempts = 0
+                            while (remote.isEmpty() && attempts < 2) {
+                                attempts++
+                                delay(2500L)
+                                remote = Search.recent(context)
+                            }
+                            recentsSyncedAccount = activeAccountId
                             if (remote.isNotEmpty()) {
                                 RecentSearches.merge(context, remote)
                                 log.i("reconciled ${remote.size} recent searches with the account")
@@ -1970,7 +1977,6 @@ class MainActivity : ComponentActivity() {
             onLogout = {
                 log.i("logout tapped")
                 PlaybackHost.reset(context)
-                RecentSearches.clear(context)
                 EncoreAuth.logout(context)
                 Krespot.library.invalidate()
                 val remaining = EncoreAuth.savedAccounts(context)
@@ -2005,7 +2011,6 @@ class MainActivity : ComponentActivity() {
                         Krespot.library.invalidate()
                         recreate()
                     } else {
-                        RecentSearches.clear(context)
                         EncoreAuth.logout(context)
                         Krespot.library.invalidate()
                         onSignedOut()
