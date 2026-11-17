@@ -11,6 +11,7 @@
     <string name="shuffle">Aleatório</string>
     <string name="queue">Fila</string>
     <string name="lyrics">Letras</string>
+    <string name="transcript">Transcrição</string>
     <string name="more">Mais</string>
     <string name="done">Concluído</string>
     <string name="cancel">Cancelar</string>
@@ -307,6 +308,7 @@
     <string name="change">Alterar</string>
     <string name="check">Verificar</string>
     <string name="close_lyrics">Fechar letras</string>
+    <string name="close_transcript">Fechar transcrição</string>
     <string name="close_search">Fechar busca</string>
     <string name="collapse_player">Recolher player</string>
     <string name="collapse_queue">Recolher fila</string>
@@ -342,6 +344,7 @@
     <string name="exit_search">Sair da busca</string>
     <string name="exit_select_mode">Sair do modo de seleção</string>
     <string name="expand_lyrics">Expandir letras</string>
+    <string name="expand_transcript">Expandir transcrição</string>
     <string name="find_in_playlist">Buscar na playlist</string>
     <string name="find_titles_you_ll_love">Encontre músicas que você vai amar</string>
     <string name="folder">Pasta</string>

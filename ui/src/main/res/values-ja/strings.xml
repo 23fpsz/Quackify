@@ -11,6 +11,7 @@
     <string name="shuffle">シャッフル</string>
     <string name="queue">キュー</string>
     <string name="lyrics">歌詞</string>
+    <string name="transcript">文字起こし</string>
     <string name="more">その他</string>
     <string name="done">完了</string>
     <string name="cancel">キャンセル</string>
@@ -307,6 +308,7 @@
     <string name="change">変更</string>
     <string name="check">確認</string>
     <string name="close_lyrics">歌詞を閉じる</string>
+    <string name="close_transcript">文字起こしを閉じる</string>
     <string name="close_search">検索を閉じる</string>
     <string name="collapse_player">プレイヤーを閉じる</string>
     <string name="collapse_queue">キューを閉じる</string>
@@ -342,6 +344,7 @@
     <string name="exit_search">検索を終了</string>
     <string name="exit_select_mode">選択モードを終了</string>
     <string name="expand_lyrics">歌詞を展開</string>
+    <string name="expand_transcript">文字起こしを展開</string>
     <string name="find_in_playlist">プレイリスト内を検索</string>
     <string name="find_titles_you_ll_love">お気に入りになる曲を見つけよう</string>
     <string name="folder">フォルダ</string>

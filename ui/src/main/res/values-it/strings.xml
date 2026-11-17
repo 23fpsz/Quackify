@@ -50,6 +50,7 @@
     <string name="clear_search">Cancella ricerca</string>
     <string name="close">Chiudi</string>
     <string name="close_lyrics">Chiudi testi</string>
+    <string name="close_transcript">Chiudi trascrizione</string>
     <string name="close_search">Chiudi ricerca</string>
     <string name="collapse_player">Comprimi player</string>
     <string name="collapse_queue">Comprimi coda</string>
@@ -102,6 +103,7 @@
     <string name="exit_search">Esci dalla ricerca</string>
     <string name="exit_select_mode">Esci dalla modalità selezione</string>
     <string name="expand_lyrics">Espandi testi</string>
+    <string name="expand_transcript">Espandi trascrizione</string>
     <string name="filter">Filtra</string>
     <string name="find_in_playlist">Trova nella playlist</string>
     <string name="find_titles_you_ll_love">Trova titoli che adorerai</string>
@@ -142,6 +144,7 @@
     <string name="log_out">Esci</string>
     <string name="login_streak">Serie di accessi</string>
     <string name="lyrics">Testi</string>
+    <string name="transcript">Trascrizione</string>
     <string name="minutes_played">Minuti riprodotti</string>
     <string name="more">Altro</string>
     <string name="more_like_this">Altri simili</string>

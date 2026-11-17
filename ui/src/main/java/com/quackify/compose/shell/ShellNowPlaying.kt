@@ -19,6 +19,7 @@ import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.player.EncoreNowPlayingScreen
 import com.quackify.compose.player.TimeSyncedLyric
+import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreAnimation
 
@@ -59,6 +60,7 @@ internal fun ShellNowPlaying(
     connectedDevice: String,
     coverUrl: String,
     lyrics: List<TimeSyncedLyric> = emptyList(),
+    transcript: List<TranscriptLine> = emptyList(),
     isLyricsUnderCoverEnabled: Boolean = true,
     lyricsPreview: Boolean = true,
     previousTrack: TrackItem? = null,
@@ -130,6 +132,7 @@ internal fun ShellNowPlaying(
             connectedDeviceName = connectedDevice,
             coverUrl = coverUrl,
             lyrics = lyrics,
+            transcript = transcript,
             isLyricsUnderCoverEnabled = isLyricsUnderCoverEnabled,
             showLyricsPreview = lyricsPreview,
             previousTrack = previousTrack,

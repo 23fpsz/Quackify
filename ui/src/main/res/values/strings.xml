@@ -70,6 +70,7 @@
     <string name="clear_search">Clear search</string>
     <string name="close">Close</string>
     <string name="close_lyrics">Close lyrics</string>
+    <string name="close_transcript">Close transcript</string>
     <string name="close_search">Close search</string>
     <string name="collapse_player">Collapse player</string>
     <string name="collapse_queue">Collapse queue</string>
@@ -124,6 +125,7 @@
     <string name="exit_search">Exit search</string>
     <string name="exit_select_mode">Exit select mode</string>
     <string name="expand_lyrics">Expand lyrics</string>
+    <string name="expand_transcript">Expand transcript</string>
     <string name="filter">Filter</string>
     <string name="find_in_playlist">Find in playlist</string>
     <string name="find_titles_you_ll_love">Find titles you\'ll love</string>
@@ -165,6 +167,7 @@
     <string name="log_out">Log out</string>
     <string name="login_streak">Login streak</string>
     <string name="lyrics">Lyrics</string>
+    <string name="transcript">Transcript</string>
     <string name="lyrics_show">Lyrics</string>
     <string name="lyrics_show_desc">Show the synced lyrics of the playing track</string>
     <string name="lyrics_preview">Line above the title</string>

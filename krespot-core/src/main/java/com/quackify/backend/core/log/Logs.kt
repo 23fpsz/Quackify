@@ -60,6 +60,7 @@ object Logs {
         PROFILE("profile"),
         SETTINGS("settings"),
         LYRICS("lyrics"),
+        TRANSCRIPTS("transcripts"),
         HISTORY("history"),
         RECOMMENDATIONS("recommendations"),
 

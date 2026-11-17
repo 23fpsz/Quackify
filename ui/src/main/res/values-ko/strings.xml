@@ -11,6 +11,7 @@
     <string name="shuffle">셔플</string>
     <string name="queue">대기열</string>
     <string name="lyrics">가사</string>
+    <string name="transcript">대본</string>
     <string name="more">더보기</string>
     <string name="done">완료</string>
     <string name="cancel">취소</string>
@@ -307,6 +308,7 @@
     <string name="change">변경</string>
     <string name="check">확인</string>
     <string name="close_lyrics">가사 닫기</string>
+    <string name="close_transcript">대본 닫기</string>
     <string name="close_search">검색 닫기</string>
     <string name="collapse_player">플레이어 접기</string>
     <string name="collapse_queue">대기열 접기</string>
@@ -342,6 +344,7 @@
     <string name="exit_search">검색 종료</string>
     <string name="exit_select_mode">선택 모드 종료</string>
     <string name="expand_lyrics">가사 펼치기</string>
+    <string name="expand_transcript">대본 펼치기</string>
     <string name="find_in_playlist">플레이리스트에서 찾기</string>
     <string name="find_titles_you_ll_love">좋아할 만한 곡 찾기</string>
     <string name="folder">폴더</string>

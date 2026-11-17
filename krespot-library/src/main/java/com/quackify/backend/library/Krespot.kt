@@ -39,4 +39,6 @@ object Krespot {
     val tracks = TrackSource
 
     val lyrics = LyricsSource
+
+    val transcripts = TranscriptSource
 }
