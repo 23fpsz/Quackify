@@ -435,8 +435,14 @@ class MainActivity : ComponentActivity() {
                             if (EncoreAuth.activeAccountId(context).isBlank()) {
                                 EncoreAuth.userId(context)
                                 EncoreAuth.storeCurrentAccount(context)
-                                savedAccountsList = EncoreAuth.savedAccounts(context)
                             }
+                            // onCreate snapshots this list while still logged out, so on a
+                            // fresh install it is empty, and the first login stores the
+                            // account before this branch composes - the blank-id guard
+                            // above never reloads it and the account manager sheet shows
+                            // nothing but "Add Account" until some other flow resyncs.
+                            // Always resync from storage when the logged-in ui comes up.
+                            savedAccountsList = EncoreAuth.savedAccounts(context)
                             val missing = savedAccountsList.filter { it.colorHex.isBlank() }
                             if (missing.isNotEmpty()) {
                                 log.i("backfilling profile colors for ${missing.size} account(s)")
