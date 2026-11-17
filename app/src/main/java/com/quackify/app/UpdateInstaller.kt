@@ -64,7 +64,7 @@ object UpdateInstaller {
         }
     }.getOrNull()
 
-    fun install(context: Context, file: File) {
+    fun install(context: Context, file: File, onResult: (Boolean, String) -> Unit) {
         val packageInstaller = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         val sessionId = packageInstaller.createSession(params)
@@ -74,6 +74,25 @@ object UpdateInstaller {
                 try {
                     context.unregisterReceiver(this)
                 } catch (_: IllegalArgumentException) {
+                }
+                val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE).orEmpty()
+                when (status) {
+                    PackageInstaller.STATUS_SUCCESS -> onResult(true, "")
+                    PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                        val confirm = runCatching {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                        }.getOrNull()
+                        if (confirm != null) {
+                            confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            runCatching { context.startActivity(confirm) }
+                                .onFailure { onResult(false, "confirmation activity failed") }
+                        } else {
+                            onResult(false, "no confirmation activity")
+                        }
+                    }
+                    else -> onResult(false, message.ifBlank { "status $status" })
                 }
             }
         }

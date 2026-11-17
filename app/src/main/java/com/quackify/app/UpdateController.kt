@@ -137,11 +137,19 @@ internal class UpdateController {
             return
         }
         phase = UpdateInstallPhase.Installing
-        runCatching { UpdateInstaller.install(context, file) }
-            .onFailure {
+        runCatching {
+            UpdateInstaller.install(context, file) { ok, message ->
                 phase = UpdateInstallPhase.Idle
-                Toast.makeText(context, "Install failed", Toast.LENGTH_SHORT).show()
+                if (!ok) {
+                    prompt = null
+                    log.w("install failed $message")
+                    Toast.makeText(context, "Install failed: $message", Toast.LENGTH_LONG).show()
+                }
             }
+        }.onFailure {
+            phase = UpdateInstallPhase.Idle
+            Toast.makeText(context, "Install failed", Toast.LENGTH_SHORT).show()
+        }
     }
 }
 
