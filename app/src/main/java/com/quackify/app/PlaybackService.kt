@@ -288,9 +288,13 @@ class PlaybackService : Service() {
             )
         }
         playback.setState(
-            if (playing) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED,
+            when {
+                state.isBuffering -> PlaybackStateCompat.STATE_BUFFERING
+                playing -> PlaybackStateCompat.STATE_PLAYING
+                else -> PlaybackStateCompat.STATE_PAUSED
+            },
             progress.positionMs,
-            if (playing) 1.0f else 0.0f,
+            if (playing && !state.isBuffering && progress.durationMs > 0L) 1.0f else 0.0f,
         )
         session.setPlaybackState(playback.build())
     }
