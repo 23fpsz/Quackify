@@ -63,12 +63,17 @@ internal object PlayerHeaders {
 
     private const val WEB_LANGUAGES = "en-US,en;q=0.9,fr-FR;q=0.8,fr;q=0.7"
 
+    private const val SEC_CH_UA = "\"Not A;Brand\";v=\"99\", \"Chromium\";v=\"150\", \"Google Chrome\";v=\"150\""
+
     suspend fun of(context: Context, force: Boolean = false): Map<String, String> = mapOf(
         "Authorization" to "Bearer ${EncoreAuth.token(context)}",
         "client-token" to ClientToken.get(context, force),
         "app-platform" to "WebPlayer",
         "spotify-app-version" to APP_VERSION,
         "User-Agent" to Net.DESKTOP_UA,
+        "sec-ch-ua" to SEC_CH_UA,
+        "sec-ch-ua-mobile" to "?0",
+        "sec-ch-ua-platform" to "\"Windows\"",
         "Accept" to "*/*",
         "Accept-Language" to "en-US,en;q=0.9",
     )
@@ -83,6 +88,9 @@ internal object PlayerHeaders {
         "Priority" to "u=1, i",
         "Origin" to WEB_ORIGIN,
         "Referer" to "$WEB_ORIGIN/",
+        "sec-ch-ua" to SEC_CH_UA,
+        "sec-ch-ua-mobile" to "?0",
+        "sec-ch-ua-platform" to "\"Windows\"",
         "Sec-Fetch-Dest" to "empty",
         "Sec-Fetch-Mode" to "cors",
         "Sec-Fetch-Site" to "same-site",

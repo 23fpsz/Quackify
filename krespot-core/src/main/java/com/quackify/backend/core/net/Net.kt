@@ -351,7 +351,7 @@ object Net {
     suspend fun postBlob(
         url: String,
         body: ByteArray,
-        contentType: String,
+        contentType: String?,
         headers: Map<String, String> = emptyMap(),
         tag: String = "",
     ): Blob? {
@@ -365,7 +365,7 @@ object Net {
     private suspend fun attemptPostBlob(
         url: String,
         body: ByteArray,
-        contentType: String,
+        contentType: String?,
         headers: Map<String, String>,
         tag: String,
     ): Blob? = withContext(Dispatchers.IO) {
@@ -377,9 +377,14 @@ object Net {
         log.i("$label → POST ${short(url)} body(${body.size}B binary)")
         if (enabled) headers.forEach { (k, v) -> log.i("$label   $k: ${redact(k, v)}") }
         val started = System.currentTimeMillis()
+        val sent = if (contentType != null) {
+            headers + mapOf("Content-Type" to contentType)
+        } else {
+            headers
+        }
         val outcome = runCatching {
             longClient.newCall(
-                buildRequest("POST", url, headers + mapOf("Content-Type" to contentType), body)
+                buildRequest("POST", url, sent, body)
             ).await().use { raw ->
                 val bytes = raw.body?.bytes() ?: ByteArray(0)
                 val type = raw.header("Content-Type").orEmpty()

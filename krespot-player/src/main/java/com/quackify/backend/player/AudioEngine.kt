@@ -124,7 +124,7 @@ internal class AudioDrmCallback(
             Net.postBlob(
                 url,
                 request.data,
-                "application/octet-stream",
+                null,
                 PlayerHeaders.license(context),
                 tag = "audio-license",
             )
@@ -133,12 +133,12 @@ internal class AudioDrmCallback(
         if (body == null) {
             LicenseEndpoint.invalidate(context)
             if (response?.code != 403) {
-                LicenseGate.hold(response?.code ?: 0, response?.retryAfterSeconds ?: 0L)
+                LicenseGate.hold(response?.code ?: 0, (response?.retryAfterSeconds ?: 0L) * 1000L)
             }
             throw IOException("audio licence ${response?.code ?: "failed"}")
         }
         LicenseGate.clear()
-        log.i("audio licence ${body.bytes.size}B level=${DrmLevel.applied} ${licencePolicy(body.bytes)}")
+        log.i("audio licence ${body.bytes.size}B level=${DrmLevel.applied} ${LicencePolicy.describe(body.bytes)}")
         log.i("audio licence shape ${shape(body.bytes)}")
         return MediaDrmCallback.Response(body.bytes)
     }
@@ -153,35 +153,6 @@ internal class AudioDrmCallback(
         val body = response?.takeIf { it.ok } ?: throw IOException("provision ${response?.code ?: "failed"}")
         return MediaDrmCallback.Response(body.bytes)
     }
-
-    private fun licencePolicy(bytes: ByteArray): String = runCatching {
-        fun policyOf(raw: ByteArray, depth: Int = 0): Map<Int, Long>? {
-            if (depth > 4) return null
-            val values = mutableMapOf<Int, Long>()
-            val nested = mutableListOf<ByteArray>()
-            val reader = Reader(raw)
-            while (!reader.done()) {
-                val (field, wire) = reader.tag()
-                when (wire) {
-                    0 -> values[field] = reader.varint()
-                    2 -> nested.add(reader.bytes())
-                    else -> reader.skip(wire)
-                }
-            }
-            val looksLikePolicy = values.containsKey(1) && values.containsKey(2) &&
-                values[1] in 0L..1L && (values.containsKey(5) || values.containsKey(6))
-            if (looksLikePolicy) return values
-            for (child in nested) {
-                val found = runCatching { policyOf(child, depth + 1) }.getOrNull()
-                if (found != null) return found
-            }
-            return null
-        }
-        val policy = policyOf(bytes)
-            ?: return@runCatching "policy not found"
-        "play=${policy[1] ?: -1} persist=${policy[2] ?: -1} renew=${policy[3] ?: -1} " +
-            "rental=${policy[4] ?: -1}s playbackDur=${policy[5] ?: -1}s licenseDur=${policy[6] ?: -1}s"
-    }.getOrElse { "policy unreadable" }
 }
 
 internal class AudioEngine(
@@ -193,6 +164,8 @@ internal class AudioEngine(
     private var kit: DefaultMediaSourceFactory? = null
 
     private val licensedFiles = java.util.LinkedHashSet<String>()
+
+    private val offlineKeySets = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     val hasMedia: Boolean get() = loaded
 
@@ -262,6 +235,8 @@ internal class AudioEngine(
         withContext(Dispatchers.Main) {
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
             val factory = ensureKit()
+            val keySetId = offlineKeySetFor(source)
+            if (keySetId != null) offlineKeySets[uri] = source.fileId else offlineKeySets.remove(uri)
             val reused = !licensedFiles.add(source.fileId)
             log.i(
                 if (reused) "licence reused for '${source.fileId.take(12)}' and its ${licensedFiles.size} sibling(s)"
@@ -282,7 +257,7 @@ internal class AudioEngine(
                     it.addListener(listener)
                     player = it
                 }
-            live.setMediaSource(factory.createMediaSource(itemFor(uri, source)))
+            live.setMediaSource(factory.createMediaSource(itemFor(uri, source, keySetId)))
             live.prepare()
             live.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
             live.playWhenReady = autoplay
@@ -314,16 +289,53 @@ internal class AudioEngine(
     }
 
 
-    fun queueNext(uri: String, source: AudioSource) {
-        runOnMain {
-            val p = player ?: return@runOnMain
+    /**
+     * A cached offline key set lets the DRM session restore its keys without
+     * a license roundtrip; an unknown track pays one offline acquisition that
+     * then serves every later play. Re-throws the rate-limit refusal so the
+     * caller surfaces it exactly like the online path does.
+     */
+    private suspend fun offlineKeySetFor(source: AudioSource): ByteArray? {
+        if (source.seektable.pssh.isBlank()) return null
+        LicenseStore.keySetIdFor(context, source.fileId)?.let {
+            log.i("offline licence restored for '${source.fileId.take(12)}'")
+            return it
+        }
+        return OfflineLicence.acquire(context, source)
+    }
+
+    /**
+     * Hands the queue the next track with its licence already settled: the
+     * item joins the playlist carrying a key set id whenever one is available,
+     * so the prebuffered track restores keys instead of asking the endpoint
+     * again at transition time. [whileOn] is the uri the engine must still be
+     * on when the item lands - the licence roundtrip can outlive a skip.
+     */
+    suspend fun queueNext(uri: String, source: AudioSource, whileOn: String): Boolean {
+        val keySetId = try {
+            offlineKeySetFor(source)
+        } catch (refusal: IOException) {
+            // Rate limited while pre-licensing: queueing would only ask again
+            // through the online path and burn another strike, so the normal
+            // advance (with its gate-aware retry) takes over instead.
+            log.w("queued licence refused, dropping the prebuffer for '$uri': ${refusal.message}")
+            return false
+        }
+        if (keySetId != null) offlineKeySets[uri] = source.fileId else offlineKeySets.remove(uri)
+        val added = runOnMain {
+            val p = player ?: return@runOnMain false
+            if (p.currentMediaItem?.mediaId != whileOn) return@runOnMain false
             val current = p.currentMediaItemIndex
             if (p.mediaItemCount > current + 1) p.removeMediaItems(current + 1, p.mediaItemCount)
-            p.addMediaItem(itemFor(uri, source))
+            p.addMediaItem(itemFor(uri, source, keySetId))
+            true
+        } ?: false
+        if (added) {
+            log.i("audio queued next '$uri' '${source.fileId.take(12)}' " +
+                    if (source.seektable.pssh.isNotBlank()) "drm" else "clear"
+            )
         }
-        log.i("audio queued next '$uri' '${source.fileId.take(12)}' " +
-                if (source.seektable.pssh.isNotBlank()) "drm" else "clear"
-        )
+        return added
     }
 
     fun skipTo(uri: String): Boolean {
@@ -341,7 +353,7 @@ internal class AudioEngine(
         return moved
     }
 
-    private fun itemFor(uri: String, source: AudioSource): MediaItem {
+    private fun itemFor(uri: String, source: AudioSource, keySetId: ByteArray? = null): MediaItem {
         val encrypted = source.seektable.pssh.isNotBlank()
         return MediaItem.Builder()
             .setMediaId(uri)
@@ -354,6 +366,7 @@ internal class AudioEngine(
                     setDrmConfiguration(
                         MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID)
                             .setForceSessionsForAudioAndVideoTracks(true)
+                            .apply { if (keySetId != null) setKeySetId(keySetId) }
                             .build(),
                     )
                 }
@@ -427,6 +440,7 @@ internal class AudioEngine(
             drmManager = null
             kit = null
             licensedFiles.clear()
+            offlineKeySets.clear()
         }
     }
 
@@ -493,6 +507,13 @@ internal class AudioEngine(
 
         override fun onPlayerError(error: PlaybackException) {
             log.e("audio playback failed ${error.errorCodeName}: ${error.message}")
+            if (error.errorCodeName.contains("DRM")) {
+                val fileId = offlineKeySets.remove(lastItemUri)
+                if (fileId != null) {
+                    LicenseStore.forget(context, fileId)
+                    log.w("dropped the offline licence for '${lastItemUri.takeLast(12)}' after a drm error")
+                }
+            }
             onEvent?.invoke(PlayerEvent.Failed("${error.errorCodeName}: ${error.message ?: "audio error"}"))
         }
     }
@@ -512,7 +533,7 @@ internal class AudioEngine(
     }
 }
 
-private class Reader(private val data: ByteArray) {
+internal class Reader(private val data: ByteArray) {
     private var pos = 0
 
     fun done(): Boolean = pos >= data.size

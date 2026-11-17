@@ -236,13 +236,18 @@ class KrespotPlayer(private val context: Context) {
     @Volatile
     private var queuedGainDb = 0.0
 
+    private val queueTicket = java.util.concurrent.atomic.AtomicLong(0L)
+
     /**
      * Hands the engine the next track of the queue so ExoPlayer prebuffers it
      * while the current one plays and the transition carries no silence. A
      * warm source queues right away; a cold one resolves here and only queues
-     * if the engine is still on the track that asked for it. The bridge checks
-     * hasQueuedNext at the end of the track, so a late resolve can never leave
-     * the transition hanging - the normal advance simply takes over.
+     * if the engine is still on the track that asked for it. The licence
+     * (restored, or freshly acquired offline) is settled before the item
+     * joins the playlist, so the prebuffered track never asks the endpoint
+     * again at transition time. The bridge checks hasQueuedNext at the end of
+     * the track, so a late resolve can never leave the transition hanging -
+     * the normal advance simply takes over.
      */
     fun queueNext(track: CommandTrack, spclient: String) {
         if (track.isDirect) return
@@ -253,30 +258,25 @@ class KrespotPlayer(private val context: Context) {
         if (queuedNextUri == track.uri) return
         val file = track.best() ?: track.files.firstOrNull()
         val cached = sourceFor(track.uri)
-        if (cached != null) {
-            live.queueNext(track.uri, cached)
-            SongCache.touch(track.uri, context)
-            queuedNextUri = track.uri
-            queuedNextTrack = track
-            queuedGainDb = file?.gainDb ?: 0.0
-            log.i("queued next '${track.name}' from the warm source")
-            return
-        }
+        val ticket = queueTicket.incrementAndGet()
         scope.launch {
-            val source = warmSource(track.uri, spclient) ?: return@launch
+            val source = cached ?: warmSource(track.uri, spclient) ?: return@launch
+            if (ticket != queueTicket.get()) return@launch
             val still = engine
             if (still !== live || still.currentUri != askedFor || _state.value.trackUri != askedFor) {
                 return@launch
             }
-            still.queueNext(track.uri, source)
+            if (!still.queueNext(track.uri, source, askedFor)) return@launch
+            SongCache.touch(track.uri, context)
             queuedNextUri = track.uri
             queuedNextTrack = track
             queuedGainDb = file?.gainDb ?: 0.0
-            log.i("queued next '${track.name}' after resolving")
+            log.i("queued next '${track.name}' ${if (cached != null) "from the warm source" else "after resolving"}")
         }
     }
 
     fun clearQueuedNext() {
+        queueTicket.incrementAndGet()
         queuedNextUri = ""
         queuedNextTrack = null
     }
