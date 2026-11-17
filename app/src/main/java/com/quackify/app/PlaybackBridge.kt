@@ -92,6 +92,9 @@ const val AUTOPLAY_ON_END_PREF = "autoplayOnEnd"
 /** Settings toggle: prebuffer the next track so transitions carry no silence. */
 const val GAPLESS_PREF = "gaplessPlayback"
 
+/** The video/audio mode the user last picked, so the next video track follows it. */
+const val VIDEO_MODE_PREF = "videoModePreferred"
+
 /** Last context this phone played, so a cold start can rebuild its row list. */
 const val CHAIN_CONTEXT_PREF = "chainContext"
 
@@ -245,6 +248,9 @@ class PlaybackBridge(private val context: Context) {
         private set
 
     private var videoFlagsUri = ""
+
+    /** The video/audio mode the user last picked; rides across tracks and restarts. */
+    private var videoModePreferred = false
 
     /** The track whose video source is already being prefetched. */
     private var videoPrefetchUri = ""
@@ -507,6 +513,10 @@ class PlaybackBridge(private val context: Context) {
         }
 
         override fun onSwitchVideo(toVideo: Boolean) {
+            videoModePreferred = toVideo
+            com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS).edit()
+                .putBoolean(VIDEO_MODE_PREF, toVideo)
+                .apply()
             switchVideo(toVideo)
         }
 
@@ -757,6 +767,8 @@ class PlaybackBridge(private val context: Context) {
         )
         autoplayOnStartup = com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .getBoolean(AUTOPLAY_ON_STARTUP_PREF, false)
+        videoModePreferred = com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
+            .getBoolean(VIDEO_MODE_PREF, false)
         autoplayPending = true
         autoplayArmedAt = SystemClock.elapsedRealtime()
         if (autoplayOnStartup) log.i("autoplay on startup is armed")
@@ -1118,6 +1130,7 @@ class PlaybackBridge(private val context: Context) {
     /** The video engine gave up: back to the audio track at the last known position. */
     private fun fallbackFromVideo() {
         log.w("the video engine failed, falling back to audio")
+        videoAutoSwitched += state.trackUri
         state = state.copy(videoActive = false, videoQualities = emptyList(), videoSwitching = false)
         player.stopVideo()
         scope.launch {
@@ -1158,6 +1171,14 @@ class PlaybackBridge(private val context: Context) {
         ) {
             videoAutoSwitched += uri
             log.i("episode '$uri' has video, switching to video automatically")
+            switchVideo(true)
+            return
+        }
+        if (!episode && available && !active && videoModePreferred &&
+            uri !in videoAutoSwitched && player.state.value.trackUri == uri
+        ) {
+            videoAutoSwitched += uri
+            log.i("video mode is the user's pick, switching '$uri' to video automatically")
             switchVideo(true)
             return
         }
