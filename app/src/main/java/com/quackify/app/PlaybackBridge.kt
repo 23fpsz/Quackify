@@ -92,6 +92,15 @@ const val AUTOPLAY_ON_END_PREF = "autoplayOnEnd"
 /** Settings toggle: prebuffer the next track so transitions carry no silence. */
 const val GAPLESS_PREF = "gaplessPlayback"
 
+/** Settings toggle: pause when the BT, USB or wired audio output disconnects. */
+const val PAUSE_ON_DISCONNECT_PREF = "pauseOnDisconnect"
+
+/** Settings toggle: resume when a BT audio device connects. */
+const val RESUME_ON_CONNECT_PREF = "resumeOnConnect"
+
+/** Settings toggle: resume when wired headphones are plugged in. */
+const val RESUME_ON_HEADPHONE_PREF = "resumeOnHeadphone"
+
 /** The video/audio mode the user last picked, so the next video track follows it. */
 const val VIDEO_MODE_PREF = "videoModePreferred"
 
@@ -127,6 +136,18 @@ class PlaybackBridge(private val context: Context) {
     private fun gaplessEnabled(): Boolean =
         com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .getBoolean(GAPLESS_PREF, false)
+
+    private fun pauseOnDisconnectEnabled(): Boolean =
+        com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
+            .getBoolean(PAUSE_ON_DISCONNECT_PREF, true)
+
+    private fun resumeOnConnectEnabled(): Boolean =
+        com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
+            .getBoolean(RESUME_ON_CONNECT_PREF, false)
+
+    private fun resumeOnHeadphoneEnabled(): Boolean =
+        com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
+            .getBoolean(RESUME_ON_HEADPHONE_PREF, false)
 
     /** The track the engine is prebuffering to take over without a restart. */
     @Volatile
@@ -3746,6 +3767,7 @@ class PlaybackBridge(private val context: Context) {
     private val localOutputWatcher = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
             refreshLocalOutput()
+            resumeOnOutputGained(addedDevices)
         }
 
         override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
@@ -3773,7 +3795,32 @@ class PlaybackBridge(private val context: Context) {
         }
     }
 
+    private fun resumeOnOutputGained(addedDevices: Array<out AudioDeviceInfo>) {
+        if (state.controllingRemote) return
+        val bluetooth = addedDevices.any { LocalOutput.isBluetooth(it.type) }
+        val wired = addedDevices.any { LocalOutput.isWired(it.type) }
+        val allowed = (bluetooth && resumeOnConnectEnabled()) ||
+                (wired && resumeOnHeadphoneEnabled())
+        if (!allowed) return
+        scope.launch { resumeLocalAfterOutputGained() }
+    }
+
+    private suspend fun resumeLocalAfterOutputGained() {
+        if (!player.hasSource || player.isPlaying) return
+        val loadedUri = player.state.value.trackUri
+        val loadedArtist = artistUriOf(loadedUri)
+        if (loadedArtist.isNotBlank() && ArtistBanStore.banned(context, loadedArtist)) {
+            log.i("output gained: resume of '$loadedUri' blocked, artist is banned")
+            return
+        }
+        log.i("output gained: resuming the engine here")
+        player.resume()
+        state = state.copy(isPlaying = true, isBuffering = false)
+        publishLocalFromEngine(playing = true)
+    }
+
     private suspend fun pauseOnOutputLost() {
+        if (!pauseOnDisconnectEnabled()) return
         if (!player.hasSource || !player.isPlaying) return
         log.i("output lost: the bluetooth or wired device is gone, pausing locally")
         player.pause()
