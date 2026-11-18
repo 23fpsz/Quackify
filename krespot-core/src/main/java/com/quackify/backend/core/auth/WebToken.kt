@@ -47,6 +47,29 @@ object WebToken {
             log.w("api/token skipped, there is no sp_dc to mint with")
             return null
         }
+        val minted = mintWith(cookie) ?: return null
+        val (token, expires) = minted
+        val previous = EncoreAuth.token(context)
+        EncoreAuth.saveToken(context, token, expires)
+        val ttl = if (expires > 0L) "${(expires - System.currentTimeMillis()) / 1000L}s" else "?"
+        log.i("api/token ${token.length}B ttl=$ttl changed=${previous != token}")
+        return token
+    }
+
+    /**
+     * Mints a web token for a sp_dc without touching the stored session: the
+     * account it belongs to is on its way out, so its token must not
+     * overwrite the active account's. Returns the token and its expiry.
+     */
+    suspend fun peek(context: Context, spDc: String): Pair<String, Long>? {
+        if (spDc.isBlank()) {
+            log.w("api/token peek skipped, there is no sp_dc")
+            return null
+        }
+        return mintWith("sp_dc=$spDc")
+    }
+
+    private suspend fun mintWith(cookie: String): Pair<String, Long>? {
         val server = serverSeconds(cookie)
         val totp = code(System.currentTimeMillis())
         val totpServer = if (server > 0L) code(server * 1000L) else "unavailable"
@@ -67,14 +90,7 @@ object WebToken {
             log.w("api/token ${response.code} no accessToken ${response.body.take(160)}")
             return null
         }
-        val expires = json.optLong("accessTokenExpirationTimestampMs", 0L)
-        val previous = EncoreAuth.token(context)
-        EncoreAuth.saveToken(context, token, expires)
-        val ttl = if (expires > 0L) "${(expires - System.currentTimeMillis()) / 1000L}s" else "?"
-        log.i("api/token ${response.code} ${token.length}B client=${json.optString("clientId").take(8)}… " +
-                "ttl=$ttl totp=$totp changed=${previous != token}"
-        )
-        return token
+        return token to json.optLong("accessTokenExpirationTimestampMs", 0L)
     }
 
     fun code(millis: Long): String {

@@ -217,6 +217,59 @@ object EncoreAuth {
         return wasActive
     }
 
+    /** The stored session snapshot (a domain -> cookies JSON map) of a saved account. */
+    fun accountSession(context: Context, id: String): String =
+        prefs(context).getString("multi.$id.session", null).orEmpty()
+
+    /**
+     * The open.spotify.com cookie line of a session snapshot — sp_dc, sp_key
+     * and their companions — ready to be sent as a Cookie header.
+     */
+    fun openSessionCookies(session: String): String {
+        val map = runCatching { JSONObject(session) }.getOrNull() ?: return ""
+        val line = map.optString("https://open.spotify.com", "")
+            .ifBlank {
+                COOKIE_DOMAINS.firstNotNullOfOrNull { domain ->
+                    map.optString(domain, "").takeIf { it.contains("sp_dc=") }
+                }.orEmpty()
+            }
+        return line.split(";")
+            .map { it.trim() }
+            .filter { it.contains("=") }
+            .joinToString("; ")
+    }
+
+    /**
+     * Signs a session out on the server, the endpoint the web player calls
+     * on logout: POST /api/logout with the account's cookies. After this the
+     * sp_dc is revoked everywhere, not just deleted from this device.
+     */
+    suspend fun revokeRemoteSession(cookies: String): Boolean {
+        if (cookies.isBlank()) return false
+        val response = Net.requestOnce(
+            "POST",
+            "https://open.spotify.com/api/logout",
+            mapOf(
+                "Accept" to "application/json",
+                "Accept-Language" to "en",
+                "App-Platform" to "WebPlayer",
+                "Cache-Control" to "no-cache",
+                "Pragma" to "no-cache",
+                "Origin" to "https://open.spotify.com",
+                "Referer" to "https://open.spotify.com/",
+                "Sec-Fetch-Dest" to "empty",
+                "Sec-Fetch-Mode" to "cors",
+                "Sec-Fetch-Site" to "same-origin",
+                "User-Agent" to DESKTOP_UA,
+                "Cookie" to cookies,
+            ),
+            "",
+            tag = "logout",
+        )
+        log.i("remote logout -> ${response?.code ?: "no response"} ${response?.body?.take(80).orEmpty()}")
+        return response?.ok == true
+    }
+
     /**
      * Prepares the cookie jar for logging into an additional account: the
      * for credentials. The secure session itself is untouched.
