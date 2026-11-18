@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,7 @@ import com.quackify.compose.theme.EncoreTheme
 import com.quackify.backend.library.Krespot
 import androidx.compose.ui.res.stringResource
 import com.quackify.compose.R
+import kotlinx.coroutines.launch
 
 private data class DiscographyTab(val key: String, val labelRes: Int)
 
@@ -83,6 +85,7 @@ fun DiscographySheet(
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    val retryScope = rememberCoroutineScope()
 
     val rows = remember { mutableStateListOf<ShelfItem>() }
     var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
@@ -92,6 +95,12 @@ fun DiscographySheet(
     var total by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    // The server pages per item group, but a page can yield fewer rows than
+    // groups (unparsable releases, dupes the filter drops), so the next
+    // offset must advance by the groups we asked for - rows.size can stall
+    // below totalCount and spin the loader forever.
+    var nextOffset by remember { mutableStateOf(0) }
+    var exhausted by remember { mutableStateOf(false) }
 
     suspend fun fetch(reset: Boolean) {
         if (loading) return
@@ -100,9 +109,11 @@ fun DiscographySheet(
         if (reset) {
             rows.clear()
             total = 0
+            nextOffset = 0
+            exhausted = false
         }
         val order = if (alphabetical) "NAME_ASC" else "DATE_DESC"
-        val page = Krespot.artists.discography(context, artistUri, section, rows.size, order)
+        val page = Krespot.artists.discography(context, artistUri, section, nextOffset, order)
         loading = false
         if (page == null) {
             failed = true
@@ -110,6 +121,8 @@ fun DiscographySheet(
         }
         rows.addAll(page.rows.filter { row -> rows.none { it.uri == row.uri } })
         total = page.total
+        nextOffset += page.fetched
+        if (!page.hasMore || page.fetched <= 0) exhausted = true
     }
 
     LaunchedEffect(artistUri) {
@@ -126,7 +139,7 @@ fun DiscographySheet(
         listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
     }
     LaunchedEffect(lastVisible, section, alphabetical, rows.size, total) {
-        if (rows.isNotEmpty() && rows.size < total && lastVisible >= rows.size - 3) fetch(false)
+        if (!exhausted && rows.isNotEmpty() && lastVisible >= rows.size - 3) fetch(false)
     }
 
     ModalBottomSheet(
@@ -222,9 +235,13 @@ fun DiscographySheet(
                             }
                         )
                     }
-                    if (loading || failed) {
+                    if (failed) {
                         item(key = "status", span = { GridItemSpan(maxLineSpan) }) {
-                            StatusTile(failed)
+                            StatusTile(failed = true, onRetry = { retryScope.launch { fetch(rows.isEmpty()) } })
+                        }
+                    } else if (loading) {
+                        item(key = "status", span = { GridItemSpan(maxLineSpan) }) {
+                            StatusTile(failed = false, onRetry = {})
                         }
                     } else if (rows.isEmpty()) {
                         item(key = "empty", span = { GridItemSpan(maxLineSpan) }) { EmptyTile() }
@@ -245,8 +262,10 @@ fun DiscographySheet(
                             }
                         )
                     }
-                    if (loading || failed) {
-                        item(key = "status") { StatusTile(failed) }
+                    if (failed) {
+                        item(key = "status") { StatusTile(failed = true, onRetry = { retryScope.launch { fetch(rows.isEmpty()) } }) }
+                    } else if (loading) {
+                        item(key = "status") { StatusTile(failed = false, onRetry = {}) }
                     } else if (rows.isEmpty()) {
                         item(key = "empty") { EmptyTile() }
                     }
@@ -338,7 +357,7 @@ private fun ReleaseTile(row: ShelfItem, onClick: () -> Unit) {
 }
 
 @Composable
-private fun StatusTile(failed: Boolean) {
+private fun StatusTile(failed: Boolean, onRetry: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -348,7 +367,8 @@ private fun StatusTile(failed: Boolean) {
         if (failed) {
             Text(
                 text = stringResource(R.string.could_not_load_this_section),
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                modifier = Modifier.clickable(onClick = onRetry)
             )
         } else {
             InlineLoadingDots(color = EncoreColors.TextSecondary)
