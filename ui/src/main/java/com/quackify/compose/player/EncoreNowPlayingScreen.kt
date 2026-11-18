@@ -68,7 +68,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -361,6 +361,15 @@ fun EncoreNowPlayingScreen(
     }
     val activeLyricLine = lyrics.getOrNull(activeLyricIndex)
     val activeLyricText = activeLyricLine?.text.orEmpty()
+    // One frame-ticking clock for every place lyrics render on this screen:
+    // the one-line preview strip under the artwork, the peek card and the
+    // fullscreen view. Each renderer reads the same State from its draw
+    // phase, so they all sweep in lock-step without recomposing per frame.
+    val lyricClock = rememberLyricClock(
+        reportedPositionMs = { currentPositionMs },
+        isPlaying = isPlaying,
+        trackKey = lyrics.firstOrNull()?.startTimeMs,
+    )
 
     val activeTranscriptIndex = remember(currentPositionMs, transcript) {
         transcript.indexOfLast { currentPositionMs >= it.startMs }.coerceAtLeast(0)
@@ -687,7 +696,8 @@ fun EncoreNowPlayingScreen(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         NowPlayingSyncedLyricLine(
-                            lyricText = activeLyricText,
+                            lyricLine = activeLyricLine,
+                            clockMs = lyricClock,
                             visible = previewLyricVisible,
                             height = if (previewLyricVisible) 44.dp else 0.dp,
                             onOpenLyrics = { isLyricsFullscreen = true }
@@ -784,8 +794,7 @@ fun EncoreNowPlayingScreen(
                             visible = lyricsAvailable,
                             lyrics = lyrics,
                             activeIndex = activeLyricIndex,
-                            positionMs = currentPositionMs,
-                            isPlaying = isPlaying,
+                            clockMs = lyricClock,
                             dominantColor = dynamicArtworkColor,
                             peekHeight = LANDSCAPE_LYRICS_PEEK_HEIGHT,
                             onOpenLyrics = { isLyricsFullscreen = true },
@@ -913,7 +922,8 @@ fun EncoreNowPlayingScreen(
                         ) {
                             if (!videoActive) {
                                 NowPlayingSyncedLyricLine(
-                                    lyricText = activeLyricText,
+                                    lyricLine = activeLyricLine,
+                                    clockMs = lyricClock,
                                     visible = previewLyricVisible,
                                     height = lyricLineHeight,
                                     onOpenLyrics = { isLyricsFullscreen = true }
@@ -1031,8 +1041,7 @@ fun EncoreNowPlayingScreen(
                                 visible = lyricsAvailable && canvasControlsShown,
                                 lyrics = lyrics,
                                 activeIndex = activeLyricIndex,
-                                positionMs = currentPositionMs,
-                                isPlaying = isPlaying,
+                                clockMs = lyricClock,
                                 dominantColor = dynamicArtworkColor,
                                 onOpenLyrics = { isLyricsFullscreen = true },
                                 onShareLyrics = { isLyricsShareOpen = true }
@@ -1893,7 +1902,8 @@ private fun MusicVideoSwitchPill(
  */
 @Composable
 private fun NowPlayingSyncedLyricLine(
-    lyricText: String,
+    lyricLine: TimeSyncedLyric?,
+    clockMs: State<Long>,
     visible: Boolean,
     height: Dp,
     onOpenLyrics: () -> Unit,
@@ -1914,27 +1924,47 @@ private fun NowPlayingSyncedLyricLine(
             exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it / 2 }
         ) {
             AnimatedContent(
-                targetState = lyricText,
+                targetState = lyricLine,
                 transitionSpec = {
                     (slideInVertically { height -> height / 2 } + fadeIn(tween(200)))
                         .togetherWith(slideOutVertically { height -> -height / 2 } + fadeOut(tween(150)))
                 },
                 label = "1LineLyricsContent"
-            ) { lyricLine ->
-                Text(
-                    text = lyricLine,
-                    style = EncoreTheme.typography.titleMedium.copy(
-                        fontSize = 15.sp,
-                        lineHeight = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenLyrics() }
-                )
+            ) { line ->
+                if (line != null && line.isWordSynced) {
+                    // Karaoke sweep on the one-line strip too: same frame
+                    // clock, same draw-phase clip as the fullscreen view.
+                    WordSyncedLyricSweepText(
+                        lyric = line,
+                        positionMs = clockMs,
+                        sungColor = Color.White,
+                        unsungColor = Color.White.copy(alpha = 0.45f),
+                        style = EncoreTheme.typography.titleMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        maxLines = 2,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenLyrics() }
+                    )
+                } else {
+                    Text(
+                        text = line?.text.orEmpty(),
+                        style = EncoreTheme.typography.titleMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenLyrics() }
+                    )
+                }
             }
         }
     }
@@ -2378,8 +2408,7 @@ private fun NowPlayingLyricsCard(
     visible: Boolean,
     lyrics: List<TimeSyncedLyric>,
     activeIndex: Int,
-    positionMs: Long,
-    isPlaying: Boolean,
+    clockMs: State<Long>,
     dominantColor: Color,
     onOpenLyrics: () -> Unit,
     onShareLyrics: () -> Unit,
@@ -2387,13 +2416,6 @@ private fun NowPlayingLyricsCard(
     peekHeight: Dp = 360.dp
 ) {
     val ink = contrastInk(dominantColor)
-    // Frame-ticking clock steered by the player's coarse position reports, so
-    // the karaoke sweep glides instead of stepping twice a second.
-    val clockMs = rememberLyricClock(
-        reportedPositionMs = { positionMs },
-        isPlaying = isPlaying,
-        trackKey = lyrics.firstOrNull()?.startTimeMs,
-    )
     AnimatedVisibility(
         visible = visible,
         enter = slideInVertically(
@@ -2681,18 +2703,17 @@ private fun FullscreenLyricsView(
 ) {
     // The player only reports its position twice a second; a karaoke sweep
     // needs every frame. The clock steers itself with those readings and
-    // ticks smoothly in between.
+    // ticks smoothly in between. Kept as State: the active index is derived
+    // from it, so only the lines whose active bit flips recompose, and the
+    // sweep reads it straight from the draw phase.
     val clockMs = rememberLyricClock(
         reportedPositionMs = { currentPositionMs },
         isPlaying = isPlaying,
         trackKey = lyrics.firstOrNull()?.startTimeMs,
     )
-    val activeIndex = remember(lyrics) {
-        derivedStateOf { lyrics.indexOfLast { clockMs >= it.startTimeMs }.coerceAtLeast(0) }
-    }.value
+    val activeIndex by rememberActiveLyricIndex(clockMs, lyrics)
     val listState = rememberLazyListState()
     val ink = contrastInk(dominantColor)
-
     LaunchedEffect(activeIndex) {
         listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
     }

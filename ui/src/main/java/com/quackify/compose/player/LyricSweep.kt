@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +22,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * The song position, ticking every frame.
@@ -35,32 +38,43 @@ import kotlin.math.abs
  * While paused, every reading is the truth, including a seek made while
  * paused.
  *
- * Read the returned state inside a draw lambda or a derivedStateOf, not in
- * composition: only the draw phase should re-run each frame.
+ * Returned as [State] rather than a plain value on purpose: read inside a
+ * draw lambda or a [derivedStateOf], only the draw phase (or the derived
+ * computation) re-runs each frame. Read in composition, the whole screen
+ * would recompose sixty times a second — and a plain Long return would freeze
+ * at whatever the first composition saw, which is exactly how the fullscreen
+ * view once ended up stuck on the first line.
  */
 @Composable
 internal fun rememberLyricClock(
     reportedPositionMs: () -> Long,
     isPlaying: Boolean,
     trackKey: Any? = Unit,
-): Long {
+): State<Long> {
     val clock = remember(trackKey) { mutableLongStateOf(0L) }
     var lastReported by remember(trackKey) { mutableLongStateOf(0L) }
     var lastFrameNanos by remember(trackKey) { mutableLongStateOf(0L) }
+    // The steering reads the position through a State so the frame loop is
+    // launched once: keyed on the lambda instance, every recomposition that
+    // captured a fresh position would restart the loop and spend its first
+    // frame idle.
+    val reported by remember(reportedPositionMs) {
+        derivedStateOf { reportedPositionMs() }
+    }
 
     // Paused: follow the readings exactly, so a seek while paused lands
     // immediately and nothing drifts.
     LaunchedEffect(isPlaying, trackKey) {
         if (isPlaying) return@LaunchedEffect
-        snapshotFlow { reportedPositionMs() }.collect { reported ->
-            clock.longValue = reported
+        snapshotFlow { reported }.collect { reading ->
+            clock.longValue = reading
         }
     }
 
     LaunchedEffect(isPlaying, trackKey) {
         if (!isPlaying) return@LaunchedEffect
         lastFrameNanos = 0L
-        lastReported = reportedPositionMs()
+        lastReported = reported
         clock.longValue = lastReported
         while (true) {
             withFrameNanos { frameNanos ->
@@ -70,24 +84,38 @@ internal fun rememberLyricClock(
                 }
                 lastFrameNanos = frameNanos
             }
-            val reported = reportedPositionMs()
-            if (reported != lastReported) {
+            val reading = reported
+            if (reading != lastReported) {
                 val estimate = clock.longValue
                 // Steer, don't set: small corrections ease in, big jumps
                 // (seeks) are taken whole. A reading only slightly behind the
                 // estimate is reporting jitter, not truth — rewinding the sweep
                 // by a few frames reads as a stutter, so it is held.
-                val delta = reported - estimate
+                val delta = reading - estimate
                 clock.longValue = when {
-                    delta in -60L..60L -> reported.coerceAtLeast(estimate - 8L)
+                    delta in -60L..60L -> reading.coerceAtLeast(estimate - 8L)
                     abs(delta) < 600L -> estimate + delta / 2
-                    else -> reported
+                    else -> reading
                 }
-                lastReported = reported
+                lastReported = reading
             }
         }
     }
-    return clock.longValue
+    return clock
+}
+
+/**
+ * The line currently being sung, as a fraction of the whole lyrics list.
+ * A [derivedStateOf] over the frame clock, so it only recomposes the lines
+ * whose "active" bit actually flipped (a handful of times per song) rather
+ * than everything reading the clock.
+ */
+@Composable
+internal fun rememberActiveLyricIndex(
+    clock: State<Long>,
+    lyrics: List<TimeSyncedLyric>,
+): State<Int> = remember(lyrics, clock) {
+    derivedStateOf { lyrics.indexOfLast { clock.value >= it.startTimeMs }.coerceAtLeast(0) }
 }
 
 /**
@@ -100,13 +128,19 @@ internal fun rememberLyricClock(
  * the bright copy lands exactly on top of the dim one and the boundary moves
  * at a steady sub-letter rate instead of jumping a character at a time.
  *
+ * A wrapped line is handled a visual line at a time: the ones the boundary
+ * has already passed are lit whole, the one holding the boundary is cut at
+ * it, and the ones after it stay with the dim copy. Clipping at a single x
+ * across the whole block instead lit the second row of a two-row line in
+ * lock-step with the first, which read as two lines sweeping together.
+ *
  * The clip is recomputed in the draw phase only; a frame costs one clip and
  * one redraw of already-measured text, no recomposition.
  */
 @Composable
 internal fun WordSyncedLyricSweepText(
     lyric: TimeSyncedLyric,
-    positionMs: Long,
+    positionMs: State<Long>,
     sungColor: Color,
     unsungColor: Color,
     style: TextStyle,
@@ -132,26 +166,47 @@ internal fun WordSyncedLyricSweepText(
                 .matchParentSize()
                 .drawWithContent {
                     val measured = layout ?: return@drawWithContent
-                    val revealed = lyric.revealedChars(positionMs)
+                    val now = positionMs.value
+                    val revealed = lyric.revealedChars(now)
                     if (revealed <= 0f) return@drawWithContent
                     val textLength = lyric.text.length
                     if (revealed >= textLength) {
                         drawContent()
                         return@drawWithContent
                     }
+                    val revealedIndex = revealed.toInt().coerceIn(0, textLength - 1)
+                    // Find the visual row holding the boundary: rows before it
+                    // are lit whole, rows after it not at all, and only the
+                    // boundary row is cut. A single rect spanning the block's
+                    // full height instead lit every row at the same x — which
+                    // read as two wrapped rows sweeping together.
+                    var row = 0
+                    while (row < measured.lineCount - 1 &&
+                        revealedIndex >= measured.getLineEnd(row, visibleEnd = false)
+                    ) {
+                        row++
+                    }
                     // Interpolate the boundary's x within the character it is
                     // passing through, so the sweep moves continuously rather
                     // than a letter at a time.
-                    val index = revealed.toInt().coerceIn(0, textLength - 1)
-                    val fraction = revealed - index
-                    val left = measured.getHorizontalPosition(index, usePrimaryDirection = true)
+                    val fraction = revealed - revealedIndex
+                    val left = measured.getHorizontalPosition(revealedIndex, usePrimaryDirection = true)
                     val right = measured.getHorizontalPosition(
-                        (index + 1).coerceAtMost(textLength),
+                        (revealedIndex + 1).coerceAtMost(textLength),
                         usePrimaryDirection = true,
                     )
                     val boundary = left + (right - left) * fraction
-                    clipRect(left = 0f, top = 0f, right = boundary, bottom = size.height) {
+                    val boundaryTop = measured.getLineTop(row)
+                    val boundaryBottom = measured.getLineBottom(row)
+                    // The boundary row, cut at the boundary.
+                    clipRect(left = 0f, top = boundaryTop, right = boundary, bottom = boundaryBottom) {
                         this@drawWithContent.drawContent()
+                    }
+                    if (row > 0) {
+                        // Everything above it is already sung: lit whole.
+                        clipRect(left = 0f, top = 0f, right = size.width, bottom = boundaryTop) {
+                            this@drawWithContent.drawContent()
+                        }
                     }
                 },
         )
