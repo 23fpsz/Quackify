@@ -176,7 +176,15 @@ internal class AudioEngine(
     var onEvent: (PlayerEvent) -> Unit,
 ) {
 
-    private var kit: DefaultMediaSourceFactory? = null
+    // A DefaultDrmSessionManager is refcounted and pinned to one playback
+    // looper, so sharing one between the session and spare players lets their
+    // interleaved prepare and release calls drop the MediaDrm while a period
+    // on the other player is still preparing: every player keeps its own kit.
+    private class Kit(val factory: DefaultMediaSourceFactory, val manager: DefaultDrmSessionManager)
+
+    private var sessionKit: Kit? = null
+
+    private var spareKit: Kit? = null
 
     private val licensedFiles = java.util.LinkedHashSet<String>()
 
@@ -191,8 +199,6 @@ internal class AudioEngine(
     private var sparePlayer: ExoPlayer? = null
 
     private var crossfade: CrossfadeEngine? = null
-
-    private var drmManager: DefaultDrmSessionManager? = null
 
     @Volatile
     private var loaded = false
@@ -267,7 +273,7 @@ internal class AudioEngine(
             crossfade?.stop()
             spareGainFactor = 1f
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
-            val factory = ensureKit()
+            val factory = ensureSessionKit().factory
             val keySetId = offlineKeySetFor(source)
             if (keySetId != null) offlineKeySets[uri] = source.fileId else offlineKeySets.remove(uri)
             val reused = !licensedFiles.add(source.fileId)
@@ -302,8 +308,7 @@ internal class AudioEngine(
             true
         }
 
-    private fun ensureKit(): DefaultMediaSourceFactory {
-        kit?.let { return it }
+    private fun newKit(role: String): Kit {
         // The song cache sits between ExoPlayer and the CDN: online reads
         // seed it while streaming, offline reads come back from it, and
         // the custom key (the track uri) survives CDN url rotation.
@@ -315,11 +320,15 @@ internal class AudioEngine(
             .setMultiSession(true)
             .build(AudioDrmCallback(context) { LicenseEndpoint.of(context) })
         factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { manager })
-        drmManager = manager
-        kit = factory
-        log.i("drm kit built, one player and one session manager for the whole run")
-        return factory
+        log.i("$role drm kit built")
+        return Kit(factory, manager)
     }
+
+    private fun ensureSessionKit(): Kit =
+        sessionKit ?: newKit("session").also { sessionKit = it }
+
+    private fun ensureSpareKit(): Kit =
+        spareKit ?: newKit("spare").also { spareKit = it }
 
 
     /**
@@ -517,9 +526,8 @@ internal class AudioEngine(
             player = null
             sparePlayer?.release()
             sparePlayer = null
-            drmManager?.release()
-            drmManager = null
-            kit = null
+            sessionKit = null
+            spareKit = null
             licensedFiles.clear()
             offlineKeySets.clear()
         }
@@ -547,9 +555,9 @@ internal class AudioEngine(
 
     private fun ensureSparePlayer(): ExoPlayer {
         sparePlayer?.let { return it }
-        val factory = ensureKit()
+        val kit = ensureSpareKit()
         val built = ExoPlayer.Builder(context)
-            .setMediaSourceFactory(factory)
+            .setMediaSourceFactory(kit.factory)
             .build()
         sparePlayer = built
         log.i("spare player built for crossfades")
@@ -562,7 +570,7 @@ internal class AudioEngine(
         val engine = CrossfadeEngine(
             session = { player },
             spare = { ensureSparePlayer() },
-            buildSource = { item -> ensureKit().createMediaSource(item) },
+            buildSource = { item -> ensureSpareKit().factory.createMediaSource(item) },
             fadeMs = { configuredCrossfadeMs() },
             automixOn = { AppPrefs.getBoolean(context, CLIENT_STORE, AUTOMIX_PREF, false) },
             sessionDurationMs = { durationMs },
@@ -580,6 +588,9 @@ internal class AudioEngine(
         into.addListener(listener)
         player = into
         sparePlayer = out
+        val handedKit = sessionKit
+        sessionKit = spareKit
+        spareKit = handedKit
         lastItemUri = uri
         announced = true
         if (durationMs > 0L) {
