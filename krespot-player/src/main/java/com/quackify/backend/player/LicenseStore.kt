@@ -62,4 +62,28 @@ internal object LicenseStore {
             .remove(KEY_EXP + fileId)
             .apply()
     }
+
+    private const val KEY_UNSUPPORTED = "offline_licence_unsupported_at"
+
+    // Once the endpoint has refused offline licences we stop asking entirely
+    // and only re-probe after this long, in case the policy ever changes.
+    private const val UNSUPPORTED_REPROBE_MS = 7L * 24 * 60 * 60_000L
+
+    fun markOfflineUnsupported(context: Context) {
+        SecureStore.prefs(context).edit()
+            .putLong(KEY_UNSUPPORTED, System.currentTimeMillis())
+            .apply()
+    }
+
+    fun offlineUnsupported(context: Context): Boolean {
+        val prefs = SecureStore.prefs(context)
+        val at = prefs.getLong(KEY_UNSUPPORTED, 0L)
+        if (at == 0L) return false
+        if (System.currentTimeMillis() > at + UNSUPPORTED_REPROBE_MS) {
+            prefs.edit().remove(KEY_UNSUPPORTED).apply()
+            log.i("offline licence re-probe window opened")
+            return false
+        }
+        return true
+    }
 }

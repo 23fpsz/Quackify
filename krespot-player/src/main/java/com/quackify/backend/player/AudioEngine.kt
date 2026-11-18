@@ -138,6 +138,12 @@ internal class AudioDrmCallback(
             throw IOException("audio licence ${response?.code ?: "failed"}")
         }
         LicenseGate.clear()
+        // A streaming licence with persist=0 is the server saying this client
+        // never gets persistable licences: let the offline path stand down
+        // instead of it burning a 400 on every first play.
+        LicencePolicy.policyOf(body.bytes)?.takeIf { it[2] == 0L }?.let {
+            OfflineLicence.noteStreamingOnly(context)
+        }
         log.i("audio licence ${body.bytes.size}B level=${DrmLevel.applied} ${LicencePolicy.describe(body.bytes)}")
         log.i("audio licence shape ${shape(body.bytes)}")
         return MediaDrmCallback.Response(body.bytes)

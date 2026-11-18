@@ -43,11 +43,29 @@ internal object OfflineLicence {
     @Volatile
     private var refusals = 0
 
-    fun disabled(): Boolean = refusals >= DISABLE_AFTER
+    fun disabled(context: Context): Boolean =
+        refusals >= DISABLE_AFTER || LicenseStore.offlineUnsupported(context)
 
-    private fun refused(reason: String) {
+    private fun refused(context: Context, reason: String) {
         refusals++
-        log.w("offline licence refused ($refusals/$DISABLE_AFTER): $reason")
+        log.w("offline licence refused ($refusals/$DISABLE_AFTER): $reason, streaming online instead")
+        if (refusals >= DISABLE_AFTER) {
+            LicenseStore.markOfflineUnsupported(context)
+            log.w("offline licences look unsupported for this client, not asking again this week")
+        }
+    }
+
+    /**
+     * The online streaming licence itself says persist=0, i.e. this client is
+     * only ever handed streaming licences: paying an extra offline attempt
+     * per track would just burn a 400, so stand down until the weekly retry.
+     * Observed live: every offline request 400s with an empty body while the
+     * streaming licence returns 200 with persist=0.
+     */
+    fun noteStreamingOnly(context: Context) {
+        if (LicenseStore.offlineUnsupported(context)) return
+        LicenseStore.markOfflineUnsupported(context)
+        log.w("licence policy says persist=0, offline caching disabled for this client (weekly retry)")
     }
 
     /**
@@ -58,7 +76,7 @@ internal object OfflineLicence {
      * path would.
      */
     suspend fun acquire(context: Context, source: AudioSource): ByteArray? {
-        if (disabled()) return null
+        if (disabled(context)) return null
         val pssh = runCatching { Base64.decode(source.seektable.pssh, Base64.DEFAULT) }
             .getOrNull()
             ?.takeIf { it.isNotEmpty() }
@@ -75,7 +93,7 @@ internal object OfflineLicence {
                         drm.getKeyRequest(session, initData, MediaDrm.KEY_TYPE_OFFLINE, null)
                     }.getOrNull()
                     if (request == null) {
-                        refused("the cdm rejected the pssh")
+                        refused(context, "the cdm rejected the pssh")
                         return@withContext null
                     }
                     val response = Net.postBlob(
@@ -92,19 +110,28 @@ internal object OfflineLicence {
                             LicenseGate.hold(response.code, (response.retryAfterSeconds ?: 0L) * 1000L)
                             throw IOException("audio licence 429 (DRM_LICENSE_ACQUISITION_FAILED) offline")
                         }
-                        log.w("offline licence http=${response?.code ?: "network"}, streaming online instead")
+                        when {
+                            response == null ->
+                                log.w("offline licence network failed, streaming online instead")
+                            // A 4xx means the endpoint rejected the request
+                            // itself (offline type = 400 on this endpoint),
+                            // which is stable behaviour, not a hiccup.
+                            response.code in 400..499 -> refused(context, "http=${response.code}")
+                            else ->
+                                log.w("offline licence http=${response.code}, streaming online instead")
+                        }
                         return@withContext null
                     }
                     val keySetId = runCatching { drm.provideKeyResponse(session, body.bytes) }
                         .getOrNull()
                         ?.takeIf { it.isNotEmpty() }
                     if (keySetId == null) {
-                        refused("the licence carries no key set")
+                        refused(context, "the licence carries no key set")
                         return@withContext null
                     }
                     val policy = LicencePolicy.policyOf(body.bytes)
                     if (policy != null && policy[2] == 0L) {
-                        refused("the policy forbids persistence (persist=0)")
+                        refused(context, "the policy forbids persistence (persist=0)")
                         return@withContext null
                     }
                     LicenseGate.clear()
