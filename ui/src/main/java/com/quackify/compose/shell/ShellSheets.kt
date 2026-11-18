@@ -146,6 +146,9 @@ internal fun ShellSheets(
     onAlbumRadio: (() -> Unit)? = null,
     onAddToPlaylistFromAlbum: (() -> Unit)? = null,
     onAddToPlaylistFromTrack: (() -> Unit)? = null,
+    onAddPlaylistToAnother: (() -> Unit)? = null,
+    onPlaylistMoveToFolder: (() -> Unit)? = null,
+    canPlaylistMoveToFolder: Boolean = false,
 ) {
     ShellProfileSheets(
         flags = flags,
@@ -231,6 +234,9 @@ internal fun ShellSheets(
         onAlbumRadio = onAlbumRadio,
         onAddToPlaylistFromAlbum = onAddToPlaylistFromAlbum,
         onAddToPlaylistFromTrack = onAddToPlaylistFromTrack,
+        onAddPlaylistToAnother = onAddPlaylistToAnother,
+        onPlaylistMoveToFolder = onPlaylistMoveToFolder,
+        canPlaylistMoveToFolder = canPlaylistMoveToFolder,
     )
 
     ShellLibrarySheets(
@@ -380,6 +386,9 @@ private fun ShellEntityOptionsSheets(
     onAlbumRadio: (() -> Unit)?,
     onAddToPlaylistFromAlbum: (() -> Unit)?,
     onAddToPlaylistFromTrack: (() -> Unit)? = null,
+    onAddPlaylistToAnother: (() -> Unit)? = null,
+    onPlaylistMoveToFolder: (() -> Unit)? = null,
+    canPlaylistMoveToFolder: Boolean = false,
 ) {
     TrackOptionsSheet(
         track = selectedTrack,
@@ -417,6 +426,14 @@ private fun ShellEntityOptionsSheets(
         onSaveToggle = onTogglePlaylistSaved,
         canDeletePlaylist = playlistEditable,
         onDeletePlaylist = onDeletePlaylist,
+        onAddToPlaylist = onAddPlaylistToAnother?.let { handler ->
+            {
+                // Only real playlists offer adding their tracks elsewhere.
+                if (playlistEntity?.uri?.startsWith("spotify:playlist:") == true) handler()
+            }
+        },
+        canMoveToFolder = canPlaylistMoveToFolder,
+        onMoveToFolder = onPlaylistMoveToFolder ?: {},
         onCopyLink = { playlistEntity?.uri?.let(onCopyLink) },
         onShare = { playlistEntity?.uri?.let(onShare) }
     )
