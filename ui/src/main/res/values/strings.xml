@@ -23,6 +23,8 @@
     <string name="logcat_reset_filters">Filter options</string>
     <string name="about_the_artist">About the artist</string>
     <string name="account">Account</string>
+    <string name="remove_account_title">Remove account?</string>
+    <string name="remove_account_message_suffix">" will be removed and signed out on this device. Log in again anytime to add it back."</string>
     <string name="accounts">Accounts</string>
     <string name="active_device">Active Device</string>
     <string name="add">Add</string>
