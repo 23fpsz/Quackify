@@ -819,6 +819,7 @@ fun EncoreAppShell(
             savedAccounts = savedAccounts,
             activeAccountId = activeAccountId,
             playlistDetail = playlistDetail,
+            playlistTracks = playlistTracks,
             playlistSaved = playlistSaved,
             albumDetail = albumDetail,
             albumSaved = albumSaved,

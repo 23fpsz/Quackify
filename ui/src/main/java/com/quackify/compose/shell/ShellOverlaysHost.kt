@@ -54,6 +54,7 @@ internal class ShellOverlaysEnv(
     val trackCredits: Credits?,
     val addToPlaylistChoices: List<PlaylistChoice>?,
     val albumTracks: List<TrackItem>?,
+    val playlistTracks: List<TrackItem>? = null,
     val onPickPlaylist: ((PlaylistChoice, TrackItem) -> Unit)?,
     val onTogglePlaylist: ((PlaylistChoice, TrackItem, Boolean) -> Unit)?,
     val onLoadPlaylistFolder: (suspend (trackUri: String, folderUri: String) -> List<PlaylistChoice>)?,
@@ -115,6 +116,7 @@ internal fun ShellOverlaysHost(env: ShellOverlaysEnv) {
         trackCredits = env.trackCredits,
         addToPlaylistChoices = env.addToPlaylistChoices,
         albumTracks = env.albumTracks,
+        playlistTracks = env.playlistTracks,
         onPickPlaylist = env.onPickPlaylist,
         onTogglePlaylist = env.onTogglePlaylist,
         onLoadPlaylistFolder = env.onLoadPlaylistFolder,
@@ -217,6 +219,7 @@ internal fun ShellOverlaySheets(
     trackCredits: Credits?,
     addToPlaylistChoices: List<PlaylistChoice>?,
     albumTracks: List<TrackItem>?,
+    playlistTracks: List<TrackItem>? = null,
     onPickPlaylist: ((PlaylistChoice, TrackItem) -> Unit)?,
     onTogglePlaylist: ((PlaylistChoice, TrackItem, Boolean) -> Unit)?,
     onLoadPlaylistFolder: (suspend (trackUri: String, folderUri: String) -> List<PlaylistChoice>)?,
@@ -301,8 +304,12 @@ internal fun ShellOverlaySheets(
             onPick = { choice ->
                 val target = local.addTrackTarget
                 if (target != null) {
-                    if (target.uri.startsWith("spotify:album:")) {
-                        val rows = albumTracks.orEmpty()
+                    val rows = when {
+                        target.uri.startsWith("spotify:album:") -> albumTracks.orEmpty()
+                        target.uri.startsWith("spotify:playlist:") -> playlistTracks.orEmpty()
+                        else -> emptyList()
+                    }.filter { it.uri.startsWith("spotify:track:") }
+                    if (rows.isNotEmpty()) {
                         rows.forEach { row -> onPickPlaylist?.invoke(choice, row) }
                     } else {
                         onPickPlaylist?.invoke(choice, target)
@@ -312,8 +319,12 @@ internal fun ShellOverlaySheets(
             onToggle = { choice, isAdding ->
                 val target = local.addTrackTarget
                 if (target != null) {
-                    if (target.uri.startsWith("spotify:album:")) {
-                        val rows = albumTracks.orEmpty()
+                    val rows = when {
+                        target.uri.startsWith("spotify:album:") -> albumTracks.orEmpty()
+                        target.uri.startsWith("spotify:playlist:") -> playlistTracks.orEmpty()
+                        else -> emptyList()
+                    }.filter { it.uri.startsWith("spotify:track:") }
+                    if (rows.isNotEmpty()) {
                         rows.forEach { row ->
                             onTogglePlaylist?.invoke(choice, row, isAdding)
                                 ?: if (isAdding) onPickPlaylist?.invoke(choice, row) else Unit

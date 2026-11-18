@@ -59,6 +59,8 @@ internal class ShellSheetsEnv(
     val savedAccounts: List<EncoreAuth.Account>,
     val activeAccountId: String,
     val playlistDetail: CollectionDetail?,
+    val playlistTracks: List<TrackItem>? = null,
+    val libraryFolderChoices: List<Pair<String, String>> = emptyList(),
     val playlistSaved: Boolean?,
     val albumDetail: AlbumDetail?,
     val albumSaved: Boolean?,
@@ -472,6 +474,37 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
                 local.addTrackTarget = track
                 flags.isAddToPlaylistOpen = true
             }
-        }
+        },
+        onAddPlaylistToAnother = {
+            val uri = active.playlistUri
+            val rows = env.playlistTracks.orEmpty().filter { it.uri.startsWith("spotify:track:") }
+            if (uri.startsWith("spotify:playlist:") && rows.isNotEmpty()) {
+                flags.isPlaylistOptionsOpen = false
+                // The stand-in carries the playlist URI; the Save in sheet
+                // expands it back into these rows when a destination is
+                // picked, mirroring how albums add their whole track list.
+                val standIn = TrackItem(
+                    title = active.playlistTitle,
+                    artist = env.playlistDetail?.creator.orEmpty(),
+                    uri = uri,
+                )
+                env.onAddToPlaylist?.invoke(rows.first())
+                local.addTrackTarget = standIn
+                flags.isAddToPlaylistOpen = true
+            }
+        },
+        onPlaylistMoveToFolder = {
+            val uri = active.playlistUri
+            if (uri.startsWith("spotify:playlist:")) {
+                flags.isPlaylistOptionsOpen = false
+                local.folderDraft = FolderDraft(
+                    mode = FolderMode.PICKER,
+                    folderUri = uri,
+                    title = active.playlistTitle,
+                    folders = env.libraryFolderChoices,
+                )
+            }
+        },
+        canPlaylistMoveToFolder = active.playlistUri.startsWith("spotify:playlist:")
     )
 }
