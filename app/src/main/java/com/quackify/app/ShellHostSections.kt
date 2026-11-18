@@ -177,7 +177,13 @@ internal fun MainActivity.rememberNowPlayingData(
             nowPlayingArtistUri in inLibrary
         })
     }
-    LaunchedEffect(playback?.trackUri, LyricsOptions.translationEnabled, LyricsOptions.translationLanguage) {
+    LaunchedEffect(
+        playback?.trackUri,
+        LyricsOptions.translationEnabled,
+        LyricsOptions.translationLanguage,
+        LyricsOptions.prioritizeWordSynced,
+        LyricsOptions.providerOrder,
+    ) {
         val uri = playback?.trackUri.orEmpty()
         if (!uri.startsWith("spotify:track:")) {
             writers.setLyrics(null)
