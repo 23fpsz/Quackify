@@ -145,6 +145,7 @@ internal fun ShellSheets(
     onSongRadio: (() -> Unit)? = null,
     onAlbumRadio: (() -> Unit)? = null,
     onAddToPlaylistFromAlbum: (() -> Unit)? = null,
+    onAddToPlaylistFromTrack: (() -> Unit)? = null,
 ) {
     ShellProfileSheets(
         flags = flags,
@@ -229,6 +230,7 @@ internal fun ShellSheets(
         onSongRadio = onSongRadio,
         onAlbumRadio = onAlbumRadio,
         onAddToPlaylistFromAlbum = onAddToPlaylistFromAlbum,
+        onAddToPlaylistFromTrack = onAddToPlaylistFromTrack,
     )
 
     ShellLibrarySheets(
@@ -377,6 +379,7 @@ private fun ShellEntityOptionsSheets(
     onSongRadio: (() -> Unit)?,
     onAlbumRadio: (() -> Unit)?,
     onAddToPlaylistFromAlbum: (() -> Unit)?,
+    onAddToPlaylistFromTrack: (() -> Unit)? = null,
 ) {
     TrackOptionsSheet(
         track = selectedTrack,
@@ -397,6 +400,7 @@ private fun ShellEntityOptionsSheets(
         isTasteExcluded = trackTasteExcluded,
         onToggleTasteExclusion = onToggleTasteExclusion,
         onRemoveFromPlaylist = onRemoveTrackFromPlaylist,
+        onAddToPlaylist = onAddToPlaylistFromTrack,
         onSongRadio = onSongRadio,
         lyricsUnderCoverAvailable = lyricsUnderCoverAvailable,
         isLyricsUnderCoverEnabled = isLyricsUnderCoverEnabled,
