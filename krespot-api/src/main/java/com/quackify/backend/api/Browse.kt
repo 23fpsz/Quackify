@@ -92,13 +92,18 @@ object Browse {
         val container = browse.optJSONObject("sections")
         val items = container?.optJSONArray("items") ?: JSONArray()
         val sections = ArrayList<BrowseSection>()
+        val loose = ArrayList<BrowseCard>()
         var skipped = 0
         for (i in 0 until items.length()) {
             val node = items.optJSONObject(i) ?: continue
             val content = node.optJSONObject("sectionItems")?.optJSONArray("items")
             if (content == null) {
-                card(node)?.let { sections += BrowseSection(title = "", cards = listOf(it)) }
+                card(node)?.let(loose::add)
                 continue
+            }
+            if (loose.isNotEmpty()) {
+                sections += BrowseSection(title = "", cards = loose.toList())
+                loose.clear()
             }
             val label = node.optJSONObject("data")?.optJSONObject("title")
                 ?: node.optJSONObject("title")
@@ -112,6 +117,9 @@ object Browse {
                 continue
             }
             sections += BrowseSection(title = title, cards = cards)
+        }
+        if (loose.isNotEmpty()) {
+            sections += BrowseSection(title = "", cards = loose.toList())
         }
         val next = container?.optJSONObject("pagingInfo")?.optInt("nextOffset", -1) ?: -1
         val page = BrowsePage(
