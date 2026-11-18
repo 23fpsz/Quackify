@@ -351,7 +351,8 @@ fun EncoreNowPlayingScreen(
     val activeLyricIndex = remember(currentPositionMs, lyrics) {
         lyrics.indexOfLast { currentPositionMs >= it.startTimeMs }.coerceAtLeast(0)
     }
-    val activeLyricLine = lyrics.getOrNull(activeLyricIndex)?.text.orEmpty()
+    val activeLyricLine = lyrics.getOrNull(activeLyricIndex)
+    val activeLyricText = activeLyricLine?.text.orEmpty()
 
     val activeTranscriptIndex = remember(currentPositionMs, transcript) {
         transcript.indexOfLast { currentPositionMs >= it.startMs }.coerceAtLeast(0)
@@ -369,7 +370,7 @@ fun EncoreNowPlayingScreen(
     }
 
     val effectiveIsLoading = isLoading
-    val lyricsAvailable = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
+    val lyricsAvailable = lyrics.isNotEmpty() && activeLyricText.isNotBlank()
     val effectiveLyricsVisible = lyricsAvailable
     val previewLyricVisible = effectiveLyricsVisible && showLyricsPreview
     val transcriptAvailable = transcript.isNotEmpty()
@@ -678,7 +679,7 @@ fun EncoreNowPlayingScreen(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         NowPlayingSyncedLyricLine(
-                            lyricText = activeLyricLine,
+                            lyricText = activeLyricText,
                             visible = previewLyricVisible,
                             height = if (previewLyricVisible) 44.dp else 0.dp,
                             onOpenLyrics = { isLyricsFullscreen = true }
@@ -775,6 +776,7 @@ fun EncoreNowPlayingScreen(
                             visible = lyricsAvailable,
                             lyrics = lyrics,
                             activeIndex = activeLyricIndex,
+                            positionMs = currentPositionMs,
                             dominantColor = dynamicArtworkColor,
                             peekHeight = LANDSCAPE_LYRICS_PEEK_HEIGHT,
                             onOpenLyrics = { isLyricsFullscreen = true },
@@ -902,7 +904,7 @@ fun EncoreNowPlayingScreen(
                         ) {
                             if (!videoActive) {
                                 NowPlayingSyncedLyricLine(
-                                    lyricText = activeLyricLine,
+                                    lyricText = activeLyricText,
                                     visible = previewLyricVisible,
                                     height = lyricLineHeight,
                                     onOpenLyrics = { isLyricsFullscreen = true }
@@ -1020,6 +1022,7 @@ fun EncoreNowPlayingScreen(
                                 visible = lyricsAvailable && canvasControlsShown,
                                 lyrics = lyrics,
                                 activeIndex = activeLyricIndex,
+                                positionMs = currentPositionMs,
                                 dominantColor = dynamicArtworkColor,
                                 onOpenLyrics = { isLyricsFullscreen = true },
                                 onShareLyrics = { isLyricsShareOpen = true }
@@ -2333,6 +2336,7 @@ private fun NowPlayingLyricsCard(
     visible: Boolean,
     lyrics: List<TimeSyncedLyric>,
     activeIndex: Int,
+    positionMs: Long,
     dominantColor: Color,
     onOpenLyrics: () -> Unit,
     onShareLyrics: () -> Unit,
@@ -2411,22 +2415,38 @@ private fun NowPlayingLyricsCard(
                 ) {
                     itemsIndexed(lyrics) { i, lyric ->
                         val isActive = i == activeIndex
-                        Text(
-                            text = lyric.text,
-                            style = EncoreTheme.typography.titleMedium.copy(
-                                fontSize = if (isActive) lyricFontSize * 1.02f else lyricFontSize,
-                                lineHeight = 31.sp,
-                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
-                                color = when {
-                                    isActive -> ink.copy(alpha = 0.95f)
-                                    i < activeIndex -> ink.copy(alpha = 0.45f)
-                                    else -> ink.copy(alpha = 0.55f)
-                                }
-                            ),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
+                        if (isActive && lyric.isWordSynced) {
+                            WordSyncedLyricText(
+                                lyric = lyric,
+                                positionMs = positionMs,
+                                sungColor = ink,
+                                unsungColor = ink.copy(alpha = 0.55f),
+                                style = EncoreTheme.typography.titleMedium.copy(
+                                    fontSize = lyricFontSize * 1.02f,
+                                    lineHeight = 31.sp,
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                                maxLines = 2,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        } else {
+                            Text(
+                                text = lyric.text,
+                                style = EncoreTheme.typography.titleMedium.copy(
+                                    fontSize = if (isActive) lyricFontSize * 1.02f else lyricFontSize,
+                                    lineHeight = 31.sp,
+                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = when {
+                                        isActive -> ink.copy(alpha = 0.95f)
+                                        i < activeIndex -> ink.copy(alpha = 0.45f)
+                                        else -> ink.copy(alpha = 0.55f)
+                                    }
+                                ),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -2656,19 +2676,37 @@ private fun FullscreenLyricsView(
         ) {
             itemsIndexed(lyrics) { index, line ->
                 val isCurrentLine = index == activeIndex
-                Text(
-                    text = line.text,
-                    style = EncoreTheme.typography.titleLarge.copy(
-                        fontSize = 24.sp,
-                        lineHeight = 34.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isCurrentLine) ink else ink.copy(alpha = 0.35f)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSeekMs(line.startTimeMs) }
-                        .padding(vertical = EncoreSpacers.Tighter)
-                )
+                if (isCurrentLine && line.isWordSynced) {
+                    WordSyncedLyricText(
+                        lyric = line,
+                        positionMs = currentPositionMs,
+                        sungColor = ink,
+                        unsungColor = ink.copy(alpha = 0.35f),
+                        style = EncoreTheme.typography.titleLarge.copy(
+                            fontSize = 24.sp,
+                            lineHeight = 34.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSeekMs(line.startTimeMs) }
+                            .padding(vertical = EncoreSpacers.Tighter)
+                    )
+                } else {
+                    Text(
+                        text = line.text,
+                        style = EncoreTheme.typography.titleLarge.copy(
+                            fontSize = 24.sp,
+                            lineHeight = 34.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isCurrentLine) ink else ink.copy(alpha = 0.35f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSeekMs(line.startTimeMs) }
+                            .padding(vertical = EncoreSpacers.Tighter)
+                    )
+                }
             }
         }
     }

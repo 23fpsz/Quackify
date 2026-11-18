@@ -12,6 +12,7 @@ import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.EpisodeTranscript
 import com.quackify.backend.model.SearchKind
 import com.quackify.backend.model.TrackLyrics
+import com.quackify.compose.player.LyricsOptions
 import com.quackify.compose.home.HomeShelf
 import com.quackify.compose.home.QuickAccessItem
 import com.quackify.compose.home.toFavoriteArtistsShelf
@@ -182,7 +183,24 @@ internal fun MainActivity.rememberNowPlayingData(
             writers.setLyrics(null)
             return@LaunchedEffect
         }
-        writers.setLyrics(Krespot.lyrics.lyrics(this@rememberNowPlayingData, uri))
+        val bridge = PlaybackHost.bridge
+        val duration = bridge?.progressSnapshot?.durationMs ?: 0L
+        val repository = Krespot.lyricsRepository
+        val result = repository.lyrics(
+            context = this@rememberNowPlayingData,
+            trackUri = uri,
+            title = playback?.title.orEmpty(),
+            artist = playback?.artist.orEmpty(),
+            durationMs = duration,
+            sources = LyricsOptions.providerOrder.toSet(),
+            order = LyricsOptions.providerOrder,
+            prioritizeWordSynced = LyricsOptions.prioritizeWordSynced,
+        )
+        if (result != null) {
+            writers.setLyrics(repository.asTrackLyrics(result))
+        } else {
+            writers.setLyrics(Krespot.lyrics.lyrics(this@rememberNowPlayingData, uri))
+        }
     }
     LaunchedEffect(playback?.trackUri) {
         val uri = playback?.trackUri.orEmpty()

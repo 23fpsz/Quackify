@@ -85,6 +85,8 @@ import com.quackify.compose.home.toTrackItem
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.library.LibraryItemType
 import com.quackify.compose.player.TimeSyncedLyric
+import com.quackify.compose.player.LyricWordSpan
+import com.quackify.compose.player.LyricSyllableSpan
 import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.player.TranscriptWordSpan
 import com.quackify.compose.playlist.TrackItem
@@ -1526,8 +1528,24 @@ class MainActivity : ComponentActivity() {
         nowPlayingArtistImageUrl = nowPlayingArtist?.imageUrl?.takeIf { it.isNotBlank() },
         nowPlayingArtistFollowed = nowPlayingArtistFollowed,
         nowPlayingLyrics = remember(nowPlayingLyrics) {
-            nowPlayingLyrics?.lines?.map {
-                TimeSyncedLyric(it.startTimeMs, it.text)
+            val lyrics = nowPlayingLyrics
+            lyrics?.lines?.mapIndexed { index, line ->
+                val timings = lyrics.wordTimings.getOrNull(index)
+                TimeSyncedLyric(
+                    startTimeMs = line.startTimeMs,
+                    text = line.text,
+                    words = timings?.words?.map { word ->
+                        LyricWordSpan(
+                            startMs = word.startMs,
+                            endMs = word.endMs,
+                            text = word.text,
+                            syllables = word.syllables.map { s ->
+                                LyricSyllableSpan(s.startMs, s.endMs, s.startChar, s.endChar)
+                            },
+                        )
+                    }.orEmpty(),
+                    sungUntilMs = timings?.sungUntilMs,
+                )
             }.orEmpty()
         },
         nowPlayingTranscript = remember(nowPlayingTranscript) {

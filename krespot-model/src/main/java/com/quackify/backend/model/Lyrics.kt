@@ -24,9 +24,29 @@ data class TrackLyrics(
     val lines: List<LyricLine>,
     val provider: String,
     val synced: Boolean,
+    val wordTimings: List<WordTimings> = emptyList(),
 )
 
 data class LyricLine(
     val startTimeMs: Long,
     val text: String,
+)
+
+data class WordTimings(
+    val words: List<WordTiming> = emptyList(),
+    val sungUntilMs: Long? = null,
+)
+
+data class WordTiming(
+    val startMs: Long,
+    val endMs: Long,
+    val text: String,
+    val syllables: List<SyllableTiming> = emptyList(),
+)
+
+data class SyllableTiming(
+    val startMs: Long,
+    val endMs: Long,
+    val startChar: Int,
+    val endChar: Int,
 )

@@ -178,6 +178,12 @@
     <string name="lyrics_show_desc">Show the synced lyrics of the playing track</string>
     <string name="lyrics_preview">Line above the title</string>
     <string name="lyrics_preview_desc">Show the current lyric line above the track title</string>
+    <string name="lyrics_prioritize_word_synced">Prioritize word-synced lyrics</string>
+    <string name="lyrics_prioritize_word_synced_desc">Keep searching other sources for word-by-word timing when the top source only has line-synced lyrics</string>
+    <string name="lyrics_source">Lyrics source</string>
+    <string name="lyrics_source_desc">Tap a source to move it to the top. Sources are tried in this order.</string>
+    <string name="lyrics_provider_word_synced">Word-synced</string>
+    <string name="lyrics_provider_line_synced">Line-synced</string>
     <string name="minutes_played">Minutes played</string>
     <string name="more">More</string>
     <string name="more_like_this">More Like This</string>
