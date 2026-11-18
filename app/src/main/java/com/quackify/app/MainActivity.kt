@@ -731,11 +731,12 @@ class MainActivity : ComponentActivity() {
                 LibraryItem(
                     title = item.title,
                     subtitle = item.subtitle,
-                    type = when (item.kind) {
-                        ShelfKind.ARTIST -> LibraryItemType.ARTIST
-                        ShelfKind.ALBUM -> LibraryItemType.ALBUM
-                        ShelfKind.FOLDER -> LibraryItemType.FOLDER
-                        ShelfKind.SHOW, ShelfKind.EPISODE -> LibraryItemType.PODCAST
+                    type = when {
+                        item.uri.startsWith("spotify:show:") -> LibraryItemType.PODCAST
+                        item.kind == ShelfKind.ARTIST -> LibraryItemType.ARTIST
+                        item.kind == ShelfKind.ALBUM -> LibraryItemType.ALBUM
+                        item.kind == ShelfKind.FOLDER -> LibraryItemType.FOLDER
+                        item.kind == ShelfKind.SHOW || item.kind == ShelfKind.EPISODE -> LibraryItemType.PODCAST
                         else -> LibraryItemType.PLAYLIST
                     },
                     uri = item.uri,
