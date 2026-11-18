@@ -56,7 +56,7 @@ internal class ShellHosts(
     val handlePodcastOpen: (String, String) -> Unit,
     val openArtist: (String, String) -> Unit,
     val openAlbum: (String, String, String) -> Unit,
-    val openPlaylist: (String, String) -> Unit,
+    val openPlaylist: (String, String, String?) -> Unit,
     val openShow: (String) -> Unit,
     val openEpisode: (String) -> Unit,
     val openUserProfile: (String, String) -> Unit,
