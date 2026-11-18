@@ -42,6 +42,7 @@ import com.quackify.backend.connect.command.AudioFile
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.api.AudioFeatures
+import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.store.AppPrefs
 
 private val log = Logs.of(Logs.Module.PLAYER)
@@ -100,7 +101,15 @@ data class PlayerState(
     val isVideo: Boolean = false,
 )
 
+private fun resumeStoreFor(account: String): String =
+    if (account.isBlank()) PLAYER_PREFS else "$PLAYER_PREFS.$account"
+
 class KrespotPlayer(private val context: Context) {
+
+    // The resume point belongs to the account that played it, so a bridge
+    // minted after an account switch resumes that account's own last track
+    // instead of whatever the previous account left on this device.
+    private val resumeStore = resumeStoreFor(EncoreAuth.activeAccountId(context))
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -491,6 +500,7 @@ class KrespotPlayer(private val context: Context) {
     }
 
     init {
+        adoptLegacyResume()
         focus.onPause = {
             log.i("the audio focus went to another app, pausing")
             pausedByFocus = true
@@ -519,7 +529,7 @@ class KrespotPlayer(private val context: Context) {
 
     fun resumeLast(spclient: String) {
         scope.launch {
-            val prefs = com.quackify.backend.core.store.AppPrefs.prefs(context, PLAYER_PREFS)
+            val prefs = AppPrefs.prefs(context, resumeStore)
             val uri = prefs.getString(KEY_RESUME_URI, "").orEmpty()
             val file = prefs.getString(KEY_RESUME_FILE, "").orEmpty()
             val format = prefs.getInt(KEY_RESUME_FORMAT, 0)
@@ -538,6 +548,29 @@ class KrespotPlayer(private val context: Context) {
         }
     }
 
+    private fun adoptLegacyResume() {
+        if (resumeStore == PLAYER_PREFS) return
+        val legacy = AppPrefs.prefs(context, PLAYER_PREFS)
+        val uri = legacy.getString(KEY_RESUME_URI, "").orEmpty()
+        if (uri.startsWith("spotify:track:")) {
+            val scoped = AppPrefs.prefs(context, resumeStore)
+            if (scoped.getString(KEY_RESUME_URI, "").orEmpty().isBlank()) {
+                scoped.edit()
+                    .putString(KEY_RESUME_URI, uri)
+                    .putString(KEY_RESUME_FILE, legacy.getString(KEY_RESUME_FILE, "").orEmpty())
+                    .putInt(KEY_RESUME_FORMAT, legacy.getInt(KEY_RESUME_FORMAT, 0))
+                    .putLong(KEY_RESUME_AT, legacy.getLong(KEY_RESUME_AT, 0L))
+                    .apply()
+            }
+        }
+        legacy.edit()
+            .remove(KEY_RESUME_URI)
+            .remove(KEY_RESUME_FILE)
+            .remove(KEY_RESUME_FORMAT)
+            .remove(KEY_RESUME_AT)
+            .apply()
+    }
+
     private fun persistResume() {
         val current = _state.value
         val file = current.fileId
@@ -547,7 +580,7 @@ class KrespotPlayer(private val context: Context) {
         ) return
         resumeWrittenUri = current.trackUri
         resumeWrittenMs = current.positionMs
-        com.quackify.backend.core.store.AppPrefs.prefs(context, PLAYER_PREFS).edit()
+        AppPrefs.prefs(context, resumeStore).edit()
             .putString(KEY_RESUME_URI, current.trackUri)
             .putString(KEY_RESUME_FILE, file)
             .putInt(KEY_RESUME_FORMAT, current.format)

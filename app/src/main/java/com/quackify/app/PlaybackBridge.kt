@@ -124,6 +124,20 @@ class PlaybackBridge(private val context: Context) {
 
     private val player = KrespotPlayer(context)
 
+    // The remembered queue and last track belong to the active account, so a
+    // bridge minted after a switch reads the new account's own session
+    // instead of inheriting the previous account's.
+    private val sessionAccount = EncoreAuth.activeAccountId(context)
+
+    private val chainContextKey = scopedSessionKey(CHAIN_CONTEXT_PREF)
+
+    private val chainRowsKey = scopedSessionKey(CHAIN_ROWS_PREF)
+
+    private val lastArtistKey = scopedSessionKey(LAST_TRACK_ARTIST_PREF)
+
+    private fun scopedSessionKey(base: String): String =
+        if (sessionAccount.isBlank()) base else "$base.$sessionAccount"
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private var dealer: Job? = null
@@ -796,6 +810,7 @@ class PlaybackBridge(private val context: Context) {
 
     fun start() {
         if (dealer != null) return
+        adoptLegacySessionPrefs()
         log.i("start device=" + deviceId)
         (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
             ?.registerAudioDeviceCallback(localOutputWatcher, Handler(Looper.getMainLooper()))
@@ -826,7 +841,7 @@ class PlaybackBridge(private val context: Context) {
                 player.resumeLast(connect.spclientHost)
                 banWarm.await()
                 val savedArtist = com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
-                    .getString(LAST_TRACK_ARTIST_PREF, "").orEmpty()
+                    .getString(lastArtistKey, "").orEmpty()
                 if (savedArtist.isNotBlank() && ArtistBanStore.bannedCached(savedArtist)) {
                     log.i("resume: the saved track's artist '$savedArtist' is banned, the warm source stays unused")
                 }
@@ -958,7 +973,7 @@ class PlaybackBridge(private val context: Context) {
                     state = next
                     if (next.trackUri.startsWith("spotify:track:") && next.artistUri.isNotBlank()) {
                         com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS).edit()
-                            .putString(LAST_TRACK_ARTIST_PREF, next.artistUri)
+                            .putString(lastArtistKey, next.artistUri)
                             .apply()
                     }
                     if (local && waiting != null) {
@@ -4105,6 +4120,27 @@ class PlaybackBridge(private val context: Context) {
         return ""
     }
 
+    private fun adoptLegacySessionPrefs() {
+        if (sessionAccount.isBlank()) return
+        val prefs = com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
+        if (prefs.getString(chainContextKey, "").orEmpty().isNotBlank()) {
+            prefs.edit()
+                .remove(CHAIN_CONTEXT_PREF)
+                .remove(CHAIN_ROWS_PREF)
+                .remove(LAST_TRACK_ARTIST_PREF)
+                .apply()
+            return
+        }
+        prefs.edit()
+            .putString(chainContextKey, prefs.getString(CHAIN_CONTEXT_PREF, "").orEmpty())
+            .putString(chainRowsKey, prefs.getString(CHAIN_ROWS_PREF, "").orEmpty())
+            .putString(lastArtistKey, prefs.getString(LAST_TRACK_ARTIST_PREF, "").orEmpty())
+            .remove(CHAIN_CONTEXT_PREF)
+            .remove(CHAIN_ROWS_PREF)
+            .remove(LAST_TRACK_ARTIST_PREF)
+            .apply()
+    }
+
     /**
      * The context this phone last played is the only clue a cold start has:
      * the cluster comes back with the track, the position and the context uri
@@ -4120,14 +4156,14 @@ class PlaybackBridge(private val context: Context) {
         rememberedRows = rows
         com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .edit()
-            .putString(CHAIN_CONTEXT_PREF, contextUri)
-            .putString(CHAIN_ROWS_PREF, rows.joinToString("\n"))
+            .putString(chainContextKey, contextUri)
+            .putString(chainRowsKey, rows.joinToString("\n"))
             .apply()
     }
 
     private fun restoredRows(): List<String> = com.quackify.backend.core.store.AppPrefs
         .prefs(context, CLIENT_PREFS)
-        .getString(CHAIN_ROWS_PREF, "").orEmpty()
+        .getString(chainRowsKey, "").orEmpty()
         .split("\n")
         .filter { it.startsWith("spotify:") }
 
@@ -4138,7 +4174,7 @@ class PlaybackBridge(private val context: Context) {
         val contextUri = fromCluster
             ?: rememberedChain.takeIf { usableContext(it) }
             ?: com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
-                .getString(CHAIN_CONTEXT_PREF, "").orEmpty().takeIf { usableContext(it) }
+                .getString(chainContextKey, "").orEmpty().takeIf { usableContext(it) }
             ?: return
         if (cluster.nextTracks.isNotEmpty()) return
         val anchor = cluster.track.uri
@@ -4146,7 +4182,7 @@ class PlaybackBridge(private val context: Context) {
         if (anchor in restoreTried) return
         restoreTried += anchor
         val keptFor = com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
-            .getString(CHAIN_CONTEXT_PREF, "").orEmpty()
+            .getString(chainContextKey, "").orEmpty()
         val remembered = if (keptFor == contextUri) restoredRows() else emptyList()
         if (remembered.isNotEmpty() && anchor in remembered) {
             chainRows = remembered
