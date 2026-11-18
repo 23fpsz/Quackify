@@ -166,6 +166,10 @@
     <string name="smart_shuffle_on">Aléatoire intelligent activé</string>
     <string name="autoplay">Lecture automatique</string>
     <string name="gapless_playback">Lecture sans coupure</string>
+    <string name="crossfade">Fondu enchaîné</string>
+    <string name="crossfade_off">Désactivé</string>
+    <string name="crossfade_seconds">%1$d s</string>
+    <string name="crossfade_subtitle">Fait fondre la fin de chaque morceau dans le suivant au lieu de changer de titre brutalement.</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">Activer Canvas</string>
     <string name="turn_off_canvas">Désactiver Canvas</string>

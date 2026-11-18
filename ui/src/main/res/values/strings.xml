@@ -77,6 +77,10 @@
     <string name="connected_devices">Connected devices</string>
     <string name="contributors">Contributors</string>
     <string name="copy_link">Copy link</string>
+    <string name="crossfade">Crossfade</string>
+    <string name="crossfade_off">Off</string>
+    <string name="crossfade_seconds">%1$d s</string>
+    <string name="crossfade_subtitle">Blend the end of each track into the next one instead of changing songs abruptly.</string>
     <string name="could_not_load_this_list">Could not load this list</string>
     <string name="could_not_load_this_section">Could not load this section</string>
     <string name="couldnt_load">Couldn\'t load</string>

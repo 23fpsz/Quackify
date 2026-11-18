@@ -166,6 +166,10 @@
     <string name="smart_shuffle_on">智能随机播放开</string>
     <string name="autoplay">自动播放</string>
     <string name="gapless_playback">无缝播放</string>
+    <string name="crossfade">交叉淡入淡出</string>
+    <string name="crossfade_off">关</string>
+    <string name="crossfade_seconds">%1$d 秒</string>
+    <string name="crossfade_subtitle">将每首歌曲的结尾与下一首自然混合，避免生硬的切换。</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">开启 Canvas</string>
     <string name="turn_off_canvas">关闭 Canvas</string>
