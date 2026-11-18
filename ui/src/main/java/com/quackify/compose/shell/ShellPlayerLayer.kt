@@ -168,14 +168,23 @@ internal fun BoxScope.ShellPlayerLayer(
     }
 
     if (!docked) {
-        // BackHandler is LIFO, and this layer composes after the screen
-        // content but before the sheets/overlays hosts - so this registration
-        // outranks screen-level handlers (Settings' category, a playlist's
-        // search mode) while sheets on top still win over it. In portrait the
-        // fullscreen player covers the screen, so back must collapse it
-        // before whatever sits underneath reacts.
-        BackHandler(enabled = env.isPlayerExpanded) {
-            env.setIsPlayerExpanded(false)
+        // Conditional composition, not `enabled = ...`: the back dispatcher
+        // is LIFO by the moment a callback is ADDED, and BackHandler adds its
+        // callback once, on first composition. A callback registered here at
+        // app start loses to any screen-level handler added later (Settings'
+        // category, a playlist's search mode), so the first back press
+        // navigated the screen hidden under the player and only the second
+        // one collapsed it. Composing the handler only while the player is
+        // actually expanded re-adds it at that moment, making it the newest
+        // callback - it then wins over those screen handlers. Handlers inside
+        // the player content (lyrics fullscreen) and the sheets/overlays
+        // hosts compose after this one, so they stay newer and still win.
+        // landscapeDual keeps the player as a persistent side pane rather
+        // than an overlay, so back there must keep navigating the content.
+        if (!landscapeDual && env.isPlayerExpanded && !env.flags.isLogcatOpen) {
+            BackHandler {
+                env.setIsPlayerExpanded(false)
+            }
         }
         NowPlayingScreenLayer(
             env = env,
