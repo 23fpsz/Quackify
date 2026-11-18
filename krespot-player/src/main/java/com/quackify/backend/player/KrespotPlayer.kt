@@ -266,7 +266,7 @@ class KrespotPlayer(private val context: Context) {
             if (still !== live || still.currentUri != askedFor || _state.value.trackUri != askedFor) {
                 return@launch
             }
-            if (!still.queueNext(track.uri, source, askedFor)) return@launch
+            if (!still.queueNext(track.uri, source, askedFor, file?.gainDb ?: 0.0)) return@launch
             SongCache.touch(track.uri, context)
             queuedNextUri = track.uri
             queuedNextTrack = track
@@ -279,6 +279,7 @@ class KrespotPlayer(private val context: Context) {
         queueTicket.incrementAndGet()
         queuedNextUri = ""
         queuedNextTrack = null
+        engine?.clearQueuedNext()
     }
 
     fun hasSourceFor(trackUri: String): Boolean = sourceFor(trackUri) != null

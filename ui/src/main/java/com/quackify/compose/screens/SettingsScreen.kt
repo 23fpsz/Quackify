@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -64,6 +66,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
 import android.widget.Toast
+import kotlin.math.roundToInt
 import com.quackify.compose.R
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.DeviceInfo
@@ -149,6 +152,9 @@ fun SettingsScreen(
     }
     var gapless by remember {
         mutableStateOf(clientPrefs.getBoolean("gaplessPlayback", false))
+    }
+    var crossfadeSeconds by remember {
+        mutableStateOf((clientPrefs.getInt("crossfadeMs", 0) / 1000).coerceIn(0, 12))
     }
     var pauseOnDisconnect by remember {
         mutableStateOf(clientPrefs.getBoolean("pauseOnDisconnect", true))
@@ -502,6 +508,21 @@ fun SettingsScreen(
                                 clientPrefs.edit().putBoolean("gaplessPlayback", on).apply()
                             }
                         )
+                        SettingsSliderRow(
+                            title = stringResource(R.string.crossfade),
+                            subtitle = stringResource(R.string.crossfade_subtitle),
+                            value = crossfadeSeconds,
+                            maxValue = 12,
+                            valueLabel = if (crossfadeSeconds == 0) {
+                                stringResource(R.string.crossfade_off)
+                            } else {
+                                stringResource(R.string.crossfade_seconds, crossfadeSeconds)
+                            },
+                            onValueChange = { seconds ->
+                                crossfadeSeconds = seconds
+                                clientPrefs.edit().putInt("crossfadeMs", seconds * 1000).apply()
+                            }
+                        )
                         SettingsToggleRow(
                             title = stringResource(R.string.pause_on_disconnect),
                             subtitle = stringResource(R.string.pause_when_the_bluetooth_usb_or_wired_audio),
@@ -767,6 +788,58 @@ private fun SettingsSectionHeader(title: String) {
         ),
         modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
     )
+}
+
+@Composable
+private fun SettingsSliderRow(
+    title: String,
+    subtitle: String,
+    value: Int,
+    maxValue: Int,
+    valueLabel: String,
+    onValueChange: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                style = EncoreTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium,
+                    color = EncoreColors.TextPrimary
+                )
+            )
+            Text(
+                text = valueLabel,
+                style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+            )
+        }
+        if (subtitle.isNotBlank()) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+            )
+        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onValueChange(it.roundToInt().coerceIn(0, maxValue)) },
+            valueRange = 0f..maxValue.toFloat(),
+            steps = maxValue - 1,
+            colors = SliderDefaults.colors(
+                thumbColor = EncoreColors.Green,
+                activeTrackColor = EncoreColors.Green,
+                inactiveTrackColor = EncoreColors.Card
+            )
+        )
+    }
 }
 
 @Composable

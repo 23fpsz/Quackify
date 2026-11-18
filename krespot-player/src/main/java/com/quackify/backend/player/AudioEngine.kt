@@ -39,6 +39,7 @@ import androidx.media3.exoplayer.drm.MediaDrmCallback
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
+import com.quackify.backend.core.store.AppPrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -54,6 +55,12 @@ import java.util.concurrent.CountDownLatch
 private val log = Logs.of(Logs.Module.PLAYER)
 
 private const val PROGRESS_MS = 500L
+
+private const val CLIENT_STORE = "quackify.client"
+
+private const val CROSSFADE_MS_PREF = "crossfadeMs"
+
+private const val MAX_CROSSFADE_MS = 12_000L
 
 internal object DrmLevel {
 
@@ -179,6 +186,10 @@ internal class AudioEngine(
 
     private var player: ExoPlayer? = null
 
+    private var sparePlayer: ExoPlayer? = null
+
+    private var crossfade: CrossfadeEngine? = null
+
     private var drmManager: DefaultDrmSessionManager? = null
 
     @Volatile
@@ -203,7 +214,13 @@ internal class AudioEngine(
         get() = runOnMain { player?.currentMediaItem?.mediaId }.orEmpty()
 
     val hasQueuedNext: Boolean
-        get() = runOnMain { player?.let { it.mediaItemCount > it.currentMediaItemIndex + 1 } } ?: false
+        get() {
+            val queued = runOnMain {
+                val p = player ?: return@runOnMain false
+                p.mediaItemCount > p.currentMediaItemIndex + 1
+            } ?: false
+            return queued || crossfade?.hasHold() == true
+        }
 
     @Volatile
     private var progressJob: Job? = null
@@ -219,6 +236,9 @@ internal class AudioEngine(
 
     @Volatile
     private var gainFactor = 1f
+
+    @Volatile
+    private var spareGainFactor = 1f
 
     val currentPositionMs: Long
         get() = runOnMain { player?.currentPosition } ?: lastPositionMs
@@ -239,6 +259,8 @@ internal class AudioEngine(
         gainDb: Double,
     ): Boolean =
         withContext(Dispatchers.Main) {
+            crossfade?.stop()
+            spareGainFactor = 1f
             val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
             val factory = ensureKit()
             val keySetId = offlineKeySetFor(source)
@@ -317,7 +339,7 @@ internal class AudioEngine(
      * again at transition time. [whileOn] is the uri the engine must still be
      * on when the item lands - the licence roundtrip can outlive a skip.
      */
-    suspend fun queueNext(uri: String, source: AudioSource, whileOn: String): Boolean {
+    suspend fun queueNext(uri: String, source: AudioSource, whileOn: String, gainDb: Double): Boolean {
         val keySetId = try {
             offlineKeySetFor(source)
         } catch (refusal: IOException) {
@@ -328,20 +350,36 @@ internal class AudioEngine(
             return false
         }
         if (keySetId != null) offlineKeySets[uri] = source.fileId else offlineKeySets.remove(uri)
+        val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
+        val item = itemFor(uri, source, keySetId)
+        val heldForFade = configuredCrossfadeMs() > 0L
         val added = runOnMain {
             val p = player ?: return@runOnMain false
             if (p.currentMediaItem?.mediaId != whileOn) return@runOnMain false
-            val current = p.currentMediaItemIndex
-            if (p.mediaItemCount > current + 1) p.removeMediaItems(current + 1, p.mediaItemCount)
-            p.addMediaItem(itemFor(uri, source, keySetId))
-            true
+            if (heldForFade) {
+                true
+            } else {
+                val current = p.currentMediaItemIndex
+                if (p.mediaItemCount > current + 1) p.removeMediaItems(current + 1, p.mediaItemCount)
+                p.addMediaItem(item)
+                true
+            }
         } ?: false
-        if (added) {
+        if (!added) return false
+        if (uri.isNotBlank()) itemDurations[uri] = totalMs
+        if (heldForFade) {
+            spareGainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
+            crossfadeEngine()?.hold(item, totalMs)
+            log.i(
+                "audio held next '$uri' '${source.fileId.take(12)}' for a crossfade " +
+                    if (source.seektable.pssh.isNotBlank()) "drm" else "clear"
+            )
+        } else {
             log.i("audio queued next '$uri' '${source.fileId.take(12)}' " +
                     if (source.seektable.pssh.isNotBlank()) "drm" else "clear"
             )
         }
-        return added
+        return true
     }
 
     fun skipTo(uri: String): Boolean {
@@ -399,7 +437,10 @@ internal class AudioEngine(
 
     fun seekTo(ms: Long) {
         lastPositionMs = ms
-        runOnMain { player?.seekTo(ms) }
+        runOnMain {
+            crossfade?.onUserSeek()
+            player?.seekTo(ms)
+        }
         onEvent?.invoke(PlayerEvent.Seeked(ms))
     }
 
@@ -419,7 +460,15 @@ internal class AudioEngine(
     }
 
     fun rate(mult: Float) {
-        runOnMain { player?.playbackParameters = PlaybackParameters(mult.coerceIn(0.5f, 3.5f)) }
+        runOnMain {
+            val parameters = PlaybackParameters(mult.coerceIn(0.5f, 3.5f))
+            player?.playbackParameters = parameters
+            sparePlayer?.playbackParameters = parameters
+        }
+    }
+
+    fun clearQueuedNext() {
+        runOnMain { crossfade?.dropHold() }
     }
 
     fun stop() {
@@ -429,7 +478,11 @@ internal class AudioEngine(
         lastItemUri = ""
         progressJob?.cancel()
         progressJob = null
-        runOnMain { player?.stop() }
+        runOnMain {
+            crossfade?.stop()
+            player?.stop()
+            sparePlayer?.stop()
+        }
     }
 
     fun release() {
@@ -440,8 +493,12 @@ internal class AudioEngine(
         progressJob?.cancel()
         progressJob = null
         runOnMain {
+            crossfade?.release()
+            crossfade = null
             player?.release()
             player = null
+            sparePlayer?.release()
+            sparePlayer = null
             drmManager?.release()
             drmManager = null
             kit = null
@@ -451,7 +508,67 @@ internal class AudioEngine(
     }
 
     private fun applyVolume() {
-        runOnMain { player?.volume = (duckLevel * userLevel * gainFactor).coerceIn(0f, 1f) }
+        runOnMain {
+            val cross = crossfade
+            if (cross != null) {
+                cross.applyVolumes(::volumeOf)
+            } else {
+                player?.let { it.volume = volumeOf(it) }
+            }
+        }
+    }
+
+    private fun volumeOf(p: ExoPlayer): Float {
+        val gain = if (p === player) gainFactor else if (p === sparePlayer) spareGainFactor else 1f
+        return (duckLevel * userLevel * gain).coerceIn(0f, 1f)
+    }
+
+    private fun configuredCrossfadeMs(): Long =
+        AppPrefs.getInt(context, CLIENT_STORE, CROSSFADE_MS_PREF, 0)
+            .toLong().coerceIn(0L, MAX_CROSSFADE_MS)
+
+    private fun ensureSparePlayer(): ExoPlayer {
+        sparePlayer?.let { return it }
+        val factory = ensureKit()
+        val built = ExoPlayer.Builder(context)
+            .setMediaSourceFactory(factory)
+            .build()
+        sparePlayer = built
+        log.i("spare player built for crossfades")
+        return built
+    }
+
+    private fun crossfadeEngine(): CrossfadeEngine? {
+        crossfade?.let { return it }
+        if (player == null) return null
+        val engine = CrossfadeEngine(
+            session = { player },
+            spare = { ensureSparePlayer() },
+            buildSource = { item -> ensureKit().createMediaSource(item) },
+            fadeMs = { configuredCrossfadeMs() },
+            sessionDurationMs = { durationMs },
+            baseVolume = ::volumeOf,
+            onEvent = { event -> onEvent(event) },
+            onHandoff = ::onCrossfadeHandoff,
+        )
+        crossfade = engine
+        return engine
+    }
+
+    private fun onCrossfadeHandoff(out: ExoPlayer, into: ExoPlayer, uri: String, durationMs: Long) {
+        out.removeListener(listener)
+        into.addListener(listener)
+        player = into
+        sparePlayer = out
+        lastItemUri = uri
+        announced = true
+        if (durationMs > 0L) {
+            this.durationMs = durationMs
+            itemDurations[uri] = durationMs
+        }
+        gainFactor = spareGainFactor
+        spareGainFactor = 1f
+        log.i("crossfade handed the session to '${uri.takeLast(12)}'")
     }
 
     private fun startProgress() {
@@ -499,6 +616,7 @@ internal class AudioEngine(
                     if (started) startProgress()
                 }
                 Player.STATE_ENDED -> {
+                    if (crossfade?.onSessionEnded() == true) return
                     lastPositionMs = durationMs
                     onEvent?.invoke(PlayerEvent.Ended(lastItemUri))
                     lastItemUri = ""

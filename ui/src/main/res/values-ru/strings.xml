@@ -166,6 +166,10 @@
     <string name="smart_shuffle_on">Умное перемешивание включено</string>
     <string name="autoplay">Автовоспроизведение</string>
     <string name="gapless_playback">Беспрерывное воспроизведение</string>
+    <string name="crossfade">Кроссфейд</string>
+    <string name="crossfade_off">Выкл.</string>
+    <string name="crossfade_seconds">%1$d с</string>
+    <string name="crossfade_subtitle">Плавно соединяет конец каждого трека с началом следующего вместо резкой смены песен.</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">Включить Canvas</string>
     <string name="turn_off_canvas">Выключить Canvas</string>

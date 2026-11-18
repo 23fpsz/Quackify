@@ -92,6 +92,9 @@ const val AUTOPLAY_ON_END_PREF = "autoplayOnEnd"
 /** Settings toggle: prebuffer the next track so transitions carry no silence. */
 const val GAPLESS_PREF = "gaplessPlayback"
 
+/** Settings slider: how long the crossfade between two tracks runs, in ms. */
+const val CROSSFADE_MS_PREF = "crossfadeMs"
+
 /** Settings toggle: pause when the BT, USB or wired audio output disconnects. */
 const val PAUSE_ON_DISCONNECT_PREF = "pauseOnDisconnect"
 
@@ -137,6 +140,13 @@ class PlaybackBridge(private val context: Context) {
         com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .getBoolean(GAPLESS_PREF, false)
 
+    private fun crossfadeMs(): Int =
+        com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
+            .getInt(CROSSFADE_MS_PREF, 0)
+
+    /** Either way of queuing the next track ahead: plain prebuffer or crossfade. */
+    private fun seamlessEnabled(): Boolean = gaplessEnabled() || crossfadeMs() > 0
+
     private fun pauseOnDisconnectEnabled(): Boolean =
         com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .getBoolean(PAUSE_ON_DISCONNECT_PREF, true)
@@ -171,7 +181,7 @@ class PlaybackBridge(private val context: Context) {
      * track the listener expected.
      */
     private fun peekNextTrack(ended: String): CommandTrack? {
-        if (!gaplessEnabled()) return null
+        if (!seamlessEnabled()) return null
         if (ended.isBlank() || ended.startsWith(AD_PREFIX)) return null
         val server = connect.cluster.value
         val context = chainContext.ifBlank { server?.contextUri.orEmpty() }
@@ -251,7 +261,7 @@ class PlaybackBridge(private val context: Context) {
 
     /** Queues the next track into the live engine so the handoff is seamless. */
     private fun queueGaplessNext(currentUri: String) {
-        if (!gaplessEnabled()) return
+        if (!seamlessEnabled()) return
         if (sleepEndOfTrackArmed) return
         val next = peekNextTrack(currentUri) ?: return
         if (!next.uri.startsWith("spotify:track:")) return
@@ -4464,7 +4474,7 @@ class PlaybackBridge(private val context: Context) {
                 is PlayerEvent.Seeked -> scope.launch { publishLocalFromEngine(event.positionMs) }
                 is PlayerEvent.Ended -> {
                     val ended = event.uri.ifBlank { player.state.value.trackUri }
-                    if (gaplessEnabled() && player.currentUri != ended) {
+                    if (seamlessEnabled() && player.currentUri != ended) {
                         log.i("player ended '$ended', the queued track takes over without a restart")
                         return
                     }
@@ -4586,7 +4596,7 @@ class PlaybackBridge(private val context: Context) {
                     val ended = event.uri.ifBlank {
                         command.currentTrack?.uri.orEmpty().ifBlank { player.state.value.trackUri }
                     }
-                    if (gaplessEnabled() && player.currentUri != ended) {
+                    if (seamlessEnabled() && player.currentUri != ended) {
                         log.i("player ended '$ended', the queued track takes over without a restart")
                         return@launch
                     }

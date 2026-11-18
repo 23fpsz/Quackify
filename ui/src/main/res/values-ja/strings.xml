@@ -166,6 +166,10 @@
     <string name="smart_shuffle_on">スマートシャッフルオン</string>
     <string name="autoplay">オートプレイ</string>
     <string name="gapless_playback">ギャップレス再生</string>
+    <string name="crossfade">クロスフェード</string>
+    <string name="crossfade_off">オフ</string>
+    <string name="crossfade_seconds">%1$d 秒</string>
+    <string name="crossfade_subtitle">曲が急に切り替わるのではなく、終わりを次の曲へなめらかにブレンドします。</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">Canvasをオン</string>
     <string name="turn_off_canvas">Canvasをオフ</string>

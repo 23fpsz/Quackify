@@ -166,6 +166,10 @@
     <string name="smart_shuffle_on">스마트 셔플 켬</string>
     <string name="autoplay">자동 재생</string>
     <string name="gapless_playback">갭리스 재생</string>
+    <string name="crossfade">크로스페이드</string>
+    <string name="crossfade_off">꺼짐</string>
+    <string name="crossfade_seconds">%1$d초</string>
+    <string name="crossfade_subtitle">곡이 갑자기 바뀌는 대신 끝부분을 다음 곡과 자연스럽게 섭어 재생합니다.</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">Canvas 켜기</string>
     <string name="turn_off_canvas">Canvas 끄기</string>

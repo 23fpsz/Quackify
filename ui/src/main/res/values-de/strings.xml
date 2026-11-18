@@ -166,6 +166,10 @@
     <string name="smart_shuffle_on">Smart Shuffle an</string>
     <string name="autoplay">Autoplay</string>
     <string name="gapless_playback">Lückenlose Wiedergabe</string>
+    <string name="crossfade">Crossfade</string>
+    <string name="crossfade_off">Aus</string>
+    <string name="crossfade_seconds">%1$d s</string>
+    <string name="crossfade_subtitle">Blendet das Ende jedes Titels in den nächsten über, statt Songs abrupt zu wechseln.</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">Canvas aktivieren</string>
     <string name="turn_off_canvas">Canvas deaktivieren</string>
