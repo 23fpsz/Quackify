@@ -73,7 +73,11 @@ import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.player.LyricsOptions
+import com.quackify.compose.player.TRANSLATION_DEVICE_LANGUAGE
 import com.quackify.compose.sheets.LyricsProviderSheet
+import com.quackify.compose.sheets.TranslationLanguageSheet
+import com.quackify.backend.library.lyrics.translationLanguageName
+import java.util.Locale
 import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import com.quackify.compose.widget.WidgetBackgroundStyle
@@ -133,6 +137,22 @@ fun SettingsScreen(
     val lyricsPreview = LyricsOptions.preview
     val lyricsPrioritizeWordSynced = LyricsOptions.prioritizeWordSynced
     val lyricsProviderOrder = LyricsOptions.providerOrder
+    val lyricsTranslationEnabled = LyricsOptions.translationEnabled
+    val lyricsTranslationLanguage = LyricsOptions.translationLanguage
+    val translationLanguageLabel = remember(lyricsTranslationLanguage) {
+        if (lyricsTranslationLanguage == TRANSLATION_DEVICE_LANGUAGE) {
+            context.getString(
+                R.string.lyrics_translation_device_language,
+                context.resources.configuration.locales[0]?.displayLanguage
+                    ?.takeIf { it.isNotBlank() } ?: Locale.getDefault().displayLanguage,
+            )
+        } else {
+            translationLanguageName(
+                lyricsTranslationLanguage,
+                context.resources.configuration.locales[0] ?: Locale.getDefault(),
+            )
+        }
+    }
     val account = remember { EncoreAuth.account(context) }
     val version = remember {
         runCatching {
@@ -178,6 +198,7 @@ fun SettingsScreen(
     var widgetOptions by remember { mutableStateOf(WidgetOptionsStore.load(context)) }
     var category by remember { mutableStateOf<Int?>(null) }
     var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
+    var translationLanguageSheetOpen by remember { mutableStateOf(false) }
 
     BackHandler(enabled = category != null) {
         category = null
@@ -370,6 +391,57 @@ fun SettingsScreen(
                                 text = lyricsProviderOrder.firstOrNull()?.label.orEmpty(),
                                 style = EncoreTheme.typography.bodySmallBold.copy(
                                     color = if (lyricsEnabled) EncoreColors.Green
+                                    else EncoreColors.TextSecondary
+                                )
+                            )
+                        }
+                        SettingsToggleRow(
+                            title = stringResource(R.string.lyrics_translation),
+                            subtitle = stringResource(R.string.lyrics_translation_desc),
+                            isChecked = lyricsTranslationEnabled,
+                            enabled = lyricsEnabled,
+                            onCheckedChange = { on ->
+                                LyricsOptions.setTranslationEnabled(context, on)
+                            }
+                        )
+                        if (translationLanguageSheetOpen) {
+                            TranslationLanguageSheet(
+                                selectedCode = lyricsTranslationLanguage,
+                                onLanguageSelected = { code ->
+                                    LyricsOptions.setTranslationLanguage(context, code)
+                                },
+                                onDismiss = { translationLanguageSheetOpen = false }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(
+                                    enabled = lyricsEnabled && lyricsTranslationEnabled
+                                ) { translationLanguageSheetOpen = true }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                                Text(
+                                    text = stringResource(R.string.lyrics_translation_language),
+                                    style = EncoreTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (lyricsEnabled && lyricsTranslationEnabled) EncoreColors.TextPrimary
+                                        else EncoreColors.TextSecondary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = stringResource(R.string.lyrics_translation_language_desc),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
+                            Text(
+                                text = translationLanguageLabel,
+                                style = EncoreTheme.typography.bodySmallBold.copy(
+                                    color = if (lyricsEnabled && lyricsTranslationEnabled) EncoreColors.Green
                                     else EncoreColors.TextSecondary
                                 )
                             )

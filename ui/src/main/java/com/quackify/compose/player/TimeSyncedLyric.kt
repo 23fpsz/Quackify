@@ -7,6 +7,7 @@ data class TimeSyncedLyric(
     val text: String,
     val words: List<LyricWordSpan> = emptyList(),
     val sungUntilMs: Long? = null,
+    val translation: String = "",
 ) {
     val isWordSynced: Boolean get() = words.isNotEmpty()
 
