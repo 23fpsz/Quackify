@@ -22,6 +22,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +46,8 @@ import androidx.compose.ui.res.stringResource
  * saved on this device, marks the active one, offers adding another account
  * and deleting the saved ones. The delete control only appears while more
  * than one account exists — a single remaining account has nothing to switch
- * to after a delete, so it stays undeletable from here.
+ * to after a delete, so it stays undeletable from here — and every delete
+ * first asks for confirmation, because it also signs the account out.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +65,7 @@ fun AccountsSheet(
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val canDelete = accounts.size > 1
+    var removeAsk by remember { mutableStateOf<EncoreAuth.Account?>(null) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -167,7 +173,7 @@ fun AccountsSheet(
                                 .size(22.dp)
                                 .clip(RoundedCornerShape(999.dp))
                                 .clickable {
-                                    onRemoveAccount(account.id)
+                                    removeAsk = account
                                 }
                                 .padding(3.dp)
                         )
@@ -209,5 +215,18 @@ fun AccountsSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    removeAsk?.let { account ->
+        DeleteConfirmDialog(
+            title = stringResource(R.string.remove_account_title),
+            message = "\"" +
+                account.name.ifBlank { stringResource(R.string.listener) } +
+                "\"" +
+                stringResource(R.string.remove_account_message_suffix),
+            confirmLabel = stringResource(R.string.remove),
+            onConfirm = { onRemoveAccount(account.id) },
+            onDismiss = { removeAsk = null }
+        )
     }
 }
