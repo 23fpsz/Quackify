@@ -40,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +58,7 @@ import com.quackify.compose.theme.EncoreTheme
 import com.quackify.backend.library.Krespot
 import androidx.compose.ui.res.stringResource
 import com.quackify.compose.R
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 private data class DiscographyTab(val key: String, val labelRes: Int)
@@ -113,16 +115,24 @@ fun DiscographySheet(
             exhausted = false
         }
         val order = if (alphabetical) "NAME_ASC" else "DATE_DESC"
-        val page = Krespot.artists.discography(context, artistUri, section, nextOffset, order)
-        loading = false
-        if (page == null) {
-            failed = true
-            return
+        // The scroll LaunchedEffect restarts on every frame while flinging;
+        // a restart cancels the in-flight call below, and the plain-field
+        // bookkeeping after it would never run - leaving loading stuck true
+        // and every later fetch refused. try/finally makes the flag honest
+        // again even when the coroutine is cancelled mid-request.
+        try {
+            val page = Krespot.artists.discography(context, artistUri, section, nextOffset, order)
+            if (page == null) {
+                failed = true
+                return
+            }
+            rows.addAll(page.rows.filter { row -> rows.none { it.uri == row.uri } })
+            total = page.total
+            nextOffset += page.fetched
+            if (!page.hasMore || page.fetched <= 0) exhausted = true
+        } finally {
+            loading = false
         }
-        rows.addAll(page.rows.filter { row -> rows.none { it.uri == row.uri } })
-        total = page.total
-        nextOffset += page.fetched
-        if (!page.hasMore || page.fetched <= 0) exhausted = true
     }
 
     LaunchedEffect(artistUri) {
@@ -133,13 +143,21 @@ fun DiscographySheet(
         fetch(true)
     }
 
-    val lastVisible = if (grid) {
-        gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-    } else {
-        listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-    }
-    LaunchedEffect(lastVisible, section, alphabetical, rows.size, total) {
-        if (!exhausted && rows.isNotEmpty() && lastVisible >= rows.size - 3) fetch(false)
+    // snapshotFlow coalesces the per-frame layout changes into distinct
+    // emissions, so a fling restarts this collector only when the trigger
+    // row actually changes - not every frame, which used to cancel and
+    // re-fire the request mid-flight.
+    LaunchedEffect(grid, section, alphabetical) {
+        snapshotFlow {
+            val lastIndex = if (grid) {
+                gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            } else {
+                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            }
+            lastIndex >= rows.size - 3
+        }.distinctUntilChanged().collect { nearEnd ->
+            if (nearEnd && !exhausted && rows.isNotEmpty() && !loading) fetch(false)
+        }
     }
 
     ModalBottomSheet(
