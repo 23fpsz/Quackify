@@ -2060,6 +2060,7 @@ class MainActivity : ComponentActivity() {
             onRemoveAccount = { id ->
                 log.i("remove account tapped id=$id")
                 resetHomeSplash()
+                AccountSignOut.begin(context, id)
                 if (forgetAccountAndSwitch(id)) {
                     PlaybackHost.reset(context)
                     val remaining = EncoreAuth.savedAccounts(context)

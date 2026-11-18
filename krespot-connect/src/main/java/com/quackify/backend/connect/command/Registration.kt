@@ -160,6 +160,85 @@ object Registration {
         return response
     }
 
+    /**
+     * The logout-time counterpart of the register handshake: drops every
+     * entry this device holds in an account's cluster, the sequence the web
+     * player walks on logout. Credentials are passed in explicitly — the
+     * account being signed out is not necessarily the active one, so
+     * ConnectHeaders (bound to the active session) must not be used here.
+     * Returns how many of the three entries the server accepted.
+     */
+    suspend fun signOutDevices(
+        spclient: String,
+        deviceId: String,
+        token: String,
+        clientToken: String,
+    ): Int {
+        if (spclient.isBlank() || token.isBlank()) {
+            log.w("device sign-out skipped, spclient=${spclient.isNotBlank()} token=${token.isNotBlank()}")
+            return 0
+        }
+        val headers = mapOf(
+            "Authorization" to "Bearer $token",
+            "client-token" to clientToken,
+            "Accept" to "application/json",
+            "app-platform" to "WebPlayer",
+            "spotify-app-version" to ConnectHeaders.APP_VERSION,
+            "Origin" to "https://open.spotify.com",
+            "Referer" to "https://open.spotify.com/",
+            "User-Agent" to Net.DESKTOP_UA,
+        )
+        var removed = 0
+
+        // The hidden observer entry, the one the web player drops first.
+        val observerId = observerId(deviceId)
+        val observer = Net.requestOnce(
+            "DELETE",
+            "https://$spclient/connect-state/v1/devices/$observerId",
+            headers,
+            null,
+            tag = "signout-observer",
+        )
+        log.i("sign-out observer $observerId -> ${observer?.code ?: "no response"}")
+        if (observer?.ok == true) removed++
+
+        // The member entry this app publishes librespot-style.
+        val member = Net.requestOnce(
+            "DELETE",
+            "https://$spclient/connect-state/v1/devices/$deviceId",
+            headers,
+            null,
+            tag = "signout-member",
+        )
+        log.i("sign-out member $deviceId -> ${member?.code ?: "no response"}")
+        if (member?.ok == true) removed++
+
+        // The track-playback device, deregistered with the same body the
+        // web player sends (a JSON body labeled text/plain, verbatim).
+        val body = JSONObject()
+            .put("seq_num", 1)
+            .put("state_ref", JSONObject.NULL)
+            .put(
+                "sub_state",
+                JSONObject()
+                    .put("playback_speed", 1)
+                    .put("format", "file_urls_external")
+                    .put("is_video_on", false),
+            )
+            .put("debug_source", "deregister")
+            .toString()
+        val playback = Net.requestOnce(
+            "DELETE",
+            "https://$spclient/track-playback/v1/devices/$deviceId",
+            headers + mapOf("Content-Type" to "text/plain;charset=UTF-8"),
+            body,
+            tag = "signout-playback",
+        )
+        log.i("sign-out track-playback $deviceId -> ${playback?.code ?: "no response"}")
+        if (playback?.ok == true) removed++
+        return removed
+    }
+
     suspend fun player(
         context: Context,
         spclient: String,

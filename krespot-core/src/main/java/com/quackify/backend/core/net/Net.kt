@@ -228,6 +228,21 @@ object Net {
         tag: String = "",
     ): Response? = requestBytes(method, url, headers, body?.toByteArray(), tag, body)
 
+    /**
+     * A one-shot request: unlike [request] it never swaps its Authorization
+     * header for a refreshed token on a 401, because the caller's credentials
+     * belong to an account that is not — or is about to stop being — the
+     * active one, and a silent retry under the active session would act on
+     * the wrong account.
+     */
+    suspend fun requestOnce(
+        method: String,
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        body: String? = null,
+        tag: String = "",
+    ): Response? = attempt(method, url, headers, body?.toByteArray(), tag, body)
+
     suspend fun requestBytes(
         method: String,
         url: String,
