@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -167,6 +168,15 @@ internal fun BoxScope.ShellPlayerLayer(
     }
 
     if (!docked) {
+        // BackHandler is LIFO, and this layer composes after the screen
+        // content but before the sheets/overlays hosts - so this registration
+        // outranks screen-level handlers (Settings' category, a playlist's
+        // search mode) while sheets on top still win over it. In portrait the
+        // fullscreen player covers the screen, so back must collapse it
+        // before whatever sits underneath reacts.
+        BackHandler(enabled = env.isPlayerExpanded) {
+            env.setIsPlayerExpanded(false)
+        }
         NowPlayingScreenLayer(
             env = env,
             visible = env.isPlayerExpanded && !env.flags.isLogcatOpen,
