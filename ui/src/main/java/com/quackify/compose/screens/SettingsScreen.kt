@@ -179,6 +179,9 @@ fun SettingsScreen(
     var crossfadeSeconds by remember {
         mutableStateOf((clientPrefs.getInt("crossfadeMs", 0) / 1000).coerceIn(0, 12))
     }
+    var automix by remember {
+        mutableStateOf(clientPrefs.getBoolean("automix", false))
+    }
     var pauseOnDisconnect by remember {
         mutableStateOf(clientPrefs.getBoolean("pauseOnDisconnect", true))
     }
@@ -646,6 +649,18 @@ fun SettingsScreen(
                             onValueChange = { seconds ->
                                 crossfadeSeconds = seconds
                                 clientPrefs.edit().putInt("crossfadeMs", seconds * 1000).apply()
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = stringResource(R.string.automix),
+                            subtitle = stringResource(R.string.automix_subtitle),
+                            isChecked = automix,
+                            enabled = true,
+                            badge = stringResource(R.string.beta),
+                            badgeInfo = stringResource(R.string.automix_warning),
+                            onCheckedChange = { on ->
+                                automix = on
+                                clientPrefs.edit().putBoolean("automix", on).apply()
                             }
                         )
                         SettingsToggleRow(

@@ -60,6 +60,8 @@ private const val CLIENT_STORE = "quackify.client"
 
 private const val CROSSFADE_MS_PREF = "crossfadeMs"
 
+private const val AUTOMIX_PREF = "automix"
+
 private const val MAX_CROSSFADE_MS = 12_000L
 
 internal object DrmLevel {
@@ -240,6 +242,9 @@ internal class AudioEngine(
     @Volatile
     private var spareGainFactor = 1f
 
+    @Volatile
+    private var userRate = 1f
+
     val currentPositionMs: Long
         get() = runOnMain { player?.currentPosition } ?: lastPositionMs
 
@@ -339,7 +344,13 @@ internal class AudioEngine(
      * again at transition time. [whileOn] is the uri the engine must still be
      * on when the item lands - the licence roundtrip can outlive a skip.
      */
-    suspend fun queueNext(uri: String, source: AudioSource, whileOn: String, gainDb: Double): Boolean {
+    suspend fun queueNext(
+        uri: String,
+        source: AudioSource,
+        whileOn: String,
+        gainDb: Double,
+        spec: TransitionSpec?,
+    ): Boolean {
         val keySetId = try {
             offlineKeySetFor(source)
         } catch (refusal: IOException) {
@@ -352,7 +363,7 @@ internal class AudioEngine(
         if (keySetId != null) offlineKeySets[uri] = source.fileId else offlineKeySets.remove(uri)
         val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
         val item = itemFor(uri, source, keySetId)
-        val heldForFade = configuredCrossfadeMs() > 0L
+        val heldForFade = spec != null || configuredCrossfadeMs() > 0L
         val added = runOnMain {
             val p = player ?: return@runOnMain false
             if (p.currentMediaItem?.mediaId != whileOn) return@runOnMain false
@@ -369,7 +380,7 @@ internal class AudioEngine(
         if (uri.isNotBlank()) itemDurations[uri] = totalMs
         if (heldForFade) {
             spareGainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
-            crossfadeEngine()?.hold(item, totalMs)
+            crossfadeEngine()?.hold(item, totalMs, spec)
             log.i(
                 "audio held next '$uri' '${source.fileId.take(12)}' for a crossfade " +
                     if (source.seektable.pssh.isNotBlank()) "drm" else "clear"
@@ -460,10 +471,17 @@ internal class AudioEngine(
     }
 
     fun rate(mult: Float) {
+        val clamped = mult.coerceIn(0.5f, 3.5f)
+        userRate = clamped
         runOnMain {
-            val parameters = PlaybackParameters(mult.coerceIn(0.5f, 3.5f))
-            player?.playbackParameters = parameters
-            sparePlayer?.playbackParameters = parameters
+            val cross = crossfade
+            if (cross != null) {
+                cross.applyUserRate(clamped)
+            } else {
+                val parameters = PlaybackParameters(clamped)
+                player?.playbackParameters = parameters
+                sparePlayer?.playbackParameters = parameters
+            }
         }
     }
 
@@ -546,7 +564,9 @@ internal class AudioEngine(
             spare = { ensureSparePlayer() },
             buildSource = { item -> ensureKit().createMediaSource(item) },
             fadeMs = { configuredCrossfadeMs() },
+            automixOn = { AppPrefs.getBoolean(context, CLIENT_STORE, AUTOMIX_PREF, false) },
             sessionDurationMs = { durationMs },
+            userRate = { userRate },
             baseVolume = ::volumeOf,
             onEvent = { event -> onEvent(event) },
             onHandoff = ::onCrossfadeHandoff,

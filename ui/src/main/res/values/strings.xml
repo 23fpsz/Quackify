@@ -48,6 +48,9 @@
     <string name="artists">Artists</string>
     <string name="artwork_tint">Artwork tint</string>
     <string name="auto">Auto</string>
+    <string name="automix">Automix</string>
+    <string name="automix_subtitle">DJ-style transitions that beat-match and tempo-stretch the next track into the current one.</string>
+    <string name="automix_warning">Automix is in beta. It reads each track\'s beat grid and stretches the incoming tempo to blend songs like a DJ. Tracks without a beat grid fall back to a plain crossfade, and it may use extra data.</string>
     <string name="autoplay">Autoplay</string>
     <string name="autoplay_on_startup">Autoplay on startup</string>
     <string name="back">Back</string>

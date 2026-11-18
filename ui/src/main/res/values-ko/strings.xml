@@ -170,6 +170,9 @@
     <string name="crossfade_off">꺼짐</string>
     <string name="crossfade_seconds">%1$d초</string>
     <string name="crossfade_subtitle">곡이 갑자기 바뀌는 대신 끝부분을 다음 곡과 자연스럽게 섭어 재생합니다.</string>
+    <string name="automix">오토믹스</string>
+    <string name="automix_subtitle">DJ처럼 다음 곡의 비트를 맞추고 템포를 조정해 자연스럽게 이어주는 트랜지션.</string>
+    <string name="automix_warning">오토믹스는 베타입니다. 곡마다 비트 그리드를 읽고 DJ처럼 템포를 조정합니다. 그리드가 없는 곡은 일반 크로스페이드로 동작하며, 데이터를 추가로 사용할 수 있습니다.</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">Canvas 켜기</string>
     <string name="turn_off_canvas">Canvas 끄기</string>

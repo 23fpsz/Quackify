@@ -170,6 +170,9 @@
     <string name="crossfade_off">关</string>
     <string name="crossfade_seconds">%1$d 秒</string>
     <string name="crossfade_subtitle">将每首歌曲的结尾与下一首自然混合，避免生硬的切换。</string>
+    <string name="automix">自动混音</string>
+    <string name="automix_subtitle">DJ 风格的过渡：将下一首歌曲对齐节拍并调整速度自然衔接。</string>
+    <string name="automix_warning">自动混音处于测试阶段。它会读取每首歌曲的节拍网格，并像 DJ 一样调整下一首的速度。没有网格的歌曲会退回普通交叉淡入淡出，且可能消耗额外流量。</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">开启 Canvas</string>
     <string name="turn_off_canvas">关闭 Canvas</string>

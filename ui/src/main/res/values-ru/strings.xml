@@ -170,6 +170,9 @@
     <string name="crossfade_off">Выкл.</string>
     <string name="crossfade_seconds">%1$d с</string>
     <string name="crossfade_subtitle">Плавно соединяет конец каждого трека с началом следующего вместо резкой смены песен.</string>
+    <string name="automix">Автомикс</string>
+    <string name="automix_subtitle">Переходы в стиле DJ: следующий трек подстраивается под бит и темп.</string>
+    <string name="automix_warning">Автомикс — бета. Он читает сетку битов каждого трека и меняет темп входящего, смешивая как DJ. Треки без сетки переходят обычным кроссфейдом, и может расходовать трафик.</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">Включить Canvas</string>
     <string name="turn_off_canvas">Выключить Canvas</string>

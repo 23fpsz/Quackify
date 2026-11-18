@@ -95,6 +95,9 @@ const val GAPLESS_PREF = "gaplessPlayback"
 /** Settings slider: how long the crossfade between two tracks runs, in ms. */
 const val CROSSFADE_MS_PREF = "crossfadeMs"
 
+/** Settings toggle: DJ-style transitions that beat-match the next track. */
+const val AUTOMIX_PREF = "automix"
+
 /** Settings toggle: pause when the BT, USB or wired audio output disconnects. */
 const val PAUSE_ON_DISCONNECT_PREF = "pauseOnDisconnect"
 
@@ -144,8 +147,12 @@ class PlaybackBridge(private val context: Context) {
         com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
             .getInt(CROSSFADE_MS_PREF, 0)
 
-    /** Either way of queuing the next track ahead: plain prebuffer or crossfade. */
-    private fun seamlessEnabled(): Boolean = gaplessEnabled() || crossfadeMs() > 0
+    private fun automixEnabled(): Boolean =
+        com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
+            .getBoolean(AUTOMIX_PREF, false)
+
+    /** Either way of queuing the next track ahead: plain prebuffer, crossfade or automix. */
+    private fun seamlessEnabled(): Boolean = gaplessEnabled() || crossfadeMs() > 0 || automixEnabled()
 
     private fun pauseOnDisconnectEnabled(): Boolean =
         com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS)
