@@ -249,10 +249,10 @@ private fun NowPlayingScreenLayer(
                 env.onArtistFollowToggle?.invoke(env.resolvedArtistUri, follow)
             }
         },
-        // The full lyrics list flows unconditionally - the master switch lives
-        // in Settings; the under-cover toggle below only kills the preview
-        // line, not the lyrics feature (fullscreen lyrics included).
-        lyrics = env.nowPlayingLyrics,
+        // The master switch gates the lyrics list itself; the under-cover
+        // toggle only hides the preview line, and both read live state so a
+        // Settings change applies to the open player without a reopen.
+        lyrics = if (LyricsOptions.enabled) env.nowPlayingLyrics else emptyList(),
         transcript = env.nowPlayingTranscript,
         lyricsPreview = LyricsOptions.preview,
         previousTrack = playbackState?.previousTrack,
