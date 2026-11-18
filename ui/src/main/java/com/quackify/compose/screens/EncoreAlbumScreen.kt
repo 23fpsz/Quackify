@@ -600,7 +600,7 @@ fun EncoreAlbumScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(moreByArtist, key = { it.title + it.year }) { release ->
+                        items(moreByArtist.distinctBy { it.uri }, key = { it.uri }) { release ->
                             Column(
                                 modifier = Modifier
                                     .width(140.dp)
