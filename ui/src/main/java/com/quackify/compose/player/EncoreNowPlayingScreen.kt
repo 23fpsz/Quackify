@@ -291,7 +291,6 @@ fun EncoreNowPlayingScreen(
     onArtistFollowToggle: (Boolean) -> Unit = {},
     lyrics: List<TimeSyncedLyric> = emptyList(),
     transcript: List<TranscriptLine> = emptyList(),
-    isLyricsUnderCoverEnabled: Boolean = true,
     showLyricsPreview: Boolean = true,
     previousTrack: TrackItem? = null,
     nextTrack: TrackItem? = null,
@@ -371,7 +370,6 @@ fun EncoreNowPlayingScreen(
 
     val effectiveIsLoading = isLoading
     val lyricsAvailable = lyrics.isNotEmpty() && activeLyricLine.isNotBlank()
-    val syncedLyricLineVisible = isLyricsUnderCoverEnabled && lyricsAvailable
     val effectiveLyricsVisible = lyricsAvailable
     val previewLyricVisible = effectiveLyricsVisible && showLyricsPreview
     val transcriptAvailable = transcript.isNotEmpty()

@@ -125,8 +125,11 @@ fun SettingsScreen(
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
-    var lyricsEnabled by remember { mutableStateOf(LyricsOptions.enabled) }
-    var lyricsPreview by remember { mutableStateOf(LyricsOptions.preview) }
+    // Read the live LyricsOptions state, not a one-shot copy: the fullscreen
+    // player's three-dot sheet writes the same flags, and the rows here must
+    // flip with them while the settings screen sits composed underneath.
+    val lyricsEnabled = LyricsOptions.enabled
+    val lyricsPreview = LyricsOptions.preview
     val account = remember { EncoreAuth.account(context) }
     val version = remember {
         runCatching {
@@ -306,7 +309,6 @@ fun SettingsScreen(
                             isChecked = lyricsEnabled,
                             enabled = true,
                             onCheckedChange = { on ->
-                                lyricsEnabled = on
                                 LyricsOptions.setEnabled(context, on)
                             }
                         )
@@ -316,7 +318,6 @@ fun SettingsScreen(
                             isChecked = lyricsPreview,
                             enabled = lyricsEnabled,
                             onCheckedChange = { on ->
-                                lyricsPreview = on
                                 LyricsOptions.setPreview(context, on)
                             }
                         )
