@@ -266,10 +266,11 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         canvasAvailable = flags.isTrackOptionsFromPlayer && env.isCanvasAllowed && env.canvasFilePath != null,
         isCanvasEnabled = env.isCanvasEnabled,
         onCanvasToggle = { env.onCanvasToggle?.invoke(!env.isCanvasEnabled) },
-        lyricsUnderCoverAvailable = flags.isTrackOptionsFromPlayer,
-        // The row is about the synced lyric line under the cover only: it
-        // writes the preview flag, never the master lyrics switch - turning
-        // the line off must not take the whole lyrics feature down with it.
+        // The row and Settings > "Line above the title" are the same switch
+        // (LyricsOptions.preview), so they always read the same value. It
+        // only shows while the master lyrics switch is on too - toggling the
+        // line with lyrics themselves off is a no-op that reads as broken.
+        lyricsUnderCoverAvailable = flags.isTrackOptionsFromPlayer && LyricsOptions.enabled,
         isLyricsUnderCoverEnabled = LyricsOptions.preview,
         onLyricsUnderCoverToggle = { LyricsOptions.setPreview(env.context, !LyricsOptions.preview) },
         canvasResolution = env.canvasResolution,
