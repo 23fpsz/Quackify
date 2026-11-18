@@ -928,7 +928,8 @@ internal fun ShellBrowsePane(
     onOpenShow: (String) -> Unit,
     onOpenAlbum: (String, String) -> Unit,
     onOpenPlaylist: (String, String, String?) -> Unit,
-    onLoadMore: () -> Unit
+    onLoadMore: () -> Unit,
+    loadingMore: Boolean = false
 ) {
     if (page == null) {
         EncoreBrowseScreen(
@@ -937,7 +938,7 @@ internal fun ShellBrowsePane(
             colorHex = "",
             sections = emptyList(),
             isLoading = true,
-            isLoadingMore = false,
+            isLoadingMore = loadingMore,
             hasMore = false,
             onBackClick = onBack,
             onCardClick = { _, _ -> },
@@ -950,7 +951,7 @@ internal fun ShellBrowsePane(
             colorHex = page.colorHex,
             sections = page.sections,
             isLoading = false,
-            isLoadingMore = false,
+            isLoadingMore = loadingMore,
             hasMore = page.nextOffset != null,
             onBackClick = onBack,
             onCardClick = { title, uri ->

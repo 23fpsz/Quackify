@@ -213,6 +213,7 @@ class MainActivity : ComponentActivity() {
     private var showDetail by mutableStateOf<ShowDetail?>(null)
     private var episodeDetail by mutableStateOf<EpisodeDetail?>(null)
     private var browsePage by mutableStateOf<BrowsePage?>(null)
+    private var browseLoadingMore by mutableStateOf(false)
     private var categoryShelves by mutableStateOf<List<CategoryShelf>?>(null)
     private var browseCategories by mutableStateOf<List<BrowseCard>>(emptyList())
     internal val homeArtistImages = mutableStateMapOf<String, String>()
@@ -1906,6 +1907,7 @@ class MainActivity : ComponentActivity() {
             },
             searchSavedOverrides = searchSavedOverrides.toMap(),
             browsePage = browsePage,
+            browseLoadingMore = browseLoadingMore,
             categoryShelves = categoryShelves,
             videoFullscreen = videoFullscreen,
             onToggleVideoFullscreen = { on ->
@@ -1941,6 +1943,26 @@ class MainActivity : ComponentActivity() {
                 browseUri = uri
                 browseFetch++
                 browsePage = null
+            },
+            onLoadMoreBrowse = {
+                val current = browsePage
+                if (current != null && !browseLoadingMore) {
+                    val next = current.nextOffset
+                    val uri = browseUri
+                    if (next != null && uri.isNotBlank()) {
+                        scope.launch {
+                            browseLoadingMore = true
+                            val more = Browse.page(context, uri, next)
+                            if (more != null && browsePage === current) {
+                                browsePage = current.copy(
+                                    sections = current.sections + more.sections,
+                                    nextOffset = more.nextOffset,
+                                )
+                            }
+                            browseLoadingMore = false
+                        }
+                    }
+                }
             },
             folderItems = folderItems,
             folderLoading = folderItems == null,
