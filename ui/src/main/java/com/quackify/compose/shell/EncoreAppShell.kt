@@ -245,6 +245,7 @@ fun EncoreAppShell(
     onDeeplinkSearch: ((String) -> Unit)? = null,
     onOpenBrowse: ((String) -> Unit)? = null,
     onLoadMoreBrowse: (() -> Unit)? = null,
+    browseLoadingMore: Boolean = false,
     onLoadMoreEpisodes: (() -> Unit)? = null,
     playlistTracks: List<TrackItem>? = null,
     playlistDetail: CollectionDetail? = null,
@@ -1073,6 +1074,7 @@ fun EncoreAppShell(
                         onOpenBrowse = onOpenBrowse,
                         onOpenShow = onOpenShow,
                         onLoadMore = onLoadMoreBrowse,
+                        loadingMore = browseLoadingMore,
                     )
     
                     ShellScreen.SHOW -> ShellShowRoute(

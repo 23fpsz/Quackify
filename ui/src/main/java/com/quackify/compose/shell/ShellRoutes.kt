@@ -676,6 +676,7 @@ internal fun ShellBrowseRoute(
     onOpenBrowse: ((String) -> Unit)?,
     onOpenShow: ((String) -> Unit)?,
     onLoadMore: (() -> Unit)?,
+    loadingMore: Boolean = false,
 ) {
     ShellBrowsePane(
         page = page,
@@ -688,7 +689,8 @@ internal fun ShellBrowseRoute(
         onOpenShow = { uri -> onOpenShow?.invoke(uri) },
         onOpenAlbum = { title, uri -> env.openAlbum(title, "", uri) },
         onOpenPlaylist = env.openPlaylist,
-        onLoadMore = { onLoadMore?.invoke() }
+        onLoadMore = { onLoadMore?.invoke() },
+        loadingMore = loadingMore
     )
 }
 
