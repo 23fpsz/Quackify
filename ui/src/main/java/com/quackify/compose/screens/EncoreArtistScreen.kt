@@ -950,7 +950,7 @@ private fun ArtistReleaseCarousel(
         contentPadding = PaddingValues(horizontal = EncoreSpacers.Base),
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(releases, key = { it.title + it.year }) { release ->
+        items(releases.distinctBy { it.uri }, key = { it.uri }) { release ->
             ArtistReleaseCard(release, onReleaseClick)
         }
     }
