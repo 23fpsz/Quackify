@@ -184,6 +184,11 @@
     <string name="lyrics_source_desc">Tap a source to move it to the top. Sources are tried in this order.</string>
     <string name="lyrics_provider_word_synced">Word-synced</string>
     <string name="lyrics_provider_line_synced">Line-synced</string>
+    <string name="lyrics_translation">Translate lyrics</string>
+    <string name="lyrics_translation_desc">Show a translation of each line under the original lyric</string>
+    <string name="lyrics_translation_language">Translation language</string>
+    <string name="lyrics_translation_language_desc">Lyrics are translated into this language</string>
+    <string name="lyrics_translation_device_language">Device language (%1$s)</string>
     <string name="minutes_played">Minutes played</string>
     <string name="more">More</string>
     <string name="more_like_this">More Like This</string>

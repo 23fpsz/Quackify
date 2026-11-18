@@ -1545,6 +1545,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }.orEmpty(),
                     sungUntilMs = timings?.sungUntilMs,
+                    translation = line.translation,
                 )
             }.orEmpty()
         },

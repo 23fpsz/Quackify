@@ -177,7 +177,7 @@ internal fun MainActivity.rememberNowPlayingData(
             nowPlayingArtistUri in inLibrary
         })
     }
-    LaunchedEffect(playback?.trackUri) {
+    LaunchedEffect(playback?.trackUri, LyricsOptions.translationEnabled, LyricsOptions.translationLanguage) {
         val uri = playback?.trackUri.orEmpty()
         if (!uri.startsWith("spotify:track:")) {
             writers.setLyrics(null)
@@ -196,11 +196,35 @@ internal fun MainActivity.rememberNowPlayingData(
             order = LyricsOptions.providerOrder,
             prioritizeWordSynced = LyricsOptions.prioritizeWordSynced,
         )
-        if (result != null) {
-            writers.setLyrics(repository.asTrackLyrics(result))
+        var trackLyrics = if (result != null) {
+            repository.asTrackLyrics(result)
         } else {
-            writers.setLyrics(Krespot.lyrics.lyrics(this@rememberNowPlayingData, uri))
+            Krespot.lyrics.lyrics(this@rememberNowPlayingData, uri)
         }
+        if (trackLyrics != null && LyricsOptions.translationEnabled && LyricsOptions.enabled) {
+            val target = LyricsOptions.translationTargetTag(this@rememberNowPlayingData)
+            val translated = com.quackify.backend.library.lyrics.LyricsTranslation.translate(
+                context = this@rememberNowPlayingData,
+                trackId = uri,
+                lines = trackLyrics.lines.map { it.text },
+                targetLanguageTag = target,
+            )
+            if (translated is com.quackify.backend.library.lyrics.LyricsTranslation.Result.Translated) {
+                val texts = translated.texts
+                trackLyrics = trackLyrics.copy(
+                    sourceLanguage = translated.sourceLanguage,
+                    lines = trackLyrics.lines.mapIndexed { index, line ->
+                        val slotIndex = translatedSlotIndex(trackLyrics.lines, index)
+                        line.copy(
+                            translation = slotIndex?.let { texts.getOrNull(it) }.orEmpty(),
+                        )
+                    },
+                )
+            } else if (translated is com.quackify.backend.library.lyrics.LyricsTranslation.Result.SameLanguage) {
+                trackLyrics = trackLyrics.copy(sourceLanguage = translated.language)
+            }
+        }
+        writers.setLyrics(trackLyrics)
     }
     LaunchedEffect(playback?.trackUri) {
         val uri = playback?.trackUri.orEmpty()
@@ -222,4 +246,20 @@ internal fun MainActivity.rememberNowPlayingData(
         artistUri = nowPlayingArtistUri,
         canvasAllowed = canvasAllowed,
     )
+}
+
+/**
+ * The translation result carries one entry per non-blank line, in order, so
+ * this maps a line's index onto the entry that translates it.
+ */
+private fun translatedSlotIndex(
+    lines: List<com.quackify.backend.model.LyricLine>,
+    lineIndex: Int,
+): Int? {
+    var slot = 0
+    lines.forEachIndexed { index, line ->
+        if (index == lineIndex) return if (line.text.isNotBlank()) slot else null
+        if (line.text.isNotBlank()) slot++
+    }
+    return null
 }

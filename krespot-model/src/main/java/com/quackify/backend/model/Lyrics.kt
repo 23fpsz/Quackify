@@ -25,11 +25,13 @@ data class TrackLyrics(
     val provider: String,
     val synced: Boolean,
     val wordTimings: List<WordTimings> = emptyList(),
+    val sourceLanguage: String = "",
 )
 
 data class LyricLine(
     val startTimeMs: Long,
     val text: String,
+    val translation: String = "",
 )
 
 data class WordTimings(

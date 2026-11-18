@@ -2427,7 +2427,7 @@ private fun NowPlayingLyricsCard(
                                     fontWeight = FontWeight.Bold,
                                 ),
                                 maxLines = 2,
-                                modifier = Modifier.padding(bottom = 6.dp)
+                                modifier = Modifier.padding(bottom = 2.dp)
                             )
                         } else {
                             Text(
@@ -2441,6 +2441,19 @@ private fun NowPlayingLyricsCard(
                                         i < activeIndex -> ink.copy(alpha = 0.45f)
                                         else -> ink.copy(alpha = 0.55f)
                                     }
+                                ),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(bottom = if (isActive && lyric.translation.isNotBlank()) 2.dp else 6.dp)
+                            )
+                        }
+                        if (isActive && lyric.translation.isNotBlank()) {
+                            Text(
+                                text = lyric.translation,
+                                style = EncoreTheme.typography.bodyMedium.copy(
+                                    fontSize = 14.sp,
+                                    lineHeight = 19.sp,
+                                    color = ink.copy(alpha = 0.65f)
                                 ),
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
@@ -2690,7 +2703,10 @@ private fun FullscreenLyricsView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSeekMs(line.startTimeMs) }
-                            .padding(vertical = EncoreSpacers.Tighter)
+                            .padding(
+                                top = EncoreSpacers.Tighter,
+                                bottom = if (isCurrentLine && line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
+                            )
                     )
                 } else {
                     Text(
@@ -2704,7 +2720,24 @@ private fun FullscreenLyricsView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSeekMs(line.startTimeMs) }
-                            .padding(vertical = EncoreSpacers.Tighter)
+                            .padding(
+                                top = EncoreSpacers.Tighter,
+                                bottom = if (isCurrentLine && line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
+                            )
+                    )
+                }
+                if (isCurrentLine && line.translation.isNotBlank()) {
+                    Text(
+                        text = line.translation,
+                        style = EncoreTheme.typography.bodyMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 21.sp,
+                            color = ink.copy(alpha = 0.55f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSeekMs(line.startTimeMs) }
+                            .padding(bottom = EncoreSpacers.Tighter)
                     )
                 }
             }
