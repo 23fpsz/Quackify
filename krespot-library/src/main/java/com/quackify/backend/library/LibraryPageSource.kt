@@ -325,7 +325,7 @@ object LibraryPageSource {
                     count = lists,
                 )
             }
-            "Show" -> ShelfItem(
+            "Show", "Podcast" -> ShelfItem(
                 uri = uri,
                 title = name,
                 subtitle = "Podcast • " + data.optJSONObject("publisher")?.optString("name").orEmpty(),
@@ -335,16 +335,25 @@ object LibraryPageSource {
                 pinned = pinned,
                 pinnable = pinnable,
             )
-            else -> ShelfItem(
-                uri = uri,
-                title = name.ifBlank { type },
-                subtitle = type,
-                kind = ShelfKind.UNKNOWN,
-                imageUrl = GraphQl.entityImage(data),
-                colorHex = GraphQl.entityColor(data),
-                pinned = pinned,
-                pinnable = pinnable,
-            )
+            else -> {
+                // The typename set is not stable across libraryV3 responses;
+                // the URI is the trustworthy signal for shows and folders.
+                val uriKind = when {
+                    uri.startsWith("spotify:show:") -> ShelfKind.SHOW
+                    uri.startsWith("spotify:start-group:") || uri.startsWith("spotify:end-group:") -> ShelfKind.FOLDER
+                    else -> ShelfKind.UNKNOWN
+                }
+                ShelfItem(
+                    uri = uri,
+                    title = name.ifBlank { type },
+                    subtitle = if (uriKind == ShelfKind.SHOW) "Podcast" else type,
+                    kind = uriKind,
+                    imageUrl = GraphQl.entityImage(data),
+                    colorHex = GraphQl.entityColor(data),
+                    pinned = pinned,
+                    pinnable = pinnable,
+                )
+            }
         }
     }
 }

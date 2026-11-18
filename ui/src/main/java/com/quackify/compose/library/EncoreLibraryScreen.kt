@@ -514,12 +514,23 @@ fun EncoreLibraryScreen(
                             .fillMaxWidth()
                             .combinedClickable(
                                 onClick = {
-                                    when (item.type) {
-                                        LibraryItemType.ALBUM -> onAlbumClick(item.title, "", item.uri)
-                                        LibraryItemType.PODCAST -> onPodcastClick(item.title, item.uri)
-                                        LibraryItemType.ARTIST -> onArtistClick(item.title, item.uri)
-                                        LibraryItemType.FOLDER -> onFolderClick(item)
-                                        else -> onItemClick(item.title, item.uri)
+                                    when {
+                                        // The URI is the last word on what a row opens;
+                                        // a mistyped kind must never send a show to
+                                        // the playlist screen again.
+                                        item.uri.startsWith("spotify:show:") ->
+                                            onPodcastClick(item.title, item.uri)
+                                        item.uri.startsWith("spotify:album:") ->
+                                            onAlbumClick(item.title, "", item.uri)
+                                        item.uri.startsWith("spotify:artist:") ->
+                                            onArtistClick(item.title, item.uri)
+                                        else -> when (item.type) {
+                                            LibraryItemType.ALBUM -> onAlbumClick(item.title, "", item.uri)
+                                            LibraryItemType.PODCAST -> onPodcastClick(item.title, item.uri)
+                                            LibraryItemType.ARTIST -> onArtistClick(item.title, item.uri)
+                                            LibraryItemType.FOLDER -> onFolderClick(item)
+                                            else -> onItemClick(item.title, item.uri)
+                                        }
                                     }
                                 },
                                 onLongClick = { onItemLongPress(item) }
@@ -619,12 +630,23 @@ fun EncoreLibraryScreen(
                             .fillMaxWidth()
                             .combinedClickable(
                                 onClick = {
-                                    when (item.type) {
-                                        LibraryItemType.ALBUM -> onAlbumClick(item.title, "", item.uri)
-                                        LibraryItemType.PODCAST -> onPodcastClick(item.title, item.uri)
-                                        LibraryItemType.ARTIST -> onArtistClick(item.title, item.uri)
-                                        LibraryItemType.FOLDER -> onFolderClick(item)
-                                        else -> onItemClick(item.title, item.uri)
+                                    when {
+                                        // The URI is the last word on what a row opens;
+                                        // a mistyped kind must never send a show to
+                                        // the playlist screen again.
+                                        item.uri.startsWith("spotify:show:") ->
+                                            onPodcastClick(item.title, item.uri)
+                                        item.uri.startsWith("spotify:album:") ->
+                                            onAlbumClick(item.title, "", item.uri)
+                                        item.uri.startsWith("spotify:artist:") ->
+                                            onArtistClick(item.title, item.uri)
+                                        else -> when (item.type) {
+                                            LibraryItemType.ALBUM -> onAlbumClick(item.title, "", item.uri)
+                                            LibraryItemType.PODCAST -> onPodcastClick(item.title, item.uri)
+                                            LibraryItemType.ARTIST -> onArtistClick(item.title, item.uri)
+                                            LibraryItemType.FOLDER -> onFolderClick(item)
+                                            else -> onItemClick(item.title, item.uri)
+                                        }
                                     }
                                 },
                                 onLongClick = { onItemLongPress(item) }
