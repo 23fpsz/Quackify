@@ -196,6 +196,8 @@
     <string name="lyrics_translation_language">Translation language</string>
     <string name="lyrics_translation_language_desc">Lyrics are translated into this language</string>
     <string name="lyrics_translation_device_language">Device language (%1$s)</string>
+    <string name="lyrics_menu">Lyrics options</string>
+    <string name="share_lyrics_desc">Share the lyrics of this track</string>
     <string name="minutes_played">Minutes played</string>
     <string name="more">More</string>
     <string name="more_like_this">More Like This</string>

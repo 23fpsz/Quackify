@@ -68,6 +68,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -96,6 +97,7 @@ import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -116,6 +118,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.quackify.compose.R
 import com.quackify.compose.shell.ChapterMarker
+import com.quackify.compose.sheets.LyricsProviderSheet
+import com.quackify.compose.sheets.LyricsShortcutSheet
+import com.quackify.compose.sheets.TranslationLanguageSheet
 import com.quackify.compose.components.CanvasVideoPlayer
 import com.quackify.compose.components.MusicVideoSurface
 import com.quackify.compose.components.EncoreHeartButton
@@ -298,6 +303,9 @@ fun EncoreNowPlayingScreen(
 ) {
     var isLyricsFullscreen by remember { mutableStateOf(false) }
     var isLyricsShareOpen by remember { mutableStateOf(false) }
+    var isLyricsMenuOpen by remember { mutableStateOf(false) }
+    var isTranslationLanguageSheetOpen by remember { mutableStateOf(false) }
+    var isLyricsProviderSheetOpen by remember { mutableStateOf(false) }
     var isTranscriptFullscreen by remember { mutableStateOf(false) }
 
     BackHandler(enabled = isLyricsFullscreen) { isLyricsFullscreen = false }
@@ -777,6 +785,7 @@ fun EncoreNowPlayingScreen(
                             lyrics = lyrics,
                             activeIndex = activeLyricIndex,
                             positionMs = currentPositionMs,
+                            isPlaying = isPlaying,
                             dominantColor = dynamicArtworkColor,
                             peekHeight = LANDSCAPE_LYRICS_PEEK_HEIGHT,
                             onOpenLyrics = { isLyricsFullscreen = true },
@@ -1023,6 +1032,7 @@ fun EncoreNowPlayingScreen(
                                 lyrics = lyrics,
                                 activeIndex = activeLyricIndex,
                                 positionMs = currentPositionMs,
+                                isPlaying = isPlaying,
                                 dominantColor = dynamicArtworkColor,
                                 onOpenLyrics = { isLyricsFullscreen = true },
                                 onShareLyrics = { isLyricsShareOpen = true }
@@ -1083,10 +1093,12 @@ fun EncoreNowPlayingScreen(
                 title = title,
                 artist = artist,
                 currentPositionMs = currentPositionMs,
+                isPlaying = isPlaying,
                 dominantColor = dominantColor,
                 lyrics = lyrics,
                 onSeekMs = { targetMs -> if (durationMs > 0L) onSeek(targetMs.toFloat() / durationMs.toFloat()) },
                 onShareClick = { isLyricsShareOpen = true },
+                onLyricsMenuClick = { isLyricsMenuOpen = true },
                 onClose = { isLyricsFullscreen = false }
             )
         }
@@ -1131,6 +1143,36 @@ fun EncoreNowPlayingScreen(
                 initialDominantColor = dominantColor,
                 onDismiss = { isLyricsShareOpen = false },
                 onShareConfirm = { _, _, _ -> isLyricsShareOpen = false }
+            )
+        }
+
+        if (isLyricsMenuOpen) {
+            val context = LocalContext.current
+            LyricsShortcutSheet(
+                onDismiss = { isLyricsMenuOpen = false },
+                onShareClick = { isLyricsShareOpen = true },
+                onOpenTranslationLanguage = { isTranslationLanguageSheetOpen = true },
+                onOpenLyricsSources = { isLyricsProviderSheetOpen = true }
+            )
+        }
+        if (isTranslationLanguageSheetOpen) {
+            val context = LocalContext.current
+            TranslationLanguageSheet(
+                selectedCode = LyricsOptions.translationLanguage,
+                onLanguageSelected = { code ->
+                    LyricsOptions.setTranslationLanguage(context, code)
+                },
+                onDismiss = { isTranslationLanguageSheetOpen = false }
+            )
+        }
+        if (isLyricsProviderSheetOpen) {
+            val context = LocalContext.current
+            LyricsProviderSheet(
+                orderedProviders = LyricsOptions.providerOrder,
+                onOrderSelected = { order ->
+                    LyricsOptions.setProviderOrder(context, order)
+                },
+                onDismiss = { isLyricsProviderSheetOpen = false }
             )
         }
     }
@@ -2337,6 +2379,7 @@ private fun NowPlayingLyricsCard(
     lyrics: List<TimeSyncedLyric>,
     activeIndex: Int,
     positionMs: Long,
+    isPlaying: Boolean,
     dominantColor: Color,
     onOpenLyrics: () -> Unit,
     onShareLyrics: () -> Unit,
@@ -2344,6 +2387,13 @@ private fun NowPlayingLyricsCard(
     peekHeight: Dp = 360.dp
 ) {
     val ink = contrastInk(dominantColor)
+    // Frame-ticking clock steered by the player's coarse position reports, so
+    // the karaoke sweep glides instead of stepping twice a second.
+    val clockMs = rememberLyricClock(
+        reportedPositionMs = { positionMs },
+        isPlaying = isPlaying,
+        trackKey = lyrics.firstOrNull()?.startTimeMs,
+    )
     AnimatedVisibility(
         visible = visible,
         enter = slideInVertically(
@@ -2416,9 +2466,9 @@ private fun NowPlayingLyricsCard(
                     itemsIndexed(lyrics) { i, lyric ->
                         val isActive = i == activeIndex
                         if (isActive && lyric.isWordSynced) {
-                            WordSyncedLyricText(
+                            WordSyncedLyricSweepText(
                                 lyric = lyric,
-                                positionMs = positionMs,
+                                positionMs = clockMs,
                                 sungColor = ink,
                                 unsungColor = ink.copy(alpha = 0.55f),
                                 style = EncoreTheme.typography.titleMedium.copy(
@@ -2621,13 +2671,25 @@ private fun FullscreenLyricsView(
     title: String,
     artist: String,
     currentPositionMs: Long,
+    isPlaying: Boolean,
     dominantColor: Color,
     lyrics: List<TimeSyncedLyric>,
     onSeekMs: (Long) -> Unit,
     onShareClick: () -> Unit,
+    onLyricsMenuClick: () -> Unit,
     onClose: () -> Unit
 ) {
-    val activeIndex = lyrics.indexOfLast { currentPositionMs >= it.startTimeMs }.coerceAtLeast(0)
+    // The player only reports its position twice a second; a karaoke sweep
+    // needs every frame. The clock steers itself with those readings and
+    // ticks smoothly in between.
+    val clockMs = rememberLyricClock(
+        reportedPositionMs = { currentPositionMs },
+        isPlaying = isPlaying,
+        trackKey = lyrics.firstOrNull()?.startTimeMs,
+    )
+    val activeIndex = remember(lyrics) {
+        derivedStateOf { lyrics.indexOfLast { clockMs >= it.startTimeMs }.coerceAtLeast(0) }
+    }.value
     val listState = rememberLazyListState()
     val ink = contrastInk(dominantColor)
 
@@ -2673,9 +2735,9 @@ private fun FullscreenLyricsView(
             }
 
             EncoreIconButton(
-                iconRes = R.drawable.encore_icon_share_android_24,
-                contentDescription = stringResource(R.string.share),
-                onClick = onShareClick,
+                iconRes = R.drawable.encore_icon_more_android_24,
+                contentDescription = stringResource(R.string.lyrics_menu),
+                onClick = onLyricsMenuClick,
                 tint = ink
             )
         }
@@ -2690,9 +2752,9 @@ private fun FullscreenLyricsView(
             itemsIndexed(lyrics) { index, line ->
                 val isCurrentLine = index == activeIndex
                 if (isCurrentLine && line.isWordSynced) {
-                    WordSyncedLyricText(
+                    WordSyncedLyricSweepText(
                         lyric = line,
-                        positionMs = currentPositionMs,
+                        positionMs = clockMs,
                         sungColor = ink,
                         unsungColor = ink.copy(alpha = 0.35f),
                         style = EncoreTheme.typography.titleLarge.copy(

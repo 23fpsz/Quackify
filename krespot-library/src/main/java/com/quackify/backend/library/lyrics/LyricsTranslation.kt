@@ -187,37 +187,47 @@ object LyricsTranslation {
 
     private fun marker(index: Int): String = "\uE000${index.toString().padStart(4, '0')}\uE001"
 
-    private fun requestBatch(batch: Batch, target: String): BatchAnswer? = runCatching {
-        val form = FormBody.Builder()
-            .add("client", "dict-chrome-ex")
-            .add("sl", "auto")
-            .add("tl", target)
-            .add("dt", "t")
-            .add("q", batch.payload)
-            .build()
-        val request = Request.Builder()
-            .url(ENDPOINT)
-            .header("User-Agent", "SpotiDuck/1.0")
-            .header("Accept", "application/json")
-            .post(form)
-            .build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@runCatching null
-            val body = response.body?.string() ?: return@runCatching null
-            val root = JSONArray(body)
-            val translatedBody = buildString {
-                for (i in 0 until root.getJSONArray(0).length()) {
-                    append(root.getJSONArray(0).getJSONArray(i).optString(0))
+    /**
+     * One blocking request. Always called on [Dispatchers.IO]: the call sites
+     * launch batches with `async { }` inheriting a main-thread context, and
+     * Android refuses sockets there — the NetworkOnMainThreadException was
+     * swallowed by the runCatching below, which read as "translation
+     * unavailable" with no trace of a request ever being made.
+     */
+    private suspend fun requestBatch(batch: Batch, target: String): BatchAnswer? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val form = FormBody.Builder()
+                    .add("client", "dict-chrome-ex")
+                    .add("sl", "auto")
+                    .add("tl", target)
+                    .add("dt", "t")
+                    .add("q", batch.payload)
+                    .build()
+                val request = Request.Builder()
+                    .url(ENDPOINT)
+                    .header("User-Agent", "SpotiDuck/1.0")
+                    .header("Accept", "application/json")
+                    .post(form)
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@runCatching null
+                    val body = response.body?.string() ?: return@runCatching null
+                    val root = JSONArray(body)
+                    val translatedBody = buildString {
+                        for (i in 0 until root.getJSONArray(0).length()) {
+                            append(root.getJSONArray(0).getJSONArray(i).optString(0))
+                        }
+                    }
+                    val source = root.opt(2)?.let { if (it is String) it else "" } ?: ""
+                    val parts = translatedBody.split(markerRegex).map(String::trim)
+                    if (source.isBlank() || parts.size != batch.slots.size || parts.any { it.isBlank() }) {
+                        return@runCatching null
+                    }
+                    BatchAnswer(parts, source, batch.payload.length)
                 }
-            }
-            val source = root.opt(2)?.let { if (it is String) it else "" } ?: ""
-            val parts = translatedBody.split(markerRegex).map(String::trim)
-            if (source.isBlank() || parts.size != batch.slots.size || parts.any { it.isBlank() }) {
-                return@runCatching null
-            }
-            BatchAnswer(parts, source, batch.payload.length)
+            }.getOrNull()
         }
-    }.getOrNull()
 
     fun canonicalLanguage(tag: String): String {
         val normalized = tag.replace('_', '-')
