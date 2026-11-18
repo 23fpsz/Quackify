@@ -463,6 +463,15 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
                 uri = active.albumUri.ifBlank { env.albumDetail?.uri.orEmpty() }
             )
             flags.isAddToPlaylistOpen = true
+        },
+        onAddToPlaylistFromTrack = {
+            val track = local.trackForOptions
+            if (track != null && track.uri.startsWith("spotify:track:")) {
+                flags.isTrackOptionsOpen = false
+                env.onAddToPlaylist?.invoke(track)
+                local.addTrackTarget = track
+                flags.isAddToPlaylistOpen = true
+            }
         }
     )
 }

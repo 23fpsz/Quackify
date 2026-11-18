@@ -79,6 +79,8 @@ fun TrackOptionsSheet(
     onToggleTasteExclusion: (Boolean) -> Unit = {},
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onSongRadio: (() -> Unit)? = null,
+    /** Opens the "Save in" picker; null hides the row (non-track entities). */
+    onAddToPlaylist: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || track == null) return
@@ -204,6 +206,17 @@ fun TrackOptionsSheet(
                     onClick = {
                         onDismiss()
                         onRemoveFromPlaylist()
+                    }
+                )
+            }
+
+            if (onAddToPlaylist != null && track.uri.startsWith("spotify:track:")) {
+                ContextMenuRowItem(
+                    title = stringResource(R.string.add_to_playlist),
+                    iconRes = R.drawable.encore_icon_add_to_playlist_24,
+                    onClick = {
+                        onDismiss()
+                        onAddToPlaylist()
                     }
                 )
             }
