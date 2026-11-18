@@ -73,7 +73,7 @@ internal class ShellRouteEnv(
     val handlePodcastOpen: (String, String) -> Unit,
     val openArtist: (String, String) -> Unit,
     val openAlbum: (String, String, String) -> Unit,
-    val openPlaylist: (String, String) -> Unit,
+    val openPlaylist: (String, String, String?) -> Unit,
     val openShow: (String) -> Unit,
     val openEpisode: (String) -> Unit,
     val openUserProfile: (String, String) -> Unit,
@@ -224,8 +224,7 @@ internal fun ShellLibraryRoute(
     EncoreLibraryScreen(
         onItemClick = { itemTitle, itemUri ->
             val foundItem = libraryItems?.find { it.uri == itemUri || it.title == itemTitle }
-            env.active.playlistCoverUrl = foundItem?.imageUrl
-            env.openPlaylist(itemTitle, itemUri)
+            env.openPlaylist(itemTitle, itemUri, foundItem?.imageUrl)
         },
         onItemLongPress = env.handleLibraryLongPress,
         onFolderClick = env.handleFolderClick,
@@ -456,7 +455,7 @@ internal fun ShellArtistRoute(
             if (uri.startsWith("spotify:album:")) {
                 env.openAlbum(title, "", uri)
             } else {
-                env.openPlaylist(title, uri)
+                env.openPlaylist(title, uri, null)
             }
         },
         onAboutClick = { env.flags.isArtistAboutOpen = true },
@@ -485,9 +484,7 @@ internal fun ShellCategoryRoute(
             val foundItem = homeQuickAccessItems?.find { it.uri == uri || it.title == title }
             val foundRec = homeRecommendations?.find { it.uri == uri || it.title == title }
             val foundLib = libraryItems?.find { it.uri == uri || it.title == title }
-            val cover = foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl
-            env.active.playlistCoverUrl = cover
-            env.openPlaylist(title, uri)
+            env.openPlaylist(title, uri, foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl)
         },
         onAlbumClick = { title, artist, uri ->
             env.openAlbum(title, artist, uri)
@@ -601,7 +598,7 @@ internal fun ShellActivityRoute(
         onOpenNotification = { item ->
             when {
                 item.actionUri.startsWith("spotify:playlist:") ->
-                    env.openPlaylist(item.title, item.actionUri)
+                    env.openPlaylist(item.title, item.actionUri, item.entityImageUrl.takeIf { it.isNotBlank() })
                 item.actionUri.startsWith("spotify:user:") ->
                     env.openUserProfile(item.actionUri, item.primaryActor.ifBlank { item.title })
                 item.actionUri.startsWith("spotify:artist:") ->
@@ -765,7 +762,6 @@ internal fun ShellFolderRoute(
     env: ShellRouteEnv,
     items: List<LibraryItem>?,
     loading: Boolean,
-    onLoadPlaylist: ((String) -> Unit)?,
 ) {
     ShellFolderPane(
         items = items,
@@ -776,12 +772,7 @@ internal fun ShellFolderRoute(
         userColorHex = env.userColorHex,
         onItemClick = { itemTitle, itemUri ->
             val foundItem = items?.find { it.uri == itemUri || it.title == itemTitle }
-            env.active.playlistCoverUrl = foundItem?.imageUrl
-            env.navController.pushCurrentState()
-            env.active.playlistTitle = itemTitle
-            env.active.playlistUri = itemUri
-            env.navController.currentScreen = ShellScreen.PLAYLIST
-            if (itemUri.isNotEmpty()) if (onLoadPlaylist != null) onLoadPlaylist?.invoke(itemUri) else env.playerListener?.onLoadPlaylist(itemUri)
+            env.openPlaylist(itemTitle, itemUri, foundItem?.imageUrl)
         },
         onItemLongPress = env.handleLibraryLongPress,
         onFolderClick = env.handleFolderClick,
@@ -806,7 +797,7 @@ internal fun ShellFolderRoute(
         onPlayClick = {
             val firstItem = items?.firstOrNull()
             if (firstItem != null && firstItem.type == LibraryItemType.PLAYLIST) {
-                env.openPlaylist(firstItem.title, firstItem.uri)
+                env.openPlaylist(firstItem.title, firstItem.uri, firstItem.imageUrl)
             }
         }
     )
@@ -847,7 +838,7 @@ internal fun ShellProfileRoute(
             when {
                 card.uri.startsWith("spotify:artist:") -> env.openArtist(card.title, card.uri)
                 card.uri.startsWith("spotify:album:") -> env.openAlbum(card.title, "", card.uri)
-                card.uri.startsWith("spotify:playlist:") -> env.openPlaylist(card.title, card.uri)
+                card.uri.startsWith("spotify:playlist:") -> env.openPlaylist(card.title, card.uri, card.imageUrl)
             }
         },
         contextsTitle = if (profile?.isCurrentUser == false) stringResource(R.string.public_playlists) else stringResource(R.string.recently_played),

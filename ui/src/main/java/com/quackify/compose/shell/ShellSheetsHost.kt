@@ -50,7 +50,7 @@ internal class ShellSheetsEnv(
     val blockedOffline: () -> Boolean = { false },
     val shareEntity: (String) -> Unit,
     val copyEntityLink: (String) -> Unit,
-    val openPlaylist: (String, String) -> Unit,
+    val openPlaylist: (String, String, String?) -> Unit,
     val openArtist: (String, String) -> Unit,
     val openAlbum: (String, String, String) -> Unit,
     val userDisplayName: String,
@@ -247,7 +247,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
                 env.shellScope.launch {
                     val radio = env.onArtistRadio?.invoke(artistUriNow)
                     if (radio != null && radio.startsWith("spotify:playlist:")) {
-                        env.openPlaylist(artistRadioTitle, radio)
+                        env.openPlaylist(artistRadioTitle, radio, null)
                     }
                 }
             }
@@ -437,7 +437,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
                 env.shellScope.launch {
                     val radio = env.onArtistRadio?.invoke(trackNow.uri)
                     if (radio != null && radio.startsWith("spotify:playlist:")) {
-                        env.openPlaylist(trackRadioTitle, radio)
+                        env.openPlaylist(trackRadioTitle, radio, null)
                     }
                 }
             }
@@ -450,7 +450,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
                 env.shellScope.launch {
                     val radio = env.onArtistRadio?.invoke(albumUriNow)
                     if (radio != null && radio.startsWith("spotify:playlist:")) {
-                        env.openPlaylist(albumRadioTitle, radio)
+                        env.openPlaylist(albumRadioTitle, radio, null)
                     }
                 }
             }

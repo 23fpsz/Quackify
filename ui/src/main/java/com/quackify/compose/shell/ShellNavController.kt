@@ -169,7 +169,7 @@ internal class ShellNavController(
         onOpenShow?.invoke(uri)
     }
 
-    fun openPlaylist(context: Context, title: String, uri: String) {
+    fun openPlaylist(context: Context, title: String, uri: String, coverUrl: String? = null) {
         if (uri.isBlank()) {
             Toast.makeText(context, context.getString(R.string.couldnt_open, title), Toast.LENGTH_SHORT).show()
             return
@@ -177,6 +177,10 @@ internal class ShellNavController(
         pushCurrentState()
         active.playlistTitle = title
         active.playlistUri = uri
+        // Callers that know the artwork (library, home) pass it along; everyone
+        // else clears the field so the playlist screen falls back to the cover
+        // the detail fetch returns instead of showing the last opened one.
+        active.playlistCoverUrl = coverUrl
         currentScreen = ShellScreen.PLAYLIST
         if (onLoadPlaylist != null) onLoadPlaylist.invoke(uri) else playerListener?.onLoadPlaylist(uri)
     }

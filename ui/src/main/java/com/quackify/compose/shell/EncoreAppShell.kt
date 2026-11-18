@@ -589,8 +589,8 @@ fun EncoreAppShell(
 
     val openShow: (String) -> Unit = { uri -> navController.openShow(uri) }
 
-    val openPlaylist: (String, String) -> Unit = { title, uri ->
-        navController.openPlaylist(context, title, uri)
+    val openPlaylist: (String, String, String?) -> Unit = { title, uri, coverUrl ->
+        navController.openPlaylist(context, title, uri, coverUrl)
     }
 
     val openEpisode: (String) -> Unit = { uri -> navController.openEpisode(uri) }
@@ -1098,7 +1098,6 @@ fun EncoreAppShell(
                         env = hosts.route(),
                         items = folderItems,
                         loading = folderLoading,
-                        onLoadPlaylist = onLoadPlaylist,
                     )
     
                     ShellScreen.PROFILE -> ShellProfileRoute(

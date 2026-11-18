@@ -493,7 +493,7 @@ internal fun ShellSearchPane(
     onPodcastClick: (String, String) -> Unit,
     onOpenEpisode: (String) -> Unit,
     onOpenShow: (String) -> Unit,
-    onOpenPlaylist: (String, String) -> Unit,
+    onOpenPlaylist: (String, String, String?) -> Unit,
     onUserClick: (String, String) -> Unit,
     onTrackSelect: (TrackItem) -> Unit,
     onTrackOptionsClick: (TrackItem) -> Unit,
@@ -508,7 +508,7 @@ internal fun ShellSearchPane(
         onEpisodeClick = { _, uri -> if (uri.isNotEmpty()) onOpenEpisode(uri) },
         onShowClick = { _, uri -> if (uri.isNotEmpty()) onOpenShow(uri) },
         onUserClick = onUserClick,
-        onPlaylistClick = onOpenPlaylist,
+        onPlaylistClick = { title, uri -> onOpenPlaylist(title, uri, null) },
         onTrackSelect = onTrackSelect,
         onTrackOptionsClick = onTrackOptionsClick,
         onTrackAddToQueue = onTrackAddToQueue,
@@ -675,7 +675,7 @@ internal fun ShellHomePane(
     onOpenAlbum: (String, String, String) -> Unit,
     onOpenShow: (String) -> Unit,
     onOpenEpisode: (String) -> Unit,
-    onOpenPlaylist: (String, String) -> Unit,
+    onOpenPlaylist: (String, String, String?) -> Unit,
 ) {
     EncoreHomeScreen(
         onPlaylistClick = { playlist, uri ->
@@ -694,7 +694,7 @@ internal fun ShellHomePane(
             } else if (uri.startsWith("spotify:track:")) {
                 onPlayTrackShortcut(uri, foundItem?.title ?: playlist)
             } else {
-                onOpenPlaylist(playlist, uri)
+                onOpenPlaylist(playlist, uri, foundItem?.imageUrl ?: foundRec?.imageUrl ?: foundLib?.imageUrl)
             }
         },
         onProfileClick = onOpenProfile,
@@ -927,7 +927,7 @@ internal fun ShellBrowsePane(
     onOpenBrowse: (String, String) -> Unit,
     onOpenShow: (String) -> Unit,
     onOpenAlbum: (String, String) -> Unit,
-    onOpenPlaylist: (String, String) -> Unit,
+    onOpenPlaylist: (String, String, String?) -> Unit,
     onLoadMore: () -> Unit
 ) {
     if (page == null) {
@@ -958,7 +958,7 @@ internal fun ShellBrowsePane(
                     uri.startsWith("spotify:show:") -> onOpenShow(uri)
                     uri.startsWith("spotify:page:") -> onOpenBrowse(uri, title)
                     uri.startsWith("spotify:album:") -> onOpenAlbum(title, uri)
-                    uri.startsWith("spotify:") -> onOpenPlaylist(title, uri)
+                    uri.startsWith("spotify:") -> onOpenPlaylist(title, uri, null)
                     else -> Unit
                 }
             },
