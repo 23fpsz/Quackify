@@ -147,6 +147,15 @@ fun SettingsScreen(
     var gapless by remember {
         mutableStateOf(clientPrefs.getBoolean("gaplessPlayback", false))
     }
+    var pauseOnDisconnect by remember {
+        mutableStateOf(clientPrefs.getBoolean("pauseOnDisconnect", true))
+    }
+    var resumeOnConnect by remember {
+        mutableStateOf(clientPrefs.getBoolean("resumeOnConnect", false))
+    }
+    var resumeOnHeadphone by remember {
+        mutableStateOf(clientPrefs.getBoolean("resumeOnHeadphone", false))
+    }
     var appIcon by remember {
         mutableStateOf(clientPrefs.getString("appIcon", "default").orEmpty().ifBlank { "default" })
     }
@@ -490,6 +499,36 @@ fun SettingsScreen(
                             onCheckedChange = { on ->
                                 gapless = on
                                 clientPrefs.edit().putBoolean("gaplessPlayback", on).apply()
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = stringResource(R.string.pause_on_disconnect),
+                            subtitle = stringResource(R.string.pause_when_the_bluetooth_usb_or_wired_audio),
+                            isChecked = pauseOnDisconnect,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                pauseOnDisconnect = on
+                                clientPrefs.edit().putBoolean("pauseOnDisconnect", on).apply()
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = stringResource(R.string.resume_on_connect),
+                            subtitle = stringResource(R.string.resume_when_a_bluetooth_audio_device_connect),
+                            isChecked = resumeOnConnect,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                resumeOnConnect = on
+                                clientPrefs.edit().putBoolean("resumeOnConnect", on).apply()
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = stringResource(R.string.resume_on_headphone_plug),
+                            subtitle = stringResource(R.string.resume_when_wired_headphones_are_plugged_in),
+                            isChecked = resumeOnHeadphone,
+                            enabled = true,
+                            onCheckedChange = { on ->
+                                resumeOnHeadphone = on
+                                clientPrefs.edit().putBoolean("resumeOnHeadphone", on).apply()
                             }
                         )
                     }

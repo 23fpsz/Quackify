@@ -148,6 +148,12 @@
     <string name="go_to_artist_radio">Go to artist radio</string>
     <string name="go_to_show">Go to show</string>
     <string name="go_to_song_radio">Go to song radio</string>
+    <string name="pause_on_disconnect">Pause on disconnect</string>
+    <string name="pause_when_the_bluetooth_usb_or_wired_audio">Pause when the Bluetooth, USB or wired audio device disconnects.</string>
+    <string name="resume_on_connect">Resume on connect</string>
+    <string name="resume_when_a_bluetooth_audio_device_connect">Resume when a Bluetooth audio device connects.</string>
+    <string name="resume_on_headphone_plug">Resume on headphone plug</string>
+    <string name="resume_when_wired_headphones_are_plugged_in">Resume when wired headphones are plugged in.</string>
     <string name="home_screen_widgets_come_in_4x1_3x2_and_3x3_size">Home screen widgets come in 4x1, 3x2 and 3x3 sizes. Changes show up the next time the widgets refresh.</string>
     <string name="if_you_go_back_now_you_ll_lose_your_changes">If you go back now, you\'ll lose your changes.</string>
     <string name="install">Install</string>
