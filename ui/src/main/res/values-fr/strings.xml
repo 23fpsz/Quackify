@@ -170,6 +170,9 @@
     <string name="crossfade_off">Désactivé</string>
     <string name="crossfade_seconds">%1$d s</string>
     <string name="crossfade_subtitle">Fait fondre la fin de chaque morceau dans le suivant au lieu de changer de titre brutalement.</string>
+    <string name="automix">Automix</string>
+    <string name="automix_subtitle">Transitions façon DJ qui calent le prochain morceau sur le beat et ajustent son tempo.</string>
+    <string name="automix_warning">Automix est en bêta. Il lit la grille de beats de chaque morceau et ajuste le tempo entrant pour enchaîner comme un DJ. Les morceaux sans grille retombent sur un simple fondu, et cela peut consommer des données.</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">Activer Canvas</string>
     <string name="turn_off_canvas">Désactiver Canvas</string>

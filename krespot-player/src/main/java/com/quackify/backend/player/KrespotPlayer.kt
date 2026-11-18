@@ -41,6 +41,8 @@ import kotlinx.coroutines.launch
 import com.quackify.backend.connect.command.AudioFile
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.api.AudioFeatures
+import com.quackify.backend.core.store.AppPrefs
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
@@ -69,6 +71,12 @@ private const val KEY_RESUME_FORMAT = "resumeFormat"
 private const val KEY_RESUME_AT = "resumeAt"
 
 private const val RESUME_WRITE_MS = 5_000L
+
+private const val CLIENT_STORE = "quackify.client"
+
+private const val CROSSFADE_MS_PREF = "crossfadeMs"
+
+private const val AUTOMIX_PREF = "automix"
 
 sealed interface PlayerEvent {
     data class Started(val uri: String = "") : PlayerEvent
@@ -266,13 +274,46 @@ class KrespotPlayer(private val context: Context) {
             if (still !== live || still.currentUri != askedFor || _state.value.trackUri != askedFor) {
                 return@launch
             }
-            if (!still.queueNext(track.uri, source, askedFor, file?.gainDb ?: 0.0)) return@launch
+            val spec = automixSpecFor(track, source)
+            if (!still.queueNext(track.uri, source, askedFor, file?.gainDb ?: 0.0, spec)) return@launch
             SongCache.touch(track.uri, context)
             queuedNextUri = track.uri
             queuedNextTrack = track
             queuedGainDb = file?.gainDb ?: 0.0
             log.i("queued next '${track.name}' ${if (cached != null) "from the warm source" else "after resolving"}")
         }
+    }
+
+    private fun automixEnabled(): Boolean =
+        AppPrefs.getBoolean(context, CLIENT_STORE, AUTOMIX_PREF, false)
+
+    /**
+     * Plans the DJ transition into [next] when automix is on and both sides
+     * have a beat grid, so the fade the engine holds is already sized in whole
+     * bars with the incoming track's tempo stretch decided. Null leaves the
+     * plain crossfade in charge.
+     */
+    private suspend fun automixSpecFor(next: CommandTrack, nextSource: AudioSource): TransitionSpec? {
+        if (!automixEnabled()) return null
+        if (AutomixPlanner.unmixable(next.name)) return null
+        val currentUri = _state.value.trackUri
+        if (!currentUri.startsWith("spotify:track:")) return null
+        if (!next.uri.startsWith("spotify:track:")) return null
+        val outGrid = AudioFeatures.grid(context, currentUri) ?: return null
+        val inGrid = AudioFeatures.grid(context, next.uri) ?: return null
+        val nextDurationMs = nextSource.seektable.totalDuration * 1000L / nextSource.seektable.timescale
+        val spec = AutomixPlanner.plan(
+            outGrid,
+            inGrid,
+            _state.value.durationMs,
+            nextDurationMs,
+            AppPrefs.getInt(context, CLIENT_STORE, CROSSFADE_MS_PREF, 0).toLong(),
+        )
+        log.i(
+            "automix into '${next.name}' fade=${spec.fadeMs}ms rate=${spec.incomingRate} " +
+                "lock=${spec.phaseLock}"
+        )
+        return spec
     }
 
     fun clearQueuedNext() {

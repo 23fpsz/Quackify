@@ -170,6 +170,9 @@
     <string name="crossfade_off">Aus</string>
     <string name="crossfade_seconds">%1$d s</string>
     <string name="crossfade_subtitle">Blendet das Ende jedes Titels in den nächsten über, statt Songs abrupt zu wechseln.</string>
+    <string name="automix">Automix</string>
+    <string name="automix_subtitle">DJ-Übergänge, die den nächsten Titel beatgenau und tempoverzerrt in den aktuellen einfügen.</string>
+    <string name="automix_warning">Automix ist beta. Es liest das Beat-Raster jedes Titels und passt das Tempo des nächsten an, um Songs wie ein DJ zu überblenden. Titel ohne Beat-Raster fallen auf einen einfachen Crossfade zurück, und es kann mehr Daten verbrauchen.</string>
     <string name="canvas">Canvas</string>
     <string name="turn_on_canvas">Canvas aktivieren</string>
     <string name="turn_off_canvas">Canvas deaktivieren</string>
