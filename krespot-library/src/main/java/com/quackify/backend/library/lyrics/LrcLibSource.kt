@@ -10,7 +10,7 @@ import kotlin.math.abs
 object LrcLibSource {
 
     private const val BASE = "https://lrclib.net/api"
-    private const val AGENT = "SpotiDuck (https://github.com/AldySan/SpotiDuck-Compose)"
+    private const val AGENT = "Quackify (https://github.com/23fpsz/Quackify)"
 
     suspend fun lyrics(
         context: Context,
