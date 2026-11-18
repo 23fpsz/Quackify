@@ -22,4 +22,5 @@ dependencies {
     api(project(":krespot-api"))
     api(project(":krespot-model"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.okhttp)
 }

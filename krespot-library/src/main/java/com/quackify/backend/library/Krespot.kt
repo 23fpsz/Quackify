@@ -40,5 +40,7 @@ object Krespot {
 
     val lyrics = LyricsSource
 
+    val lyricsRepository = com.quackify.backend.library.lyrics.LyricsRepository
+
     val transcripts = TranscriptSource
 }

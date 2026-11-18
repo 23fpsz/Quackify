@@ -73,6 +73,7 @@ import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.player.LyricsOptions
+import com.quackify.compose.sheets.LyricsProviderSheet
 import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import com.quackify.compose.widget.WidgetBackgroundStyle
@@ -130,6 +131,8 @@ fun SettingsScreen(
     // flip with them while the settings screen sits composed underneath.
     val lyricsEnabled = LyricsOptions.enabled
     val lyricsPreview = LyricsOptions.preview
+    val lyricsPrioritizeWordSynced = LyricsOptions.prioritizeWordSynced
+    val lyricsProviderOrder = LyricsOptions.providerOrder
     val account = remember { EncoreAuth.account(context) }
     val version = remember {
         runCatching {
@@ -174,6 +177,7 @@ fun SettingsScreen(
     var versionTaps by remember { mutableIntStateOf(0) }
     var widgetOptions by remember { mutableStateOf(WidgetOptionsStore.load(context)) }
     var category by remember { mutableStateOf<Int?>(null) }
+    var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
 
     BackHandler(enabled = category != null) {
         category = null
@@ -321,6 +325,55 @@ fun SettingsScreen(
                                 LyricsOptions.setPreview(context, on)
                             }
                         )
+                        SettingsToggleRow(
+                            title = stringResource(R.string.lyrics_prioritize_word_synced),
+                            subtitle = stringResource(R.string.lyrics_prioritize_word_synced_desc),
+                            isChecked = lyricsPrioritizeWordSynced,
+                            enabled = lyricsEnabled,
+                            onCheckedChange = { on ->
+                                LyricsOptions.setPrioritizeWordSynced(context, on)
+                            }
+                        )
+                        if (lyricsProviderSheetOpen) {
+                            LyricsProviderSheet(
+                                orderedProviders = lyricsProviderOrder,
+                                onOrderSelected = { order ->
+                                    LyricsOptions.setProviderOrder(context, order)
+                                },
+                                onDismiss = { lyricsProviderSheetOpen = false }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = lyricsEnabled) { lyricsProviderSheetOpen = true }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                                Text(
+                                    text = stringResource(R.string.lyrics_source),
+                                    style = EncoreTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (lyricsEnabled) EncoreColors.TextPrimary
+                                        else EncoreColors.TextSecondary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = stringResource(R.string.lyrics_source_desc),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
+                            Text(
+                                text = lyricsProviderOrder.firstOrNull()?.label.orEmpty(),
+                                style = EncoreTheme.typography.bodySmallBold.copy(
+                                    color = if (lyricsEnabled) EncoreColors.Green
+                                    else EncoreColors.TextSecondary
+                                )
+                            )
+                        }
                     }
 
                     item {

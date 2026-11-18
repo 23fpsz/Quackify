@@ -13,6 +13,7 @@ import com.quackify.compose.sheets.EntityOptionsSheet
 import com.quackify.compose.sheets.LibraryCreateSheet
 import com.quackify.compose.sheets.LibrarySortOption
 import com.quackify.compose.sheets.LibrarySortSheet
+import com.quackify.compose.sheets.LyricsProviderSheet
 import com.quackify.compose.sheets.SortDirection
 import com.quackify.compose.sheets.ProfileDrawerSheet
 import com.quackify.compose.sheets.SleepTimerOption
@@ -38,6 +39,7 @@ internal data class SheetFlags(
     val queue: Boolean = false,
     val sleepTimer: Boolean = false,
     val canvasResolutionSheet: Boolean = false,
+    val lyricsProviderSheet: Boolean = false,
 )
 
 @Composable
@@ -100,6 +102,9 @@ internal fun ShellSheets(
     onCanvasResolution: (Int) -> Unit = {},
     onCanvasResolutionClick: () -> Unit = {},
     onDismissCanvasResolution: () -> Unit = {},
+    lyricsProviderOrder: List<com.quackify.backend.library.lyrics.LyricsProvider> = com.quackify.backend.library.lyrics.LyricsProvider.offered,
+    onLyricsProviderOrder: (List<com.quackify.backend.library.lyrics.LyricsProvider>) -> Unit = {},
+    onDismissLyricsProvider: () -> Unit = {},
     onDismissProfile: () -> Unit,
     onDismissAccounts: () -> Unit,
     onSwitchAccount: (String) -> Unit,
@@ -262,6 +267,9 @@ internal fun ShellSheets(
         onDismissSleepTimer = onDismissSleepTimer,
         onCanvasResolution = onCanvasResolution,
         onDismissCanvasResolution = onDismissCanvasResolution,
+        lyricsProviderOrder = lyricsProviderOrder,
+        onLyricsProviderOrder = onLyricsProviderOrder,
+        onDismissLyricsProvider = onDismissLyricsProvider,
         onCreatePlaylist = onCreatePlaylist,
         onCreateFolder = onCreateFolder,
         onSortSelected = onSortSelected,
@@ -501,6 +509,9 @@ private fun ShellLibrarySheets(
     onDismissSleepTimer: () -> Unit,
     onCanvasResolution: (Int) -> Unit,
     onDismissCanvasResolution: () -> Unit,
+    lyricsProviderOrder: List<com.quackify.backend.library.lyrics.LyricsProvider>,
+    onLyricsProviderOrder: (List<com.quackify.backend.library.lyrics.LyricsProvider>) -> Unit,
+    onDismissLyricsProvider: () -> Unit,
     onCreatePlaylist: () -> Unit,
     onCreateFolder: () -> Unit,
     onSortSelected: (LibrarySortOption, SortDirection) -> Unit,
@@ -576,6 +587,14 @@ private fun ShellLibrarySheets(
             selectedHeight = canvasResolution,
             onHeightSelected = onCanvasResolution,
             onDismiss = onDismissCanvasResolution
+        )
+    }
+
+    if (flags.lyricsProviderSheet) {
+        LyricsProviderSheet(
+            orderedProviders = lyricsProviderOrder,
+            onOrderSelected = onLyricsProviderOrder,
+            onDismiss = onDismissLyricsProvider
         )
     }
 }

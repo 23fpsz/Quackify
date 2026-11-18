@@ -164,7 +164,8 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             device = flags.isDeviceSheetOpen,
             queue = flags.isQueueSheetOpen,
             sleepTimer = flags.isSleepTimerOpen,
-            canvasResolutionSheet = flags.isCanvasResolutionSheetOpen
+            canvasResolutionSheet = flags.isCanvasResolutionSheetOpen,
+            lyricsProviderSheet = flags.isLyricsProviderSheetOpen
         ),
         selectedTrack = local.trackForOptions,
         devices = playbackState?.devices.orEmpty(),
@@ -275,6 +276,9 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         onLyricsUnderCoverToggle = { LyricsOptions.setPreview(env.context, !LyricsOptions.preview) },
         canvasResolution = env.canvasResolution,
         onCanvasResolution = { res -> env.onCanvasResolution?.invoke(res) },
+        lyricsProviderOrder = LyricsOptions.providerOrder,
+        onLyricsProviderOrder = { order -> LyricsOptions.setProviderOrder(env.context, order) },
+        onDismissLyricsProvider = { flags.isLyricsProviderSheetOpen = false },
         onDismissProfile = { flags.isProfileDrawerOpen = false },
         onDismissAccounts = { flags.isAccountsSheetOpen = false },
         onSwitchAccount = { id -> env.onSwitchAccount?.invoke(id) },
