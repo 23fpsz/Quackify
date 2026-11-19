@@ -88,8 +88,6 @@ import com.quackify.backend.library.lyrics.translationLanguageName
 import java.util.Locale
 import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
-import com.quackify.compose.widget.WidgetBackgroundStyle
-import com.quackify.compose.widget.WidgetOptionsStore
 import androidx.compose.ui.res.stringResource
 
 data class AppUpdate(
@@ -215,7 +213,6 @@ fun SettingsScreen(
         mutableStateOf(clientPrefs.getBoolean("debugLogging", false))
     }
     var versionTaps by remember { mutableIntStateOf(0) }
-    var widgetOptions by remember { mutableStateOf(WidgetOptionsStore.load(context)) }
     var category by remember { mutableStateOf<Int?>(null) }
     var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
     var translationLanguageSheetOpen by remember { mutableStateOf(false) }
@@ -299,7 +296,7 @@ fun SettingsScreen(
                         )
                         SettingsCategoryRow(
                             title = stringResource(R.string.personalization),
-                            description = stringResource(R.string.app_icon_and_home_screen_widgets),
+                            description = stringResource(R.string.app_icon),
                             onClick = { category = 1 }
                         )
                         SettingsCategoryRow(
@@ -549,76 +546,6 @@ fun SettingsScreen(
 
                 }
                 if (target == 1) {
-                    item {
-                        SettingsSectionHeader(title = stringResource(R.string.widget))
-                        Text(
-                            text = stringResource(R.string.home_screen_widgets_come_in_4x1_3x2_and_3x3_size),
-                            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                        SettingsToggleRow(
-                            title = stringResource(R.string.show_artwork),
-                            subtitle = stringResource(R.string.display_the_album_cover_on_the_widgets),
-                            isChecked = widgetOptions.showArtwork,
-                            enabled = true,
-                            onCheckedChange = { on ->
-                                widgetOptions = widgetOptions.copy(showArtwork = on)
-                                WidgetOptionsStore.saveShowArtwork(context, on)
-                            }
-                        )
-                        SettingsToggleRow(
-                            title = stringResource(R.string.show_like_button),
-                            subtitle = stringResource(R.string.keep_the_heart_beside_the_playback_controls),
-                            isChecked = widgetOptions.showLike,
-                            enabled = true,
-                            onCheckedChange = { on ->
-                                widgetOptions = widgetOptions.copy(showLike = on)
-                                WidgetOptionsStore.saveShowLike(context, on)
-                            }
-                        )
-                        SettingsToggleRow(
-                            title = stringResource(R.string.show_progress_bar),
-                            subtitle = stringResource(R.string.a_thin_playback_line_on_the_3x2_and_3x3_widgets),
-                            isChecked = widgetOptions.showProgress,
-                            enabled = true,
-                            onCheckedChange = { on ->
-                                widgetOptions = widgetOptions.copy(showProgress = on)
-                                WidgetOptionsStore.saveShowProgress(context, on)
-                            }
-                        )
-                        Text(
-                            text = stringResource(R.string.background),
-                            style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            SettingsChipOption(
-                                label = stringResource(R.string.dark),
-                                selected = widgetOptions.background == WidgetBackgroundStyle.DARK,
-                                onClick = {
-                                    widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.DARK)
-                                    WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.DARK)
-                                }
-                            )
-                            SettingsChipOption(
-                                label = stringResource(R.string.artwork_tint),
-                                selected = widgetOptions.background == WidgetBackgroundStyle.TINTED,
-                                onClick = {
-                                    widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.TINTED)
-                                    WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.TINTED)
-                                }
-                            )
-                            SettingsChipOption(
-                                label = stringResource(R.string.transparent),
-                                selected = widgetOptions.background == WidgetBackgroundStyle.TRANSPARENT,
-                                onClick = {
-                                    widgetOptions = widgetOptions.copy(background = WidgetBackgroundStyle.TRANSPARENT)
-                                    WidgetOptionsStore.saveBackground(context, WidgetBackgroundStyle.TRANSPARENT)
-                                }
-                            )
-                        }
-                    }
-
                     item {
                         SettingsSectionHeader(title = stringResource(R.string.app_icon))
                         Text(
@@ -1206,31 +1133,6 @@ private fun SettingsIconOption(
             )
         )
     }
-}
-
-@Composable
-private fun SettingsChipOption(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Text(
-        text = label,
-        style = EncoreTheme.typography.bodySmall.copy(
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) Color.White else EncoreColors.TextSecondary
-        ),
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) EncoreColors.Green else EncoreColors.Card)
-            .border(
-                width = 1.dp,
-                color = if (selected) EncoreColors.Green else EncoreColors.Divider,
-                shape = RoundedCornerShape(16.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-    )
 }
 
 @Composable

@@ -2,11 +2,8 @@ package com.quackify.app.widget
 
 import android.content.Context
 import android.os.SystemClock
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.updateAll
 import com.quackify.app.PlaybackHost
 import com.quackify.backend.core.log.Logs
-import com.quackify.compose.widget.WidgetOptionsStore
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -81,8 +78,7 @@ object WidgetSync {
                             ?.let { WidgetSnapshot.from(it.state, it.progress) }
                             ?.takeIf { it.hasTrack }
                         val snapshot = resolve(live, app)
-                        val options = WidgetOptionsStore.load(app)
-                        val key = "${snapshot.fingerprint()}|$options"
+                        val key = snapshot.fingerprint()
                         if (key != lastKey) {
                             lastKey = key
                             if (live != null && !overrideActive()) {
@@ -124,9 +120,6 @@ object WidgetSync {
     }
 
     suspend fun refresh(context: Context) {
-        updateAllSafely(QuackifyWidget4x1(), context)
-        updateAllSafely(QuackifyWidget3x2(), context)
-        updateAllSafely(QuackifyWidget3x3(), context)
         try {
             HomeWidget.updateAllWidgets(context)
         } catch (t: Throwable) {
@@ -141,16 +134,6 @@ object WidgetSync {
             SquareArtWidget.updateAllWidgets(context)
         } catch (t: Throwable) {
             log.w("SquareArtWidget update failed: ${t.message}", t)
-        }
-    }
-
-    private suspend fun updateAllSafely(widget: GlanceAppWidget, context: Context) {
-        try {
-            widget.updateAll(context)
-        } catch (canceled: CancellationException) {
-            throw canceled
-        } catch (t: Throwable) {
-            log.w("widget update failed ${t.javaClass.simpleName}: ${t.message}", t)
         }
     }
 }
