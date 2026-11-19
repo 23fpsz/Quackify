@@ -35,6 +35,8 @@ data class TrackRow(
     val saved: Boolean? = null,
     val albumUri: String = "",
     val artistUri: String = "",
+    /** Every credited artist's uri, in display order; the first one mirrors [artistUri]. */
+    val artistUris: List<String> = emptyList(),
     val discNumber: Int = 1,
     val trackNumber: Int = 0,
     val video: Boolean = false,
@@ -51,9 +53,13 @@ data class TrackItem(
     val durationMs: Long = 0L,
     val albumUri: String = "",
     val artistUri: String = "",
+    /** Every credited artist's uri, in display order; the first one mirrors [artistUri]. */
+    val artistUris: List<String> = emptyList(),
     val albumName: String = "",
     val discNumber: Int = 1,
     val trackNumber: Int = 0,
     val hasVideo: Boolean = false,
     val addedAt: Long = 0L,
+    /** False when the catalogue row is unavailable in this market or account. */
+    val playable: Boolean = true,
 )

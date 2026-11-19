@@ -48,6 +48,7 @@
     <string name="go_to_artist">Ir para o artista</string>
     <string name="go_to_album_radio">Ir para a rádio do álbum</string>
     <string name="go_to_artist_radio">Ir para a rádio do artista</string>
+<string name="view_artist">Ver artista</string>
     <string name="go_to_song_radio">Ir para a rádio da música</string>
     <string name="go_to_playlist_radio">Ir para a rádio da playlist</string>
     <string name="go_to_show">Ir para o show</string>

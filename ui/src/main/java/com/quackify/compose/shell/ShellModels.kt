@@ -125,6 +125,8 @@ data class ComposePlaybackState(
     val connectedDevice: String = "",
     val trackUri: String = "",
     val artistUri: String = "",
+    /** Every credited artist's uri on the playing track, in display order. */
+    val artistUris: List<String> = emptyList(),
     val albumUri: String = "",
     val activeDeviceName: String = "",
     val activeDeviceId: String = "",
@@ -248,6 +250,7 @@ internal class ShellUiFlags {
     var isCreatePlaylistOpen by mutableStateOf(false)
     var isContributorsOpen by mutableStateOf(false)
     var isLogcatOpen by mutableStateOf(false)
+    var isArtistListOpen by mutableStateOf(false)
 }
 
 internal class ShellActiveEntity {

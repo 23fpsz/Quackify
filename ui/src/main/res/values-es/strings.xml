@@ -130,6 +130,7 @@
     <string name="go_to_album_radio">Ir a la radio del álbum</string>
     <string name="go_to_artist">Ir al artista</string>
     <string name="go_to_artist_radio">Ir a la radio del artista</string>
+<string name="view_artist">Ver artista</string>
     <string name="go_to_show">Ir al show</string>
     <string name="go_to_song_radio">Ir a la radio de la canción</string>
     <string name="home_screen_widgets_come_in_4x1_3x2_and_3x3_size">Los widgets de la pantalla de inicio vienen en tamaños 4x1, 3x2 y 3x3. Los cambios aparecen la próxima vez que se actualicen.</string>

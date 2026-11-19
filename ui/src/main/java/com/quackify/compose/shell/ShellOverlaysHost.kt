@@ -14,6 +14,8 @@ import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.share.Share
 import com.quackify.compose.sheets.AddToPlaylistSheet
 import com.quackify.compose.sheets.ArtistAboutSheet
+import com.quackify.compose.sheets.ArtistListEntry
+import com.quackify.compose.sheets.ArtistListSheet
 import com.quackify.compose.sheets.CreditsSheet
 import com.quackify.compose.sheets.DiscographySheet
 import com.quackify.compose.sheets.EncoreCreateNameDialog
@@ -280,6 +282,29 @@ internal fun ShellOverlaySheets(
             onDismiss = { flags.isArtistAboutOpen = false },
             onLinkClick = { link -> Share.openUrl(context, link) }
         )
+    }
+
+    if (flags.isArtistListOpen) {
+        // The playing track credits two or more artists: the sheet walks the
+        // credit list, pairing each displayed name with its uri, and opens
+        // the artist page the row picks. With one artist (or none known) it
+        // degrades to the plain open-artist path.
+        val names = playbackState?.artist.orEmpty().split(", ").filter { it.isNotBlank() }
+        val uris = playbackState?.artistUris.orEmpty().filter { it.startsWith("spotify:artist:") }
+        val entries = names.zip(uris).map { (name, uri) -> ArtistListEntry(name = name, uri = uri) }
+        if (entries.size > 1) {
+            ArtistListSheet(
+                artists = entries,
+                onDismiss = { flags.isArtistListOpen = false },
+                onViewArtist = { entry ->
+                    flags.isArtistListOpen = false
+                    openArtist(entry.name, entry.uri)
+                }
+            )
+        } else {
+            flags.isArtistListOpen = false
+            openArtist(names.firstOrNull().orEmpty(), uris.firstOrNull().orEmpty())
+        }
     }
 
     if (flags.isDiscographyOpen) {

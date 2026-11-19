@@ -396,9 +396,11 @@ fun EncoreTrackRow(
     saved: Boolean? = null,
     artistUri: String = "",
     onLikeToggle: (() -> Unit)? = null,
-    onAddToQueue: (() -> Unit)? = null
+    onAddToQueue: (() -> Unit)? = null,
+    playable: Boolean = true
 ) {
     val isBanned = com.quackify.compose.bans.ArtistBans.isBanned(artistUri)
+    val isDimmed = isBanned || !playable
     SwipeToQueueBox(
         onAddToQueue = onAddToQueue?.takeIf { !isBanned },
         modifier = modifier
@@ -425,7 +427,10 @@ fun EncoreTrackRow(
                     } else {
                         Text(
                             text = trackNumber.toString(),
-                            style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                            style = EncoreTheme.typography.bodyMedium.copy(
+                                color = if (isDimmed) EncoreColors.TextSecondary.copy(alpha = 0.55f)
+                                else EncoreColors.TextSecondary
+                            )
                         )
                     }
                 }
@@ -434,7 +439,7 @@ fun EncoreTrackRow(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .graphicsLayer { alpha = if (isBanned) 0.4f else 1f },
+                        .graphicsLayer { alpha = if (isDimmed) 0.4f else 1f },
                     contentAlignment = Alignment.Center
                 ) {
                     EncoreArtworkImage(
@@ -472,7 +477,7 @@ fun EncoreTrackRow(
                         fontWeight = FontWeight.SemiBold,
                         color = when {
                             isPlaying -> EncoreColors.Green
-                            isBanned -> EncoreColors.TextSecondary.copy(alpha = 0.55f)
+                            isDimmed -> EncoreColors.TextSecondary.copy(alpha = 0.55f)
                             else -> EncoreColors.TextPrimary
                         }
                     ),
@@ -497,7 +502,7 @@ fun EncoreTrackRow(
                     Text(
                         text = artist,
                         style = EncoreTheme.typography.bodySmall.copy(
-                            color = EncoreColors.TextSecondary.takeIf { !isBanned }
+                            color = EncoreColors.TextSecondary.takeIf { !isDimmed }
                                 ?: EncoreColors.TextSecondary.copy(alpha = 0.55f)
                         ),
                         maxLines = 1,
@@ -506,7 +511,7 @@ fun EncoreTrackRow(
                 }
             }
 
-            if (onLikeToggle != null && !isBanned) {
+            if (onLikeToggle != null && !isBanned && playable) {
                 EncoreHeartButton(
                     isLiked = saved == true,
                     onLikeToggle = onLikeToggle,

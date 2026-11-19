@@ -173,6 +173,7 @@
     <string name="go_to_album_radio">Go to album radio</string>
     <string name="go_to_artist">Go to artist</string>
     <string name="go_to_artist_radio">Go to artist radio</string>
+<string name="view_artist">View artist</string>
     <string name="go_to_show">Go to show</string>
     <string name="go_to_song_radio">Go to song radio</string>
     <string name="pause_on_disconnect">Pause on disconnect</string>

@@ -48,6 +48,7 @@
     <string name="go_to_artist">アーティストを見る</string>
     <string name="go_to_album_radio">アルバムラジオを見る</string>
     <string name="go_to_artist_radio">アーティストラジオを見る</string>
+<string name="view_artist">アーティストを見る</string>
     <string name="go_to_song_radio">楽曲ラジオを見る</string>
     <string name="go_to_playlist_radio">プレイリストラジオを見る</string>
     <string name="go_to_show">番組を見る</string>
