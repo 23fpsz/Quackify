@@ -1845,6 +1845,7 @@ class MainActivity : ComponentActivity() {
             onSearchSubmit = { query ->
                 RecentSearches.recordQuery(context, query)
                 submittedSearchQuery = query
+                scope.launch { Search.saveRecent(context, listOf(Search.searchUriOf(query))) }
             },
             searchSuggestionHits = searchHits,
             browseCategories = browseCategories,
@@ -1877,12 +1878,20 @@ class MainActivity : ComponentActivity() {
             searchQuery = searchTerm,
             searchData = searchData,
             onClearRecentSearches = {
+                val uris = RecentSearches.all(context)
+                    .mapNotNull { it.uri.takeIf { uri -> uri.startsWith("spotify:") } }
                 RecentSearches.clear(context)
                 log.i("cleared the recent searches on this device")
+                if (uris.isNotEmpty()) {
+                    scope.launch { Search.removeRecent(context, uris) }
+                }
             },
             onRemoveRecentSearch = { item ->
                 RecentSearches.remove(context, item.uri.ifBlank { item.title })
                 log.i("removed '${item.title}' from the recent searches")
+                if (item.uri.startsWith("spotify:")) {
+                    scope.launch { Search.removeRecent(context, listOf(item.uri)) }
+                }
             },
             onPromoteRecentSearch = { item ->
                 RecentSearches.promote(context, item.uri.ifBlank { item.title })
@@ -1891,6 +1900,9 @@ class MainActivity : ComponentActivity() {
             onRecordRecentSearch = { hit ->
                 RecentSearches.record(context, hit)
                 log.i("recorded '${hit.title}' in the recent searches")
+                if (hit.uri.isNotBlank()) {
+                    scope.launch { Search.saveRecent(context, listOf(hit.uri)) }
+                }
                 val submitted = submittedSearchQuery
                 if (submitted != null && searchTerm.trim() == submitted) {
                     RecentSearches.remove(context, submitted)
