@@ -10,6 +10,7 @@
     <string name="next">Próxima</string>
     <string name="shuffle">Aleatório</string>
     <string name="queue">Fila</string>
+    <string name="queue_reordered">Fila reordenada</string>
     <string name="lyrics">Letras</string>
     <string name="transcript">Transcrição</string>
     <string name="more">Mais</string>
@@ -57,6 +58,7 @@
     <string name="remove_from_liked_songs">Remover das músicas curtidas</string>
     <string name="remove_from_playlist">Remover da playlist</string>
     <string name="remove_from_queue">Remover da fila</string>
+    <string name="removed_from_queue">Removido da fila</string>
     <string name="add_to_your_library">Adicionar à Sua Biblioteca</string>
     <string name="remove_from_your_library">Remover da Sua Biblioteca</string>
     <string name="save_to_your_library">Salvar na Sua Biblioteca</string>

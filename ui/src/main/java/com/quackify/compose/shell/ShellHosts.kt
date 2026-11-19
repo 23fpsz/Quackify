@@ -14,6 +14,7 @@ import com.quackify.backend.model.PlaylistPermissions
 import com.quackify.backend.model.ProfileUser
 import com.quackify.backend.model.SearchHit
 import com.quackify.backend.model.ShowDetail
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.library.LibraryItem
@@ -112,6 +113,7 @@ internal class ShellHosts(
     val onAddToPlaylist: ((TrackItem) -> Unit)?,
     val context: Context,
     val handleQueueAdd: (String) -> Unit,
+    val toastState: QuackifyToastState? = null,
     val copyEntityLink: (String) -> Unit,
     val savedAccounts: List<EncoreAuth.Account>,
     val activeAccountId: String,
@@ -305,6 +307,7 @@ internal class ShellHosts(
         connectedDevice = connectedDevice,
         handleBack = handleBack,
         handleQueueAdd = handleQueueAdd,
+        toastState = toastState,
         blockedOffline = { actions.blockedOffline() },
         shareEntity = shareEntity,
         copyEntityLink = copyEntityLink,

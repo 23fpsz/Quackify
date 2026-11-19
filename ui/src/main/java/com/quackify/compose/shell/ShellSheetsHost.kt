@@ -15,6 +15,7 @@ import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.ShowDetail
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.player.LyricsOptions
 import com.quackify.compose.sheets.EntityOptions
@@ -45,6 +46,7 @@ internal class ShellSheetsEnv(
     val connectedDevice: String,
     val handleBack: () -> Unit,
     val handleQueueAdd: (String) -> Unit,
+    val toastState: QuackifyToastState? = null,
     /** Returns true (and fires the offline toast) when a play/queue action
      * must be refused because the network watchdog says we are offline. */
     val blockedOffline: () -> Boolean = { false },
@@ -367,6 +369,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         onSelectDevice = { id -> env.setLocalDevice(id); flags.isDeviceSheetOpen = false; env.playerListener?.onSelectDevice(id) },
         onDeviceVisible = { visible -> env.playerListener?.onDeviceSheetVisible(visible) },
         userQueue = playbackState?.queue.orEmpty(),
+        toastState = env.toastState,
         trackTasteExcluded = env.trackTasteExcluded,
         trackPlaysOverride = local.trackOptionsPlays,
         onToggleTasteExclusion = toggle@{ exclude ->

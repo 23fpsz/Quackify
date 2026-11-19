@@ -24,6 +24,8 @@ import com.quackify.compose.shell.ChapterMarker
 import com.quackify.compose.shell.ComposePlaybackState
 import com.quackify.compose.shell.ComposePlayerListener
 import com.quackify.compose.shell.PlaybackProgress
+import com.quackify.compose.shell.QueueEditKind
+import com.quackify.compose.shell.QueueEditResult
 import com.quackify.compose.sheets.SleepTimerOption
 import com.quackify.backend.connect.KrespotConnect
 import com.quackify.backend.connect.cluster.ClusterState
@@ -117,6 +119,10 @@ const val CHAIN_CONTEXT_PREF = "chainContext"
 const val CHAIN_ROWS_PREF = "chainRows"
 
 private const val QUEUE_RETRY_MS = 1200L
+
+/** How long an optimistic queue edit may stay on screen waiting for the
+ * server's answer before the cluster's own order takes over again. */
+private const val QUEUE_SETTLE_MAX_MS = 30_000L
 
 private const val REASON_TRACKDONE = "trackdone"
 
@@ -404,6 +410,16 @@ class PlaybackBridge(private val context: Context) {
     private var promotedContext: Set<String> = emptySet()
     private var promotedContextFor: String = ""
 
+    /** The queue order the user just set, mirrored on screen before the
+     * server answers. publishQueue keeps showing these rows until the
+     * cluster reports a new queue revision (or the write is refused). */
+    private var pendingQueueOrder: List<String> = emptyList()
+    private var pendingQueueRows: List<TrackItem> = emptyList()
+    private var pendingContextRows: List<TrackItem> = emptyList()
+    private var pendingQueueRevision: String = ""
+    private var pendingQueueAt = 0L
+    private var queueEditSerial = 0L
+
     @Volatile
     private var pendingShuffle: Boolean? = null
 
@@ -520,6 +536,10 @@ class PlaybackBridge(private val context: Context) {
     }
 
     var state by mutableStateOf(ComposePlaybackState())
+
+    /** Bumped whenever the server confirms a queue edit the user made, so
+     * the shell can toast the outcome. */
+    var queueEditResult by mutableStateOf(QueueEditResult())
         private set
 
     val progress = PlaybackProgress()
@@ -747,12 +767,54 @@ class PlaybackBridge(private val context: Context) {
         }
 
         override fun onQueueSet(uris: List<String>) {
-            scope.launch {
-                val cluster = connect.cluster.value
-                if (cluster == null) {
-                    log.w("queue set ignored, no cluster yet")
-                    return@launch
+            val cluster = connect.cluster.value
+            if (cluster == null) {
+                log.w("queue set ignored, no cluster yet")
+                return
+            }
+            if (uris.isEmpty()) return
+            val previousQueue = state.queue
+            val previousContext = state.queueFromContext
+            val previousTail = queuedTail
+            val sameRows = uris.sorted() ==
+                (previousQueue.map { it.uri } + previousContext.map { it.uri })
+                    .filter { it.isNotBlank() }.sorted()
+            val queuePool = previousQueue.toMutableList()
+            val contextPool = previousContext.toMutableList()
+            fun takeFrom(pool: MutableList<TrackItem>, uri: String): TrackItem? {
+                val at = pool.indexOfFirst { it.uri == uri }
+                return if (at >= 0) pool.removeAt(at) else null
+            }
+            val pendingRows = mutableListOf<TrackItem>()
+            val pendingContext = mutableListOf<TrackItem>()
+            val tail = mutableListOf<TrackItem>()
+            uris.forEach { uri ->
+                val fromQueue = takeFrom(queuePool, uri)
+                if (fromQueue != null) {
+                    pendingRows += fromQueue
+                    tail += fromQueue
+                    return@forEach
                 }
+                val fromContext = takeFrom(contextPool, uri)
+                if (fromContext != null) {
+                    pendingContext += fromContext
+                    tail += fromContext
+                    return@forEach
+                }
+                val known = previousTail.firstOrNull { it.uri == uri }
+                    ?: TrackItem(title = "", artist = "", uri = uri)
+                pendingRows += known
+                tail += known
+            }
+            val editId = ++queueEditSerial
+            pendingQueueOrder = uris
+            pendingQueueRows = pendingRows
+            pendingContextRows = pendingContext
+            pendingQueueRevision = cluster.queueRevision
+            pendingQueueAt = SystemClock.elapsedRealtime()
+            queuedTail = tail
+            publishQueue(cluster)
+            scope.launch {
                 val allowed = uris.filter { uri ->
                     val artist = artistUriOf(uri)
                     artist.isBlank() || !ArtistBanStore.banned(context, artist)
@@ -760,18 +822,29 @@ class PlaybackBridge(private val context: Context) {
                 if (allowed.size < uris.size) {
                     log.i("queue set: dropped ${uris.size - allowed.size} banned row(s)")
                 }
-                if (allowed.isEmpty()) return@launch
-                val promoted = state.queueFromContext.map { it.uri }.filter { it.isNotBlank() }
-                if (!writeQueue(allowed, cluster)) return@launch
-                val local = queuedTail.associateBy { it.uri }
-                queuedTail = allowed.map { local[it] ?: TrackItem(title = "", artist = "", uri = it) }
-                if (promoted.isNotEmpty()) {
-                    promotedContext = promotedContext + promoted
-                    promotedContextFor = cluster.contextUri
-                    log.i("queue: ${promoted.size} context row(s) queued, their context copies get skipped")
+                if (allowed.isNotEmpty() && writeQueue(allowed, cluster)) {
+                    if (editId == queueEditSerial) {
+                        reportQueueEdit(if (sameRows) QueueEditKind.REORDER else QueueEditKind.REMOVE)
+                    }
+                    val promoted = previousContext.map { it.uri }.filter { it.isNotBlank() }
+                    if (promoted.isNotEmpty()) {
+                        promotedContext = promotedContext + promoted
+                        promotedContextFor = cluster.contextUri
+                        log.i("queue: ${promoted.size} context row(s) queued, their context copies get skipped")
+                    }
+                    publishQueue(connect.cluster.value)
+                    connect.refreshCluster(force = true)
+                    return@launch
                 }
-                publishQueue(cluster)
-                connect.refreshCluster()
+                if (editId == queueEditSerial) {
+                    pendingQueueOrder = emptyList()
+                    pendingQueueRows = emptyList()
+                    pendingContextRows = emptyList()
+                    queuedTail = previousTail
+                    state = state.copy(queue = previousQueue, queueFromContext = previousContext)
+                    log.w("queue set rolled back, the server refused the new order")
+                    publishQueue(connect.cluster.value)
+                }
             }
         }
     }
@@ -3934,7 +4007,26 @@ class PlaybackBridge(private val context: Context) {
         local = true,
     )
 
+    private fun reportQueueEdit(kind: QueueEditKind) {
+        queueEditResult = QueueEditResult(queueEditResult.id + 1, kind)
+    }
+
+    private fun settlePendingQueue(cluster: ClusterState?) {
+        if (pendingQueueOrder.isEmpty()) return
+        val settled = SystemClock.elapsedRealtime() - pendingQueueAt > QUEUE_SETTLE_MAX_MS ||
+            cluster?.queueRevision != pendingQueueRevision ||
+            cluster != null && cluster.nextTracks
+                .filter { it.isVisible }.map { it.uri } == pendingQueueOrder
+        if (!settled) return
+        log.i("queue edit settled after ${SystemClock.elapsedRealtime() - pendingQueueAt}ms, " +
+            "the server order takes over")
+        pendingQueueOrder = emptyList()
+        pendingQueueRows = emptyList()
+        pendingContextRows = emptyList()
+    }
+
     private fun publishQueue(cluster: ClusterState?) {
+        settlePendingQueue(cluster)
         val loaded = player.state.value.trackUri
         val anchor = (if (pendingActive()) pendingTrack else "")
             .ifBlank { loaded }
@@ -3966,7 +4058,13 @@ class PlaybackBridge(private val context: Context) {
             ?.map { uri -> decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri) }
             ?.filterNot { bannedCachedUri(it.uri) }
             .orEmpty()
-        val contextRows = localRows.ifEmpty { serverRows }
+        val contextRows = if (pendingQueueOrder.isNotEmpty()) {
+            pendingContextRows
+                .map { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
+                .filterNot { bannedCachedUri(it.uri) }
+        } else {
+            localRows.ifEmpty { serverRows }
+        }
         val radio = server && follows &&
                 cluster!!.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
         val label = if (server && follows && !radio && !single) {
@@ -3974,7 +4072,12 @@ class PlaybackBridge(private val context: Context) {
                 state.queueContextLabel.takeIf { state.queueContext == context }.orEmpty()
             }.ifBlank { playlistLabelOf(context) }
         } else ""
-        val queued = if (server) {
+        val queued = if (pendingQueueOrder.isNotEmpty()) {
+            val shown = pendingQueueRows.mapTo(HashSet()) { it.uri }
+            (pendingQueueRows + queuedTail.filterNot { it.uri in shown })
+                .map { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
+                .filterNot { bannedCachedUri(it.uri) }
+        } else if (server) {
             val onServer = cluster!!.queued
                 .map { it.asTrackItem() }
                 .filterNot { bannedCachedUri(it.uri) }

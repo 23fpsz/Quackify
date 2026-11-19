@@ -158,6 +158,13 @@ data class ChapterMarker(
     val endMs: Long,
 )
 
+enum class QueueEditKind { REMOVE, REORDER }
+
+data class QueueEditResult(
+    val id: Int = 0,
+    val kind: QueueEditKind = QueueEditKind.REMOVE,
+)
+
 interface ComposePlayerListener {
     fun onPlayPause() {}
     fun onSkipNext() {}

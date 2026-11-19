@@ -10,6 +10,7 @@
     <string name="next">次の曲</string>
     <string name="shuffle">シャッフル</string>
     <string name="queue">キュー</string>
+    <string name="queue_reordered">キューの順序を変更しました</string>
     <string name="lyrics">歌詞</string>
     <string name="transcript">文字起こし</string>
     <string name="more">その他</string>
@@ -57,6 +58,7 @@
     <string name="remove_from_liked_songs">お気に入りから削除</string>
     <string name="remove_from_playlist">プレイリストから削除</string>
     <string name="remove_from_queue">キューから削除</string>
+    <string name="removed_from_queue">キューから削除しました</string>
     <string name="add_to_your_library">ライブラリに追加</string>
     <string name="remove_from_your_library">ライブラリから削除</string>
     <string name="save_to_your_library">ライブラリに保存</string>

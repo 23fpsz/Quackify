@@ -24,6 +24,7 @@ import com.quackify.compose.sheets.EncoreQueueSheet
 import com.quackify.compose.sheets.ShowOptionsSheet
 import com.quackify.compose.sheets.TrackOptionsSheet
 import com.quackify.compose.sheets.toEncoreDevice
+import com.quackify.compose.components.QuackifyToastState
 
 internal data class SheetFlags(
     val profileDrawer: Boolean = false,
@@ -51,6 +52,7 @@ internal fun ShellSheets(
     connectedDevice: String,
     userQueue: List<TrackItem>,
     queueFromContext: List<TrackItem>,
+    toastState: QuackifyToastState? = null,
     trackTasteExcluded: Boolean? = null,
     trackPlaysOverride: Long? = null,
     onToggleTasteExclusion: (Boolean) -> Unit = {},
@@ -254,6 +256,7 @@ internal fun ShellSheets(
         connectedDevice = connectedDevice,
         userQueue = userQueue,
         queueFromContext = queueFromContext,
+        toastState = toastState,
         queueSourceContext = queueSourceContext,
         currentTrackUri = currentTrackUri,
         currentTrackTitle = currentTrackTitle,
@@ -496,6 +499,7 @@ private fun ShellLibrarySheets(
     connectedDevice: String,
     userQueue: List<TrackItem>,
     queueFromContext: List<TrackItem>,
+    toastState: QuackifyToastState? = null,
     queueSourceContext: String,
     currentTrackUri: String,
     currentTrackTitle: String,
@@ -570,7 +574,8 @@ private fun ShellLibrarySheets(
             onDismissRequest = onDismissQueue,
             onTrackSelect = onQueueTrackSelect,
             onRemoveFromQueue = onRemoveFromQueue,
-            onReorderQueue = onReorderQueue
+            onReorderQueue = onReorderQueue,
+            toastState = toastState
         )
     }
 

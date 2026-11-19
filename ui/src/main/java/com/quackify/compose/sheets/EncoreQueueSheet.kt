@@ -48,6 +48,8 @@ import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayIndicator
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.components.QuackifyToastHost
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.playlist.EditableTrackItem
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.playlist.dragHandle
@@ -77,6 +79,7 @@ fun EncoreQueueSheet(
     onTrackSelect: (TrackItem) -> Unit,
     onRemoveFromQueue: (TrackItem) -> Unit = {},
     onReorderQueue: (List<TrackItem>) -> Unit = {},
+    toastState: QuackifyToastState? = null,
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -240,6 +243,15 @@ fun EncoreQueueSheet(
                         Spacer(modifier = Modifier.height(EncoreSpacers.Base))
                     }
                 }
+            }
+
+            if (toastState != null && toastState.entries.isNotEmpty()) {
+                QuackifyToastHost(
+                    state = toastState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = EncoreSpacers.Tighter)
+                )
             }
         }
     }

@@ -10,6 +10,7 @@
     <string name="next">Далее</string>
     <string name="shuffle">Перемешать</string>
     <string name="queue">Очередь</string>
+    <string name="queue_reordered">Порядок очереди изменён</string>
     <string name="lyrics">Текст песни</string>
     <string name="transcript">Расшифровка</string>
     <string name="more">Ещё</string>
@@ -57,6 +58,7 @@
     <string name="remove_from_liked_songs">Убрать из любимых треков</string>
     <string name="remove_from_playlist">Убрать из плейлиста</string>
     <string name="remove_from_queue">Убрать из очереди</string>
+    <string name="removed_from_queue">Удалено из очереди</string>
     <string name="add_to_your_library">Добавить в медиатеку</string>
     <string name="remove_from_your_library">Убрать из медиатеки</string>
     <string name="save_to_your_library">Сохранить в медиатеку</string>
