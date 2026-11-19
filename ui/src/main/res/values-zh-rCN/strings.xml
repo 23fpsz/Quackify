@@ -10,6 +10,7 @@
     <string name="next">下一首</string>
     <string name="shuffle">随机播放</string>
     <string name="queue">播放队列</string>
+    <string name="queue_reordered">播放队列已重新排序</string>
     <string name="lyrics">歌词</string>
     <string name="transcript">文字稿</string>
     <string name="more">更多</string>
@@ -57,6 +58,7 @@
     <string name="remove_from_liked_songs">从喜欢的歌曲中移除</string>
     <string name="remove_from_playlist">从歌单中移除</string>
     <string name="remove_from_queue">从播放队列中移除</string>
+    <string name="removed_from_queue">已从播放队列中移除</string>
     <string name="add_to_your_library">添加到你的媒体库</string>
     <string name="remove_from_your_library">从你的媒体库中移除</string>
     <string name="save_to_your_library">保存到你的媒体库</string>

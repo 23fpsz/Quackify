@@ -161,6 +161,7 @@ fun EncoreAppShell(
     progressState: PlaybackProgress? = null,
     playerListener: ComposePlayerListener? = null,
     expandPlayerSignal: Int = 0,
+    queueEditResult: QueueEditResult = QueueEditResult(),
     isComposeUiEnabled: Boolean = true,
     onToggleComposeUi: (Boolean) -> Unit = {},
     onOpenQuackifySettings: (() -> Unit)? = null,
@@ -484,6 +485,17 @@ fun EncoreAppShell(
     val offlineNow = rememberIsOffline()
     val noInternetLabel = stringResource(R.string.no_internet_connection)
     val offlineBlockedToast: () -> Unit = { toast.show(noInternetLabel) }
+
+    val removedFromQueueLabel = stringResource(R.string.removed_from_queue)
+    val queueReorderedLabel = stringResource(R.string.queue_reordered)
+    LaunchedEffect(queueEditResult.id) {
+        if (queueEditResult.id > 0) {
+            toast.show(
+                if (queueEditResult.kind == QueueEditKind.REORDER) queueReorderedLabel
+                else removedFromQueueLabel
+            )
+        }
+    }
 
     val actions = ShellActions(
         flags = flags,
@@ -814,6 +826,7 @@ fun EncoreAppShell(
             onAddToPlaylist = onAddToPlaylist,
             context = context,
             handleQueueAdd = handleQueueAdd,
+            toastState = toast,
             copyEntityLink = copyEntityLink,
             savedAccounts = savedAccounts,
             activeAccountId = activeAccountId,

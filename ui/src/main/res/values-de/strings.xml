@@ -10,6 +10,7 @@
     <string name="next">Weiter</string>
     <string name="shuffle">Zufällig</string>
     <string name="queue">Warteschlange</string>
+    <string name="queue_reordered">Warteschlange neu sortiert</string>
     <string name="lyrics">Songtext</string>
     <string name="transcript">Transkript</string>
     <string name="more">Mehr</string>
@@ -57,6 +58,7 @@
     <string name="remove_from_liked_songs">Aus Lieblingssongs entfernen</string>
     <string name="remove_from_playlist">Aus Playlist entfernen</string>
     <string name="remove_from_queue">Aus Warteschlange entfernen</string>
+    <string name="removed_from_queue">Aus der Warteschlange entfernt</string>
     <string name="add_to_your_library">Zu deiner Bibliothek hinzufügen</string>
     <string name="remove_from_your_library">Aus deiner Bibliothek entfernen</string>
     <string name="save_to_your_library">In deiner Bibliothek speichern</string>
