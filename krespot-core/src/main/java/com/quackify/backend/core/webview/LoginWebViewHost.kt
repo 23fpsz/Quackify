@@ -43,6 +43,7 @@ import android.widget.FrameLayout
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.core.locale.AppLocale
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -79,7 +80,11 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
 
     val container: FrameLayout = FrameLayout(context)
 
-    val webView: WebView = buildWebView(context, container)
+    /** The webviews run under a pinned en-US configuration whatever the app
+     *  language is, so Spotify does not negotiate it into login/player URLs. */
+    private val webContext: Context = AppLocale.loginContext(context)
+
+    val webView: WebView = buildWebView(webContext, container)
 
     private var tokenResult: CompletableDeferred<String>? = null
 
@@ -183,6 +188,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     }
 
     init {
+        AppLocale.pushLoginLocale()
         log.i("init ua=native, desktop only on the player")
         container.addView(
             webView,
@@ -299,7 +305,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 resultMsg: android.os.Message?,
             ): Boolean {
                 log.i("onCreateWindow dialog=$isDialog gesture=$isUserGesture")
-                val child = buildWebView(context, container)
+                val child = buildWebView(webContext, container)
                 child.webViewClient = object : WebViewClient() {
                     override fun onPageStarted(v: WebView?, url: String?, favicon: Bitmap?) {
                         super.onPageStarted(v, url, favicon)
@@ -562,6 +568,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
             webView.destroy()
         } catch (_: Exception) {
         }
+        AppLocale.popLoginLocale()
     }
 
     private fun installSpoofScripts(view: WebView) {
