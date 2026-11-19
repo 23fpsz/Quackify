@@ -23,6 +23,15 @@ fun artistUriOf(uri: String, sources: UriSources): String {
     return ""
 }
 
+fun artistUrisOf(uri: String, sources: UriSources): List<String> {
+    if (uri.isBlank()) return emptyList()
+    sources.decorated[uri]?.let { if (it.artistUris.isNotEmpty()) return it.artistUris }
+    (sources.queue + sources.queueFromContext)
+        .firstOrNull { it.uri == uri && it.artistUris.isNotEmpty() }
+        ?.let { return it.artistUris }
+    return emptyList()
+}
+
 fun albumUriOf(uri: String, sources: UriSources): String {
     if (uri.isBlank()) return ""
     sources.cluster?.let { at ->

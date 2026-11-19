@@ -352,6 +352,7 @@ private fun NowPlayingScreenLayer(
                 albumUri = env.resolvedAlbumUri,
                 albumName = env.currentAlbumName,
                 artistUri = env.resolvedArtistUri,
+                artistUris = playbackState?.artistUris.orEmpty(),
             )
             env.flags.isTrackOptionsFromPlayer = true
             env.flags.isTrackOptionsOpen = true
@@ -370,6 +371,7 @@ private fun NowPlayingScreenLayer(
             val uris = env.playbackState?.artistUris.orEmpty()
                 .filter { it.startsWith("spotify:artist:") }
             if (uris.size > 1) {
+                env.local.artistListTrack = null
                 env.flags.isArtistListOpen = true
             } else {
                 env.setIsPlayerExpanded(false)
