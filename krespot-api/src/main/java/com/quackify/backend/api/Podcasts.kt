@@ -348,14 +348,21 @@ object Podcasts {
     private fun wideImage(node: JSONObject): String {
         val visual = node.optJSONObject("visualIdentity") ?: return ""
         val wide = visual.optJSONObject("sixteenByNineCoverImage") ?: return ""
-        val sources = (wide.optJSONObject("data") ?: wide).optJSONArray("sources") ?: return ""
+        // The episode payload nests one more level than the show payload:
+        // sixteenByNineCoverImage -> image -> data -> sources, and its sources
+        // carry maxWidth/maxHeight instead of width/height. Fall back through
+        // the flatter shapes so either answer still resolves.
+        val data = wide.optJSONObject("image")?.optJSONObject("data")
+            ?: wide.optJSONObject("data")
+            ?: wide
+        val sources = data.optJSONArray("sources") ?: return ""
         var best = ""
         var bestWidth = -1
         for (i in 0 until sources.length()) {
             val source = sources.optJSONObject(i) ?: continue
             val url = source.optString("url")
             if (url.isBlank()) continue
-            val width = source.optInt("width", 0)
+            val width = source.optInt("maxWidth", source.optInt("width", 0))
             if (width > bestWidth) {
                 bestWidth = width
                 best = url
