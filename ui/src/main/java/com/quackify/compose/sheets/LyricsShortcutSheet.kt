@@ -19,6 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -43,6 +45,8 @@ import com.quackify.backend.library.lyrics.LyricsProvider
 import com.quackify.backend.library.lyrics.translationLanguageName
 import com.quackify.compose.R
 import com.quackify.compose.player.LyricsOptions
+import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MAX
+import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MIN
 import com.quackify.compose.player.TRANSLATION_DEVICE_LANGUAGE
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
@@ -70,6 +74,11 @@ fun LyricsShortcutSheet(
     val translationLanguage = LyricsOptions.translationLanguage
     val prioritizeWordSynced = LyricsOptions.prioritizeWordSynced
     val providerOrder = LyricsOptions.providerOrder
+    val keepScreenOn = LyricsOptions.keepScreenOn
+    val offsetTenths = LyricsOptions.offsetTenths
+    val offsetLabel = remember(offsetTenths) {
+        String.format(Locale.US, "%+.1f s", offsetTenths / 10f)
+    }
     val deviceLanguageName = remember(appLocale) {
         appLocale.displayLanguage.takeIf { it.isNotBlank() && !it.equals(appLocale.language, ignoreCase = true) }
             ?: appLocale.getDisplayLanguage(appLocale)
@@ -153,6 +162,24 @@ fun LyricsShortcutSheet(
                 onCheckedChange = { on ->
                     onDismiss()
                     LyricsOptions.setPrioritizeWordSynced(context, on)
+                }
+            )
+
+            ShortcutToggleRow(
+                title = stringResource(R.string.lyrics_keep_screen_on),
+                subtitle = stringResource(R.string.lyrics_keep_screen_on_desc),
+                isChecked = keepScreenOn,
+                onCheckedChange = { on ->
+                    onDismiss()
+                    LyricsOptions.setKeepScreenOn(context, on)
+                }
+            )
+
+            ShortcutOffsetRow(
+                offsetTenths = offsetTenths,
+                offsetLabel = offsetLabel,
+                onOffsetChange = { tenths ->
+                    LyricsOptions.setOffsetTenths(context, tenths)
                 }
             )
 
@@ -249,6 +276,59 @@ private fun ShortcutToggleRow(
     }
 }
 
+/**
+ * The lyrics offset, adjustable without leaving the reader: positive means
+ * the lyrics feel late, so the sweep is shifted earlier by that much.
+ * Applies live — the open reader retimes on the next frame.
+ */
+@Composable
+private fun ShortcutOffsetRow(
+    offsetTenths: Int,
+    offsetLabel: String,
+    onOffsetChange: (Int) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.lyrics_offset),
+                style = EncoreTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium,
+                    color = EncoreColors.TextPrimary
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = offsetLabel,
+                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.Green)
+            )
+        }
+        Text(
+            text = stringResource(R.string.lyrics_offset_desc),
+            style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+        )
+        Slider(
+            value = (offsetTenths + LYRICS_OFFSET_TENTHS_MAX).toFloat(),
+            onValueChange = { raw ->
+                onOffsetChange((raw.toInt() - LYRICS_OFFSET_TENTHS_MAX).coerceIn(
+                    LYRICS_OFFSET_TENTHS_MIN,
+                    LYRICS_OFFSET_TENTHS_MAX,
+                ))
+            },
+            valueRange = 0f..(LYRICS_OFFSET_TENTHS_MAX * 2).toFloat(),
+            steps = LYRICS_OFFSET_TENTHS_MAX * 2 - 1,
+            colors = SliderDefaults.colors(
+                thumbColor = EncoreColors.Green,
+                activeTrackColor = EncoreColors.Green,
+                inactiveTrackColor = EncoreColors.Card
+            )
+        )
+    }
+}
+
 @Composable
 private fun ShortcutValueRow(
     title: String,
@@ -256,8 +336,7 @@ private fun ShortcutValueRow(
     enabled: Boolean = true,
     iconRes: Int,
     onClick: () -> Unit
-) {
-    Row(
+) {    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
