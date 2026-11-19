@@ -24,6 +24,7 @@ import android.content.Context
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.model.*
+import org.json.JSONArray
 import org.json.JSONObject
 import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.GraphQl
@@ -39,6 +40,8 @@ object Podcasts {
     private const val OP_EPISODES = "queryPodcastEpisodes"
     private const val OP_EPISODE = "getEpisodeOrChapter"
     private const val OP_RELATED_SHOWS = "internalLinkRecommenderShow"
+    private const val OP_EPISODE_COMMENTS = "getCommentsForEntity"
+    private const val OP_ADD_EPISODE_COMMENT = "addComment"
     private const val PAGE = 50
 
     suspend fun show(context: Context, uri: String): ShowDetail? {
@@ -125,12 +128,86 @@ object Podcasts {
             played = played?.optString("state").orEmpty() == "COMPLETED",
             positionMs = played?.optLong("playPositionMilliseconds", 0L) ?: 0L,
             shareUrl = union.optJSONObject("sharingInfo")?.optString("shareUrl").orEmpty(),
+            chapters = chapters(context, uri),
         )
         log.i("episode $uri '${detail.title}' show='${detail.showName}' ${detail.releaseDate} " +
                 "${detail.durationMs}ms video=${detail.video} played=${detail.played} " +
                 "position=${detail.positionMs} playable=${detail.playable}"
         )
         return detail
+    }
+
+    suspend fun episodeComments(context: Context, episodeUri: String, token: String?): EpisodeComments? {
+        val auth = EncoreAuth.token(context)
+        if (auth.isBlank()) {
+            log.w("episodeComments: no token")
+            return null
+        }
+        val variables = JSONObject()
+            .put("uri", episodeUri)
+            .put("token", token ?: JSONObject.NULL)
+            .toString()
+        val page = Pathfinder.queryPost(context, auth, OP_EPISODE_COMMENTS, variables)
+            ?.optJSONObject("data")
+            ?.optJSONArray("comments")
+            ?.optJSONObject(0)
+            ?: run {
+                log.w("episodeComments: no page for $episodeUri")
+                return null
+            }
+        val raw = page.optJSONArray("items") ?: JSONArray()
+        val rows = (0 until raw.length()).mapNotNull { index -> comment(raw.optJSONObject(index)) }
+        val comments = EpisodeComments(
+            uri = episodeUri,
+            eligibility = page.optString("eligibilityStatus"),
+            total = page.optInt("totalCount", rows.size),
+            nextToken = page.optString("nextPageToken").orEmpty(),
+            comments = rows,
+        )
+        log.i("episodeComments $episodeUri ${comments.comments.size}/${comments.total} " +
+                "eligibility=${comments.eligibility} next=${comments.nextToken.ifBlank { "none" }}"
+        )
+        return comments
+    }
+
+    suspend fun addEpisodeComment(context: Context, episodeUri: String, text: String): Boolean {
+        if (text.isBlank()) return false
+        val auth = EncoreAuth.token(context)
+        if (auth.isBlank()) {
+            log.w("addEpisodeComment: no token")
+            return false
+        }
+        val variables = JSONObject()
+            .put("entityUri", episodeUri)
+            .put("text", text)
+            .toString()
+        val payload = Pathfinder.queryPost(context, auth, OP_ADD_EPISODE_COMMENT, variables, fallbackToGet = false)
+            ?.optJSONObject("data")
+            ?.optJSONObject("createComment")
+        val ok = payload?.optString("__typename").orEmpty() == "SuccessCreateComment" &&
+            payload.optBoolean("success", false)
+        log.i("addEpisodeComment $episodeUri ok=$ok")
+        return ok
+    }
+
+    private fun comment(node: JSONObject): EpisodeComment? {
+        val uri = node.optString("uri")
+        val text = node.optString("commentString").plainText()
+        if (uri.isBlank() || text.isBlank()) return null
+        val author = node.optJSONObject("author")?.optJSONObject("data")
+        val reactions = node.optJSONObject("reactionsMetadata")
+        val top = reactions?.optJSONArray("topReactionUnicode")
+        return EpisodeComment(
+            uri = uri,
+            authorName = author?.optString("name").orEmpty().plainText(),
+            authorUri = author?.optString("uri").orEmpty(),
+            avatarUrl = GraphQl.userAvatar(author),
+            text = text,
+            createdAtIso = node.optJSONObject("createDate")?.optString("isoString").orEmpty(),
+            reactionCount = reactions?.optInt("numberOfReactions", 0) ?: 0,
+            topReaction = top?.optString(0).orEmpty(),
+            replyCount = node.optInt("numberOfRepliesWithThreads", 0),
+        )
     }
 
     private suspend fun showUnion(context: Context, token: String, uri: String): JSONObject? {
@@ -239,6 +316,7 @@ object Podcasts {
             positionMs = played?.optLong("playPositionMilliseconds", 0L) ?: 0L,
             showName = show?.optString("name").orEmpty().plainText(),
             showUri = show?.optString("uri").orEmpty(),
+            wideImageUrl = wideImage(episode),
         )
     }
 

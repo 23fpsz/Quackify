@@ -152,6 +152,8 @@ object Pathfinder {
             "122f5c777aae5c0918baec11cd646b7034b8f213f260097b4d229ad947ec7f93",
         "getCommentsForEntity" to
             "5075cb710c32d369eb5b67f6abdfd11a48d58214795064181a7da830b5fc84b6",
+        "addComment" to
+            "504a54dcb144fc345869c93887152f53450bd41298b6edb57d9e3b1c5aae92e6",
         "queryWhatsNewFeed" to
             "d889c8c936ab192af8ced595427f5ba2acdf63478fdc0a181c8d477f8322630e",
         "whatsNewFeedNewItems" to

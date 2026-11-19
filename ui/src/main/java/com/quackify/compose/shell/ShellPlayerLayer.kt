@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import com.quackify.backend.model.EpisodeComment
+import com.quackify.backend.model.ShowDetail
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
@@ -60,6 +62,10 @@ internal class ShellPlayerEnv(
     val nowPlayingArtistBio: String,
     val nowPlayingArtistImageUrl: String?,
     val nowPlayingArtistFollowed: Boolean?,
+    val nowPlayingShow: ShowDetail? = null,
+    val nowPlayingComments: List<EpisodeComment> = emptyList(),
+    val onCommentsRefresh: (() -> Unit)? = null,
+    val onEpisodeComment: (suspend (String) -> Boolean)? = null,
     val nowPlayingLyrics: List<TimeSyncedLyric>,
     val nowPlayingTranscript: List<TranscriptLine>,
     val lyricsProviderName: String = "",
@@ -76,6 +82,7 @@ internal class ShellPlayerEnv(
     val onCanvasToggle: ((Boolean) -> Unit)?,
     val onToggleVideoFullscreen: ((Boolean) -> Unit)?,
     val onArtistFollowToggle: ((String, Boolean) -> Unit)?,
+    val onShowFollowToggle: ((String, Boolean) -> Unit)? = null,
     val onAddToPlaylist: ((TrackItem) -> Unit)?,
     val openAlbum: (String, String, String) -> Unit,
     val openArtist: (String, String) -> Unit,
@@ -262,8 +269,17 @@ private fun NowPlayingScreenLayer(
         artistBio = env.nowPlayingArtistBio,
         artistImageUrl = env.nowPlayingArtistImageUrl,
         isArtistFollowing = env.nowPlayingArtistFollowed == true,
+        nowPlayingShow = env.nowPlayingShow,
+        nowPlayingComments = env.nowPlayingComments,
+        onCommentsRefresh = { env.onCommentsRefresh?.invoke() },
+        onEpisodeComment = { text -> env.onEpisodeComment?.invoke(text) ?: false },
         onArtistFollowToggle = { follow ->
-            if (env.resolvedArtistUri.startsWith("spotify:artist:")) {
+            if (isEpisode) {
+                val showUri = env.nowPlayingShow?.uri.orEmpty()
+                if (showUri.startsWith("spotify:show:")) {
+                    env.onShowFollowToggle?.invoke(showUri, follow)
+                }
+            } else if (env.resolvedArtistUri.startsWith("spotify:artist:")) {
                 env.onArtistFollowToggle?.invoke(env.resolvedArtistUri, follow)
             }
         },

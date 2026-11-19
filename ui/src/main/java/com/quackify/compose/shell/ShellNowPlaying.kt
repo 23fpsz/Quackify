@@ -15,6 +15,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import com.quackify.backend.model.EpisodeComment
+import com.quackify.backend.model.ShowDetail
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.player.EncoreNowPlayingScreen
@@ -49,6 +51,10 @@ internal fun ShellNowPlaying(
     artistImageUrl: String?,
     isArtistFollowing: Boolean = false,
     onArtistFollowToggle: (Boolean) -> Unit = {},
+    nowPlayingShow: ShowDetail? = null,
+    nowPlayingComments: List<EpisodeComment> = emptyList(),
+    onCommentsRefresh: () -> Unit = {},
+    onEpisodeComment: suspend (String) -> Boolean = { false },
     isEnhancedTrack: Boolean = false,
     shuffleMode: ShuffleMode,
     repeatMode: RepeatMode,
@@ -121,6 +127,10 @@ internal fun ShellNowPlaying(
             artistImageUrl = artistImageUrl,
             isArtistFollowing = isArtistFollowing,
             onArtistFollowToggle = onArtistFollowToggle,
+            nowPlayingShow = nowPlayingShow,
+            nowPlayingComments = nowPlayingComments,
+            onCommentsRefresh = onCommentsRefresh,
+            onEpisodeComment = onEpisodeComment,
             isEnhancedTrack = isEnhancedTrack,
             shuffleMode = shuffleMode,
             repeatMode = repeatMode,

@@ -35,6 +35,7 @@ data class EpisodeRow(
     val positionMs: Long,
     val showName: String = "",
     val showUri: String = "",
+    val wideImageUrl: String = "",
 )
 
 data class ChapterSpan(
@@ -97,4 +98,25 @@ data class EpisodeDetail(
     val played: Boolean,
     val positionMs: Long,
     val shareUrl: String,
+    val chapters: List<ChapterSpan> = emptyList(),
+)
+
+data class EpisodeComment(
+    val uri: String,
+    val authorName: String,
+    val authorUri: String,
+    val avatarUrl: String,
+    val text: String,
+    val createdAtIso: String,
+    val reactionCount: Int,
+    val topReaction: String,
+    val replyCount: Int,
+)
+
+data class EpisodeComments(
+    val uri: String,
+    val eligibility: String,
+    val total: Int,
+    val nextToken: String,
+    val comments: List<EpisodeComment>,
 )

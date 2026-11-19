@@ -68,6 +68,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -147,6 +148,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.playlist.TrackItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import com.quackify.compose.sheets.DarkSystemBarsSheet
 import com.quackify.compose.util.rememberDominantColor
 import androidx.compose.ui.res.stringResource
 
@@ -296,6 +301,10 @@ fun EncoreNowPlayingScreen(
     artistImageUrl: String? = null,
     isArtistFollowing: Boolean = false,
     onArtistFollowToggle: (Boolean) -> Unit = {},
+    nowPlayingShow: com.quackify.backend.model.ShowDetail? = null,
+    nowPlayingComments: List<com.quackify.backend.model.EpisodeComment> = emptyList(),
+    onCommentsRefresh: () -> Unit = {},
+    onEpisodeComment: suspend (String) -> Boolean = { false },
     lyrics: List<TimeSyncedLyric> = emptyList(),
     transcript: List<TranscriptLine> = emptyList(),
     lyricsProviderName: String = "",
@@ -384,9 +393,44 @@ fun EncoreNowPlayingScreen(
         activeTranscriptRow
     }
 
-    val effectiveMonthlyListeners = monthlyListeners
-    val effectiveArtistBio = artistBio.ifBlank {
-        if (artist.isNotBlank()) "Listen to $artist. Discover top songs and upcoming releases." else ""
+    val effectiveMonthlyListeners = if (isEpisode) {
+        nowPlayingShow?.let { show ->
+            val rating = if (show.rating > 0.0) "★ %.1f".format(show.rating) else ""
+            listOfNotNull(
+                rating.takeIf { it.isNotBlank() },
+                show.topics.firstOrNull(),
+            ).joinToString(" • ").takeIf { it.isNotBlank() }
+        }.orEmpty()
+    } else {
+        monthlyListeners
+    }
+    val effectiveArtistBio = if (isEpisode) {
+        nowPlayingShow?.description.orEmpty()
+    } else {
+        artistBio.ifBlank {
+            if (artist.isNotBlank()) "Listen to $artist. Discover top songs and upcoming releases." else ""
+        }
+    }
+    val effectiveArtistImageUrl = if (isEpisode) {
+        nowPlayingShow?.imageUrl?.takeIf { it.isNotBlank() } ?: artistImageUrl
+    } else {
+        artistImageUrl
+    }
+    val effectiveArtistName = if (isEpisode) (nowPlayingShow?.publisher ?: artist) else artist
+    val effectiveIsFollowing = if (isEpisode) (nowPlayingShow?.saved == true) else isArtistFollowing
+    val effectiveOnFollowToggle: (Boolean) -> Unit = if (isEpisode) {
+        { onArtistFollowToggle(it) }
+    } else {
+        { onArtistFollowToggle(it) }
+    }
+    val showAboutArtist = if (isEpisode) {
+        effectiveArtistName.isNotBlank()
+    } else {
+        artist.isNotBlank()
+    }
+    var commentsRefreshTick by remember(nowPlayingComments) { mutableStateOf(0) }
+    LaunchedEffect(commentsRefreshTick) {
+        if (commentsRefreshTick > 0) onCommentsRefresh()
     }
 
     val effectiveIsLoading = isLoading
@@ -814,20 +858,30 @@ fun EncoreNowPlayingScreen(
                             onOpenTranscript = { isTranscriptFullscreen = true }
                         )
 
-                        if (!effectiveIsLoading && artist.isNotBlank()) {
+                        if (!effectiveIsLoading && showAboutArtist) {
                             if (lyricsAvailable || transcriptAvailable) {
                                 Spacer(modifier = Modifier.height(EncoreSpacers.Base))
                             }
 
                             NowPlayingAboutArtistCard(
-                                artist = artist,
+                                artist = effectiveArtistName,
                                 monthlyListeners = effectiveMonthlyListeners,
                                 artistBio = effectiveArtistBio,
-                                artistImageUrl = artistImageUrl,
-                                isFollowingArtist = isArtistFollowing,
-                                onFollowToggle = { onArtistFollowToggle(!isArtistFollowing) },
-                                onArtistClick = onArtistClick
+                                artistImageUrl = effectiveArtistImageUrl,
+                                isFollowingArtist = effectiveIsFollowing,
+                                onFollowToggle = { effectiveOnFollowToggle(!effectiveIsFollowing) },
+                                onArtistClick = onArtistClick,
+                                isPodcastPublisher = isEpisode
                             )
+
+                            if (isEpisode) {
+                                Spacer(modifier = Modifier.height(EncoreSpacers.Base))
+                                NowPlayingEpisodeCommentsCard(
+                                    comments = nowPlayingComments,
+                                    onRefresh = { commentsRefreshTick++ },
+                                    onPostComment = onEpisodeComment
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(EncoreSpacers.Looser3))
                         }
@@ -1059,7 +1113,7 @@ fun EncoreNowPlayingScreen(
                                 onOpenTranscript = { isTranscriptFullscreen = true }
                             )
 
-                            if (!effectiveIsLoading && artist.isNotBlank()) {
+                            if (!effectiveIsLoading && showAboutArtist) {
                                 AnimatedVisibility(
                                     visible = canvasControlsShown,
                                     enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = EncoreAnimation.DecelerateInterpolator)),
@@ -1071,14 +1125,24 @@ fun EncoreNowPlayingScreen(
                                         }
 
                                         NowPlayingAboutArtistCard(
-                                            artist = artist,
+                                            artist = effectiveArtistName,
                                             monthlyListeners = effectiveMonthlyListeners,
                                             artistBio = effectiveArtistBio,
-                                            artistImageUrl = artistImageUrl,
-                                            isFollowingArtist = isArtistFollowing,
-                                            onFollowToggle = { onArtistFollowToggle(!isArtistFollowing) },
-                                            onArtistClick = onArtistClick
+                                            artistImageUrl = effectiveArtistImageUrl,
+                                            isFollowingArtist = effectiveIsFollowing,
+                                            onFollowToggle = { effectiveOnFollowToggle(!effectiveIsFollowing) },
+                                            onArtistClick = onArtistClick,
+                                            isPodcastPublisher = isEpisode
                                         )
+
+                                        if (isEpisode) {
+                                            Spacer(modifier = Modifier.height(EncoreSpacers.Base))
+                                            NowPlayingEpisodeCommentsCard(
+                                                comments = nowPlayingComments,
+                                                onRefresh = { commentsRefreshTick++ },
+                                                onPostComment = onEpisodeComment
+                                            )
+                                        }
 
                                         Spacer(modifier = Modifier.height(48.dp))
                                     }
@@ -1131,6 +1195,7 @@ fun EncoreNowPlayingScreen(
                 title = title,
                 artist = artist,
                 currentPositionMs = currentPositionMs,
+                isPlaying = isPlaying,
                 dominantColor = dominantColor,
                 lines = transcript,
                 onSeekMs = { targetMs -> if (durationMs > 0L) onSeek(targetMs.toFloat() / durationMs.toFloat()) },
@@ -2545,7 +2610,9 @@ private fun NowPlayingLyricsCard(
 
 /**
  * "About the Artist" Card (16dp rounded corner, horizontal margin 16dp)
- * with Verified Artist badge and Follow button.
+ * with Verified Artist badge and Follow button. Podcast episodes reuse the
+ * same card as "About the show" with the publisher in place of the artist
+ * and no verified badge.
  */
 @Composable
 private fun NowPlayingAboutArtistCard(
@@ -2556,8 +2623,10 @@ private fun NowPlayingAboutArtistCard(
     isFollowingArtist: Boolean,
     onFollowToggle: () -> Unit,
     onArtistClick: () -> Unit = {},
+    isPodcastPublisher: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val fallbackColor = if (isPodcastPublisher) Color(0xFF535353) else Color(0xFFE8115B)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -2574,7 +2643,7 @@ private fun NowPlayingAboutArtistCard(
                 contentAlignment = Alignment.CenterStart
             ) {
                 Text(
-                    text = stringResource(R.string.about_the_artist),
+                    text = if (isPodcastPublisher) stringResource(R.string.about_the_show) else stringResource(R.string.about_the_artist),
                     style = EncoreTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -2609,13 +2678,13 @@ private fun NowPlayingAboutArtistCard(
                                 imageUrl = artistImageUrl,
                                 contentDescription = artist,
                                 modifier = Modifier.fillMaxSize(),
-                                fallbackColor = Color(0xFFE8115B)
+                                fallbackColor = fallbackColor
                             )
                         } else {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color(0xFFE8115B)),
+                                    .background(fallbackColor),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -2635,18 +2704,22 @@ private fun NowPlayingAboutArtistCard(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
-                            Spacer(modifier = Modifier.width(EncoreSpacers.Tighter4))
-                            Icon(
-                                painter = painterResource(id = R.drawable.encore_icon_verified_check_active_24),
-                                contentDescription = stringResource(R.string.verified_artist),
-                                tint = EncoreColors.Green,
-                                modifier = Modifier.size(16.dp)
+                            if (!isPodcastPublisher) {
+                                Spacer(modifier = Modifier.width(EncoreSpacers.Tighter4))
+                                Icon(
+                                    painter = painterResource(id = R.drawable.encore_icon_verified_check_active_24),
+                                    contentDescription = stringResource(R.string.verified_artist),
+                                    tint = EncoreColors.Green,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        if (monthlyListeners.isNotBlank()) {
+                            Text(
+                                text = monthlyListeners,
+                                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                             )
                         }
-                        Text(
-                            text = monthlyListeners,
-                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
-                        )
                     }
                 }
 
@@ -2673,15 +2746,17 @@ private fun NowPlayingAboutArtistCard(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text = artistBio,
-                style = EncoreTheme.typography.bodySmall.copy(
-                    color = EncoreColors.TextSecondary,
-                    lineHeight = 18.sp
-                ),
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (artistBio.isNotBlank()) {
+                Text(
+                    text = artistBio,
+                    style = EncoreTheme.typography.bodySmall.copy(
+                        color = EncoreColors.TextSecondary,
+                        lineHeight = 18.sp
+                    ),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -3053,14 +3128,32 @@ private fun FullscreenTranscriptView(
     title: String,
     artist: String,
     currentPositionMs: Long,
+    isPlaying: Boolean = true,
     dominantColor: Color,
     lines: List<TranscriptLine>,
     onSeekMs: (Long) -> Unit,
     onClose: () -> Unit
 ) {
-    val activeIndex = lines.indexOfLast { currentPositionMs >= it.startMs }.coerceAtLeast(0)
+    val clockMs = rememberLyricClock(
+        reportedPositionMs = { currentPositionMs },
+        isPlaying = isPlaying,
+        trackKey = lines.firstOrNull()?.startMs,
+        offsetMs = { LyricsOptions.transcriptOffsetMs },
+    )
+    val activeIndex by remember(lines, clockMs) {
+        derivedStateOf { lines.indexOfLast { clockMs.value >= it.startMs }.coerceAtLeast(0) }
+    }
     val listState = rememberLazyListState()
     val ink = contrastInk(dominantColor)
+    var isMenuOpen by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val keepScreenOn = LyricsOptions.keepScreenOn
+    DisposableEffect(keepScreenOn) {
+        val window = (context as? Activity)?.window ?: return@DisposableEffect onDispose { }
+        if (keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
 
     LaunchedEffect(activeIndex) {
         if (lines.isEmpty()) return@LaunchedEffect
@@ -3104,7 +3197,12 @@ private fun FullscreenTranscriptView(
                 )
             }
 
-            Spacer(modifier = Modifier.size(40.dp))
+            EncoreIconButton(
+                iconRes = R.drawable.encore_icon_more_android_24,
+                contentDescription = stringResource(R.string.transcript_menu),
+                onClick = { isMenuOpen = true },
+                tint = ink
+            )
         }
 
         Spacer(modifier = Modifier.height(EncoreSpacers.Looser2))
@@ -3125,27 +3223,223 @@ private fun FullscreenTranscriptView(
                     )
                 } else {
                     val isCurrentLine = index == activeIndex
-                    Text(
-                        text = buildAnnotatedString {
-                            append(line.text)
-                            if (isCurrentLine) {
-                                val prefixEnd = spokenPrefixEnd(line, currentPositionMs)
-                                if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
-                            }
-                        },
-                        style = EncoreTheme.typography.titleLarge.copy(
-                            fontSize = 22.sp,
-                            lineHeight = 32.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isCurrentLine) ink.copy(alpha = 0.5f) else ink.copy(alpha = 0.35f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSeekMs(line.startMs) }
-                            .padding(vertical = EncoreSpacers.Tighter)
-                    )
+                    val smooth = isCurrentLine && LyricsOptions.transcriptSmoothSweep && line.words.isNotEmpty()
+                    if (smooth) {
+                        TranscriptSweepText(
+                            line = line,
+                            positionMs = clockMs,
+                            sungColor = ink,
+                            unsungColor = ink.copy(alpha = 0.35f),
+                            style = EncoreTheme.typography.titleLarge.copy(
+                                fontSize = 22.sp,
+                                lineHeight = 32.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSeekMs(line.startMs) }
+                                .padding(vertical = EncoreSpacers.Tighter)
+                        )
+                    } else {
+                        Text(
+                            text = buildAnnotatedString {
+                                append(line.text)
+                                if (isCurrentLine) {
+                                    val prefixEnd = spokenPrefixEnd(line, clockMs.value)
+                                    if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
+                                }
+                            },
+                            style = EncoreTheme.typography.titleLarge.copy(
+                                fontSize = 22.sp,
+                                lineHeight = 32.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isCurrentLine) ink.copy(alpha = 0.5f) else ink.copy(alpha = 0.35f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSeekMs(line.startMs) }
+                                .padding(vertical = EncoreSpacers.Tighter)
+                        )
+                    }
                 }
             }
+        }
+    }
+
+    if (isMenuOpen) {
+        TranscriptShortcutSheet(onDismiss = { isMenuOpen = false })
+    }
+}
+
+/**
+ * The transcript line as a karaoke sweep: same two stacked copies clipped
+ * in the draw phase as the lyrics sweep, with the boundary interpolated
+ * between word timings so it travels across each word rather than jumping
+ * a word at a time.
+ */
+@Composable
+private fun TranscriptSweepText(
+    line: TranscriptLine,
+    positionMs: State<Long>,
+    sungColor: Color,
+    unsungColor: Color,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+) {
+    var layout by remember(line.text) { mutableStateOf<TextLayoutResult?>(null) }
+    Box(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = line.text,
+            style = style.copy(color = unsungColor),
+            onTextLayout = { layout = it },
+        )
+        Text(
+            text = line.text,
+            style = style.copy(color = sungColor),
+            onTextLayout = { layout = it },
+            modifier = Modifier
+                .matchParentSize()
+                .drawWithContent {
+                    val measured = layout ?: return@drawWithContent
+                    val boundary = transcriptBoundary(line, positionMs.value)
+                    if (boundary <= 0f) return@drawWithContent
+                    val textLength = line.text.length
+                    if (boundary >= textLength) {
+                        drawContent()
+                        return@drawWithContent
+                    }
+                    val boundaryIndex = boundary.toInt().coerceIn(0, textLength - 1)
+                    var row = 0
+                    while (row < measured.lineCount - 1 &&
+                        boundaryIndex >= measured.getLineEnd(row, visibleEnd = false)
+                    ) {
+                        row++
+                    }
+                    val fraction = boundary - boundaryIndex
+                    val left = measured.getHorizontalPosition(boundaryIndex, usePrimaryDirection = true)
+                    val right = measured.getHorizontalPosition(
+                        (boundaryIndex + 1).coerceAtMost(textLength),
+                        usePrimaryDirection = true,
+                    )
+                    val boundaryX = left + (right - left) * fraction
+                    val boundaryTop = measured.getLineTop(row)
+                    val boundaryBottom = measured.getLineBottom(row)
+                    clipRect(left = 0f, top = boundaryTop, right = boundaryX, bottom = boundaryBottom) {
+                        this@drawWithContent.drawContent()
+                    }
+                    if (row > 0) {
+                        clipRect(left = 0f, top = 0f, right = size.width, bottom = boundaryTop) {
+                            this@drawWithContent.drawContent()
+                        }
+                    }
+                },
+        )
+    }
+}
+
+/**
+ * Where the sweep boundary sits, in (fractional) characters: the end of the
+ * last word whose start the position passed, plus the share of the gap to
+ * the next word that has already elapsed.
+ */
+private fun transcriptBoundary(line: TranscriptLine, positionMs: Long): Float {
+    val words = line.words
+    if (words.isEmpty()) return if (positionMs >= line.startMs) line.text.length.toFloat() else 0f
+    var lastPassed = -1
+    for (index in words.indices) {
+        if (positionMs >= words[index].startMs) lastPassed = index else break
+    }
+    if (lastPassed < 0) return 0f
+    val end = words[lastPassed].endChar.toFloat()
+    val next = words.getOrNull(lastPassed + 1)
+    return if (next == null || next.startMs <= words[lastPassed].startMs) {
+        end
+    } else {
+        val span = (next.startMs - words[lastPassed].startMs).coerceAtLeast(1L)
+        val frac = ((positionMs - words[lastPassed].startMs).toFloat() / span).coerceIn(0f, 1f)
+        end + (next.endChar - words[lastPassed].endChar) * frac
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TranscriptShortcutSheet(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val smooth = LyricsOptions.transcriptSmoothSweep
+    val offsetTenths = LyricsOptions.transcriptOffsetTenths
+    val offsetLabel = remember(offsetTenths) {
+        String.format(java.util.Locale.US, "%+.1f s", offsetTenths / 10f)
+    }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        properties = DarkSystemBarsSheet,
+        containerColor = EncoreColors.Card,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .navigationBarsPadding()
+        ) {
+            Text(
+                text = stringResource(R.string.transcript_menu),
+                style = EncoreTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.smooth_transcript_animation),
+                        style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                    )
+                    Text(
+                        text = stringResource(R.string.smooth_transcript_animation_desc),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                    )
+                }
+                Switch(checked = smooth, onCheckedChange = { on ->
+                    LyricsOptions.setTranscriptSmoothSweep(context, on)
+                })
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.transcript_offset),
+                    style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = offsetLabel,
+                    style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.Green)
+                )
+            }
+            Text(
+                text = stringResource(R.string.transcript_offset_desc),
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+            )
+            Slider(
+                value = (offsetTenths + LYRICS_OFFSET_TENTHS_MAX).toFloat(),
+                onValueChange = { raw ->
+                    LyricsOptions.setTranscriptOffsetTenths(
+                        context,
+                        (raw.toInt() - LYRICS_OFFSET_TENTHS_MAX).coerceIn(
+                            LYRICS_OFFSET_TENTHS_MIN,
+                            LYRICS_OFFSET_TENTHS_MAX,
+                        )
+                    )
+                },
+                valueRange = 0f..(LYRICS_OFFSET_TENTHS_MAX * 2).toFloat(),
+                steps = LYRICS_OFFSET_TENTHS_MAX * 2 - 1,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -3155,4 +3449,210 @@ private fun formatTime(ms: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return String.format("%d:%02d", minutes, seconds)
+}
+
+/**
+ * Episode comments under the About card: the same 16dp rounded card as the
+ * rest of the now-playing extras, a composer pinned at its bottom and the
+ * thread below. Posting goes through [onPostComment]; the caller refetches
+ * the thread, so the list below updates on the next composition.
+ */
+@Composable
+private fun NowPlayingEpisodeCommentsCard(
+    comments: List<com.quackify.backend.model.EpisodeComment>,
+    onRefresh: () -> Unit,
+    onPostComment: suspend (String) -> Boolean,
+    modifier: Modifier = Modifier
+) {
+    val scope = rememberCoroutineScope()
+    var draft by remember { mutableStateOf("") }
+    var posting by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(EncoreCornerRadii.Larger3))
+            .background(EncoreColors.Card)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PEEK_HEIGHT)
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.comments),
+                    style = EncoreTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
+                )
+                EncoreIconButton(
+                    iconRes = R.drawable.encore_icon_arrow_down_24,
+                    contentDescription = stringResource(R.string.refresh_comments),
+                    onClick = onRefresh,
+                    tint = EncoreColors.TextSecondary,
+                    size = 32.dp,
+                    iconSize = 18.dp
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                comments.forEach { comment ->
+                    EpisodeCommentRow(comment = comment)
+                    Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
+                }
+                if (comments.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.no_comments_yet),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                    )
+                    Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
+                }
+
+                Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter4)
+                ) {
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = draft,
+                        onValueChange = { draft = it.take(280) },
+                        singleLine = false,
+                        textStyle = EncoreTheme.typography.bodyMedium.copy(color = Color.White),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(EncoreColors.Green),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
+                            .background(EncoreColors.PureBlack.copy(alpha = 0.3f))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        decorationBox = { inner ->
+                            Box(modifier = Modifier.heightIn(min = 20.dp)) {
+                                if (draft.isEmpty()) {
+                                    androidx.compose.material3.Text(
+                                        text = stringResource(R.string.write_a_comment),
+                                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
+                                    )
+                                } else {
+                                    inner()
+                                }
+                            }
+                        }
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(if (draft.isBlank() || posting) EncoreColors.PureBlack.copy(alpha = 0.3f) else EncoreColors.Green)
+                            .clickable(enabled = draft.isNotBlank() && !posting) {
+                                val text = draft.trim()
+                                if (text.isEmpty()) return@clickable
+                                posting = true
+                                scope.launch {
+                                    val ok = onPostComment(text)
+                                    posting = false
+                                    if (ok) {
+                                        draft = ""
+                                        onRefresh()
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (posting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(id = R.drawable.encore_icon_arrow_up_24),
+                                contentDescription = stringResource(R.string.post_comment),
+                                tint = if (draft.isBlank()) EncoreColors.TextSecondary else Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeCommentRow(
+    comment: com.quackify.backend.model.EpisodeComment,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF535353)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (comment.avatarUrl.isNotBlank()) {
+                EncoreArtworkImage(
+                    imageUrl = comment.avatarUrl,
+                    contentDescription = comment.authorName,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 16.dp
+                )
+            } else {
+                Text(
+                    text = comment.authorName.firstOrNull()?.uppercase() ?: "?",
+                    style = EncoreTheme.typography.bodySmallBold.copy(color = Color.White)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(EncoreSpacers.Tighter4))
+        Column {
+            Text(
+                text = comment.authorName,
+                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
+            )
+            Text(
+                text = comment.text,
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+            )
+            if (comment.reactionCount > 0 || comment.replyCount > 0) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter4)
+                ) {
+                    if (comment.reactionCount > 0) {
+                        Text(
+                            text = if (comment.topReaction.isNotBlank()) {
+                                "${comment.topReaction} ${comment.reactionCount}"
+                            } else {
+                                comment.reactionCount.toString()
+                            },
+                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                        )
+                    }
+                    if (comment.replyCount > 0) {
+                        Text(
+                            text = stringResource(R.string.comment_replies, comment.replyCount),
+                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

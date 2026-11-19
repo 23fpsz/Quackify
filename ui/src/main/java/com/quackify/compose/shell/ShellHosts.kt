@@ -8,6 +8,7 @@ import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.Credits
+import com.quackify.backend.model.EpisodeComment
 import com.quackify.backend.model.PlaylistChoice
 import com.quackify.backend.model.PlaylistPermissions
 import com.quackify.backend.model.ProfileUser
@@ -88,6 +89,10 @@ internal class ShellHosts(
     val nowPlayingArtistBio: String,
     val nowPlayingArtistImageUrl: String?,
     val nowPlayingArtistFollowed: Boolean?,
+    val nowPlayingShow: ShowDetail? = null,
+    val nowPlayingComments: List<EpisodeComment> = emptyList(),
+    val onCommentsRefresh: (() -> Unit)? = null,
+    val onEpisodeComment: (suspend (String) -> Boolean)? = null,
     val nowPlayingLyrics: List<TimeSyncedLyric>,
     val nowPlayingTranscript: List<TranscriptLine> = emptyList(),
     val lyricsProviderName: String = "",
@@ -103,6 +108,7 @@ internal class ShellHosts(
     val onCanvasToggle: ((Boolean) -> Unit)?,
     val onToggleVideoFullscreen: ((Boolean) -> Unit)?,
     val onArtistFollowToggle: ((String, Boolean) -> Unit)?,
+    val onShowFollowToggle: ((String, Boolean) -> Unit)? = null,
     val onAddToPlaylist: ((TrackItem) -> Unit)?,
     val context: Context,
     val handleQueueAdd: (String) -> Unit,
@@ -251,6 +257,10 @@ internal class ShellHosts(
         nowPlayingArtistBio = nowPlayingArtistBio,
         nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
         nowPlayingArtistFollowed = nowPlayingArtistFollowed,
+        nowPlayingShow = nowPlayingShow,
+        nowPlayingComments = nowPlayingComments,
+        onCommentsRefresh = onCommentsRefresh,
+        onEpisodeComment = onEpisodeComment,
         nowPlayingLyrics = nowPlayingLyrics,
         nowPlayingTranscript = nowPlayingTranscript,
         lyricsProviderName = lyricsProviderName,
@@ -267,6 +277,7 @@ internal class ShellHosts(
         onCanvasToggle = onCanvasToggle,
         onToggleVideoFullscreen = onToggleVideoFullscreen,
         onArtistFollowToggle = onArtistFollowToggle,
+        onShowFollowToggle = onShowFollowToggle ?: this.onShowFollowToggle,
         onAddToPlaylist = onAddToPlaylist,
         openAlbum = openAlbum,
         openArtist = openArtist,

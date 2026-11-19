@@ -717,6 +717,15 @@ internal fun ShellShowRoute(
         onBack = env.handleBack,
         onRetry = { uri -> onOpenShow?.invoke(uri) },
         onEpisodeClick = env.openEpisode,
+        onEpisodeMoreClick = { episode ->
+            env.local.libraryItemOptions = com.quackify.compose.sheets.EntityOptions(
+                title = episode.title,
+                subtitle = episode.showName,
+                imageUrl = episode.wideImageUrl.ifBlank { episode.imageUrl }.takeIf { it.isNotBlank() },
+                uri = episode.uri,
+            )
+            env.flags.isEpisodeOptionsOpen = true
+        },
         onPlayEpisode = { episode ->
             env.playerListener?.onPlayEpisode(episode.uri, env.active.showUri, episode.video)
         },

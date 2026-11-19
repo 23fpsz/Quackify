@@ -37,6 +37,10 @@ object LyricsOptions {
     /** Screen stays awake while the fullscreen lyrics reader is open. */
     private const val KEY_KEEP_SCREEN_ON = "lyricsKeepScreenOn"
 
+    private const val KEY_TRANSCRIPT_SMOOTH_SWEEP = "transcriptSmoothSweepEnabled"
+
+    private const val KEY_TRANSCRIPT_OFFSET_TENTHS = "transcriptOffsetTenths"
+
     var enabled by mutableStateOf(true)
         private set
 
@@ -68,6 +72,12 @@ object LyricsOptions {
     var keepScreenOn by mutableStateOf(false)
         private set
 
+    var transcriptSmoothSweep by mutableStateOf(true)
+        private set
+
+    var transcriptOffsetTenths by mutableStateOf(0)
+        private set
+
     fun load(context: Context) {
         val prefs = AppPrefs.prefs(context, PREFS)
         enabled = prefs.getBoolean(KEY_ENABLED, true)
@@ -80,6 +90,9 @@ object LyricsOptions {
             ?: TRANSLATION_DEVICE_LANGUAGE
         offsetTenths = prefs.getInt(KEY_OFFSET_TENTHS, 0).coerceIn(LYRICS_OFFSET_TENTHS_MIN, LYRICS_OFFSET_TENTHS_MAX)
         keepScreenOn = prefs.getBoolean(KEY_KEEP_SCREEN_ON, false)
+        transcriptSmoothSweep = prefs.getBoolean(KEY_TRANSCRIPT_SMOOTH_SWEEP, true)
+        transcriptOffsetTenths = prefs.getInt(KEY_TRANSCRIPT_OFFSET_TENTHS, 0)
+            .coerceIn(LYRICS_OFFSET_TENTHS_MIN, LYRICS_OFFSET_TENTHS_MAX)
     }
 
     fun setEnabled(context: Context, value: Boolean) {
@@ -136,8 +149,22 @@ object LyricsOptions {
         AppPrefs.edit(context, PREFS).putBoolean(KEY_KEEP_SCREEN_ON, value).apply()
     }
 
+    fun setTranscriptSmoothSweep(context: Context, value: Boolean) {
+        transcriptSmoothSweep = value
+        AppPrefs.edit(context, PREFS).putBoolean(KEY_TRANSCRIPT_SMOOTH_SWEEP, value).apply()
+    }
+
+    fun setTranscriptOffsetTenths(context: Context, tenths: Int) {
+        val clamped = tenths.coerceIn(LYRICS_OFFSET_TENTHS_MIN, LYRICS_OFFSET_TENTHS_MAX)
+        transcriptOffsetTenths = clamped
+        AppPrefs.edit(context, PREFS).putInt(KEY_TRANSCRIPT_OFFSET_TENTHS, clamped).apply()
+    }
+
     /** The sweep position offset to apply, in milliseconds. */
     val offsetMs: Long get() = offsetTenths * 100L
+
+    /** The transcript timing offset to apply, in milliseconds. */
+    val transcriptOffsetMs: Long get() = transcriptOffsetTenths * 100L
 
     private fun readProviderOrder(saved: String?): List<LyricsProvider> {
         if (saved.isNullOrBlank()) return LyricsProvider.offered

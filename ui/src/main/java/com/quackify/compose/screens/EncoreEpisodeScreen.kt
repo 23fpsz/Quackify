@@ -41,7 +41,9 @@ import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.rememberSmoothColor
+import com.quackify.backend.model.ChapterSpan
 import com.quackify.compose.format.formatDuration
+import com.quackify.compose.format.formatTrackLength
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.theme.EncoreTheme
@@ -67,6 +69,7 @@ fun EncoreEpisodeScreen(
     onPlayClick: () -> Unit = {},
     onShowClick: () -> Unit = {},
     onMoreClick: (() -> Unit)? = null,
+    chapters: List<ChapterSpan> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     var descriptionExpanded by remember { mutableStateOf(false) }
@@ -216,6 +219,74 @@ fun EncoreEpisodeScreen(
                                     .padding(top = 6.dp)
                                     .clickable { descriptionExpanded = !descriptionExpanded },
                             )
+                        }
+                    }
+
+                    if (chapters.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(
+                            text = stringResource(R.string.chapters),
+                            style = EncoreTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = EncoreColors.TextPrimary,
+                            ),
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        chapters.forEach { chapter ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 96.dp, height = 54.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(EncoreColors.Card),
+                                ) {
+                                    val chapterArt = wideImageUrl?.takeIf { it.isNotBlank() } ?: imageUrl
+                                    if (!chapterArt.isNullOrBlank()) {
+                                        EncoreArtworkImage(
+                                            imageUrl = chapterArt,
+                                            contentDescription = chapter.title,
+                                            modifier = Modifier.fillMaxSize(),
+                                            cornerRadius = 6.dp,
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.BottomStart,
+                                    ) {
+                                        Text(
+                                            text = formatTrackLength(chapter.startMs),
+                                            style = EncoreTheme.typography.marginal.copy(
+                                                color = Color.White,
+                                                fontSize = 9.sp,
+                                            ),
+                                            modifier = Modifier
+                                                .background(Color.Black.copy(alpha = 0.6f))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = chapter.title,
+                                        style = EncoreTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = EncoreColors.TextPrimary,
+                                        ),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = formatTrackLength(chapter.endMs - chapter.startMs),
+                                        style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                                    )
+                                }
+                            }
                         }
                     }
 
