@@ -78,6 +78,8 @@ import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.player.LyricsOptions
+import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MAX
+import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MIN
 import com.quackify.compose.player.TRANSLATION_DEVICE_LANGUAGE
 import com.quackify.compose.sheets.AppLanguageSheet
 import com.quackify.compose.sheets.LyricsProviderSheet
@@ -143,6 +145,12 @@ fun SettingsScreen(
     val lyricsPreview = LyricsOptions.preview
     val lyricsPrioritizeWordSynced = LyricsOptions.prioritizeWordSynced
     val lyricsProviderOrder = LyricsOptions.providerOrder
+    val lyricsKeepScreenOn = LyricsOptions.keepScreenOn
+    val lyricsOffsetTenths = LyricsOptions.offsetTenths + LYRICS_OFFSET_TENTHS_MAX
+    val lyricsOffsetLabel = remember(LyricsOptions.offsetTenths) {
+        val seconds = LyricsOptions.offsetTenths / 10f
+        context.getString(R.string.lyrics_offset_value, seconds)
+    }
     val lyricsTranslationEnabled = LyricsOptions.translationEnabled
     val lyricsTranslationLanguage = LyricsOptions.translationLanguage
     val translationLanguageLabel = remember(lyricsTranslationLanguage) {
@@ -367,6 +375,28 @@ fun SettingsScreen(
                             enabled = lyricsEnabled,
                             onCheckedChange = { on ->
                                 LyricsOptions.setPrioritizeWordSynced(context, on)
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = stringResource(R.string.lyrics_keep_screen_on),
+                            subtitle = stringResource(R.string.lyrics_keep_screen_on_desc),
+                            isChecked = lyricsKeepScreenOn,
+                            enabled = lyricsEnabled,
+                            onCheckedChange = { on ->
+                                LyricsOptions.setKeepScreenOn(context, on)
+                            }
+                        )
+                        SettingsSliderRow(
+                            title = stringResource(R.string.lyrics_offset),
+                            subtitle = stringResource(R.string.lyrics_offset_desc),
+                            value = lyricsOffsetTenths,
+                            maxValue = LYRICS_OFFSET_TENTHS_MAX * 2,
+                            valueLabel = lyricsOffsetLabel,
+                            onValueChange = { tenths ->
+                                LyricsOptions.setOffsetTenths(
+                                    context,
+                                    tenths - LYRICS_OFFSET_TENTHS_MAX,
+                                )
                             }
                         )
                         if (lyricsProviderSheetOpen) {

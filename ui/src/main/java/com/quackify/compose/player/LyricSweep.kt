@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -54,19 +55,33 @@ internal fun rememberLyricClock(
     val clock = remember(trackKey) { mutableLongStateOf(0L) }
     var lastReported by remember(trackKey) { mutableLongStateOf(0L) }
     var lastFrameNanos by remember(trackKey) { mutableLongStateOf(0L) }
-    // The steering reads the position through a State so the frame loop is
-    // launched once: keyed on the lambda instance, every recomposition that
-    // captured a fresh position would restart the loop and spend its first
-    // frame idle.
-    val reported by remember(reportedPositionMs) {
-        derivedStateOf { reportedPositionMs() }
+    // The frame loop is launched once per track, but the position lambda
+    // comes from whatever composition first created it — capture it through
+    // rememberUpdatedState so the loop keeps calling the freshest one and
+    // keeps seeing the position state that lambda reads. Reading the position
+    // through a derivedStateOf here instead froze the steering on the first
+    // composition's value — the lambda reads no snapshot state of its own,
+    // so the derived value computed once and never again: seeks were never
+    // followed, drift was never corrected, and after the screen had been off
+    // the sweep resumed from where it froze instead of where the song was.
+    val currentReportPosition by rememberUpdatedState(reportedPositionMs)
+
+    // The user's lyrics offset, applied where the clock is read rather than
+    // where it is written — folding it into the stored value instead would
+    // make every player reading look offset and poison the steering. Positive
+    // (lyrics felt late) shifts the sweep earlier, negative (felt early)
+    // later. Collected as state so dragging the offset slider retimes the
+    // sweep mid-line, live.
+    val offsetState = remember(trackKey) { mutableLongStateOf(0L) }
+    LaunchedEffect(trackKey) {
+        snapshotFlow { LyricsOptions.offsetMs }.collect { offsetState.longValue = it }
     }
 
     // Paused: follow the readings exactly, so a seek while paused lands
     // immediately and nothing drifts.
     LaunchedEffect(isPlaying, trackKey) {
         if (isPlaying) return@LaunchedEffect
-        snapshotFlow { reported }.collect { reading ->
+        snapshotFlow { currentReportPosition() }.collect { reading ->
             clock.longValue = reading
         }
     }
@@ -74,7 +89,7 @@ internal fun rememberLyricClock(
     LaunchedEffect(isPlaying, trackKey) {
         if (!isPlaying) return@LaunchedEffect
         lastFrameNanos = 0L
-        lastReported = reported
+        lastReported = currentReportPosition()
         clock.longValue = lastReported
         while (true) {
             withFrameNanos { frameNanos ->
@@ -84,7 +99,7 @@ internal fun rememberLyricClock(
                 }
                 lastFrameNanos = frameNanos
             }
-            val reading = reported
+            val reading = currentReportPosition()
             if (reading != lastReported) {
                 val estimate = clock.longValue
                 // Steer, don't set: small corrections ease in, big jumps
@@ -101,7 +116,11 @@ internal fun rememberLyricClock(
             }
         }
     }
-    return clock
+    // Read-time offset: both states are re-created with the track, so the
+    // derived computation is keyed to them.
+    return remember(clock, offsetState) {
+        derivedStateOf { clock.longValue + offsetState.longValue }
+    }
 }
 
 /**

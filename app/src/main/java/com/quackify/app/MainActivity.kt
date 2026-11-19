@@ -1555,6 +1555,7 @@ class MainActivity : ComponentActivity() {
                 )
             }.orEmpty()
         },
+        lyricsProviderName = nowPlayingLyrics?.provider.orEmpty(),
         nowPlayingTranscript = remember(nowPlayingTranscript) {
             nowPlayingTranscript?.lines?.map { line ->
                 TranscriptLine(

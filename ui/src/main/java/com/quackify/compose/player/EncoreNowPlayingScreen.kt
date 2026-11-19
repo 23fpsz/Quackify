@@ -97,6 +97,8 @@ import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
+import android.app.Activity
+import android.view.WindowManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -296,6 +298,7 @@ fun EncoreNowPlayingScreen(
     onArtistFollowToggle: (Boolean) -> Unit = {},
     lyrics: List<TimeSyncedLyric> = emptyList(),
     transcript: List<TranscriptLine> = emptyList(),
+    lyricsProviderName: String = "",
     showLyricsPreview: Boolean = true,
     previousTrack: TrackItem? = null,
     nextTrack: TrackItem? = null,
@@ -1105,6 +1108,7 @@ fun EncoreNowPlayingScreen(
                 isPlaying = isPlaying,
                 dominantColor = dominantColor,
                 lyrics = lyrics,
+                lyricsProviderName = lyricsProviderName,
                 onSeekMs = { targetMs -> if (durationMs > 0L) onSeek(targetMs.toFloat() / durationMs.toFloat()) },
                 onShareClick = { isLyricsShareOpen = true },
                 onLyricsMenuClick = { isLyricsMenuOpen = true },
@@ -2696,6 +2700,7 @@ private fun FullscreenLyricsView(
     isPlaying: Boolean,
     dominantColor: Color,
     lyrics: List<TimeSyncedLyric>,
+    lyricsProviderName: String,
     onSeekMs: (Long) -> Unit,
     onShareClick: () -> Unit,
     onLyricsMenuClick: () -> Unit,
@@ -2716,6 +2721,18 @@ private fun FullscreenLyricsView(
     val ink = contrastInk(dominantColor)
     LaunchedEffect(activeIndex) {
         listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
+    }
+
+    // Keep the screen awake while the reader is open, if the user asked for
+    // it. Window flag, not a wake lock: nothing to acquire or release by
+    // hand, and Android clears it never — the flag simply rides on this
+    // window and is removed the moment it is cleared.
+    val context = LocalContext.current
+    val keepScreenOn = LyricsOptions.keepScreenOn
+    DisposableEffect(keepScreenOn) {
+        val window = (context as? Activity)?.window ?: return@DisposableEffect onDispose { }
+        if (keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
     Column(
@@ -2821,6 +2838,22 @@ private fun FullscreenLyricsView(
                             .fillMaxWidth()
                             .clickable { onSeekMs(line.startTimeMs) }
                             .padding(bottom = EncoreSpacers.Tighter)
+                    )
+                }
+            }
+            if (lyricsProviderName.isNotBlank()) {
+                item {
+                    // Attribution for the source these lines came from, at
+                    // the very end of the scroll — where Spotify itself
+                    // puts it.
+                    Text(
+                        text = stringResource(R.string.lyrics_provided_by, lyricsProviderName),
+                        style = EncoreTheme.typography.marginal.copy(
+                            color = ink.copy(alpha = 0.45f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 28.dp)
                     )
                 }
             }

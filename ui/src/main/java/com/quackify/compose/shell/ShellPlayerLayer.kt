@@ -62,6 +62,7 @@ internal class ShellPlayerEnv(
     val nowPlayingArtistFollowed: Boolean?,
     val nowPlayingLyrics: List<TimeSyncedLyric>,
     val nowPlayingTranscript: List<TranscriptLine>,
+    val lyricsProviderName: String = "",
     val canvasFilePath: String?,
     val isCanvasAllowed: Boolean,
     val isCanvasEnabled: Boolean,
@@ -271,6 +272,7 @@ private fun NowPlayingScreenLayer(
         // Settings change applies to the open player without a reopen.
         lyrics = if (LyricsOptions.enabled) env.nowPlayingLyrics else emptyList(),
         transcript = env.nowPlayingTranscript,
+        lyricsProviderName = if (LyricsOptions.enabled) env.lyricsProviderName else "",
         lyricsPreview = LyricsOptions.preview,
         previousTrack = playbackState?.previousTrack,
         nextTrack = playbackState?.nextTrack,
