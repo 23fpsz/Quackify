@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -20,18 +21,24 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.components.ShimmerBlock
+import com.quackify.compose.components.ShimmerHost
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
 import androidx.compose.ui.res.stringResource
@@ -65,13 +72,19 @@ fun ArtistListSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
     val avatars = remember { mutableStateMapOf<String, String>() }
+    var avatarsResolved by remember(artists) { mutableStateOf(false) }
     LaunchedEffect(artists) {
-        val missing = artists.map { it.uri }
-            .filter { it.startsWith("spotify:artist:") && !avatars.containsKey(it) }
-            .distinct()
-        if (missing.isEmpty()) return@LaunchedEffect
-        Krespot.artists.images(context, missing).forEach { (uri, url) ->
-            if (url.isNotBlank()) avatars[uri] = url
+        try {
+            val missing = artists.map { it.uri }
+                .filter { it.startsWith("spotify:artist:") && !avatars.containsKey(it) }
+                .distinct()
+            if (missing.isNotEmpty()) {
+                Krespot.artists.images(context, missing).forEach { (uri, url) ->
+                    if (url.isNotBlank()) avatars[uri] = url
+                }
+            }
+        } finally {
+            avatarsResolved = true
         }
     }
     ModalBottomSheet(
@@ -108,6 +121,7 @@ fun ArtistListSheet(
                 ArtistListRow(
                     artist = artist,
                     imageUrl = artist.imageUrl.ifBlank { avatars[artist.uri].orEmpty() },
+                    loading = !avatarsResolved,
                     onClick = {
                         onDismiss()
                         onViewArtist(artist)
@@ -123,6 +137,7 @@ fun ArtistListSheet(
 private fun ArtistListRow(
     artist: ArtistListEntry,
     imageUrl: String,
+    loading: Boolean,
     onClick: () -> Unit,
 ) {
     val fallbackColor = Color(0xFFE8115B)
@@ -147,6 +162,15 @@ private fun ArtistListRow(
                     cornerRadius = 24.dp,
                     fallbackColor = fallbackColor
                 )
+            } else if (loading) {
+                ShimmerHost {
+                    ShimmerBlock(
+                        modifier = Modifier.fillMaxSize(),
+                        shape = CircleShape,
+                        base = fallbackColor,
+                        highlight = fallbackColor.copy(alpha = 0.45f).compositeOver(Color(0xFF2E2E2E))
+                    )
+                }
             } else {
                 Box(
                     modifier = Modifier
