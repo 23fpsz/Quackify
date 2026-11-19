@@ -980,6 +980,7 @@ internal fun ShellShowPane(
     onBack: () -> Unit,
     onRetry: (String) -> Unit,
     onEpisodeClick: (String) -> Unit,
+    onEpisodeMoreClick: ((EpisodeRow) -> Unit)? = null,
     onPlayEpisode: (EpisodeRow) -> Unit = {},
     onPlayPause: () -> Unit,
     onLoadMore: () -> Unit,
@@ -1013,6 +1014,7 @@ internal fun ShellShowPane(
             contextUri = show.uri,
             currentContextUri = currentContextUri,
             onEpisodeClick = { episode -> onEpisodeClick(episode.uri) },
+            onEpisodeMoreClick = onEpisodeMoreClick,
             onPlayEpisode = onPlayEpisode,
             onBackClick = onBack,
             onPlayPauseClick = {
@@ -1060,6 +1062,7 @@ internal fun ShellEpisodePane(
             durationMs = episode.durationMs,
             positionMs = episode.positionMs,
             isVideo = episode.video,
+            chapters = episode.chapters,
             isPlaying = isPlaying,
             isCurrent = isCurrent,
             onBackClick = onBack,

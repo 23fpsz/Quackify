@@ -47,6 +47,7 @@ import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.Credits
 import com.quackify.backend.model.EpisodeDetail
+import com.quackify.backend.model.EpisodeComment
 import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.PlaylistChoice
 import com.quackify.backend.model.PlaylistPermissions
@@ -271,6 +272,11 @@ fun EncoreAppShell(
     nowPlayingMonthlyListeners: String = "",
     nowPlayingArtistImageUrl: String? = null,
     nowPlayingArtistFollowed: Boolean? = null,
+    nowPlayingShow: ShowDetail? = null,
+    nowPlayingComments: List<EpisodeComment> = emptyList(),
+    onCommentsRefresh: (() -> Unit)? = null,
+    onEpisodeComment: (suspend (String) -> Boolean)? = null,
+    onAddEpisodeComment: ((String) -> Unit)? = null,
     nowPlayingLyrics: List<TimeSyncedLyric> = emptyList(),
     nowPlayingTranscript: List<TranscriptLine> = emptyList(),
     lyricsProviderName: String = "",
@@ -796,6 +802,10 @@ fun EncoreAppShell(
             nowPlayingArtistBio = nowPlayingArtistBio,
             nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
             nowPlayingArtistFollowed = nowPlayingArtistFollowed,
+            nowPlayingShow = nowPlayingShow,
+            nowPlayingComments = nowPlayingComments,
+            onCommentsRefresh = onCommentsRefresh,
+            onEpisodeComment = onEpisodeComment,
             nowPlayingLyrics = nowPlayingLyrics,
             nowPlayingTranscript = nowPlayingTranscript,
             lyricsProviderName = lyricsProviderName,

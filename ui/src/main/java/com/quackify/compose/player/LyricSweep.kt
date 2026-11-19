@@ -51,6 +51,7 @@ internal fun rememberLyricClock(
     reportedPositionMs: () -> Long,
     isPlaying: Boolean,
     trackKey: Any? = Unit,
+    offsetMs: () -> Long = { LyricsOptions.offsetMs },
 ): State<Long> {
     val clock = remember(trackKey) { mutableLongStateOf(0L) }
     var lastReported by remember(trackKey) { mutableLongStateOf(0L) }
@@ -74,7 +75,7 @@ internal fun rememberLyricClock(
     // sweep mid-line, live.
     val offsetState = remember(trackKey) { mutableLongStateOf(0L) }
     LaunchedEffect(trackKey) {
-        snapshotFlow { LyricsOptions.offsetMs }.collect { offsetState.longValue = it }
+        snapshotFlow { offsetMs() }.collect { offsetState.longValue = it }
     }
 
     // Paused: follow the readings exactly, so a seek while paused lands

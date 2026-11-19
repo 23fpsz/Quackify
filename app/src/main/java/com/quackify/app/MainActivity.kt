@@ -57,6 +57,7 @@ import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.Credits
 import com.quackify.backend.model.EpisodeDetail
+import com.quackify.backend.model.EpisodeComments
 import com.quackify.backend.model.EpisodeTranscript
 import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.HomeSection
@@ -255,6 +256,10 @@ class MainActivity : ComponentActivity() {
     internal var nowPlayingLyrics by mutableStateOf<TrackLyrics?>(null)
     internal var nowPlayingTranscript by mutableStateOf<EpisodeTranscript?>(null)
     internal var canvasFile by mutableStateOf<String?>(null)
+    internal var nowPlayingShow by mutableStateOf<ShowDetail?>(null)
+    internal var nowPlayingComments by mutableStateOf<EpisodeComments?>(null)
+    internal var episodeCommentsUri by mutableStateOf<String?>(null)
+    internal var episodeCommentsNonce by mutableStateOf(0)
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.wrap(newBase))
@@ -1574,6 +1579,17 @@ class MainActivity : ComponentActivity() {
         nowPlayingMonthlyListeners = nowPlayingArtist?.monthlyListeners
             ?.takeIf { it > 0L }?.let { formatCount(it) + " monthly listeners" }.orEmpty(),
         nowPlayingArtistImageUrl = nowPlayingArtist?.imageUrl?.takeIf { it.isNotBlank() },
+        nowPlayingShow = nowPlaying.showDetail,
+        nowPlayingComments = nowPlaying.episodeComments?.comments.orEmpty(),
+        onCommentsRefresh = { episodeCommentsNonce++ },
+        onEpisodeComment = { text ->
+            val uri = PlaybackHost.bridge?.state?.trackUri.orEmpty()
+            if (!uri.startsWith("spotify:episode:")) {
+                false
+            } else {
+                Podcasts.addEpisodeComment(context, uri, text)
+            }
+        },
         nowPlayingArtistFollowed = nowPlayingArtistFollowed,
         nowPlayingLyrics = remember(nowPlayingLyrics) {
             val lyrics = nowPlayingLyrics

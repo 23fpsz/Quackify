@@ -424,9 +424,10 @@ private fun EpisodeListRow(
                 .clip(RoundedCornerShape(6.dp))
                 .background(EncoreColors.Card),
         ) {
-            if (episode.imageUrl.isNotBlank()) {
+            val episodeArt = episode.wideImageUrl.ifBlank { episode.imageUrl }
+            if (episodeArt.isNotBlank()) {
                 EncoreArtworkImage(
-                    imageUrl = episode.imageUrl,
+                    imageUrl = episodeArt,
                     contentDescription = episode.title,
                     modifier = Modifier.fillMaxSize(),
                     cornerRadius = 6.dp,

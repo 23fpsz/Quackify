@@ -6,11 +6,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import com.quackify.backend.api.Library
+import com.quackify.backend.api.Podcasts
 import com.quackify.backend.api.Search
 import com.quackify.backend.library.Krespot
 import com.quackify.backend.model.ArtistDetail
+import com.quackify.backend.model.EpisodeComments
 import com.quackify.backend.model.EpisodeTranscript
 import com.quackify.backend.model.SearchKind
+import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.compose.player.LyricsOptions
 import com.quackify.compose.home.HomeShelf
@@ -40,6 +43,8 @@ internal class ShellHomeData(
 internal class ShellNowPlayingData(
     val artistUri: String,
     val canvasAllowed: Boolean,
+    val showDetail: ShowDetail?,
+    val episodeComments: EpisodeComments?,
 )
 
 private class NowPlayingWriters(
@@ -48,6 +53,8 @@ private class NowPlayingWriters(
     val setLyrics: (TrackLyrics?) -> Unit,
     val setTranscript: (EpisodeTranscript?) -> Unit,
     val setCanvasFile: (String?) -> Unit,
+    val setShowDetail: (ShowDetail?) -> Unit,
+    val setEpisodeComments: (EpisodeComments?) -> Unit,
 )
 
 @Composable
@@ -145,6 +152,8 @@ internal fun MainActivity.rememberNowPlayingData(
         setLyrics = { nowPlayingLyrics = it },
         setTranscript = { nowPlayingTranscript = it },
         setCanvasFile = { canvasFile = it },
+        setShowDetail = { nowPlayingShow = it },
+        setEpisodeComments = { nowPlayingComments = it },
     )
     val playback = PlaybackHost.bridge?.state
     val nowPlayingArtistUri = remember(playback?.trackUri, playback?.artistUri, playback?.queue, playback?.queueFromContext) {
@@ -152,6 +161,9 @@ internal fun MainActivity.rememberNowPlayingData(
             ((playback?.queue.orEmpty()) + (playback?.queueFromContext.orEmpty()))
                 .firstOrNull { it.uri == playback?.trackUri }?.artistUri.orEmpty()
         }
+    }
+    val nowPlayingEpisodeUri = remember(playback?.trackUri) {
+        playback?.trackUri.orEmpty().takeIf { it.startsWith("spotify:episode:") }
     }
     LaunchedEffect(nowPlayingArtistUri) {
         if (nowPlayingArtistUri.isBlank()) {
@@ -176,6 +188,26 @@ internal fun MainActivity.rememberNowPlayingData(
         } else {
             nowPlayingArtistUri in inLibrary
         })
+    }
+    LaunchedEffect(nowPlayingEpisodeUri) {
+        if (nowPlayingEpisodeUri == null) {
+            writers.setShowDetail(null)
+            writers.setEpisodeComments(null)
+            return@LaunchedEffect
+        }
+        val showUri = nowPlayingEpisodeUri.substringBeforeLast(":").let {
+            runCatching {
+                val episode = Podcasts.episode(this@rememberNowPlayingData, nowPlayingEpisodeUri)
+                episode?.showUri.orEmpty()
+            }.getOrDefault("")
+        }
+        if (showUri.startsWith("spotify:show:")) {
+            writers.setShowDetail(Podcasts.show(this@rememberNowPlayingData, showUri))
+        }
+        if (episodeCommentsUri != nowPlayingEpisodeUri) {
+            episodeCommentsUri = nowPlayingEpisodeUri
+            episodeCommentsNonce++
+        }
     }
     LaunchedEffect(
         playback?.trackUri,
@@ -248,9 +280,18 @@ internal fun MainActivity.rememberNowPlayingData(
         val file = CanvasKit.download(this@rememberNowPlayingData, uri, canvasResolution)
         if (uri == playback?.trackUri) writers.setCanvasFile(file)
     }
+    LaunchedEffect(episodeCommentsUri, episodeCommentsNonce) {
+        val uri = episodeCommentsUri ?: return@LaunchedEffect
+        val comments = runCatching {
+            Podcasts.episodeComments(this@rememberNowPlayingData, uri, null)
+        }.getOrNull()
+        if (episodeCommentsUri == uri) writers.setEpisodeComments(comments)
+    }
     return ShellNowPlayingData(
         artistUri = nowPlayingArtistUri,
         canvasAllowed = canvasAllowed,
+        showDetail = nowPlayingShow,
+        episodeComments = nowPlayingComments,
     )
 }
 

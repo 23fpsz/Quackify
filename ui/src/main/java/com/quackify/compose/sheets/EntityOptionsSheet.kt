@@ -68,6 +68,7 @@ fun EntityOptionsSheet(
     onGoToRadio: () -> Unit = {},
     canDeletePlaylist: Boolean = false,
     onDeletePlaylist: () -> Unit = {},
+    onSeeDescription: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || entity == null) return
@@ -146,6 +147,17 @@ fun EntityOptionsSheet(
                     onDismiss()
                     onAddToPlaylist()
                 }
+            }
+
+            if (isEpisode && onSeeDescription != null) {
+                EntityRow(
+                    title = stringResource(R.string.see_episode_description),
+                    iconRes = R.drawable.encore_icon_arrow_down_24,
+                    onClick = {
+                        onDismiss()
+                        onSeeDescription()
+                    }
+                )
             }
 
             if (canPin) {
