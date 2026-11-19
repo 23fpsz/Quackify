@@ -167,14 +167,39 @@ fun EncoreAlbumScreen(
             if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 2000f
         }
     }
-    val playDockStartPx = with(density) { 300.dp.toPx() }
-    val playFadePx = with(density) { 50.dp.toPx() }
-    val playFraction by remember {
-        derivedStateOf { ((scrollPx - playDockStartPx) / playFadePx).coerceIn(0f, 1f) }
+    var playButtonRestAnchorYInRoot by remember { mutableFloatStateOf(-1f) }
+
+    val isPlayButtonSlotMeasured by remember {
+        derivedStateOf { playButtonRestAnchorYInRoot > 0f }
+    }
+    val isHeaderOffScreen by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 }
+    }
+    val playButtonSlotYInRoot by remember {
+        derivedStateOf {
+            if (isHeaderOffScreen || playButtonRestAnchorYInRoot <= 0f) -1f else
+                playButtonRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
+        }
+    }
+
+    val dockDistancePx by remember {
+        derivedStateOf {
+            if (isHeaderOffScreen) {
+                0f
+            } else if (isPlayButtonSlotMeasured) {
+                (playButtonSlotYInRoot - pinnedTopPx).coerceAtLeast(0f)
+            } else {
+                with(density) { 300.dp.toPx() }
+            }
+        }
+    }
+    val dockThresholdPx = with(density) { 56.dp.toPx() }
+    val dockFraction by remember {
+        derivedStateOf { (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f) }
     }
 
     val topBarThreeDotsAlpha by remember {
-        derivedStateOf { 1f - playFraction }
+        derivedStateOf { if (isHeaderOffScreen) 0f else dockFraction }
     }
     val topBarTitleAlpha by remember {
         derivedStateOf {
@@ -444,16 +469,23 @@ fun EncoreAlbumScreen(
                                 Box(
                                     modifier = Modifier
                                         .size(playButtonSize)
-                                        .graphicsLayer { alpha = 1f - playFraction },
+                                        .onGloballyPositioned { coords ->
+                                            if (listState.firstVisibleItemIndex == 0) {
+                                                val currentY = coords.positionInRoot().y
+                                                playButtonRestAnchorYInRoot = currentY + listState.firstVisibleItemScrollOffset
+                                            }
+                                        },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    EncorePlayButton(
-                                        isPlaying = isPlaying,
-                                        onClick = onPlayPauseClick,
-                                        size = playButtonSize,
-                                        iconSize = 24.dp,
-                                        showShuffleBadge = false
-                                    )
+                                    if (!isPlayButtonSlotMeasured || playButtonSlotYInRoot > toolbarBottomPx) {
+                                        EncorePlayButton(
+                                            isPlaying = isPlaying,
+                                            onClick = onPlayPauseClick,
+                                            size = playButtonSize,
+                                            iconSize = 24.dp,
+                                            showShuffleBadge = false
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -727,14 +759,18 @@ fun EncoreAlbumScreen(
             }
         }
 
-        if (playFraction > 0f) {
+        if (isPlayButtonSlotMeasured && (playButtonSlotYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
+            val targetY = if (isHeaderOffScreen || playButtonSlotYInRoot < pinnedTopPx) {
+                pinnedTopPx
+            } else {
+                playButtonSlotYInRoot
+            }
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(end = 16.dp)
                     .graphicsLayer {
-                        translationY = pinnedTopPx
-                        alpha = playFraction
+                        translationY = targetY
                     }
                     .zIndex(20f)
             ) {
