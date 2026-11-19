@@ -6,44 +6,29 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
-import com.quackify.compose.components.EncoreArtworkImage
-import com.quackify.compose.components.ShimmerBlock
-import com.quackify.compose.components.ShimmerHost
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalContext
-import com.quackify.backend.library.Krespot
 
 /** One credited artist on the playing track. */
 data class ArtistListEntry(
@@ -70,23 +55,6 @@ fun ArtistListSheet(
         return
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val context = LocalContext.current
-    val avatars = remember { mutableStateMapOf<String, String>() }
-    var avatarsResolved by remember(artists) { mutableStateOf(false) }
-    LaunchedEffect(artists) {
-        try {
-            val missing = artists.map { it.uri }
-                .filter { it.startsWith("spotify:artist:") && !avatars.containsKey(it) }
-                .distinct()
-            if (missing.isNotEmpty()) {
-                Krespot.artists.images(context, missing).forEach { (uri, url) ->
-                    if (url.isNotBlank()) avatars[uri] = url
-                }
-            }
-        } finally {
-            avatarsResolved = true
-        }
-    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
@@ -120,8 +88,6 @@ fun ArtistListSheet(
             artists.forEach { artist ->
                 ArtistListRow(
                     artist = artist,
-                    imageUrl = artist.imageUrl.ifBlank { avatars[artist.uri].orEmpty() },
-                    loading = !avatarsResolved,
                     onClick = {
                         onDismiss()
                         onViewArtist(artist)
@@ -136,56 +102,15 @@ fun ArtistListSheet(
 @Composable
 private fun ArtistListRow(
     artist: ArtistListEntry,
-    imageUrl: String,
-    loading: Boolean,
     onClick: () -> Unit,
 ) {
-    val fallbackColor = Color(0xFFE8115B)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            if (imageUrl.isNotBlank()) {
-                EncoreArtworkImage(
-                    imageUrl = imageUrl,
-                    contentDescription = artist.name,
-                    modifier = Modifier.size(48.dp),
-                    cornerRadius = 24.dp,
-                    fallbackColor = fallbackColor
-                )
-            } else if (loading) {
-                ShimmerHost {
-                    ShimmerBlock(
-                        modifier = Modifier.fillMaxSize(),
-                        shape = CircleShape,
-                        base = fallbackColor,
-                        highlight = fallbackColor.copy(alpha = 0.45f).compositeOver(Color(0xFF2E2E2E))
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(fallbackColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = artist.name.firstOrNull()?.uppercase() ?: "A",
-                        style = EncoreTheme.typography.titleMedium.copy(color = Color.White)
-                    )
-                }
-            }
-        }
-        Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = artist.name,
