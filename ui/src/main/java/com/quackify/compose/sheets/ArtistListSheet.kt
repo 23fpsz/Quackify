@@ -147,7 +147,7 @@ private fun ArtistListRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = artist.name,
-                style = EncoreTheme.typography.bodyLarge.copy(
+                style = EncoreTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold,
                     color = EncoreColors.TextPrimary
                 ),
