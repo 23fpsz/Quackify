@@ -873,6 +873,7 @@ class PlaybackBridge(private val context: Context) {
                     isExplicit = track.explicit,
                     albumUri = track.albumUri,
                     artistUri = track.artistUri,
+                    artistUris = track.artistUris,
                     hasVideo = track.video,
                     isEnhanced = enhancedCached(uri),
                 )
@@ -2486,6 +2487,7 @@ class PlaybackBridge(private val context: Context) {
                     isExplicit = found.explicit,
                     albumUri = found.albumUri,
                     artistUri = found.artistUri,
+                    artistUris = found.artistUris,
                     hasVideo = found.video,
                     isEnhanced = row.isEnhanced,
                 )
@@ -3567,7 +3569,13 @@ class PlaybackBridge(private val context: Context) {
     private fun hydrateCurrent(cluster: ClusterState) {
         val uri = cluster.track.uri
         if (uri.isBlank() || uri in hydrateTried) return
-        if (cluster.track.title.isNotBlank() && cluster.track.artistName.isNotBlank()) return
+        // Cluster metadata names one artist_uri per track, so a multi-artist
+        // credit needs the decorate answer to know every credited uri. Keep
+        // hydrating while the list is missing even when the cluster already
+        // knows the title; single-artist tracks stop here as before.
+        val creditsKnown = (decorated[uri]?.artistUris).orEmpty().isNotEmpty()
+        val hydrateForCredits = cluster.track.artistName.contains(", ") && !creditsKnown
+        if (cluster.track.title.isNotBlank() && cluster.track.artistName.isNotBlank() && !hydrateForCredits) return
         if (uri.startsWith(AD_PREFIX)) {
             hydrateTried += uri
             log.i("hydrate: an ad is playing, it carries no title")
@@ -3605,9 +3613,9 @@ class PlaybackBridge(private val context: Context) {
                 hasVideo = row.video,
             )
             state = state.copy(
-                title = row.title,
-                artist = row.artists,
-                coverUrl = row.imageUrl.orEmpty(),
+                title = row.title.ifBlank { state.title },
+                artist = row.artists.ifBlank { state.artist },
+                coverUrl = row.imageUrl.ifBlank { state.coverUrl },
                 trackUri = uri,
                 artistUri = row.artistUri.ifBlank { state.artistUri.takeIf { state.trackUri == uri }.orEmpty() },
                 artistUris = row.artistUris.ifEmpty { state.artistUris.takeIf { state.trackUri == uri }.orEmpty() },
@@ -3680,6 +3688,12 @@ class PlaybackBridge(private val context: Context) {
                         artist = "",
                         coverUrl = "",
                         trackUri = cluster.track.uri,
+                        // A different track is starting: its credits are not
+                        // the old one's, and the cluster row knows only one
+                        // uri. Clear the list here; the decorate answer (from
+                        // hydrateCurrent or the queue pass) refills it.
+                        artistUri = "",
+                        artistUris = (decorated[cluster.track.uri]?.artistUris).orEmpty(),
                         isPlaying = effPlaying,
                     )
                     progress.set(position, duration)
@@ -3786,6 +3800,15 @@ class PlaybackBridge(private val context: Context) {
             artistUri = cluster.track.artistUri
                 .ifBlank { if (sameTrack) state.artistUri else "" }
                 .ifBlank { artistUriOf(cluster.track.uri) },
+            // One cluster row names one artist_uri, not the whole credit
+            // list; adopt the decorated list when it exists and otherwise
+            // drop the previous track's credits so they never leak across
+            // track changes. hydrateCurrent refills the list in the background.
+            artistUris = if (sameTrack) {
+                state.artistUris
+            } else {
+                (decorated[cluster.track.uri]?.artistUris).orEmpty()
+            },
             albumUri = cluster.track.albumUri
                 .ifBlank { if (sameTrack) state.albumUri else "" }
                 .ifBlank { albumUriOf(cluster.track.uri) },
@@ -4270,6 +4293,7 @@ class PlaybackBridge(private val context: Context) {
                     isExplicit = track.explicit,
                     albumUri = track.albumUri,
                     artistUri = track.artistUri,
+                    artistUris = track.artistUris,
                     hasVideo = track.video,
                     isEnhanced = enhancedCached(uri),
                 )
