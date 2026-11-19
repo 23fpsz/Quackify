@@ -3338,27 +3338,26 @@ private fun TranscriptSweepText(
 }
 
 /**
- * Where the sweep boundary sits, in (fractional) characters: the end of the
- * last word whose start the position passed, plus the share of the gap to
- * the next word that has already elapsed.
+ * Where the sweep boundary sits, in (fractional) characters. Each word is
+ * lit continuously from its own startMs to the next word's startMs: within
+ * that span the boundary travels the word's own character range, so a word
+ * lights up gradually as it is spoken instead of jumping whole at its start.
  */
 private fun transcriptBoundary(line: TranscriptLine, positionMs: Long): Float {
     val words = line.words
     if (words.isEmpty()) return if (positionMs >= line.startMs) line.text.length.toFloat() else 0f
-    var lastPassed = -1
-    for (index in words.indices) {
-        if (positionMs >= words[index].startMs) lastPassed = index else break
+    val start = words.first().startMs
+    if (positionMs < start) return 0f
+    for (index in words.indices.reversed()) {
+        val word = words[index]
+        if (positionMs >= word.startMs) {
+            val span = (words.getOrNull(index + 1)?.startMs ?: line.startMs + 1)
+                .coerceAtLeast(word.startMs + 1L) - word.startMs
+            val frac = ((positionMs - word.startMs).toFloat() / span).coerceIn(0f, 1f)
+            return word.startChar + (word.endChar - word.startChar) * frac
+        }
     }
-    if (lastPassed < 0) return 0f
-    val end = words[lastPassed].endChar.toFloat()
-    val next = words.getOrNull(lastPassed + 1)
-    return if (next == null || next.startMs <= words[lastPassed].startMs) {
-        end
-    } else {
-        val span = (next.startMs - words[lastPassed].startMs).coerceAtLeast(1L)
-        val frac = ((positionMs - words[lastPassed].startMs).toFloat() / span).coerceIn(0f, 1f)
-        end + (next.endChar - words[lastPassed].endChar) * frac
-    }
+    return 0f
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

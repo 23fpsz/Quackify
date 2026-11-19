@@ -77,7 +77,7 @@ object TrackSource {
                     title = detail.title,
                     artists = detail.showName,
                     album = "",
-                    imageUrl = detail.imageUrl,
+                    imageUrl = detail.wideImageUrl.ifBlank { detail.imageUrl },
                     colorHex = detail.colorHex,
                     durationMs = detail.durationMs,
                     explicit = detail.explicit,
