@@ -55,14 +55,14 @@ object CollectionSource {
     fun canonical(uri: String): String =
         if (uri.startsWith("spotify:user:") && uri.endsWith(":collection")) LIKED_URI else uri
 
-    suspend fun collection(context: Context, uri: String): CollectionDetail? {
+    suspend fun collection(context: Context, uri: String, hydrateSaved: Boolean = true): CollectionDetail? {
         val token = EncoreAuth.token(context)
         if (token.isBlank()) return null
         val target = canonical(uri)
         return if (target.startsWith("spotify:collection:")) {
             liked(context, token, target)
         } else {
-            playlist(context, token, target)
+            playlist(context, token, target, hydrateSaved)
         }
     }
 
@@ -230,11 +230,16 @@ object CollectionSource {
         return out
     }
 
-    private suspend fun playlist(context: Context, token: String, uri: String): CollectionDetail? =
+    private suspend fun playlist(
+        context: Context,
+        token: String,
+        uri: String,
+        hydrateSaved: Boolean,
+    ): CollectionDetail? =
         withContext(Dispatchers.Default) {
             val playlist = playlistPage(context, token, uri, 0, PAGE) ?: return@withContext null
             val content = playlist.optJSONObject("content")
-            val rows = withSaved(context, playlistRows(content))
+            val rows = if (hydrateSaved) withSaved(context, playlistRows(content)) else playlistRows(content)
             val total = content?.optInt("totalCount", rows.size) ?: rows.size
             val owner = playlist.optJSONObject("ownerV2")?.optJSONObject("data")
             val followers = playlist.optLong("followers", 0L)

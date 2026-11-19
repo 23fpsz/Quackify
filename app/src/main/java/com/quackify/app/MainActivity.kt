@@ -625,22 +625,35 @@ class MainActivity : ComponentActivity() {
                             if (playlistUri.isBlank()) return@LaunchedEffect
                             val uri = playlistUri
                             playlistLoading = true
-                            val detail = Krespot.collections.collection(context, uri)
-                            if (uri != playlistUri) return@LaunchedEffect
-                            playlistDetail = detail
-                            playlistTracks = detail?.tracks?.map { it.toTrackItem() }
-                            playlistHasMore = detail?.hasMore == true
-                            playlistLoading = false
-                            playlistSaved = Krespot.rootlist.saved(context, uri)
-                            playlistCanRemoveCover = false
-                            val editable = detail?.editable == true
                             coroutineScope {
-                                val saved = async { Krespot.rootlist.saved(context, uri) }
-                                val cover = if (editable) {
-                                    async { Krespot.playlists.hasCustomCover(context, uri) }
-                                } else null
-                                playlistSaved = saved.await()
-                                playlistCanRemoveCover = cover?.await() ?: false
+                                val detailDeferred = async {
+                                    Krespot.collections.collection(context, uri, hydrateSaved = false)
+                                }
+                                val savedDeferred = async {
+                                    runCatching { Krespot.rootlist.saved(context, uri) }.getOrDefault(false)
+                                }
+                                val detail = detailDeferred.await()
+                                if (uri == playlistUri) {
+                                    playlistDetail = detail
+                                    playlistTracks = detail?.tracks?.map { it.toTrackItem() }
+                                    playlistHasMore = detail?.hasMore == true
+                                    playlistLoading = false
+                                    playlistSaved = savedDeferred.await()
+                                    playlistCanRemoveCover = false
+                                    if (detail?.editable == true) {
+                                        playlistCanRemoveCover = Krespot.playlists.hasCustomCover(context, uri)
+                                    }
+                                    val unknown = detail?.tracks.orEmpty()
+                                        .filter { it.saved == null }
+                                        .map { it.uri }
+                                        .filter { it.isNotBlank() }
+                                    if (unknown.isNotEmpty()) {
+                                        val savedRows = Library.saved(context, unknown)
+                                        playlistTracks = playlistTracks?.map { item ->
+                                            if (item.saved == null) item.copy(saved = item.uri in savedRows) else item
+                                        }
+                                    }
+                                }
                             }
                         }
 
