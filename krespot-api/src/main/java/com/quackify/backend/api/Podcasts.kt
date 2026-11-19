@@ -185,7 +185,7 @@ object Podcasts {
             ?.optJSONObject("data")
             ?.optJSONObject("createComment")
         val ok = payload?.optString("__typename").orEmpty() == "SuccessCreateComment" &&
-            payload.optBoolean("success", false)
+            payload?.optBoolean("success", false) == true
         log.i("addEpisodeComment $episodeUri ok=$ok")
         return ok
     }

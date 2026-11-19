@@ -274,7 +274,7 @@ private fun NowPlayingScreenLayer(
         onCommentsRefresh = { env.onCommentsRefresh?.invoke() },
         onEpisodeComment = { text -> env.onEpisodeComment?.invoke(text) ?: false },
         onArtistFollowToggle = { follow ->
-            if (isEpisode) {
+            if (playbackState?.trackUri.orEmpty().startsWith("spotify:episode:")) {
                 val showUri = env.nowPlayingShow?.uri.orEmpty()
                 if (showUri.startsWith("spotify:show:")) {
                     env.onShowFollowToggle?.invoke(showUri, follow)
