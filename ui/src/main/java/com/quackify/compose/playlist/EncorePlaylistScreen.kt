@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.backend.model.PlaylistMember
 import com.quackify.compose.R
+import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.matchesCurrent
 import com.quackify.compose.components.matchesCurrentContext
@@ -128,8 +129,20 @@ data class TrackItem(
 
 private val trackSearchEngine = GenericSearchEngine<TrackItem>(maxResult = Int.MAX_VALUE)
 
-private val TRACK_SEARCH_FIELDS = SearchableFieldExtractor<TrackItem> {
-    arrayOf(it.title, it.artist, it.albumName)
+private enum class PlaylistSearchFilter(val labelRes: Int) {
+    TRACK(R.string.songs),
+    ARTIST(R.string.artists),
+    ALBUM(R.string.albums)
+}
+
+private fun trackSearchFields(
+    filters: Set<PlaylistSearchFilter>
+): SearchableFieldExtractor<TrackItem> = SearchableFieldExtractor { track ->
+    buildList {
+        if (PlaylistSearchFilter.TRACK in filters) add(track.title)
+        if (PlaylistSearchFilter.ARTIST in filters) add(track.artist)
+        if (PlaylistSearchFilter.ALBUM in filters) add(track.albumName)
+    }.toTypedArray()
 }
 
 private const val PRELOAD_REMAINING_TRACKS = 25
@@ -220,6 +233,7 @@ fun EncorePlaylistScreen(
     var isEditDetailsOpen by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var searchFilters by remember { mutableStateOf(setOf(PlaylistSearchFilter.TRACK)) }
     var isDownloaded by remember { mutableStateOf(false) }
     var isShuffle by remember { mutableStateOf(false) }
     val sortContext = LocalContext.current
@@ -242,12 +256,12 @@ fun EncorePlaylistScreen(
         mutableStateListOf<TrackItem>().apply { addAll(tracks) }
     }
 
-    val displayedTracks = remember(tracks, currentTracks, searchQuery, sortOption, sortDirection) {
+    val displayedTracks = remember(tracks, currentTracks, searchQuery, sortOption, sortDirection, searchFilters) {
         val query = searchQuery.trim()
         val base = if (query.isEmpty()) {
             currentTracks.toList()
         } else {
-            trackSearchEngine.filter(currentTracks, query, TRACK_SEARCH_FIELDS)
+            trackSearchEngine.filter(currentTracks, query, trackSearchFields(searchFilters))
         }
         when (sortOption) {
             PlaylistSort.TITLE -> {
@@ -504,6 +518,28 @@ fun EncorePlaylistScreen(
                         contentDescription = stringResource(R.string.playlist_options),
                         tint = Color.White,
                         modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PlaylistSearchFilter.entries.forEach { filter ->
+                    EncoreChip(
+                        text = stringResource(filter.labelRes),
+                        isSelected = filter in searchFilters,
+                        onClick = {
+                            searchFilters = if (filter in searchFilters) {
+                                searchFilters - filter
+                            } else {
+                                searchFilters + filter
+                            }
+                        }
                     )
                 }
             }
