@@ -37,6 +37,18 @@ object Search {
     const val OP_RESULTS = "searchTopResultsList"
     const val OP_SUGGESTIONS = "searchSuggestions"
     const val OP_RECENT = "recentSearches"
+    const val OP_SAVE_RECENT = "saveRecentSearches"
+    const val OP_REMOVE_RECENT = "removeRecentSearches"
+
+    private const val SEARCH_URI_PREFIX = "spotify:search:"
+
+    fun searchUriOf(query: String): String =
+        SEARCH_URI_PREFIX + java.net.URLEncoder.encode(query.trim(), "UTF-8")
+
+    fun queryOfSearchUri(uri: String): String =
+        runCatching {
+            java.net.URLDecoder.decode(uri.substringAfter(SEARCH_URI_PREFIX), "UTF-8")
+        }.getOrDefault("")
 
     private const val FULL_LIMIT = 50
     private const val SUGGEST_LIMIT = 16
@@ -142,6 +154,37 @@ object Search {
         val hits = (0 until items.length()).mapNotNull { hit(items.optJSONObject(it)) }
         log.i("recent searches -> ${hits.size}")
         return hits
+    }
+
+    suspend fun saveRecent(context: Context, uris: List<String>): Boolean {
+        val unique = uris.filter { it.isNotBlank() }.distinct()
+        if (unique.isEmpty()) return true
+        val json = mutate(context, OP_SAVE_RECENT, JSONObject().put("uris", JSONArray(unique)))
+            ?: return false
+        val node = json.optJSONObject("data")?.optJSONObject("saveToRecentSearches")
+        val ok = node != null && node.optString("__typename") != "GenericError"
+        log.i("saveRecentSearches ${unique.size} uri(s) ok=$ok")
+        return ok
+    }
+
+    suspend fun removeRecent(context: Context, uris: List<String>): Boolean {
+        val unique = uris.filter { it.isNotBlank() }.distinct()
+        if (unique.isEmpty()) return true
+        val json = mutate(context, OP_REMOVE_RECENT, JSONObject().put("uris", JSONArray(unique)))
+            ?: return false
+        val node = json.optJSONObject("data")?.optJSONObject("removeFromRecentSearches")
+        val ok = node != null && node.optString("__typename") != "GenericError"
+        log.i("removeRecentSearches ${unique.size} uri(s) ok=$ok")
+        return ok
+    }
+
+    private suspend fun mutate(context: Context, operation: String, variables: JSONObject): JSONObject? {
+        val token = EncoreAuth.token(context)
+        if (token.isBlank()) {
+            log.w("$operation: no token")
+            return null
+        }
+        return Pathfinder.queryPost(context, token, operation, variables.toString(), fallbackToGet = false)
     }
 
     private suspend fun call(context: Context, operation: String, variables: String): JSONObject? {
@@ -393,16 +436,13 @@ object Search {
     private fun hit(node: JSONObject?): SearchHit? {
         if (node == null) return null
         val wrapper = node.optJSONObject("item") ?: node
-        if (wrapper.optString("__typename") == "SearchAutoCompleteEntity") {
-            val data = wrapper.optJSONObject("data") ?: return null
-            val text = data.optString("text")
-            if (text.isBlank()) return null
-            return SearchHit(
-                kind = SearchKind.QUERY,
-                uri = data.optString("uri"),
-                title = text.plainText(),
-                subtitle = "",
-            )
+        autoCompleteHit(wrapper)?.let { return it }
+        val unknownUri = wrapper.optString("_uri")
+        if (unknownUri.startsWith(SEARCH_URI_PREFIX)) {
+            val text = queryOfSearchUri(unknownUri)
+            if (text.isNotBlank()) {
+                return SearchHit(kind = SearchKind.QUERY, uri = unknownUri, title = text, subtitle = "")
+            }
         }
         val data = wrapper.optJSONObject("data") ?: return null
         val uri = data.optString("uri")
@@ -418,6 +458,27 @@ object Search {
             else -> null
         }
         return parsed?.let { it.copy(title = it.title.plainText(), subtitle = it.subtitle.plainText()) }
+    }
+
+    private fun autoCompleteHit(wrapper: JSONObject): SearchHit? {
+        val payload = autoCompletePayload(wrapper) ?: return null
+        val text = payload.optString("text")
+        if (text.isBlank()) return null
+        return SearchHit(
+            kind = SearchKind.QUERY,
+            uri = payload.optString("uri"),
+            title = text.plainText(),
+            subtitle = "",
+        )
+    }
+
+    private fun autoCompletePayload(wrapper: JSONObject): JSONObject? {
+        if (wrapper.optString("__typename") == "SearchAutoCompleteEntity") {
+            return wrapper.optJSONObject("data")
+        }
+        val data = wrapper.optJSONObject("data") ?: return null
+        if (data.optString("__typename") != "SearchAutoCompleteEntity") return null
+        return data.optJSONObject("data") ?: data
     }
 
     private fun track(data: JSONObject): SearchHit? {

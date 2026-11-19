@@ -1,6 +1,7 @@
 package com.quackify.app
 
 import android.content.Context
+import com.quackify.backend.api.Search
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.store.AppPrefs
 import com.quackify.backend.model.SearchHit
@@ -19,6 +20,7 @@ object RecentSearches {
     private const val CACHE_KEY = "recentSearches.cache"
     private const val LIMIT = 10
     private const val QUERY_PREFIX = "query:"
+    private const val SEARCH_URI_PREFIX = "spotify:search:"
 
     data class Entry(
         val kind: String,
@@ -50,9 +52,11 @@ object RecentSearches {
     fun recordQuery(context: Context, query: String) {
         val text = query.trim()
         if (text.isEmpty()) return
-        val key = QUERY_PREFIX + text.lowercase()
+        val key = Search.searchUriOf(text)
+        val cache = cache(context)
+        cache.put(key, JSONObject().put("kind", SearchKind.QUERY.name).put("title", text))
         val next = listOf(key) + keys(context).filterNot { it == key || isSameQuery(it, text) || isTypingOf(it, text) }
-        write(context, next.take(LIMIT), cache(context))
+        write(context, next.take(LIMIT), cache)
     }
 
     fun merge(context: Context, hits: List<SearchHit>) {
@@ -60,20 +64,23 @@ object RecentSearches {
         if (remote.isEmpty()) return
         val cache = cache(context)
         remote.forEach { cache.put(it.uri, encode(it)) }
+        val existing = keys(context)
         val uris = remote.map { it.uri }
-        val next = (uris + keys(context).filterNot { it in uris }).take(LIMIT)
+        val next = (existing.filterNot { it in uris } + uris.filter { it !in existing }).take(LIMIT)
         write(context, next, cache)
     }
 
     fun remove(context: Context, key: String) {
         if (key.isBlank()) return
-        write(context, keys(context).filterNot { it == key || isSameQuery(it, key) }, cache(context))
+        val target = queryText(key).ifBlank { key }
+        write(context, keys(context).filterNot { it == key || isSameQuery(it, target) }, cache(context))
     }
 
     fun promote(context: Context, key: String) {
         if (key.isBlank()) return
+        val target = queryText(key).ifBlank { key }
         val keys = keys(context)
-        val index = keys.indexOfFirst { it == key || isSameQuery(it, key) }
+        val index = keys.indexOfFirst { it == key || isSameQuery(it, target) }
         if (index <= 0) return
         val next = ArrayList(keys)
         next.add(0, next.removeAt(index))
@@ -91,6 +98,14 @@ object RecentSearches {
         for (key in keys(context)) {
             if (key.startsWith(QUERY_PREFIX)) {
                 out += Entry(SearchKind.QUERY.name, "", key.removePrefix(QUERY_PREFIX), "", "", "")
+                continue
+            }
+            if (key.startsWith(SEARCH_URI_PREFIX)) {
+                val title = cache.optJSONObject(key)?.optString("title").orEmpty()
+                    .ifBlank { Search.queryOfSearchUri(key) }
+                if (title.isNotBlank()) {
+                    out += Entry(SearchKind.QUERY.name, key, title, "", "", "")
+                }
                 continue
             }
             val entry = cache.optJSONObject(key)?.let { decode(key, it) } ?: continue
@@ -156,15 +171,21 @@ object RecentSearches {
             .apply()
     }
 
+    private fun queryText(key: String): String = when {
+        key.startsWith(QUERY_PREFIX) -> key.removePrefix(QUERY_PREFIX)
+        key.startsWith(SEARCH_URI_PREFIX) -> Search.queryOfSearchUri(key)
+        else -> ""
+    }
+
     private fun isSameQuery(storedKey: String, target: String): Boolean {
-        if (!storedKey.startsWith(QUERY_PREFIX)) return false
-        val text = storedKey.removePrefix(QUERY_PREFIX)
-        return text.equals(target.trim().removePrefix(QUERY_PREFIX), ignoreCase = true)
+        val stored = queryText(storedKey)
+        if (stored.isEmpty()) return false
+        return stored.equals(target.trim().removePrefix(QUERY_PREFIX), ignoreCase = true)
     }
 
     private fun isTypingOf(storedKey: String, target: String): Boolean {
-        if (!storedKey.startsWith(QUERY_PREFIX)) return false
-        val stored = storedKey.removePrefix(QUERY_PREFIX)
+        val stored = queryText(storedKey).lowercase()
+        if (stored.isEmpty()) return false
         val text = target.trim().removePrefix(QUERY_PREFIX).lowercase()
         return stored.startsWith(text) || text.startsWith(stored)
     }

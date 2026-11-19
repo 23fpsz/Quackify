@@ -751,6 +751,7 @@ fun EncoreSearchScreen(
                                     isSearchBarFocused = false
                                     searchQuery = hit.title
                                     focusManager.clearFocus()
+                                    onRecordRecent(hit)
                                     onSearchQueryChange(hit.title)
                                 } else {
                                     if (hit.kind == SearchKind.TRACK) suggestionsPinned = true
