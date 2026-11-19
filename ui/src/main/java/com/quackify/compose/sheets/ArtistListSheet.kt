@@ -19,6 +19,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +35,8 @@ import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
+import com.quackify.backend.library.Krespot
 
 /** One credited artist on the playing track. */
 data class ArtistListEntry(
@@ -58,6 +63,17 @@ fun ArtistListSheet(
         return
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
+    val avatars = remember { mutableStateMapOf<String, String>() }
+    LaunchedEffect(artists) {
+        val missing = artists.map { it.uri }
+            .filter { it.startsWith("spotify:artist:") && !avatars.containsKey(it) }
+            .distinct()
+        if (missing.isEmpty()) return@LaunchedEffect
+        Krespot.artists.images(context, missing).forEach { (uri, url) ->
+            if (url.isNotBlank()) avatars[uri] = url
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         properties = DarkSystemBarsSheet,
@@ -91,6 +107,7 @@ fun ArtistListSheet(
             artists.forEach { artist ->
                 ArtistListRow(
                     artist = artist,
+                    imageUrl = artist.imageUrl.ifBlank { avatars[artist.uri].orEmpty() },
                     onClick = {
                         onDismiss()
                         onViewArtist(artist)
@@ -105,6 +122,7 @@ fun ArtistListSheet(
 @Composable
 private fun ArtistListRow(
     artist: ArtistListEntry,
+    imageUrl: String,
     onClick: () -> Unit,
 ) {
     val fallbackColor = Color(0xFFE8115B)
@@ -121,9 +139,9 @@ private fun ArtistListRow(
                 .clip(CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            if (artist.imageUrl.isNotBlank()) {
+            if (imageUrl.isNotBlank()) {
                 EncoreArtworkImage(
-                    imageUrl = artist.imageUrl,
+                    imageUrl = imageUrl,
                     contentDescription = artist.name,
                     modifier = Modifier.size(48.dp),
                     cornerRadius = 24.dp,
