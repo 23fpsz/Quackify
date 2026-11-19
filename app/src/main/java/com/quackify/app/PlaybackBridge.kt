@@ -118,6 +118,8 @@ const val CHAIN_ROWS_PREF = "chainRows"
 
 private const val QUEUE_RETRY_MS = 1200L
 
+private const val REASON_TRACKDONE = "trackdone"
+
 class PlaybackBridge(private val context: Context) {
 
     private val connect = KrespotConnect(context)
@@ -320,6 +322,28 @@ class PlaybackBridge(private val context: Context) {
     private var mirrors: Job? = null
 
     private var thresholdTrack = ""
+
+    private class PlaySession(
+        val uri: String,
+        var machineTrack: CommandTrack?,
+        var stateId: String,
+        val startWallClock: Long,
+        val startPositionMs: Long,
+        var lastPositionMs: Long,
+        val reasonStart: String,
+        val internalPlayId: Int,
+    ) {
+        var playedMs = 0L
+        var durationMs = 0L
+    }
+
+    private var playSession: PlaySession? = null
+
+    private var playInternalPlayId = 0
+
+    private var pendingReasonStart = "click"
+
+    private var pendingReasonEnd = ""
 
     @Volatile
     private var screen: List<String> = emptyList()
@@ -931,6 +955,7 @@ class PlaybackBridge(private val context: Context) {
             launch {
                 player.state.collect { playing ->
                     if (state.controllingRemote) return@collect
+                    trackPlaySession(playing)
                     val waiting = held
                     val engineUri = playing.trackUri
                     val engineOwns = player.hasSource && engineUri.isNotBlank()
@@ -996,6 +1021,10 @@ class PlaybackBridge(private val context: Context) {
 
     fun stop() {
         pauseRemoteOnExit()
+        runCatching {
+            runBlocking { withTimeoutOrNull(2_000L) { playSession?.let { finishPlaySession(it, "logout") } } }
+        }.onFailure { log.w("stream report on stop failed ${it.javaClass.simpleName}") }
+        playSession = null
         sleepTimerJob?.cancel()
         sleepTimerJob = null
         sleepEndOfTrackArmed = false
@@ -1078,6 +1107,9 @@ class PlaybackBridge(private val context: Context) {
         player.reset()
         connect.reset()
         thresholdTrack = ""
+        playSession = null
+        pendingReasonStart = "click"
+        pendingReasonEnd = ""
         held = null
         clearPending()
         chainRows = emptyList()
@@ -2215,6 +2247,7 @@ class PlaybackBridge(private val context: Context) {
             return
         }
         val accepted = connect.report(snapshot)
+        connect.melody.speed(false)
         log.i("focus pause reported accepted=$accepted pos=${player.positionMs}")
     }
 
@@ -2242,6 +2275,7 @@ class PlaybackBridge(private val context: Context) {
             return
         }
         val accepted = connect.report(snapshot)
+        connect.melody.speed(true)
         log.i("focus resume reported accepted=$accepted pos=${player.positionMs}")
     }
 
@@ -2490,7 +2524,12 @@ class PlaybackBridge(private val context: Context) {
             return
         }
         val accepted = connect.report(snapshot)
-        command.currentTrack?.let { connect.melody.audioParams(it, 0L) }
+        command.currentTrack?.takeIf { !it.isAd }?.let { adopted ->
+            connect.melody.playbackStart(adopted, snapshot.stateId, 0L)
+            connect.melody.start(adopted, snapshot.stateId, 0L, paused = false)
+            if (!adopted.isDirect) connect.melody.keysystem()
+            connect.melody.audioParams(adopted, 0L)
+        }
         log.i("report started_playing accepted=$accepted pos=0 (gapless) fmt=${snapshot.format}")
         queueGaplessNext(uri)
     }
@@ -2753,6 +2792,8 @@ class PlaybackBridge(private val context: Context) {
         log.i("replace_state: loading '${track.name}' from ${from}ms paused=${command.paused} " +
                 "seek_to=${command.seekToMs}"
         )
+        pendingReasonEnd = "fwdbtn"
+        pendingReasonStart = "fwdbtn"
         player.play(track, connect.spclientHost, from)
         if (command.paused) player.pause()
     }
@@ -2781,6 +2822,8 @@ class PlaybackBridge(private val context: Context) {
                 }
                 if (remoteTarget().isNotBlank()) return
                 if (player.hasSource && player.state.value.trackUri == track.uri) return
+                pendingReasonEnd = "fwdbtn"
+                pendingReasonStart = "fwdbtn"
                 scope.launch {
                     player.prefetch(track.uri, connect.spclientHost)
                     player.play(track, connect.spclientHost, command.startAtMs)
@@ -2799,6 +2842,8 @@ class PlaybackBridge(private val context: Context) {
             previous(force)
             return
         }
+        pendingReasonEnd = "fwdbtn"
+        pendingReasonStart = "fwdbtn"
         val cluster = connect.cluster.value ?: run {
             log.w("skip: no cluster to move through")
             return
@@ -3000,6 +3045,8 @@ class PlaybackBridge(private val context: Context) {
     }
 
     private suspend fun previous(force: Boolean = false) {
+        pendingReasonEnd = "backbtn"
+        pendingReasonStart = "backbtn"
         val loaded = player.positionMs
         if (!force && player.hasSource && loaded > RESTART_MS) {
             log.i("previous: at ${loaded}ms, restarting the track instead")
@@ -3080,6 +3127,10 @@ class PlaybackBridge(private val context: Context) {
     }
 
     private suspend fun playTrack(uri: String, contextUri: String, hint: Int) {
+        if (pendingReasonEnd.isBlank()) {
+            pendingReasonEnd = "endplay"
+            pendingReasonStart = "click"
+        }
         if ((contextUri.isBlank() || contextUri == uri) && collectionContext(uri)) {
             val first = runCatching { rowsOf(uri).firstOrNull() }.getOrNull()
             if (!first.isNullOrBlank() && first != uri) {
@@ -4349,6 +4400,11 @@ class PlaybackBridge(private val context: Context) {
         if (command.isControl) return
         learnMachineQueue(command)
         val track = command.currentTrack ?: return
+        val session = playSession
+        if (session != null && session.uri == track.uri) {
+            session.machineTrack = track
+            if (command.stateId.isNotBlank()) session.stateId = command.stateId
+        }
         val loaded = player.state.value.trackUri
         val bothAds = loaded.startsWith(AD_PREFIX) && track.uri.startsWith(AD_PREFIX)
         if (!bothAds && player.hasSource && loaded.isNotBlank() && loaded != track.uri) {
@@ -4505,10 +4561,13 @@ class PlaybackBridge(private val context: Context) {
             when (event) {
                 is PlayerEvent.Started -> {
                     if (event.uri.isNotBlank() && event.uri == player.queuedNextUri) {
+                        pendingReasonEnd = REASON_TRACKDONE
+                        openPlaySession(event.uri, player.positionMs)
                         log.i("gapless: the engine moved to '${event.uri.takeLast(12)}' on its own")
                         scope.launch { adoptEngineAdvance(event.uri) }
                         return
                     }
+                    openPlaySession(event.uri.ifBlank { state.trackUri }, player.positionMs)
                     scope.launch {
                         publishLocalFromEngine()
                         queueGaplessNext(event.uri.ifBlank { state.trackUri })
@@ -4519,13 +4578,18 @@ class PlaybackBridge(private val context: Context) {
                     val ended = event.uri.ifBlank { player.state.value.trackUri }
                     if (seamlessEnabled() && player.currentUri != ended) {
                         log.i("player ended '$ended', the queued track takes over without a restart")
+                        endPlaySession(ended, REASON_TRACKDONE)
                         return
                     }
                     log.i("player ended '$ended' with no command, advancing on this phone")
-                    scope.launch { advance(ended) }
+                    scope.launch {
+                        endPlaySession(ended, REASON_TRACKDONE)
+                        advance(ended)
+                    }
                 }
                 is PlayerEvent.Failed -> {
                     log.w("player failed with no command: ${event.message}")
+                    endPlaySession(state.trackUri, "trackerror")
                     gaplessQueuedUri = ""
                     state = state.copy(isPlaying = false, isBuffering = false)
                     scope.launch {
@@ -4553,11 +4617,15 @@ class PlaybackBridge(private val context: Context) {
         val position = if (duration > 0L) raw.coerceAtMost(duration) else raw
         when (event) {
             is PlayerEvent.Started -> {
+                val startedUri = event.uri.ifBlank { track?.uri.orEmpty() }
                 if (event.uri.isNotBlank() && event.uri == player.queuedNextUri) {
+                    pendingReasonEnd = REASON_TRACKDONE
+                    openPlaySession(startedUri, position)
                     log.i("gapless: the engine moved to '${event.uri.takeLast(12)}' on its own")
                     scope.launch { adoptEngineAdvance(event.uri) }
                     return
                 }
+                openPlaySession(startedUri, position)
                 log.i("player started pos=$position dur=${player.durationMs}ms ad=$ad")
                 scope.launch {
                     val snapshot = Snapshot.of(
@@ -4578,7 +4646,12 @@ class PlaybackBridge(private val context: Context) {
                         return@launch
                     }
                     val accepted = connect.report(snapshot)
-                    if (track != null) connect.melody.audioParams(track, position)
+                    if (track != null && !track.isAd && track.uri == startedUri) {
+                        connect.melody.playbackStart(track, snapshot.stateId, position)
+                        connect.melody.start(track, snapshot.stateId, position, paused = !player.isPlaying)
+                        if (!track.isDirect) connect.melody.keysystem()
+                        connect.melody.audioParams(track, position)
+                    }
                     log.i("report started_playing accepted=$accepted pos=$position ad=$ad " +
                             "fmt=${snapshot.format} ${snapshot.bitrate}b ${snapshot.quality}"
                     )
@@ -4604,6 +4677,8 @@ class PlaybackBridge(private val context: Context) {
             is PlayerEvent.Ended -> {
                 log.i("player ended at $raw clamped=$position dur=$duration ad=$ad")
                 scope.launch {
+                    val endedUri = event.uri.ifBlank { track?.uri.orEmpty() }
+                    endPlaySession(endedUri, REASON_TRACKDONE)
                     if (ad) {
                         val thresholdSnapshot = connect.playback?.let {
                             Snapshot.of(
@@ -4651,6 +4726,7 @@ class PlaybackBridge(private val context: Context) {
 
             is PlayerEvent.Failed -> {
                 log.w("player failed: ${event.message}")
+                endPlaySession(state.trackUri, "trackerror")
                 state = state.copy(isPlaying = false, isBuffering = false)
                 scope.launch {
                     runCatching {
@@ -4700,6 +4776,91 @@ class PlaybackBridge(private val context: Context) {
             else ->
                 log.w("this device holds the stream and was still refused, the 429 came from the edge")
         }
+    }
+
+    private fun openPlaySession(uri: String, positionMs: Long) {
+        if (uri.isBlank() || uri.startsWith(AD_PREFIX)) return
+        val current = playSession
+        if (current != null) {
+            if (current.uri == uri) {
+                pendingReasonEnd = ""
+                return
+            }
+            closePlaySession(current, pendingReasonEnd.ifBlank { "endplay" })
+        }
+        pendingReasonEnd = ""
+        playInternalPlayId += 1
+        val machine = connect.playback
+        playSession = PlaySession(
+            uri = uri,
+            machineTrack = machine?.tracks?.firstOrNull { it.uri == uri }
+                ?: machine?.currentTrack?.takeIf { it.uri == uri },
+            stateId = machine?.takeIf { it.currentTrack?.uri == uri }?.stateId.orEmpty(),
+            startWallClock = System.currentTimeMillis(),
+            startPositionMs = positionMs,
+            lastPositionMs = positionMs,
+            reasonStart = pendingReasonStart,
+            internalPlayId = playInternalPlayId,
+        )
+        pendingReasonStart = REASON_TRACKDONE
+    }
+
+    private fun endPlaySession(uri: String, reasonEnd: String) {
+        if (uri.isBlank()) return
+        val session = playSession ?: return
+        if (session.uri != uri) return
+        closePlaySession(session, reasonEnd)
+    }
+
+    private fun closePlaySession(session: PlaySession, reasonEnd: String) {
+        if (playSession === session) playSession = null
+        pendingReasonEnd = ""
+        scope.launch { finishPlaySession(session, reasonEnd) }
+    }
+
+    private suspend fun finishPlaySession(session: PlaySession, reasonEnd: String) {
+        val track = session.machineTrack
+            ?: commandFor(session.uri, chainContext.ifBlank { connect.cluster.value?.contextUri.orEmpty() })
+        if (track.isAd) return
+        val machine = connect.playback
+        val stateId = session.stateId.ifBlank {
+            machine?.takeIf { it.currentTrack?.uri == session.uri }?.stateId.orEmpty()
+        }
+        val duration = session.durationMs.takeIf { it > 0L } ?: track.durationMs
+        val msPlayed = when {
+            reasonEnd == REASON_TRACKDONE && session.playedMs > 0L -> session.playedMs
+            reasonEnd == REASON_TRACKDONE && duration > 0L ->
+                (duration - session.startPositionMs).coerceIn(0L, duration)
+            else -> session.playedMs
+        }
+        if (msPlayed <= 0L) return
+        val nextPlaybackId = machine?.takeIf { it.currentTrack?.uri == session.uri }
+            ?.following()?.stateId.orEmpty()
+        val sent = connect.melody.streamFinished(
+            track = track,
+            stateId = stateId,
+            nextPlaybackId = nextPlaybackId,
+            internalPlayId = session.internalPlayId,
+            startPositionMs = session.startPositionMs,
+            endPositionMs = session.lastPositionMs,
+            durationMs = duration,
+            startWallClock = session.startWallClock,
+            reasonStart = session.reasonStart,
+            reasonEnd = reasonEnd,
+            msPlayed = msPlayed,
+        )
+        log.i("stream '${session.uri.takeLast(16)}' verified=$sent played=${msPlayed}ms reason=$reasonEnd")
+    }
+
+    private fun trackPlaySession(playing: PlayerState) {
+        val session = playSession ?: return
+        if (playing.trackUri != session.uri) return
+        if (playing.durationMs > 0L) session.durationMs = playing.durationMs
+        if (playing.playing) {
+            val delta = playing.positionMs - session.lastPositionMs
+            if (delta in 1..5000L) session.playedMs += delta
+        }
+        session.lastPositionMs = playing.positionMs
     }
 
     private fun threshold(playing: PlayerState) {
