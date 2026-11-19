@@ -180,6 +180,8 @@
     <string name="listening_streak">Listening streak</string>
     <string name="loading_credits">Loading credits…</string>
     <string name="log_out">Log out</string>
+    <string name="language">Language</string>
+    <string name="language_system_default">System default</string>
     <string name="login_streak">Login streak</string>
     <string name="lyrics">Lyrics</string>
     <string name="transcript">Transcript</string>

@@ -41,6 +41,7 @@ import com.quackify.backend.api.Search
 import com.quackify.backend.api.Settings
 import com.quackify.backend.api.WhatsNew
 import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.core.locale.AppLocale
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ConnectivityMonitor
 import com.quackify.backend.core.net.Net
@@ -253,6 +254,10 @@ class MainActivity : ComponentActivity() {
     internal var nowPlayingLyrics by mutableStateOf<TrackLyrics?>(null)
     internal var nowPlayingTranscript by mutableStateOf<EpisodeTranscript?>(null)
     internal var canvasFile by mutableStateOf<String?>(null)
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

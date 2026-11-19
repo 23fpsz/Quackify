@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.app.Activity
 import android.content.Context
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +70,7 @@ import android.widget.Toast
 import kotlin.math.roundToInt
 import com.quackify.compose.R
 import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.core.locale.AppLocale
 import com.quackify.backend.core.log.DeviceInfo
 import com.quackify.backend.core.log.Logs
 import com.quackify.compose.components.EncoreIconButton
@@ -77,6 +79,7 @@ import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
 import com.quackify.compose.player.LyricsOptions
 import com.quackify.compose.player.TRANSLATION_DEVICE_LANGUAGE
+import com.quackify.compose.sheets.AppLanguageSheet
 import com.quackify.compose.sheets.LyricsProviderSheet
 import com.quackify.compose.sheets.TranslationLanguageSheet
 import com.quackify.backend.library.lyrics.translationLanguageName
@@ -208,6 +211,8 @@ fun SettingsScreen(
     var category by remember { mutableStateOf<Int?>(null) }
     var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
     var translationLanguageSheetOpen by remember { mutableStateOf(false) }
+    var appLanguageSheetOpen by remember { mutableStateOf(false) }
+    val appLanguage = remember { AppLocale.current(context) }
 
     BackHandler(enabled = category != null) {
         category = null
@@ -473,6 +478,43 @@ fun SettingsScreen(
                             enabled = !loading,
                             onCheckedChange = onToggleShowPlaylists
                         )
+                    }
+
+                    item {
+                        SettingsSectionHeader(title = stringResource(R.string.language))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { appLanguageSheetOpen = true }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.language),
+                                style = EncoreTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    color = EncoreColors.TextPrimary
+                                )
+                            )
+                            Text(
+                                text = AppLocale.nativeName(appLanguage)
+                                    ?: stringResource(R.string.language_system_default),
+                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.Green)
+                            )
+                        }
+                        if (appLanguageSheetOpen) {
+                            AppLanguageSheet(
+                                selected = appLanguage,
+                                onLanguageSelected = { tag ->
+                                    if (tag != appLanguage) {
+                                        AppLocale.set(context, tag)
+                                        (context as? Activity)?.recreate()
+                                    }
+                                },
+                                onDismiss = { appLanguageSheetOpen = false }
+                            )
+                        }
                     }
 
                 }
