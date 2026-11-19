@@ -99,11 +99,13 @@ class PlaybackProgress {
     fun set(positionMs: Long, durationMs: Long) {
         this.positionMs = positionMs.coerceIn(0L, durationMs.takeIf { it > 0L } ?: positionMs)
         if (durationMs > 0L) this.durationMs = durationMs
+        runCatching { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
     }
 
     fun reset() {
         positionMs = 0L
         durationMs = 0L
+        runCatching { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
     }
 }
 

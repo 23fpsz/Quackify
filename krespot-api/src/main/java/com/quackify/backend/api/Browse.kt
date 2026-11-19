@@ -43,6 +43,10 @@ object Browse {
     const val PAGE_SECTIONS = 10
     private const val PAGE_ITEMS = 10
 
+    @Volatile
+    var cachedCards: List<BrowseCard>? = null
+        private set
+
     suspend fun all(context: Context): List<BrowseCard> {
         val variables = JSONObject()
             .put("pagePagination", JSONObject().put("offset", 0).put("limit", PAGE_SECTIONS))
@@ -68,6 +72,7 @@ object Browse {
             }
         }
         log.i("browseAll -> ${out.size} categories ${out.map { it.title }.take(6)}")
+        cachedCards = out
         return out
     }
 

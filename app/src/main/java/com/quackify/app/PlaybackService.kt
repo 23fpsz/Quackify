@@ -3,19 +3,25 @@ package com.quackify.app
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.SystemClock
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat as MediaNotificationCompat
+import android.support.v4.media.MediaBrowserCompat
+import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import androidx.media.MediaBrowserServiceCompat
+import androidx.media.session.MediaButtonReceiver
+import com.quackify.app.auto.AutoMediaTree
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ConnectivityMonitor
 import com.quackify.app.widget.WidgetSync
@@ -43,10 +49,10 @@ import kotlinx.coroutines.withContext
  * straight into the bridge's listener, so the notification can never disagree
  * with the on-screen player.
  *
- * While nothing is loaded the service still keeps the process alive but
- * posts a quiet placeholder instead of a media card.
+ * Implements MediaBrowserServiceCompat to power the full Android Auto and
+ * automotive head-unit experience with dynamic Home, Recents, Library, and Browse.
  */
-class PlaybackService : Service() {
+class PlaybackService : MediaBrowserServiceCompat() {
 
     private val log = Logs.of(Logs.Module.SERVICE)
 
@@ -69,6 +75,8 @@ class PlaybackService : Service() {
     /** Identity of the last posted notification; position ticks must not repost. */
     private var lastIdentity = ""
 
+    private val autoMediaTree by lazy { AutoMediaTree(this) }
+
     @Volatile
     private var finished = false
 
@@ -82,13 +90,14 @@ class PlaybackService : Service() {
         PlaybackHost.markForeground()
         WidgetSync.start(this)
         setUpSession(bridge)
-        val foreground = runCatching {
-            startForeground(NOTIFICATION_ID, buildNotification(bridge.state))
-        }
-        if (foreground.isFailure) {
-            log.w("startForeground refused from the background, stopping until the app is visible")
-            stopSelf()
-            return
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, buildNotification(bridge.state), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification(bridge.state))
+            }
+        }.onFailure {
+            log.w("startForeground skipped in background/bind mode (${it.message}), service remaining active for Android Auto")
         }
         watch(bridge)
         log.i("service created with a media session, the app owns nothing once it leaves recents")
@@ -96,8 +105,12 @@ class PlaybackService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null) {
-            log.w("restarted by the system with nothing to play, leaving the foreground")
-            stopPlayback()
+            log.w("restarted by the system with null intent, keeping session active")
+            return START_STICKY
+        }
+        val session = session
+        if (session != null && Intent.ACTION_MEDIA_BUTTON == intent.action) {
+            MediaButtonReceiver.handleIntent(session, intent)
             return START_NOT_STICKY
         }
         when (intent.action) {
@@ -134,7 +147,12 @@ class PlaybackService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        log.i("task removed, the app is gone from recents")
+        log.i("task removed, checking playback state")
+        val isPlaying = PlaybackHost.bridge?.state?.isPlaying == true
+        if (isPlaying) {
+            log.i("playback active, keeping service alive for background/auto")
+            return
+        }
         stopPlayback()
         PlaybackHost.teardown(this)
         super.onTaskRemoved(rootIntent)
@@ -149,7 +167,7 @@ class PlaybackService : Service() {
         stopSelf()
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder? = super.onBind(intent)
 
     override fun onDestroy() {
         log.i("service destroyed")
@@ -178,20 +196,33 @@ class PlaybackService : Service() {
     private fun setUpSession(bridge: PlaybackBridge) {
         val session = MediaSessionCompat(this, "Quackify")
         this.session = session
+        session.setFlags(MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS)
+        session.setSessionActivity(contentIntent())
         session.setCallback(object : MediaSessionCompat.Callback() {
             override fun onPlay() {
-                if (!bridge.state.isPlaying) bridge.listener.onPlayPause()
+                log.i("onPlay received")
+                PlaybackHost.startService(this@PlaybackService)
+                if (bridge.state.trackUri.isNotBlank()) {
+                    if (!bridge.state.isPlaying) bridge.listener.onPlayPause()
+                } else {
+                    bridge.listener.onPlayUri("spotify:collection:tracks")
+                }
             }
 
             override fun onPause() {
+                log.i("onPause received")
                 if (bridge.state.isPlaying) bridge.listener.onPlayPause()
             }
 
             override fun onSkipToNext() {
+                log.i("onSkipToNext received")
+                PlaybackHost.startService(this@PlaybackService)
                 bridge.listener.onSkipNext()
             }
 
             override fun onSkipToPrevious() {
+                log.i("onSkipToPrevious received")
+                PlaybackHost.startService(this@PlaybackService)
                 bridge.listener.onSkipPrevious()
             }
 
@@ -205,6 +236,66 @@ class PlaybackService : Service() {
 
             override fun onFastForward() {
                 bridge.listener.onSkipSeek(15_000L)
+            }
+
+            override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+                log.i("onPlayFromMediaId received: mediaId=$mediaId")
+                PlaybackHost.startService(this@PlaybackService)
+                session?.let { s ->
+                    val playback = PlaybackStateCompat.Builder()
+                        .setActions(
+                            PlaybackStateCompat.ACTION_PLAY or
+                            PlaybackStateCompat.ACTION_PAUSE or
+                            PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                            PlaybackStateCompat.ACTION_STOP
+                        )
+                        .setState(PlaybackStateCompat.STATE_BUFFERING, 0L, 1.0f, SystemClock.elapsedRealtime())
+                        .build()
+                    s.setPlaybackState(playback)
+                }
+                if (!mediaId.isNullOrBlank()) {
+                    if (mediaId.startsWith("spotify:track:") || mediaId.startsWith("spotify:episode:")) {
+                        val extraCtx = extras?.getString("com.spotify.music.extra.CONTEXT_URI")
+                        val rawCtx = extraCtx?.takeIf { it.isNotBlank() } ?: autoMediaTree.lastBrowsedContext.takeIf { it.isNotBlank() } ?: ""
+                        val validCtx = rawCtx.takeIf {
+                            it.startsWith("spotify:playlist:") ||
+                            it.startsWith("spotify:album:") ||
+                            it.startsWith("spotify:artist:") ||
+                            it.startsWith("spotify:show:") ||
+                            it.startsWith("spotify:collection:") ||
+                            it.startsWith("spotify:user:")
+                        }
+                        if (!validCtx.isNullOrBlank()) {
+                            bridge.listener.onPlayTrack(mediaId, validCtx, -1)
+                        } else {
+                            bridge.listener.onPlayUri(mediaId)
+                        }
+                    } else {
+                        bridge.listener.onPlayUri(mediaId)
+                    }
+                } else {
+                    onPlay()
+                }
+            }
+
+            override fun onPlayFromSearch(query: String?, extras: Bundle?) {
+                log.i("onPlayFromSearch received: query=$query")
+                PlaybackHost.startService(this@PlaybackService)
+                if (!query.isNullOrBlank()) {
+                    bridge.listener.onPlayUri(query)
+                } else {
+                    onPlay()
+                }
+            }
+
+            override fun onSkipToQueueItem(queueId: Long) {
+                val idx = queueId.toInt()
+                val queue = bridge.state.queue
+                if (idx in queue.indices) {
+                    val track = queue[idx]
+                    bridge.listener.onPlayTrack(track.uri, bridge.state.contextUri, idx)
+                }
             }
 
             override fun onCustomAction(action: String?, extras: Bundle?) {
@@ -225,11 +316,26 @@ class PlaybackService : Service() {
             }
         })
         session.isActive = true
-        session.setPlaybackState(
-            PlaybackStateCompat.Builder()
-                .setState(PlaybackStateCompat.STATE_NONE, 0L, 0.0f)
-                .build()
-        )
+        sessionToken = session.sessionToken
+        session.setExtras(Bundle().apply {
+            putBoolean("android.media.session.extra.SLOT_RESERVATION_SKIP_TO_PREV", true)
+            putBoolean("android.media.session.extra.SLOT_RESERVATION_SKIP_TO_NEXT", true)
+        })
+        val hasTrack = bridge.state.trackUri.isNotBlank() || bridge.state.title.isNotBlank()
+        updatePlaybackState(session, bridge.state, bridge.progressSnapshot, hasTrack)
+        setMetadata(session, bridge.state, bridge.progressSnapshot)
+    }
+
+    private fun promoteForeground(state: ComposePlaybackState) {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, buildNotification(state), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification(state))
+            }
+        }.onFailure {
+            log.w("promoteForeground skipped: ${it.message}")
+        }
     }
 
     private fun watch(bridge: PlaybackBridge) {
@@ -251,7 +357,23 @@ class PlaybackService : Service() {
         if (finished) return
         val hasTrack = state.trackUri.isNotBlank() || state.title.isNotBlank()
         val session = session ?: return
+        log.d("apply: track='${state.title}' playing=${state.isPlaying} buffering=${state.isBuffering} pos=${progress.positionMs}/${progress.durationMs}")
         updatePlaybackState(session, state, progress, hasTrack)
+
+        val queueItems = state.queue.take(50).mapIndexed { index, track ->
+            val desc = MediaDescriptionCompat.Builder()
+                .setMediaId(track.uri)
+                .setTitle(track.title)
+                .setSubtitle(track.artist)
+                .apply {
+                    val img = track.imageUrl?.takeIf { it.isNotBlank() }
+                    if (img != null) setIconUri(android.net.Uri.parse(img))
+                }
+                .build()
+            MediaSessionCompat.QueueItem(desc, index.toLong())
+        }
+        session.setQueue(queueItems)
+
         val isEpisode = state.trackUri.startsWith("spotify:episode:") || state.contextUri.startsWith("spotify:show:")
         val identity = "${state.trackUri}|${state.title}|${state.artist}|" +
             "${state.coverUrl}|${state.isPlaying}|" +
@@ -259,9 +381,13 @@ class PlaybackService : Service() {
             "${state.isLiked}|${state.shuffleMode}|${state.repeatMode}|$isEpisode"
         if (identity == lastIdentity) return
         lastIdentity = identity
+        log.i("setMetadata: title='${state.title}' artist='${state.artist}' playing=${state.isPlaying}")
+        setMetadata(session, state, progress)
         if (hasTrack) {
-            setMetadata(session, state, progress)
             maybeLoadArt(state.coverUrl)
+        }
+        if (state.isPlaying) {
+            promoteForeground(state)
         }
         notify(buildNotification(state))
     }
@@ -277,21 +403,17 @@ class PlaybackService : Service() {
         progress: PlaybackProgressSnapshot,
         hasTrack: Boolean,
     ) {
-        if (!hasTrack) {
-            session.setPlaybackState(
-                PlaybackStateCompat.Builder()
-                    .setState(PlaybackStateCompat.STATE_NONE, 0L, 0.0f)
-                    .build()
-            )
-            return
-        }
         val playing = state.isPlaying
         val isEpisode = state.trackUri.startsWith("spotify:episode:") || state.contextUri.startsWith("spotify:show:")
         var actions = PlaybackStateCompat.ACTION_PLAY or
             PlaybackStateCompat.ACTION_PAUSE or
             PlaybackStateCompat.ACTION_PLAY_PAUSE or
             PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+            PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
+            PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
+            PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM or
+            PlaybackStateCompat.ACTION_STOP
         if (state.remoteCanSeek) {
             actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
         }
@@ -300,6 +422,11 @@ class PlaybackService : Service() {
         }
         val playback = PlaybackStateCompat.Builder()
             .setActions(actions)
+
+        val activeIdx = state.queue.indexOfFirst { it.uri == state.trackUri }
+        if (activeIdx >= 0) {
+            playback.setActiveQueueItemId(activeIdx.toLong())
+        }
 
         val config = PlayerButtonsStore.load(this)
         if (config.andAutoEnabled) {
@@ -363,14 +490,18 @@ class PlaybackService : Service() {
                 }
             }
         }
+        val playbackState = when {
+            state.isBuffering -> PlaybackStateCompat.STATE_BUFFERING
+            playing -> PlaybackStateCompat.STATE_PLAYING
+            hasTrack -> PlaybackStateCompat.STATE_PAUSED
+            else -> PlaybackStateCompat.STATE_NONE
+        }
+        val speed = if (playing && !state.isBuffering) state.playbackSpeed else 0.0f
         playback.setState(
-            when {
-                state.isBuffering -> PlaybackStateCompat.STATE_BUFFERING
-                playing -> PlaybackStateCompat.STATE_PLAYING
-                else -> PlaybackStateCompat.STATE_PAUSED
-            },
+            playbackState,
             progress.positionMs,
-            if (playing && !state.isBuffering && progress.durationMs > 0L) 1.0f else 0.0f,
+            speed,
+            SystemClock.elapsedRealtime(),
         )
         session.setPlaybackState(playback.build())
     }
@@ -381,13 +512,28 @@ class PlaybackService : Service() {
         progress: PlaybackProgressSnapshot,
     ) {
         val art = art
+        val title = state.title.ifBlank { "Quackify" }
+        val artist = state.artist.ifBlank { "Ready to play" }
+        val album = state.contextLabel.ifBlank { state.artist }
+        val duration = if (progress.durationMs > 0L) progress.durationMs else -1L
         val metadata = MediaMetadataCompat.Builder()
-            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, state.title.ifBlank { "Unknown track" })
-            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, state.artist.ifBlank { "Unknown artist" })
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, progress.durationMs)
+            .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, state.trackUri)
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
+            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, album)
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
+        if (state.coverUrl.isNotBlank()) {
+            metadata.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, state.coverUrl)
+            metadata.putString(MediaMetadataCompat.METADATA_KEY_ART_URI, state.coverUrl)
+            metadata.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, state.coverUrl)
+        }
         if (art != null) {
             metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, art)
             metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, art)
+            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, art)
         }
         session.setMetadata(metadata.build())
     }
@@ -618,8 +764,38 @@ class PlaybackService : Service() {
         ShuffleMode.OFF -> "Shuffle Off"
     }
 
+    override fun onGetRoot(
+        clientPackageName: String,
+        clientUid: Int,
+        rootHints: Bundle?
+    ): BrowserRoot? = autoMediaTree.getRoot(clientPackageName, clientUid, rootHints)
+
+    override fun onLoadChildren(
+        parentId: String,
+        result: Result<List<MediaBrowserCompat.MediaItem>>
+    ) {
+        autoMediaTree.loadChildren(parentId, result, scope)
+    }
+
+    override fun onSearch(
+        query: String,
+        extras: Bundle?,
+        result: Result<List<MediaBrowserCompat.MediaItem>>
+    ) {
+        autoMediaTree.search(query, extras, result, scope)
+    }
+
     companion object {
-        const val ACTION_STOP = "com.quackify.app.STOP"
+        const val ROOT_ID = AutoMediaTree.ROOT_ID
+        const val TAB_HOME = AutoMediaTree.TAB_HOME
+        const val TAB_RECENTS = AutoMediaTree.TAB_RECENTS
+        const val TAB_BROWSE = AutoMediaTree.TAB_BROWSE
+        const val TAB_LIBRARY = AutoMediaTree.TAB_LIBRARY
+        const val NODE_LIBRARY_PLAYLISTS = AutoMediaTree.NODE_LIBRARY_PLAYLISTS
+        const val NODE_LIBRARY_ALBUMS = AutoMediaTree.NODE_LIBRARY_ALBUMS
+        const val NODE_LIBRARY_ARTISTS = AutoMediaTree.NODE_LIBRARY_ARTISTS
+        const val NODE_LIBRARY_PODCASTS = AutoMediaTree.NODE_LIBRARY_PODCASTS
+                const val ACTION_STOP = "com.quackify.app.STOP"
         const val ACTION_REFRESH = "com.quackify.app.REFRESH"
         const val EXTRA_OPEN_PLAYER = "com.quackify.app.OPEN_PLAYER"
         private const val ACTION_TOGGLE = "com.quackify.app.TOGGLE"
@@ -639,3 +815,4 @@ class PlaybackService : Service() {
         const val NOTIFICATION_ID = 1
     }
 }
+
