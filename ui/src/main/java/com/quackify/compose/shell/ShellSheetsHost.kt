@@ -346,7 +346,14 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         onViewArtist = { artist, uri ->
             flags.isTrackOptionsOpen = false
             env.setIsPlayerExpanded(false)
-            env.openArtist(artist, uri)
+            val track = local.trackForOptions
+            val uris = track?.artistUris.orEmpty().filter { it.startsWith("spotify:artist:") }
+            if (uris.size > 1) {
+                local.artistListTrack = track
+                flags.isArtistListOpen = true
+            } else {
+                env.openArtist(artist, uri)
+            }
         },
         onViewAlbum = { album, uri ->
             flags.isTrackOptionsOpen = false

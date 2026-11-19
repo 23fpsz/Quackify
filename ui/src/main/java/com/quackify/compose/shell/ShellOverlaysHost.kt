@@ -103,6 +103,7 @@ internal fun ShellOverlaysHost(env: ShellOverlaysEnv) {
         active = env.active,
         playbackState = env.playbackState,
         isLiked = env.isLiked,
+        setIsPlayerExpanded = env.setIsPlayerExpanded,
         profileFollowers = env.profileFollowers,
         profileFollowing = env.profileFollowing,
         profileFollowLoading = env.profileFollowLoading,
@@ -206,6 +207,7 @@ internal fun ShellOverlaySheets(
     active: ShellActiveEntity,
     playbackState: ComposePlaybackState?,
     isLiked: Boolean,
+    setIsPlayerExpanded: (Boolean) -> Unit,
     profileFollowers: List<ProfileUser>,
     profileFollowing: List<ProfileUser>,
     profileFollowLoading: Boolean,
@@ -289,21 +291,35 @@ internal fun ShellOverlaySheets(
         // credit list, pairing each displayed name with its uri, and opens
         // the artist page the row picks. With one artist (or none known) it
         // degrades to the plain open-artist path.
-        val names = playbackState?.artist.orEmpty().split(", ").filter { it.isNotBlank() }
-        val uris = playbackState?.artistUris.orEmpty().filter { it.startsWith("spotify:artist:") }
+        val target = local.artistListTrack
+        val names = target?.artist.orEmpty().split(", ").filter { it.isNotBlank() }
+            .ifEmpty { playbackState?.artistNames.orEmpty().filter { it.isNotBlank() } }
+            .ifEmpty { playbackState?.artist.orEmpty().split(", ").filter { it.isNotBlank() } }
+        val uris = (target?.artistUris ?: playbackState?.artistUris.orEmpty())
+            .filter { it.startsWith("spotify:artist:") }
         val entries = names.zip(uris).map { (name, uri) -> ArtistListEntry(name = name, uri = uri) }
         if (entries.size > 1) {
             ArtistListSheet(
                 artists = entries,
-                onDismiss = { flags.isArtistListOpen = false },
+                onDismiss = {
+                    flags.isArtistListOpen = false
+                    local.artistListTrack = null
+                },
                 onViewArtist = { entry ->
                     flags.isArtistListOpen = false
+                    local.artistListTrack = null
+                    setIsPlayerExpanded(false)
                     openArtist(entry.name, entry.uri)
                 }
             )
         } else {
             flags.isArtistListOpen = false
-            openArtist(names.firstOrNull().orEmpty(), uris.firstOrNull().orEmpty())
+            local.artistListTrack = null
+            setIsPlayerExpanded(false)
+            openArtist(
+                names.firstOrNull().orEmpty(),
+                uris.firstOrNull().orEmpty().ifBlank { target?.artistUri.orEmpty() }
+            )
         }
     }
 

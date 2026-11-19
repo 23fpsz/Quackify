@@ -13,6 +13,7 @@ import com.quackify.app.bridge.QueueTarget
 import com.quackify.app.bridge.UriSources
 import com.quackify.app.bridge.albumUriOf
 import com.quackify.app.bridge.artistUriOf
+import com.quackify.app.bridge.artistUrisOf
 import com.quackify.app.bridge.asCommandTrack
 import com.quackify.app.bridge.asTrackItem
 import com.quackify.app.bridge.playingUri
@@ -385,6 +386,8 @@ class PlaybackBridge(private val context: Context) {
     private var blankSeen = ""
 
     private val hydrateTried = HashSet<String>()
+
+    private val creditsTried = HashSet<String>()
     private var machineLearned = ""
 
     @Volatile
@@ -1047,6 +1050,8 @@ class PlaybackBridge(private val context: Context) {
                     } else {
                         progress.durationMs
                     }
+                    val nextUris = if (engineOwns && engineUri != state.trackUri) artistUrisOf(engineUri)
+                    else state.artistUris
                     val next = state.copy(
                         title = if (local && waiting != null) waiting.name else state.title,
                         artist = if (local && waiting != null) waiting.artists else state.artist,
@@ -1054,6 +1059,8 @@ class PlaybackBridge(private val context: Context) {
                         trackUri = if (engineOwns) engineUri else state.trackUri,
                         artistUri = if (engineOwns && engineUri != state.trackUri) artistUriOf(engineUri)
                         else state.artistUri,
+                        artistUris = nextUris,
+                        artistNames = state.artistNames.takeIf { nextUris == state.artistUris }.orEmpty(),
                         albumUri = if (engineOwns && engineUri != state.trackUri) albumUriOf(engineUri)
                         else state.albumUri,
                         isPlaying = if (engineOwns) playing.playing else state.isPlaying,
@@ -1070,6 +1077,7 @@ class PlaybackBridge(private val context: Context) {
                         return@collect
                     }
                     state = next
+                    if (identityChanged) hydrateArtistCredits()
                     if (next.trackUri.startsWith("spotify:track:") && next.artistUri.isNotBlank()) {
                         com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS).edit()
                             .putString(lastArtistKey, next.artistUri)
@@ -1146,6 +1154,7 @@ class PlaybackBridge(private val context: Context) {
         progress.reset()
         scope.cancel()
         hydrateTried.clear()
+        creditsTried.clear()
         machineLearned = ""
         log.i("bridge stopped, every collector and the socket are gone")
     }
@@ -1197,6 +1206,7 @@ class PlaybackBridge(private val context: Context) {
         activeSeen = ""
         engineSeen = ""
         hydrateTried.clear()
+        creditsTried.clear()
         machineLearned = ""
         cluster = null
         state = ComposePlaybackState()
@@ -2496,12 +2506,16 @@ class PlaybackBridge(private val context: Context) {
         val duration = adoptDuration.takeIf { it > 0L }
             ?: row.durationMs.takeIf { it > 0L }
             ?: progress.durationMs
+        val nextUris = decorated[row.uri]?.artistUris.orEmpty()
+            .ifEmpty { state.artistUris.takeIf { state.trackUri == row.uri }.orEmpty() }
         state = state.copy(
             title = row.title,
             artist = row.artistName,
             coverUrl = row.imageUrl,
             trackUri = row.uri,
             artistUri = row.artistUri.ifBlank { state.artistUri.takeIf { state.trackUri == row.uri }.orEmpty() },
+            artistUris = nextUris,
+            artistNames = state.artistNames.takeIf { nextUris == state.artistUris }.orEmpty(),
             albumUri = row.albumUri.ifBlank { state.albumUri.takeIf { state.trackUri == row.uri }.orEmpty() },
             isPlaying = playing,
             isBuffering = playing,
@@ -2512,6 +2526,7 @@ class PlaybackBridge(private val context: Context) {
             connectedDevice = localOutputLabel(),
             devices = state.devices.map { it.copy(active = it.id == deviceId) },
         )
+        hydrateArtistCredits()
         progress.set(positionMs, duration)
         if (startEngine) {
             player.play(row.asCommandTrack(), connect.spclientHost, positionMs)
@@ -2864,19 +2879,21 @@ class PlaybackBridge(private val context: Context) {
         val position = if (moved) command.seekToMs else progress.positionMs
         val nextArtistUri = if (track.uri != state.trackUri) artistUriOf(track.uri) else state.artistUri
         val nextAlbumUri = if (track.uri != state.trackUri) albumUriOf(track.uri) else state.albumUri
+        val nextUris = if (track.uri != state.trackUri) {
+            (decorated[track.uri]?.artistUris).orEmpty().ifEmpty {
+                state.artistUris.takeIf { state.artistUri == nextArtistUri && it.isNotEmpty() }.orEmpty()
+            }
+        } else {
+            state.artistUris
+        }
         state = state.copy(
             title = track.name,
             artist = track.artists,
             coverUrl = track.imageUrl,
             trackUri = track.uri,
             artistUri = nextArtistUri,
-            artistUris = if (track.uri != state.trackUri) {
-                (decorated[track.uri]?.artistUris).orEmpty().ifEmpty {
-                    state.artistUris.takeIf { state.artistUri == nextArtistUri && it.isNotEmpty() }.orEmpty()
-                }
-            } else {
-                state.artistUris
-            },
+            artistUris = nextUris,
+            artistNames = state.artistNames.takeIf { nextUris == state.artistUris }.orEmpty(),
             albumUri = nextAlbumUri,
             isPlaying = if (loaded == track.uri && player.hasSource) player.isPlaying
             else !command.paused,
@@ -2887,6 +2904,7 @@ class PlaybackBridge(private val context: Context) {
             connectedDevice = localOutputLabel(),
             devices = state.devices.map { it.copy(active = it.id == deviceId) },
         )
+        hydrateArtistCredits()
         progress.set(position, progress.durationMs)
         val from = command.startAtMs
         if (loaded == track.uri) {
@@ -3626,6 +3644,8 @@ class PlaybackBridge(private val context: Context) {
 
     private fun artistUriOf(uri: String): String = artistUriOf(uri, uriSources())
 
+    private fun artistUrisOf(uri: String): List<String> = artistUrisOf(uri, uriSources())
+
     private fun albumUriOf(uri: String): String = albumUriOf(uri, uriSources())
 
     private fun uriSources(): UriSources = UriSources(
@@ -3634,6 +3654,38 @@ class PlaybackBridge(private val context: Context) {
         queue = state.queue,
         queueFromContext = state.queueFromContext,
     )
+
+    /**
+     * The cluster and the state machine name one artist uri at most, so a
+     * multi-artist track keeps a single-artist state and the picker never
+     * opens. The track credits modal lists every credited artist; its Artist
+     * group fills the missing uris and the exact names into the state.
+     */
+    private fun hydrateArtistCredits() {
+        val uri = state.trackUri
+        if (!uri.startsWith("spotify:track:")) return
+        if (state.artistUris.count { it.startsWith("spotify:artist:") } > 1) return
+        if (!state.artist.contains(",")) return
+        if (uri in creditsTried) return
+        creditsTried += uri
+        scope.launch {
+            val credits = runCatching { Krespot.albums.credits(context, uri) }.getOrNull()
+            if (credits == null) {
+                creditsTried -= uri
+                return@launch
+            }
+            val main = credits.groups.firstOrNull { it.name == "Artist" }?.people.orEmpty()
+                .filter { it.uri.startsWith("spotify:artist:") }
+                .distinctBy { it.uri }
+            if (main.size < 2) return@launch
+            if (state.trackUri != uri) return@launch
+            log.i("credits: '${uri.takeLast(12)}' carries ${main.size} main artist(s), the picker can open")
+            state = state.copy(
+                artistUris = main.map { it.uri },
+                artistNames = main.map { it.name },
+            )
+        }
+    }
 
     private fun mirror(cluster: ClusterState?) {
         if (cluster == null) return
@@ -3792,6 +3844,7 @@ class PlaybackBridge(private val context: Context) {
         }
         val duration = cluster.durationMs.takeIf { it > 0L } ?: cluster.track.durationMs
         val sameTrack = cluster.track.uri == state.trackUri
+        val nextUris = if (sameTrack) state.artistUris else artistUrisOf(cluster.track.uri)
         state = state.copy(
             title = cluster.track.title.ifBlank { if (sameTrack) state.title else "" },
             artist = cluster.track.artistName.ifBlank { if (sameTrack) state.artist else "" },
@@ -3801,14 +3854,12 @@ class PlaybackBridge(private val context: Context) {
                 .ifBlank { if (sameTrack) state.artistUri else "" }
                 .ifBlank { artistUriOf(cluster.track.uri) },
             // One cluster row names one artist_uri, not the whole credit
-            // list; adopt the decorated list when it exists and otherwise
-            // drop the previous track's credits so they never leak across
-            // track changes. hydrateCurrent refills the list in the background.
-            artistUris = if (sameTrack) {
-                state.artistUris
-            } else {
-                (decorated[cluster.track.uri]?.artistUris).orEmpty()
-            },
+            // list; adopt the decorated (or queued) list when it exists and
+            // otherwise drop the previous track's credits so they never leak
+            // across track changes. hydrateCurrent and the credits hydrate
+            // refill the list in the background.
+            artistUris = nextUris,
+            artistNames = state.artistNames.takeIf { nextUris == state.artistUris }.orEmpty(),
             albumUri = cluster.track.albumUri
                 .ifBlank { if (sameTrack) state.albumUri else "" }
                 .ifBlank { albumUriOf(cluster.track.uri) },
@@ -3818,6 +3869,7 @@ class PlaybackBridge(private val context: Context) {
             contextUri = cluster.contextUri,
             contextLabel = contextLabelOf(cluster),
         )
+        hydrateArtistCredits()
         progress.set(position, duration)
         watchForVanishedActive(cluster)
         refreshVideoFlags()
@@ -4611,19 +4663,21 @@ class PlaybackBridge(private val context: Context) {
         val duration = track.durationMs.takeIf { it > 0L } ?: progress.durationMs
         val nextArtistUri = if (track.uri != state.trackUri) artistUriOf(track.uri) else state.artistUri
         val nextAlbumUri = if (track.uri != state.trackUri) albumUriOf(track.uri) else state.albumUri
+        val nextUris = if (track.uri != state.trackUri) {
+            (decorated[track.uri]?.artistUris).orEmpty().ifEmpty {
+                state.artistUris.takeIf { state.artistUri == nextArtistUri && it.isNotEmpty() }.orEmpty()
+            }
+        } else {
+            state.artistUris
+        }
         state = state.copy(
             title = track.name,
             artist = track.artists,
             coverUrl = track.imageUrl,
             trackUri = track.uri,
             artistUri = nextArtistUri,
-            artistUris = if (track.uri != state.trackUri) {
-                (decorated[track.uri]?.artistUris).orEmpty().ifEmpty {
-                    state.artistUris.takeIf { state.artistUri == nextArtistUri && it.isNotEmpty() }.orEmpty()
-                }
-            } else {
-                state.artistUris
-            },
+            artistUris = nextUris,
+            artistNames = state.artistNames.takeIf { nextUris == state.artistUris }.orEmpty(),
             albumUri = nextAlbumUri,
             isPlaying = if (local) player.isPlaying else !command.paused,
             isBuffering = if (local) player.state.value.buffering else false,
@@ -4631,6 +4685,7 @@ class PlaybackBridge(private val context: Context) {
             contextUri = track.contextUri.ifBlank { state.contextUri },
             contextLabel = command.contextDescription.trim(),
         )
+        hydrateArtistCredits()
         progress.set(position, duration)
     }
 

@@ -127,6 +127,8 @@ data class ComposePlaybackState(
     val artistUri: String = "",
     /** Every credited artist's uri on the playing track, in display order. */
     val artistUris: List<String> = emptyList(),
+    /** Names paired with [artistUris]; blank until the credits answer lands. */
+    val artistNames: List<String> = emptyList(),
     val albumUri: String = "",
     val activeDeviceName: String = "",
     val activeDeviceId: String = "",
@@ -309,6 +311,7 @@ internal class ShellLocalState {
     var folderDraft by mutableStateOf<FolderDraft?>(null)
     var playlistCreateName by mutableStateOf("My Playlist")
     var creditsTrack by mutableStateOf<TrackItem?>(null)
+    var artistListTrack by mutableStateOf<TrackItem?>(null)
     var addTrackTarget by mutableStateOf<TrackItem?>(null)
     var sleepTimer by mutableStateOf<SleepTimerOption?>(null)
 }
