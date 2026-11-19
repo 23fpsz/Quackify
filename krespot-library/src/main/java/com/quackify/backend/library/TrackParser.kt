@@ -46,6 +46,15 @@ internal fun track(
         ?.takeIf { it > 0L }
         ?: data.optJSONObject("trackDuration")?.optLong("totalMilliseconds", 0L)
         ?: 0L
+    val artistsNode = data.optJSONObject("artists")
+    val credited = artistsNode?.optJSONArray("items")
+    val artistUris = ArrayList<String>()
+    if (credited != null) {
+        for (i in 0 until credited.length()) {
+            val uri = credited.optJSONObject(i)?.optString("uri").orEmpty()
+            if (uri.startsWith("spotify:artist:")) artistUris += uri
+        }
+    }
     return TrackRow(
         uri = data.optString("uri").ifBlank { fallbackUri },
         title = title,
@@ -62,8 +71,8 @@ internal fun track(
         plays = data.optString("playcount").toLongOrNull() ?: data.optLong("playcount", 0L).takeIf { it > 0L } ?: 0L,
         saved = if (data.has("saved")) data.optBoolean("saved", false) else savedHint,
         albumUri = albumNode?.optString("uri").orEmpty(),
-        artistUri = data.optJSONObject("artists")?.optJSONArray("items")
-            ?.optJSONObject(0)?.optString("uri").orEmpty(),
+        artistUri = artistUris.firstOrNull().orEmpty(),
+        artistUris = artistUris,
         discNumber = data.optInt("discNumber", 1),
         trackNumber = data.optInt("trackNumber", 0),
         video = data.hasVideo(),

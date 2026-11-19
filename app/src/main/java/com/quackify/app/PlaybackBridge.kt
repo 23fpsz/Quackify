@@ -2868,6 +2868,13 @@ class PlaybackBridge(private val context: Context) {
             coverUrl = track.imageUrl,
             trackUri = track.uri,
             artistUri = nextArtistUri,
+            artistUris = if (track.uri != state.trackUri) {
+                (decorated[track.uri]?.artistUris).orEmpty().ifEmpty {
+                    state.artistUris.takeIf { state.artistUri == nextArtistUri && it.isNotEmpty() }.orEmpty()
+                }
+            } else {
+                state.artistUris
+            },
             albumUri = nextAlbumUri,
             isPlaying = if (loaded == track.uri && player.hasSource) player.isPlaying
             else !command.paused,
@@ -3594,6 +3601,7 @@ class PlaybackBridge(private val context: Context) {
                 isExplicit = row.explicit,
                 albumUri = row.albumUri,
                 artistUri = row.artistUri,
+                artistUris = row.artistUris,
                 hasVideo = row.video,
             )
             state = state.copy(
@@ -3602,6 +3610,7 @@ class PlaybackBridge(private val context: Context) {
                 coverUrl = row.imageUrl.orEmpty(),
                 trackUri = uri,
                 artistUri = row.artistUri.ifBlank { state.artistUri.takeIf { state.trackUri == uri }.orEmpty() },
+                artistUris = row.artistUris.ifEmpty { state.artistUris.takeIf { state.trackUri == uri }.orEmpty() },
                 albumUri = row.albumUri.ifBlank { state.albumUri.takeIf { state.trackUri == uri }.orEmpty() },
             )
         }
@@ -4584,6 +4593,13 @@ class PlaybackBridge(private val context: Context) {
             coverUrl = track.imageUrl,
             trackUri = track.uri,
             artistUri = nextArtistUri,
+            artistUris = if (track.uri != state.trackUri) {
+                (decorated[track.uri]?.artistUris).orEmpty().ifEmpty {
+                    state.artistUris.takeIf { state.artistUri == nextArtistUri && it.isNotEmpty() }.orEmpty()
+                }
+            } else {
+                state.artistUris
+            },
             albumUri = nextAlbumUri,
             isPlaying = if (local) player.isPlaying else !command.paused,
             isBuffering = if (local) player.state.value.buffering else false,

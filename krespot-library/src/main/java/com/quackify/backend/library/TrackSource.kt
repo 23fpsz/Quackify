@@ -64,7 +64,14 @@ object TrackSource {
         for ((chunk, tracks) in answers.filterNotNull()) {
             for (i in 0 until tracks.length()) {
                 val node = tracks.optJSONObject(i) ?: continue
-                val row = track(node, chunk.getOrNull(i).orEmpty()) ?: continue
+                // The answer drops rows the server cannot serve (market or
+                // account), so the i-th node is not the i-th uri asked for:
+                // pair each node with the uri it names, never with position.
+                val nodeUri = node.optJSONObject("data")?.optString("uri").orEmpty()
+                    .ifBlank { node.optString("uri").orEmpty() }
+                val fallbackUri = nodeUri.takeIf { it.isNotBlank() }
+                    ?: chunk.getOrNull(i).orEmpty()
+                val row = track(node, fallbackUri) ?: continue
                 out[row.uri] = row
             }
         }
@@ -83,6 +90,7 @@ object TrackSource {
                     explicit = detail.explicit,
                     playable = detail.playable,
                     artistUri = detail.showUri,
+                    artistUris = listOf(detail.showUri),
                     video = detail.video,
                 )
             }

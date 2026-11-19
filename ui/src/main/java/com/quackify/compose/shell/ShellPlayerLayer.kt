@@ -364,8 +364,17 @@ private fun NowPlayingScreenLayer(
             env.openAlbum(env.currentTrackTitle, env.currentArtist, env.resolvedAlbumUri)
         },
         onArtistClick = {
-            env.setIsPlayerExpanded(false)
-            env.openArtist(env.currentArtist, env.resolvedArtistUri)
+            // A track credited to two or more artists opens the picker sheet
+            // so each artist has their own row; a single artist still jumps
+            // straight into their page.
+            val uris = env.playbackState?.artistUris.orEmpty()
+                .filter { it.startsWith("spotify:artist:") }
+            if (uris.size > 1) {
+                env.flags.isArtistListOpen = true
+            } else {
+                env.setIsPlayerExpanded(false)
+                env.openArtist(env.currentArtist, env.resolvedArtistUri)
+            }
         },
         onArtistLongClick = {
             env.local.artistOptionsName = env.currentArtist

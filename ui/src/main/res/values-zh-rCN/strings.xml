@@ -48,6 +48,7 @@
     <string name="go_to_artist">查看艺人</string>
     <string name="go_to_album_radio">转到专辑电台</string>
     <string name="go_to_artist_radio">转到艺人电台</string>
+<string name="view_artist">查看艺人</string>
     <string name="go_to_song_radio">转到歌曲电台</string>
     <string name="go_to_playlist_radio">转到歌单电台</string>
     <string name="go_to_show">转到节目</string>

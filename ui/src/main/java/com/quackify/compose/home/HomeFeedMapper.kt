@@ -193,11 +193,13 @@ fun TrackRow.toTrackItem(): TrackItem = TrackItem(
     durationMs = durationMs,
     albumUri = albumUri,
     artistUri = artistUri,
+    artistUris = artistUris,
     discNumber = discNumber,
     trackNumber = trackNumber,
     hasVideo = video,
     plays = plays,
     addedAt = addedAt,
+    playable = playable,
 )
 
 fun ShelfItem.toArtistRelease(): ArtistRelease {

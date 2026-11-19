@@ -48,6 +48,7 @@
     <string name="go_to_artist">Künstler aufrufen</string>
     <string name="go_to_album_radio">Albumradio aufrufen</string>
     <string name="go_to_artist_radio">Künstlerradio aufrufen</string>
+<string name="view_artist">Künstler ansehen</string>
     <string name="go_to_song_radio">Songradio aufrufen</string>
     <string name="go_to_playlist_radio">Playlist-Radio aufrufen</string>
     <string name="go_to_show">Show aufrufen</string>

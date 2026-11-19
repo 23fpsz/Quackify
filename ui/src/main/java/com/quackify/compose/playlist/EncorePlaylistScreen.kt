@@ -118,6 +118,7 @@ data class TrackItem(
     val durationMs: Long = 0L,
     val albumUri: String = "",
     val artistUri: String = "",
+    val artistUris: List<String> = emptyList(),
     val albumName: String = "",
     val discNumber: Int = 1,
     val trackNumber: Int = 0,
@@ -125,6 +126,8 @@ data class TrackItem(
     val isEnhanced: Boolean = false,
     val plays: Long = 0L,
     val addedAt: Long = 0L,
+    /** False when the catalogue row is unavailable in this market or account. */
+    val playable: Boolean = true,
 )
 
 private val trackSearchEngine = GenericSearchEngine<TrackItem>(maxResult = Int.MAX_VALUE)
@@ -1225,6 +1228,7 @@ fun EncorePlaylistScreen(
                         hasVideo = track.hasVideo,
                         imageUrl = track.imageUrl,
                         artistUri = track.artistUri,
+                        playable = track.playable,
                         onClick = { onTrackSelect(track) },
                         onMoreClick = { onTrackOptionsClick(track) },
                         saved = track.saved,
