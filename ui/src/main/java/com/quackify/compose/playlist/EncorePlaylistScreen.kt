@@ -566,18 +566,44 @@ fun EncorePlaylistScreen(
             val toolbarBottomPx = with(density) { toolbarBottom.toPx() }
             val chipsScrollState = rememberScrollState()
 
+            var headerBottomRestAnchorYInRoot by remember { mutableFloatStateOf(-1f) }
+
             val searchProgress = (currentSearchHeightDp / maxSearchHeightDp).coerceIn(0f, 1f)
             val dynamicTopOffsetDp = (toolbarHeight - 8.dp) * (1f - searchProgress)
             val dynamicTopOffsetPx = with(density) { dynamicTopOffsetDp.toPx().toInt() }
 
-            val playDockStartPx = with(density) { 290.dp.toPx() }
-            val playFadePx = with(density) { 50.dp.toPx() }
-            val playFraction by remember {
-                derivedStateOf { ((scrollPx - playDockStartPx) / playFadePx).coerceIn(0f, 1f) }
+            var playButtonRestAnchorYInRoot by remember { mutableFloatStateOf(-1f) }
+
+            val isPlayButtonSlotMeasured by remember {
+                derivedStateOf { playButtonRestAnchorYInRoot > 0f }
+            }
+            val isHeaderOffScreen by remember {
+                derivedStateOf { listState.firstVisibleItemIndex > 0 }
+            }
+            val playButtonSlotYInRoot by remember {
+                derivedStateOf {
+                    if (isHeaderOffScreen || playButtonRestAnchorYInRoot <= 0f) -1f else
+                        playButtonRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
+                }
             }
 
+            val dockDistancePx by remember {
+                derivedStateOf {
+                    if (isHeaderOffScreen) {
+                        0f
+                    } else if (isPlayButtonSlotMeasured) {
+                        (playButtonSlotYInRoot - pinnedTopPx).coerceAtLeast(0f)
+                    } else {
+                        with(density) { 300.dp.toPx() }
+                    }
+                }
+            }
+            val dockThresholdPx = with(density) { 56.dp.toPx() }
+            val dockFraction by remember {
+                derivedStateOf { (dockDistancePx / dockThresholdPx).coerceIn(0f, 1f) }
+            }
             val topBarThreeDotsAlpha by remember {
-                derivedStateOf { 1f - playFraction }
+                derivedStateOf { if (isHeaderOffScreen) 0f else dockFraction }
             }
             val topBarTitleAlpha by remember {
                 derivedStateOf {
@@ -595,10 +621,18 @@ fun EncorePlaylistScreen(
                 derivedStateOf { ((1f - topBarAlpha) * 0.35f).coerceIn(0f, 0.35f) }
             }
 
-            val approxHeaderBottomPx = with(density) { (470.dp + currentSearchHeightDp).toPx() }
             val currentGradientHeightDp by remember {
                 derivedStateOf {
-                    maxOf(toolbarBottom, with(density) { (approxHeaderBottomPx - scrollPx).toDp() })
+                    if (headerBottomRestAnchorYInRoot > 0f) {
+                        if (listState.firstVisibleItemIndex > 0) {
+                            toolbarBottom
+                        } else {
+                            val currentBottomPx = headerBottomRestAnchorYInRoot - listState.firstVisibleItemScrollOffset
+                            maxOf(toolbarBottom, with(density) { currentBottomPx.toDp() })
+                        }
+                    } else {
+                        maxOf(toolbarBottom, toolbarBottom + with(density) { (360.dp.toPx() - scrollPx).toDp() })
+                    }
                 }
             }
 
@@ -641,6 +675,12 @@ fun EncorePlaylistScreen(
                                     val placeable = measurable.measure(constraints)
                                     layout(placeable.width, placeable.height - dynamicTopOffsetPx) {
                                         placeable.placeRelative(0, -dynamicTopOffsetPx)
+                                    }
+                                }
+                                .onGloballyPositioned { coords ->
+                                    if (listState.firstVisibleItemIndex == 0) {
+                                        val currentBottom = coords.positionInRoot().y + coords.size.height
+                                        headerBottomRestAnchorYInRoot = currentBottom + listState.firstVisibleItemScrollOffset
                                     }
                                 }
                         ) {
@@ -1041,16 +1081,23 @@ fun EncorePlaylistScreen(
                                     Box(
                                         modifier = Modifier
                                             .size(playButtonSize)
-                                            .graphicsLayer { alpha = 1f - playFraction },
+                                            .onGloballyPositioned { coords ->
+                                                if (listState.firstVisibleItemIndex == 0) {
+                                                    val currentY = coords.positionInRoot().y
+                                                    playButtonRestAnchorYInRoot = currentY + listState.firstVisibleItemScrollOffset
+                                                }
+                                            },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        EncorePlayButton(
-                                            isPlaying = isPlaying,
-                                            onClick = onPlayPauseClick,
-                                            size = playButtonSize,
-                                            iconSize = 24.dp,
-                                            showShuffleBadge = false
-                                        )
+                                        if (!isPlayButtonSlotMeasured || playButtonSlotYInRoot > toolbarBottomPx) {
+                                            EncorePlayButton(
+                                                isPlaying = isPlaying,
+                                                onClick = onPlayPauseClick,
+                                                size = playButtonSize,
+                                                iconSize = 24.dp,
+                                                showShuffleBadge = false
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1380,14 +1427,18 @@ fun EncorePlaylistScreen(
                 }
             }
 
-            if (playFraction > 0f) {
+            if (isPlayButtonSlotMeasured && (playButtonSlotYInRoot <= toolbarBottomPx || isHeaderOffScreen)) {
+                val targetY = if (isHeaderOffScreen || playButtonSlotYInRoot < pinnedTopPx) {
+                    pinnedTopPx
+                } else {
+                    playButtonSlotYInRoot
+                }
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(end = 16.dp)
                         .graphicsLayer {
-                            translationY = pinnedTopPx
-                            alpha = playFraction
+                            translationY = targetY
                         }
                         .zIndex(20f)
                 ) {

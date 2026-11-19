@@ -20,6 +20,10 @@ import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ConnectivityMonitor
 import com.quackify.app.widget.WidgetSync
 import com.quackify.compose.components.RepeatMode
+import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.settings.PlayerButtonAction
+import com.quackify.compose.settings.PlayerButtonsConfig
+import com.quackify.compose.settings.PlayerButtonsStore
 import com.quackify.compose.shell.ComposePlaybackState
 import java.net.HttpURLConnection
 import java.net.URL
@@ -108,6 +112,20 @@ class PlaybackService : Service() {
             ACTION_LIKE -> PlaybackHost.bridge?.listener?.onLikeToggle()
             ACTION_SHUFFLE -> PlaybackHost.bridge?.listener?.onShuffleToggle()
             ACTION_REPEAT -> PlaybackHost.bridge?.listener?.onRepeatToggle()
+            ACTION_REWIND_15 -> PlaybackHost.bridge?.listener?.onSkipSeek(-15_000L)
+            ACTION_FORWARD_15 -> PlaybackHost.bridge?.listener?.onSkipSeek(15_000L)
+            ACTION_REFRESH -> {
+                val state = PlaybackHost.bridge?.state
+                if (state != null) {
+                    lastIdentity = ""
+                    notify(buildNotification(state))
+                    val session = session
+                    if (session != null) {
+                        val progress = PlaybackHost.bridge?.progressSnapshot ?: com.quackify.app.PlaybackProgressSnapshot(0, 0)
+                        updatePlaybackState(session, state, progress, true)
+                    }
+                }
+            }
         }
         PlaybackHost.ensure(this)
         PlaybackHost.markForeground()
@@ -181,11 +199,23 @@ class PlaybackService : Service() {
                 bridge.listener.onSeek(pos)
             }
 
+            override fun onRewind() {
+                bridge.listener.onSkipSeek(-15_000L)
+            }
+
+            override fun onFastForward() {
+                bridge.listener.onSkipSeek(15_000L)
+            }
+
             override fun onCustomAction(action: String?, extras: Bundle?) {
                 when (action) {
                     CUSTOM_LIKE -> bridge.listener.onLikeToggle()
                     CUSTOM_SHUFFLE -> bridge.listener.onShuffleToggle()
                     CUSTOM_REPEAT -> bridge.listener.onRepeatToggle()
+                    CUSTOM_SEEK_BACK_15, "SEEK_15_SECONDS_BACK", "SEEK_BACK_15_ACTION" ->
+                        bridge.listener.onSkipSeek(-15_000L)
+                    CUSTOM_SEEK_FORWARD_15, "SEEK_15_SECONDS_FORWARD", "SEEK_FORWARD_15_ACTION" ->
+                        bridge.listener.onSkipSeek(15_000L)
                 }
             }
 
@@ -222,10 +252,11 @@ class PlaybackService : Service() {
         val hasTrack = state.trackUri.isNotBlank() || state.title.isNotBlank()
         val session = session ?: return
         updatePlaybackState(session, state, progress, hasTrack)
+        val isEpisode = state.trackUri.startsWith("spotify:episode:") || state.contextUri.startsWith("spotify:show:")
         val identity = "${state.trackUri}|${state.title}|${state.artist}|" +
             "${state.coverUrl}|${state.isPlaying}|" +
             "${state.contextLabel}|${art != null}|" +
-            "${state.isLiked}|${state.shuffleMode}|${state.repeatMode}"
+            "${state.isLiked}|${state.shuffleMode}|${state.repeatMode}|$isEpisode"
         if (identity == lastIdentity) return
         lastIdentity = identity
         if (hasTrack) {
@@ -255,6 +286,7 @@ class PlaybackService : Service() {
             return
         }
         val playing = state.isPlaying
+        val isEpisode = state.trackUri.startsWith("spotify:episode:") || state.contextUri.startsWith("spotify:show:")
         var actions = PlaybackStateCompat.ACTION_PLAY or
             PlaybackStateCompat.ACTION_PAUSE or
             PlaybackStateCompat.ACTION_PLAY_PAUSE or
@@ -263,29 +295,73 @@ class PlaybackService : Service() {
         if (state.remoteCanSeek) {
             actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
         }
+        if (isEpisode) {
+            actions = actions or PlaybackStateCompat.ACTION_REWIND or PlaybackStateCompat.ACTION_FAST_FORWARD
+        }
         val playback = PlaybackStateCompat.Builder()
             .setActions(actions)
-        playback.addCustomAction(
-            PlaybackStateCompat.CustomAction.Builder(
-                CUSTOM_LIKE, if (state.isLiked) "Unlike" else "Like",
-                if (state.isLiked) R.drawable.ic_notif_like_on else R.drawable.ic_notif_like
-            ).build()
-        )
-        if (state.remoteCanShuffle) {
-            playback.addCustomAction(
-                PlaybackStateCompat.CustomAction.Builder(
-                    CUSTOM_SHUFFLE, "Shuffle", R.drawable.ic_notif_shuffle
-                ).build()
-            )
-        }
-        if (state.remoteCanRepeat) {
-            playback.addCustomAction(
-                PlaybackStateCompat.CustomAction.Builder(
-                    CUSTOM_REPEAT, "Repeat",
-                    if (state.repeatMode == RepeatMode.REPEAT_ONE) R.drawable.ic_notif_repeat_one
-                    else R.drawable.ic_notif_repeat
-                ).build()
-            )
+
+        val config = PlayerButtonsStore.load(this)
+        if (config.andAutoEnabled) {
+            if (isEpisode) {
+                playback.addCustomAction(
+                    PlaybackStateCompat.CustomAction.Builder(
+                        CUSTOM_SEEK_BACK_15,
+                        "Rewind 15s",
+                        R.drawable.encore_icon_seek_back_15,
+                    ).build()
+                )
+                playback.addCustomAction(
+                    PlaybackStateCompat.CustomAction.Builder(
+                        CUSTOM_SEEK_FORWARD_15,
+                        "Forward 15s",
+                        R.drawable.encore_icon_seek_forward_15,
+                    ).build()
+                )
+            } else {
+                val addedActions = mutableSetOf<String>()
+                for (action in config.slots) {
+                    if (addedActions.contains(action.token)) continue
+                    when (action) {
+                        PlayerButtonAction.FAV -> {
+                            playback.addCustomAction(
+                                PlaybackStateCompat.CustomAction.Builder(
+                                    CUSTOM_LIKE, if (state.isLiked) "Unlike" else "Like",
+                                    if (state.isLiked) R.drawable.ic_notif_like_on else R.drawable.ic_notif_like
+                                ).build()
+                            )
+                            addedActions.add(action.token)
+                        }
+                        PlayerButtonAction.SHUFFLE -> {
+                            if (state.remoteCanShuffle) {
+                                val resId = resolveShuffleAsset(state.shuffleMode)
+                                playback.addCustomAction(
+                                    PlaybackStateCompat.CustomAction.Builder(
+                                        CUSTOM_SHUFFLE,
+                                        resolveShuffleLabel(state.shuffleMode),
+                                        resId,
+                                    ).build()
+                                )
+                                addedActions.add(action.token)
+                            }
+                        }
+                        PlayerButtonAction.REPEAT -> {
+                            if (state.remoteCanRepeat) {
+                                val resId = resolveRepeatAsset(state.repeatMode)
+                                playback.addCustomAction(
+                                    PlaybackStateCompat.CustomAction.Builder(
+                                        CUSTOM_REPEAT,
+                                        resolveRepeatLabel(state.repeatMode),
+                                        resId,
+                                    ).build()
+                                )
+                                addedActions.add(action.token)
+                            }
+                        }
+                        else -> {}
+                    }
+                }
+            }
         }
         playback.setState(
             when {
@@ -395,30 +471,99 @@ class PlaybackService : Service() {
         if (state.contextLabel.isNotBlank()) {
             builder.setSubText(state.contextLabel)
         }
-        builder
-            .addAction(
-                if (state.isLiked) R.drawable.ic_notif_like_on else R.drawable.ic_notif_like,
-                if (state.isLiked) "Unlike" else "Like",
-                servicePending(ACTION_LIKE),
-            )
-            .addAction(R.drawable.ic_notif_previous, "Previous", servicePending(ACTION_PREVIOUS))
-            .addAction(
+        val isEpisode = state.trackUri.startsWith("spotify:episode:") || state.contextUri.startsWith("spotify:show:")
+        if (isEpisode) {
+            builder.addAction(R.drawable.ic_notif_previous, "Previous", servicePending(ACTION_PREVIOUS))
+            builder.addAction(R.drawable.encore_icon_seek_back_15, "Rewind 15s", servicePending(ACTION_REWIND_15))
+            builder.addAction(
                 if (state.isPlaying) R.drawable.ic_notif_pause else R.drawable.ic_notif_play,
                 if (state.isPlaying) "Pause" else "Play",
                 servicePending(ACTION_TOGGLE),
             )
-            .addAction(R.drawable.ic_notif_next, "Next", servicePending(ACTION_NEXT))
-            .addAction(R.drawable.ic_notif_shuffle, "Shuffle", servicePending(ACTION_SHUFFLE))
-            .addAction(
-                if (state.repeatMode == RepeatMode.REPEAT_ONE) R.drawable.ic_notif_repeat_one
-                else R.drawable.ic_notif_repeat,
-                "Repeat",
-                servicePending(ACTION_REPEAT),
+            builder.addAction(R.drawable.encore_icon_seek_forward_15, "Forward 15s", servicePending(ACTION_FORWARD_15))
+            builder.addAction(R.drawable.ic_notif_next, "Next", servicePending(ACTION_NEXT))
+
+            builder.setStyle(
+                MediaNotificationCompat.MediaStyle()
+                    .setMediaSession(session?.sessionToken)
+                    .setShowActionsInCompactView(1, 2, 3)
             )
+            return builder.build()
+        }
+
+        val config = PlayerButtonsStore.load(this)
+        val nonNoneSlots = config.slots.filter { it != PlayerButtonAction.NONE }
+        val slotsToUse = if (nonNoneSlots.isEmpty()) PlayerButtonsConfig.DEFAULT_SLOTS else nonNoneSlots
+
+        val addedActionIndices = mutableListOf<Int>()
+        var actionIdx = 0
+        for (action in slotsToUse) {
+            when (action) {
+                PlayerButtonAction.PLAY -> {
+                    builder.addAction(
+                        if (state.isPlaying) R.drawable.ic_notif_pause else R.drawable.ic_notif_play,
+                        if (state.isPlaying) "Pause" else "Play",
+                        servicePending(ACTION_TOGGLE),
+                    )
+                    addedActionIndices.add(actionIdx++)
+                }
+                PlayerButtonAction.PREV -> {
+                    builder.addAction(R.drawable.ic_notif_previous, "Previous", servicePending(ACTION_PREVIOUS))
+                    addedActionIndices.add(actionIdx++)
+                }
+                PlayerButtonAction.NEXT -> {
+                    builder.addAction(R.drawable.ic_notif_next, "Next", servicePending(ACTION_NEXT))
+                    addedActionIndices.add(actionIdx++)
+                }
+                PlayerButtonAction.FAV -> {
+                    builder.addAction(
+                        if (state.isLiked) R.drawable.ic_notif_like_on else R.drawable.ic_notif_like,
+                        if (state.isLiked) "Unlike" else "Like",
+                        servicePending(ACTION_LIKE),
+                    )
+                    addedActionIndices.add(actionIdx++)
+                }
+                PlayerButtonAction.REPEAT -> {
+                    val resId = resolveRepeatAsset(state.repeatMode)
+                    builder.addAction(
+                        resId,
+                        resolveRepeatLabel(state.repeatMode),
+                        servicePending(ACTION_REPEAT),
+                    )
+                    addedActionIndices.add(actionIdx++)
+                }
+                PlayerButtonAction.SHUFFLE -> {
+                    val resId = resolveShuffleAsset(state.shuffleMode)
+                    builder.addAction(
+                        resId,
+                        resolveShuffleLabel(state.shuffleMode),
+                        servicePending(ACTION_SHUFFLE),
+                    )
+                    addedActionIndices.add(actionIdx++)
+                }
+                PlayerButtonAction.NONE -> {}
+            }
+        }
+
+        val compactIndices = mutableListOf<Int>()
+        val prevIdx = slotsToUse.indexOf(PlayerButtonAction.PREV)
+        val playIdx = slotsToUse.indexOf(PlayerButtonAction.PLAY)
+        val nextIdx = slotsToUse.indexOf(PlayerButtonAction.NEXT)
+        if (playIdx in addedActionIndices) {
+            if (prevIdx in addedActionIndices && prevIdx != playIdx) compactIndices.add(prevIdx)
+            compactIndices.add(playIdx)
+            if (nextIdx in addedActionIndices && nextIdx != playIdx && nextIdx != prevIdx) compactIndices.add(nextIdx)
+        }
+        val finalCompact = if (compactIndices.isNotEmpty()) {
+            compactIndices.sorted().take(3).toIntArray()
+        } else {
+            addedActionIndices.take(3).toIntArray()
+        }
+
         builder.setStyle(
             MediaNotificationCompat.MediaStyle()
                 .setMediaSession(session?.sessionToken)
-                .setShowActionsInCompactView(1, 2, 3)
+                .setShowActionsInCompactView(*finalCompact)
         )
         return builder.build()
     }
@@ -449,8 +594,33 @@ class PlaybackService : Service() {
         manager.notify(NOTIFICATION_ID, notification)
     }
 
+    private fun resolveRepeatAsset(mode: RepeatMode): Int = when (mode) {
+        RepeatMode.REPEAT_ONE -> R.drawable.repone
+        RepeatMode.REPEAT_ALL -> R.drawable.repon
+        RepeatMode.OFF -> R.drawable.repoff
+    }
+
+    private fun resolveShuffleAsset(mode: ShuffleMode): Int = when (mode) {
+        ShuffleMode.SMART_SHUFFLE -> R.drawable.smart_shuffle
+        ShuffleMode.SHUFFLE -> R.drawable.shuffle
+        ShuffleMode.OFF -> R.drawable.shuffleoff
+    }
+
+    private fun resolveRepeatLabel(mode: RepeatMode): String = when (mode) {
+        RepeatMode.REPEAT_ONE -> "Repeat One"
+        RepeatMode.REPEAT_ALL -> "Repeat All"
+        RepeatMode.OFF -> "Repeat Off"
+    }
+
+    private fun resolveShuffleLabel(mode: ShuffleMode): String = when (mode) {
+        ShuffleMode.SMART_SHUFFLE -> "Smart Shuffle"
+        ShuffleMode.SHUFFLE -> "Shuffle On"
+        ShuffleMode.OFF -> "Shuffle Off"
+    }
+
     companion object {
         const val ACTION_STOP = "com.quackify.app.STOP"
+        const val ACTION_REFRESH = "com.quackify.app.REFRESH"
         const val EXTRA_OPEN_PLAYER = "com.quackify.app.OPEN_PLAYER"
         private const val ACTION_TOGGLE = "com.quackify.app.TOGGLE"
         private const val ACTION_NEXT = "com.quackify.app.NEXT"
@@ -458,9 +628,13 @@ class PlaybackService : Service() {
         private const val ACTION_LIKE = "com.quackify.app.LIKE"
         private const val ACTION_SHUFFLE = "com.quackify.app.SHUFFLE"
         private const val ACTION_REPEAT = "com.quackify.app.REPEAT"
+        const val ACTION_REWIND_15 = "com.quackify.app.REWIND_15"
+        const val ACTION_FORWARD_15 = "com.quackify.app.FORWARD_15"
         private const val CUSTOM_LIKE = "com.quackify.app.custom.LIKE"
         private const val CUSTOM_SHUFFLE = "com.quackify.app.custom.SHUFFLE"
         private const val CUSTOM_REPEAT = "com.quackify.app.custom.REPEAT"
+        private const val CUSTOM_SEEK_BACK_15 = "com.quackify.app.custom.SEEK_BACK_15"
+        private const val CUSTOM_SEEK_FORWARD_15 = "com.quackify.app.custom.SEEK_FORWARD_15"
         const val CHANNEL = "quackify-playback"
         const val NOTIFICATION_ID = 1
     }

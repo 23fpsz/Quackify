@@ -565,4 +565,24 @@
         <item quantity="one">1 play</item>
         <item quantity="other">%1$s plays</item>
     </plurals>
+    <string name="player_controls">Player controls</string>
+    <string name="notification_and_car_controls">Notification &amp; Android Auto controls</string>
+    <string name="notification_and_car_controls_desc">Customize button order and actions for media notifications, lock screens, and Android Auto</string>
+    <string name="configure_player_buttons">Configure Player Buttons</string>
+    <string name="configure_player_buttons_subtitle">Car Screen &amp; Phone Notification Controls</string>
+    <string name="tap_button_to_customize">👉 Tap any button icon in the preview above to customize its action and position!</string>
+    <string name="reset_default">Reset Default</string>
+    <string name="save_and_apply">Save &amp; Apply</string>
+    <string name="select_action_for_slot">Select Action for Button %1$d</string>
+    <string name="previous_track">Previous Track</string>
+    <string name="play_pause">Play / Pause</string>
+    <string name="next_track">Next Track</string>
+    <string name="favorite_like">Favorite / Like</string>
+    <string name="repeat_mode">Repeat Mode</string>
+    <string name="shuffle_mode">Shuffle Mode</string>
+    <string name="none_empty_slot">None (Empty Slot)</string>
+    <string name="enable_android_auto">Android Auto integration</string>
+    <string name="enable_android_auto_desc">Expose custom player controls on the car display</string>
+    <string name="app_icon_and_player_controls">App icon and player controls</string>
+    <string name="player_controls_and_app_icon">Player controls and app icon</string>
 </resources>

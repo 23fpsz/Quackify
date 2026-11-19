@@ -45,6 +45,11 @@ object PlaybackHost {
             .onFailure { log.e("service start failed ${it.javaClass.simpleName}: ${it.message}") }
     }
 
+    fun refreshNotification(context: Context) {
+        val intent = Intent(context, PlaybackService::class.java).setAction(PlaybackService.ACTION_REFRESH)
+        runCatching { context.startService(intent) }
+    }
+
     fun markForeground() {
         foreground = true
     }
