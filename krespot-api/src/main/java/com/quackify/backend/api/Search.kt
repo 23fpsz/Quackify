@@ -60,32 +60,13 @@ object Search {
         val trimmed = term.trim()
         if (trimmed.isEmpty()) return null
         val json = call(context, OP_RESULTS, variables(trimmed, limit, prefix = false)) ?: return null
-        val results = withSaved(context, withResolvedUsers(context, parseResults(json, trimmed), trimmed))
+        val results = withResolvedUsers(context, parseResults(json, trimmed), trimmed)
         log.i("search '$trimmed' tracks=${results.tracks.size} artists=${results.artists.size} " +
                 "albums=${results.albums.size} playlists=${results.playlists.size} " +
                 "sections=${results.sections.map { "${it.title}(${it.items.size})" }} " +
                 "chips=${results.chips} totals=${results.totals}"
         )
         return results
-    }
-
-    private suspend fun withSaved(context: Context, results: SearchResults): SearchResults {
-        val uris = (results.tracks + results.artists + results.albums + results.playlists +
-            results.others + results.sections.flatMap { it.items }).map { it.uri }
-        val saved = Library.saved(context, uris)
-        if (saved.isEmpty()) return results
-        fun mark(hit: SearchHit) = if (hit.uri in saved) hit.copy(saved = true) else hit
-        return results.copy(
-            top = results.top?.let(::mark),
-            tracks = results.tracks.map(::mark),
-            artists = results.artists.map(::mark),
-            albums = results.albums.map(::mark),
-            playlists = results.playlists.map(::mark),
-            others = results.others.map(::mark),
-            sections = results.sections.map { section ->
-                section.copy(items = section.items.map(::mark))
-            },
-        )
     }
 
     suspend fun suggest(context: Context, term: String, limit: Int = SUGGEST_LIMIT): List<SearchHit> {
