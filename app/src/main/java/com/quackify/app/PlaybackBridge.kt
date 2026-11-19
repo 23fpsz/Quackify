@@ -2731,7 +2731,39 @@ class PlaybackBridge(private val context: Context) {
             log.w("skip: '${active.name}' refused the $what, leaving the stream where it is")
             return
         }
+        if (!force && state.trackUri.startsWith("spotify:episode:") && state.chapters.isNotEmpty()) {
+            if (skipChapter(next)) return
+        }
         skipLocal(forward = next, force = force)
+    }
+
+    private fun skipChapter(forward: Boolean): Boolean {
+        val chapters = state.chapters
+        if (chapters.isEmpty()) return false
+        val pos = player.positionMs.takeIf { it > 0L } ?: progress.positionMs
+        if (forward) {
+            val nextChapter = chapters.firstOrNull { it.startMs > pos + 1000L }
+            if (nextChapter != null) {
+                log.i("skip: jumping to next podcast chapter '${nextChapter.title}' at ${nextChapter.startMs}ms")
+                listener.onSeek(nextChapter.startMs)
+                return true
+            }
+            return false
+        } else {
+            val currentChapter = chapters.lastOrNull { pos >= it.startMs } ?: return false
+            if (pos - currentChapter.startMs > 3000L) {
+                log.i("skip: restarting current podcast chapter '${currentChapter.title}' at ${currentChapter.startMs}ms")
+                listener.onSeek(currentChapter.startMs)
+                return true
+            }
+            val prevChapter = chapters.filter { it.startMs < currentChapter.startMs }.lastOrNull()
+            if (prevChapter != null) {
+                log.i("skip: jumping to previous podcast chapter '${prevChapter.title}' at ${prevChapter.startMs}ms")
+                listener.onSeek(prevChapter.startMs)
+                return true
+            }
+            return false
+        }
     }
 
     private fun applyReplaceState(command: PlaybackCommand) {
