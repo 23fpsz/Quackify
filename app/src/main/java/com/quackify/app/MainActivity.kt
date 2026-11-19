@@ -1253,9 +1253,12 @@ class MainActivity : ComponentActivity() {
 
     private suspend fun runSearch(term: String): Pair<com.quackify.backend.model.SearchResults?, List<SearchHit>> {
         delay(280)
-        val hits = Search.suggest(applicationContext, term)
-        val results = Search.query(applicationContext, term)
-        return results?.let { decorateSearchTracks(applicationContext, it) } to hits
+        return coroutineScope {
+            val suggestions = async { Search.suggest(applicationContext, term) }
+            val results = async { Search.query(applicationContext, term) }
+            val decorated = results.await()?.let { decorateSearchTracks(applicationContext, it) }
+            decorated to suggestions.await()
+        }
     }
 
     internal fun buildHistoryStats(
