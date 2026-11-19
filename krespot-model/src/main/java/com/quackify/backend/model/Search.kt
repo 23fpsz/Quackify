@@ -65,6 +65,13 @@ data class SearchResults(
 
     val hasVideo: Boolean get() = tracks.any { it.video }
 
+    val savedCandidates: List<String>
+        get() = (listOfNotNull(top) + tracks + artists + albums + playlists + others +
+            sections.flatMap { it.items })
+            .map { it.uri }
+            .filter { it.isNotBlank() }
+            .distinct()
+
     fun of(kind: SearchKind): List<SearchHit> = when (kind) {
         SearchKind.TRACK -> tracks
         SearchKind.ARTIST -> artists
@@ -75,6 +82,22 @@ data class SearchResults(
 
     fun withSaved(uri: String, saved: Boolean): SearchResults {
         fun mark(hit: SearchHit) = if (hit.uri == uri) hit.copy(saved = saved) else hit
+        return copy(
+            top = top?.let(::mark),
+            tracks = tracks.map(::mark),
+            artists = artists.map(::mark),
+            albums = albums.map(::mark),
+            playlists = playlists.map(::mark),
+            others = others.map(::mark),
+            sections = sections.map { section ->
+                section.copy(items = section.items.map(::mark))
+            },
+        )
+    }
+
+    fun withSaved(uris: Set<String>): SearchResults {
+        if (uris.isEmpty()) return this
+        fun mark(hit: SearchHit) = if (hit.uri in uris) hit.copy(saved = true) else hit
         return copy(
             top = top?.let(::mark),
             tracks = tracks.map(::mark),

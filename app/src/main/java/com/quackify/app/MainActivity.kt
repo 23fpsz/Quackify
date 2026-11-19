@@ -933,6 +933,14 @@ class MainActivity : ComponentActivity() {
                                 RecentSearches.recordQuery(context, term)
                                 submittedSearchQuery = term
                             }
+                            val results = searched.first
+                            if (results != null && results.savedCandidates.isNotEmpty()) {
+                                val saved = Library.saved(applicationContext, results.savedCandidates)
+                                val current = searchData
+                                if (saved.isNotEmpty() && current != null && current.query == term) {
+                                    searchData = current.withSaved(saved)
+                                }
+                            }
                         }
 
                         LaunchedEffect(searchTerm, offlineNow, loggedIn, activeAccountId) {
