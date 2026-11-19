@@ -46,6 +46,10 @@ object HomeFeed {
     const val MUSIC_VIDEOS = "HomeMusicVideosSectionData"
     const val PODCAST_VIDEOS = "HomePodcastVideosCarouselSectionData"
 
+    @Volatile
+    var cachedPayload: HomeFeedPayload? = null
+        private set
+
     private val SILENT = setOf(
         "HomeOnboardingSectionData",
         "HomeOnboardingSectionDataV2",
@@ -79,6 +83,7 @@ object HomeFeed {
             variables = variables,
         ) ?: return HomeFeedPayload()
         val payload = withContext(Dispatchers.Default) { parse(json) }
+        cachedPayload = payload
         val colored = payload.sections.sumOf { section -> section.items.count { it.colorHex.isNotBlank() } }
         log.i("facet='$facet' parsed ${payload.sections.size} sections, " +
                 "${payload.sections.sumOf { it.items.size }} items, $colored with extracted color, " +

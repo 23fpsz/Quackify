@@ -538,7 +538,13 @@ class PlaybackBridge(private val context: Context) {
         }
     }
 
-    var state by mutableStateOf(ComposePlaybackState())
+    private var _state by mutableStateOf(ComposePlaybackState())
+    var state: ComposePlaybackState
+        get() = _state
+        private set(value) {
+            _state = value
+            runCatching { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
+        }
 
     /** Bumped whenever the server confirms a queue edit the user made, so
      * the shell can toast the outcome. */
