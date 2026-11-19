@@ -43,7 +43,7 @@ object Search {
     private const val SEARCH_URI_PREFIX = "spotify:search:"
 
     fun searchUriOf(query: String): String =
-        SEARCH_URI_PREFIX + java.net.URLEncoder.encode(query.trim(), "UTF-8")
+        SEARCH_URI_PREFIX + java.net.URLEncoder.encode(query.trim(), "UTF-8").replace("+", "%20")
 
     fun queryOfSearchUri(uri: String): String =
         runCatching {

@@ -66,8 +66,15 @@ object RecentSearches {
         remote.forEach { cache.put(it.uri, encode(it)) }
         val existing = keys(context)
         val uris = remote.map { it.uri }
-        val next = (existing.filterNot { it in uris } + uris.filter { it !in existing }).take(LIMIT)
-        write(context, next, cache)
+        val remoteQueries = remote.mapNotNull { queryTextOrNull(it.uri) }
+            .map { it.lowercase() }
+            .toHashSet()
+        val kept = existing.filterNot { key ->
+            if (key in uris) return@filterNot true
+            val text = queryTextOrNull(key)?.lowercase() ?: return@filterNot false
+            text in remoteQueries
+        }
+        write(context, (uris + kept).take(LIMIT), cache)
     }
 
     fun remove(context: Context, key: String) {
@@ -171,11 +178,13 @@ object RecentSearches {
             .apply()
     }
 
-    private fun queryText(key: String): String = when {
+    private fun queryTextOrNull(key: String): String? = when {
         key.startsWith(QUERY_PREFIX) -> key.removePrefix(QUERY_PREFIX)
-        key.startsWith(SEARCH_URI_PREFIX) -> Search.queryOfSearchUri(key)
-        else -> ""
+        key.startsWith(SEARCH_URI_PREFIX) -> Search.queryOfSearchUri(key).takeIf { it.isNotBlank() }
+        else -> null
     }
+
+    private fun queryText(key: String): String = queryTextOrNull(key).orEmpty()
 
     private fun isSameQuery(storedKey: String, target: String): Boolean {
         val stored = queryText(storedKey)
