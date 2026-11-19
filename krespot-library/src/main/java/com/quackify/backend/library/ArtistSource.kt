@@ -51,6 +51,12 @@ object ArtistSource {
 
     private const val SPCLIENT = "https://spclient.wg.spotify.com"
     private const val DISCOGRAPHY_PAGE = 20
+    private const val WEB_API_ARTISTS = "https://api.spotify.com/v1/artists"
+    private const val IMAGES_BATCH = 50
+    private const val IMAGE_CACHE_LIMIT = 120
+
+    private val imageCache = LinkedHashMap<String, String>()
+    private val imageLock = Any()
 
     suspend fun artist(context: Context, uri: String): ArtistDetail? {
         val token = EncoreAuth.token(context)
@@ -143,6 +149,65 @@ object ArtistSource {
             )
             detail
         }
+    }
+
+    suspend fun images(context: Context, uris: List<String>): Map<String, String> {
+        val wanted = uris.filter { it.startsWith("spotify:artist:") }.distinct()
+        if (wanted.isEmpty()) return emptyMap()
+        val token = EncoreAuth.token(context)
+        if (token.isBlank()) return emptyMap()
+        val out = LinkedHashMap<String, String>()
+        val missing = wanted.filter { uri ->
+            synchronized(imageLock) {
+                val cached = imageCache[uri]
+                if (cached != null) {
+                    out[uri] = cached
+                    false
+                } else {
+                    true
+                }
+            }
+        }
+        if (missing.isEmpty()) return out
+        missing.chunked(IMAGES_BATCH).forEach { batch ->
+            val ids = batch.joinToString(",") { it.substringAfterLast(':') }
+            val response = Net.get("$WEB_API_ARTISTS?ids=$ids", spHeaders(context), "artist/images")
+            val nodes = response?.takeIf { it.ok }?.json()?.optJSONArray("artists") ?: return@forEach
+            val answered = LinkedHashMap<String, String>()
+            for (i in 0 until nodes.length()) {
+                val node = nodes.optJSONObject(i) ?: continue
+                val uri = node.optString("uri")
+                if (!uri.startsWith("spotify:artist:")) continue
+                answered[uri] = largestImage(node.optJSONArray("images"))
+            }
+            synchronized(imageLock) {
+                batch.forEach { uri ->
+                    val url = answered[uri].orEmpty()
+                    out[uri] = url
+                    imageCache[uri] = url
+                }
+                while (imageCache.size > IMAGE_CACHE_LIMIT) imageCache.remove(imageCache.keys.first())
+            }
+        }
+        log.i("images ${wanted.size} artist(s) -> ${out.count { it.value.isNotBlank() }} with an avatar " +
+                "(${missing.size} asked, cache=${wanted.size - missing.size})"
+        )
+        return out
+    }
+
+    private fun largestImage(images: JSONArray?): String {
+        if (images == null) return ""
+        var best = ""
+        var width = -1
+        for (i in 0 until images.length()) {
+            val image = images.optJSONObject(i) ?: continue
+            val w = image.optInt("width", 0)
+            if (w > width) {
+                width = w
+                best = image.optString("url")
+            }
+        }
+        return best
     }
 
     suspend fun discographyCounts(context: Context, uri: String): Map<String, Int> {
