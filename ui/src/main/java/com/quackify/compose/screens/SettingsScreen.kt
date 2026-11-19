@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,7 +84,10 @@ import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MIN
 import com.quackify.compose.player.TRANSLATION_DEVICE_LANGUAGE
 import com.quackify.compose.sheets.AppLanguageSheet
 import com.quackify.compose.sheets.LyricsProviderSheet
+import com.quackify.compose.sheets.PlayerButtonsConfigSheet
 import com.quackify.compose.sheets.TranslationLanguageSheet
+import com.quackify.compose.settings.PlayerButtonsConfig
+import com.quackify.compose.settings.PlayerButtonsStore
 import com.quackify.backend.library.lyrics.translationLanguageName
 import java.util.Locale
 import com.quackify.compose.theme.EncoreTheme
@@ -213,6 +217,8 @@ fun SettingsScreen(
         mutableStateOf(clientPrefs.getBoolean("debugLogging", false))
     }
     var versionTaps by remember { mutableIntStateOf(0) }
+    var playerButtonsConfig by remember { mutableStateOf(PlayerButtonsStore.load(context)) }
+    var playerButtonsSheetOpen by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf<Int?>(null) }
     var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
     var translationLanguageSheetOpen by remember { mutableStateOf(false) }
@@ -296,7 +302,7 @@ fun SettingsScreen(
                         )
                         SettingsCategoryRow(
                             title = stringResource(R.string.personalization),
-                            description = stringResource(R.string.app_icon),
+                            description = stringResource(R.string.player_controls_and_app_icon),
                             onClick = { category = 1 }
                         )
                         SettingsCategoryRow(
@@ -546,6 +552,68 @@ fun SettingsScreen(
 
                 }
                 if (target == 1) {
+                    item {
+                        SettingsSectionHeader(title = stringResource(R.string.player_controls))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { playerButtonsSheetOpen = true }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                                Text(
+                                    text = stringResource(R.string.notification_and_car_controls),
+                                    style = EncoreTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        color = EncoreColors.TextPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = stringResource(R.string.notification_and_car_controls_desc),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
+                            Icon(
+                                painter = painterResource(R.drawable.encore_icon_chevron_right_24),
+                                contentDescription = null,
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        SettingsToggleRow(
+                            title = stringResource(R.string.enable_android_auto),
+                            subtitle = stringResource(R.string.enable_android_auto_desc),
+                            isChecked = playerButtonsConfig.andAutoEnabled,
+                            enabled = true,
+                            onCheckedChange = { enabled ->
+                                val updated = playerButtonsConfig.copy(andAutoEnabled = enabled)
+                                playerButtonsConfig = updated
+                                PlayerButtonsStore.save(context, updated)
+                                val intent = Intent().setClassName(context.packageName, "com.quackify.app.PlaybackService")
+                                    .setAction("com.quackify.app.REFRESH")
+                                runCatching { context.startService(intent) }
+                            }
+                        )
+
+                        if (playerButtonsSheetOpen) {
+                            PlayerButtonsConfigSheet(
+                                initialConfig = playerButtonsConfig,
+                                onSave = { updated ->
+                                    playerButtonsConfig = updated
+                                    PlayerButtonsStore.save(context, updated)
+                                    val intent = Intent().setClassName(context.packageName, "com.quackify.app.PlaybackService")
+                                        .setAction("com.quackify.app.REFRESH")
+                                    runCatching { context.startService(intent) }
+                                },
+                                onDismiss = { playerButtonsSheetOpen = false }
+                            )
+                        }
+                    }
+
                     item {
                         SettingsSectionHeader(title = stringResource(R.string.app_icon))
                         Text(
