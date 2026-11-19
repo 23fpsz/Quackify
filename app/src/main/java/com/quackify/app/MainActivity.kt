@@ -210,6 +210,7 @@ class MainActivity : ComponentActivity() {
     private var searchHits by mutableStateOf<List<SearchHit>>(emptyList())
     private val searchSavedOverrides = mutableStateMapOf<String, Boolean>()
     private var recentsSyncedAccount by mutableStateOf<String?>(null)
+    private var recentsSyncedAt = 0L
     private var submittedSearchQuery by mutableStateOf<String?>(null)
     private var showDetail by mutableStateOf<ShowDetail?>(null)
     private var episodeDetail by mutableStateOf<EpisodeDetail?>(null)
@@ -954,11 +955,19 @@ class MainActivity : ComponentActivity() {
                                     searchData = current.withSaved(saved)
                                 }
                             }
+                            if (results != null) {
+                                delay(RECENT_SEARCH_SETTLE_MS)
+                                if (searchTerm.trim() == term) {
+                                    Search.saveRecent(context, listOf(Search.searchUriOf(term)))
+                                }
+                            }
                         }
 
-                        LaunchedEffect(searchTerm, offlineNow, loggedIn, activeAccountId) {
+                        LaunchedEffect(searchTerm, offlineNow, loggedIn, activeAccountId, resumeSignal) {
                             if (searchTerm.isNotBlank() || offlineNow || !loggedIn) return@LaunchedEffect
-                            if (recentsSyncedAccount == activeAccountId) return@LaunchedEffect
+                            if (recentsSyncedAccount == activeAccountId &&
+                                System.currentTimeMillis() - recentsSyncedAt < RECENTS_SYNC_THROTTLE_MS
+                            ) return@LaunchedEffect
                             var remote = Search.recent(context)
                             var attempts = 0
                             while (remote.isEmpty() && attempts < 2) {
@@ -967,6 +976,7 @@ class MainActivity : ComponentActivity() {
                                 remote = Search.recent(context)
                             }
                             recentsSyncedAccount = activeAccountId
+                            recentsSyncedAt = System.currentTimeMillis()
                             if (remote.isNotEmpty()) {
                                 RecentSearches.merge(context, remote)
                                 log.i("reconciled ${remote.size} recent searches with the account")
@@ -1270,6 +1280,14 @@ class MainActivity : ComponentActivity() {
             ),
             System.currentTimeMillis(),
         )
+    }
+
+    private fun serverRecentUri(uri: String, title: String): String? = when {
+        uri.startsWith("spotify:search:") ->
+            Search.searchUriOf(Search.queryOfSearchUri(uri).ifBlank { title })
+        uri.startsWith("spotify:") -> uri
+        title.isNotBlank() -> Search.searchUriOf(title)
+        else -> null
     }
 
     private suspend fun runSearch(term: String): Pair<com.quackify.backend.model.SearchResults?, List<SearchHit>> {
@@ -1904,7 +1922,8 @@ class MainActivity : ComponentActivity() {
             searchData = searchData,
             onClearRecentSearches = {
                 val uris = RecentSearches.all(context)
-                    .mapNotNull { it.uri.takeIf { uri -> uri.startsWith("spotify:") } }
+                    .mapNotNull { serverRecentUri(it.uri, it.title) }
+                    .distinct()
                 RecentSearches.clear(context)
                 log.i("cleared the recent searches on this device")
                 if (uris.isNotEmpty()) {
@@ -1914,8 +1933,8 @@ class MainActivity : ComponentActivity() {
             onRemoveRecentSearch = { item ->
                 RecentSearches.remove(context, item.uri.ifBlank { item.title })
                 log.i("removed '${item.title}' from the recent searches")
-                if (item.uri.startsWith("spotify:")) {
-                    scope.launch { Search.removeRecent(context, listOf(item.uri)) }
+                serverRecentUri(item.uri, item.title)?.let { uri ->
+                    scope.launch { Search.removeRecent(context, listOf(uri)) }
                 }
             },
             onPromoteRecentSearch = { item ->
@@ -2135,6 +2154,8 @@ class MainActivity : ComponentActivity() {
         const val CLIENT_PREFS = "quackify.client"
         const val RESUME_REFRESH_AFTER_MS = 60_000L
         const val TOKEN_STILL_GOOD_MS = 60_000L
+        const val RECENTS_SYNC_THROTTLE_MS = 5 * 60_000L
+        const val RECENT_SEARCH_SETTLE_MS = 4_000L
     }
 }
 
