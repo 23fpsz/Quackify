@@ -258,6 +258,7 @@ fun EncoreNowPlayingScreen(
     canSeek: Boolean = true,
     connectedDeviceName: String,
     onCollapseClick: () -> Unit,
+    onExpandPlayerClick: () -> Unit = {},
     onPlayPauseClick: () -> Unit,
     onSkipNextClick: () -> Unit,
     onSkipPreviousClick: () -> Unit,
@@ -344,7 +345,11 @@ fun EncoreNowPlayingScreen(
     val appContext = LocalContext.current.applicationContext
     val realLandscape = view.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val onToggleViewLayout: (() -> Unit)? = if (realLandscape) {
-        { PlayerViewOptions.setLandscapeDualView(appContext, !PlayerViewOptions.landscapeDualView) }
+        {
+            val dual = PlayerViewOptions.landscapeDualView
+            PlayerViewOptions.setLandscapeDualView(appContext, !dual)
+            if (dual && docked) onExpandPlayerClick()
+        }
     } else {
         null
     }

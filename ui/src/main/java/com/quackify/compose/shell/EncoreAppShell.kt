@@ -99,9 +99,9 @@ private const val SPLIT_PLAYER_MIN_FRACTION = 0.3f
 private const val SPLIT_PLAYER_MAX_FRACTION = 0.46f
 
 /**
- * Any landscape window wide enough for two columns keeps the now playing
+ * Any landscape window wide enough for two columns can keep the now playing
  * screen docked as a side pane next to the app instead of collapsing it into
- * a mini player.
+ * a mini player; the landscape dual view preference turns that off.
  */
 @Composable
 internal fun isSplitPlayerLayout(): Boolean {
@@ -929,7 +929,8 @@ fun EncoreAppShell(
             onCreatePlaylist = onCreatePlaylist,
             playlistDescription = playlistDetail?.description.orEmpty(),
         )
-        val splitPlayer = isSplitPlayerLayout()
+        val splitPlayer = isSplitPlayerLayout() &&
+            com.quackify.compose.player.PlayerViewOptions.landscapeDualView
         val splitFraction = splitPlayerWidthFraction()
         val splitGap = LocalConfiguration.current.screenWidthDp * SPLIT_PLAYER_GAP_FRACTION
         val contentFraction = if (splitPlayer) 1f - splitFraction - SPLIT_PLAYER_GAP_FRACTION else 1f

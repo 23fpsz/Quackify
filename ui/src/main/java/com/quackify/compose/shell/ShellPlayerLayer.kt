@@ -343,6 +343,7 @@ private fun NowPlayingScreenLayer(
         connectedDevice = env.connectedDevice,
         coverUrl = env.currentCoverUrl,
         onCollapse = { env.setIsPlayerExpanded(false) },
+        onExpandPlayer = { env.setIsPlayerExpanded(true) },
         onPlayPause = env.handlePlayPause,
         onSkipNext = env.handleSkipNext,
         onSkipPrevious = env.handleSkipPrevious,
