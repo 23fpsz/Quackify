@@ -66,6 +66,7 @@
     <string name="save_album">앨범 저장</string>
     <string name="copy_link">링크 복사</string>
     <string name="link_copied">링크 복사됨</string>
+    <string name="version_copied">버전 복사됨</string>
     <string name="track_link">곡 링크</string>
     <string name="liked_songs">좋아요한 곡</string>
     <string name="songs">곡</string>
