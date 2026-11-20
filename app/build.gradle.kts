@@ -39,6 +39,7 @@ android {
         create("standard") {
             dimension = "islandId"
             applicationId = "com.quackify.app"
+            isDefault = true
         }
         create("spotify") {
             dimension = "islandId"

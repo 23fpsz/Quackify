@@ -27,6 +27,8 @@ import com.quackify.backend.core.net.ConnectivityMonitor
 import com.quackify.app.widget.WidgetSync
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.components.resolveRemoteImageUrl
+import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.settings.PlayerButtonAction
 import com.quackify.compose.settings.PlayerButtonsConfig
 import com.quackify.compose.settings.PlayerButtonsStore
@@ -62,14 +64,11 @@ class PlaybackService : MediaBrowserServiceCompat() {
 
     private var watcher: Job? = null
 
-    /** Artwork for the current cover, plus the URL it was decoded from. */
-    private var art: Bitmap? = null
-
-    private var artUrl = ""
-
-    /** Covers that failed to decode once are not retried on every state tick. */
+    /** Artwork for the current track and cover URL. Stored together so stale bitmaps never leak. */
+    private var currentArtTrackUri = ""
+    private var currentArtUrl = ""
+    private var currentArt: Bitmap? = null
     private var artRefused = ""
-
     private var artJob: Job? = null
 
     /** Identity of the last posted notification; position ticks must not repost. */
@@ -324,6 +323,10 @@ class PlaybackService : MediaBrowserServiceCompat() {
         val hasTrack = bridge.state.trackUri.isNotBlank() || bridge.state.title.isNotBlank()
         updatePlaybackState(session, bridge.state, bridge.progressSnapshot, hasTrack)
         setMetadata(session, bridge.state, bridge.progressSnapshot)
+        if (hasTrack) {
+            val cover = bridge.state.coverUrl.ifBlank { bridge.coverUrlFor(bridge.state.trackUri) }
+            maybeLoadArt(bridge.state.trackUri, cover)
+        }
     }
 
     private fun promoteForeground(state: ComposePlaybackState) {
@@ -366,7 +369,7 @@ class PlaybackService : MediaBrowserServiceCompat() {
                 .setTitle(track.title)
                 .setSubtitle(track.artist)
                 .apply {
-                    val img = track.imageUrl?.takeIf { it.isNotBlank() }
+                    val img = resolveRemoteImageUrl(track.imageUrl?.takeIf { it.isNotBlank() })
                     if (img != null) setIconUri(android.net.Uri.parse(img))
                 }
                 .build()
@@ -375,19 +378,45 @@ class PlaybackService : MediaBrowserServiceCompat() {
         session.setQueue(queueItems)
 
         val isEpisode = state.trackUri.startsWith("spotify:episode:") || state.contextUri.startsWith("spotify:show:")
+        val effectiveCover = state.coverUrl.ifBlank { PlaybackHost.bridge?.coverUrlFor(state.trackUri).orEmpty() }
+        val resolvedCover = resolveRemoteImageUrl(effectiveCover).orEmpty()
+        val hasArt = currentArt != null && currentArtTrackUri == state.trackUri && currentArtUrl == resolvedCover
         val identity = "${state.trackUri}|${state.title}|${state.artist}|" +
-            "${state.coverUrl}|${state.isPlaying}|" +
-            "${state.contextLabel}|${art != null}|" +
+            "$resolvedCover|${state.isPlaying}|" +
+            "${state.contextLabel}|$hasArt|" +
             "${state.isLiked}|${state.shuffleMode}|${state.repeatMode}|$isEpisode"
         if (identity == lastIdentity) return
         lastIdentity = identity
         log.i("setMetadata: title='${state.title}' artist='${state.artist}' playing=${state.isPlaying}")
         setMetadata(session, state, progress)
         if (hasTrack) {
-            maybeLoadArt(state.coverUrl)
+            maybeLoadArt(state.trackUri, resolvedCover)
         }
         if (state.isPlaying) {
             promoteForeground(state)
+            if (hasTrack && state.trackUri.isNotBlank()) {
+                runCatching {
+                    PlayHistory.record(
+                        applicationContext,
+                        TrackItem(
+                            title = state.title,
+                            artist = state.artist,
+                            uri = state.trackUri,
+                            imageUrl = state.coverUrl.takeIf { it.isNotBlank() },
+                            artistUri = state.artistUri,
+                            albumUri = state.albumUri,
+                            isExplicit = state.explicit,
+                            durationMs = progress.durationMs,
+                        ),
+                        System.currentTimeMillis(),
+                    )
+                }
+                val ctxUri = state.contextUri
+                if (ctxUri.startsWith("spotify:playlist:")) {
+                    val title = state.contextLabel.ifBlank { "Playlist" }
+                    PlayStats.tallyPlaylist(applicationContext, ctxUri, title)
+                }
+            }
         }
         notify(buildNotification(state))
     }
@@ -511,11 +540,19 @@ class PlaybackService : MediaBrowserServiceCompat() {
         state: ComposePlaybackState,
         progress: PlaybackProgressSnapshot,
     ) {
-        val art = art
         val title = state.title.ifBlank { "Quackify" }
         val artist = state.artist.ifBlank { "Ready to play" }
         val album = state.contextLabel.ifBlank { state.artist }
         val duration = if (progress.durationMs > 0L) progress.durationMs else -1L
+
+        val effectiveCover = state.coverUrl.ifBlank { PlaybackHost.bridge?.coverUrlFor(state.trackUri).orEmpty() }
+        val resolvedCover = resolveRemoteImageUrl(effectiveCover).orEmpty()
+        val matchingArt = if (currentArt != null && currentArtTrackUri == state.trackUri && currentArtUrl == resolvedCover) {
+            currentArt
+        } else {
+            null
+        }
+
         val metadata = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, state.trackUri)
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
@@ -525,54 +562,70 @@ class PlaybackService : MediaBrowserServiceCompat() {
             .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
             .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, album)
             .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
-        if (state.coverUrl.isNotBlank()) {
-            metadata.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, state.coverUrl)
-            metadata.putString(MediaMetadataCompat.METADATA_KEY_ART_URI, state.coverUrl)
-            metadata.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, state.coverUrl)
+        if (resolvedCover.isNotBlank()) {
+            metadata.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, resolvedCover)
+            metadata.putString(MediaMetadataCompat.METADATA_KEY_ART_URI, resolvedCover)
+            metadata.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, resolvedCover)
         }
-        if (art != null) {
-            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, art)
-            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, art)
-            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, art)
+        if (matchingArt != null) {
+            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, matchingArt)
+            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, matchingArt)
+            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, matchingArt)
         }
         session.setMetadata(metadata.build())
     }
 
-    private fun maybeLoadArt(url: String) {
-        if (url.isBlank()) {
-            artUrl = ""
-            art = null
+    private fun maybeLoadArt(trackUri: String, rawUrl: String) {
+        val effective = rawUrl.ifBlank { PlaybackHost.bridge?.coverUrlFor(trackUri).orEmpty() }
+        val target = resolveRemoteImageUrl(effective).orEmpty()
+        if (trackUri.isBlank() || target.isBlank()) {
+            artJob?.cancel()
+            currentArtTrackUri = ""
+            currentArtUrl = ""
+            currentArt = null
+            artRefused = ""
             return
         }
-        if (url == artUrl || url == artRefused) return
-        artUrl = url
-        art = null
+        if (currentArt != null && currentArtTrackUri == trackUri && currentArtUrl == target) return
+        if (currentArtTrackUri == trackUri && currentArtUrl == target && artJob?.isActive == true) return
+        if (target == artRefused) return
+
+        currentArtTrackUri = trackUri
+        currentArtUrl = target
+        currentArt = null
         artJob?.cancel()
         artJob = scope.launch {
-            val bitmap = withContext(Dispatchers.IO) { fetchArt(url) }
+            val bitmap = withContext(Dispatchers.IO) { fetchArt(target) }
             if (finished) return@launch
             if (bitmap == null) {
-                artRefused = url
-                log.w("cover '${url.takeLast(28)}' could not be decoded, the notification stays bare")
+                artRefused = target
+                log.w("cover '${target.takeLast(28)}' could not be decoded, the notification stays bare")
                 return@launch
             }
-            art = bitmap
-            val state = PlaybackHost.bridge?.state ?: return@launch
-            val progress = PlaybackHost.bridge?.progressSnapshot ?: return@launch
+            val currentBridge = PlaybackHost.bridge ?: return@launch
+            val currentState = currentBridge.state
+            val progress = currentBridge.progressSnapshot
+            if (currentState.trackUri != trackUri) {
+                log.i("cover decoded for '${trackUri.takeLast(12)}' but player is now at '${currentState.trackUri.takeLast(12)}', discarding")
+                return@launch
+            }
+            currentArt = bitmap
             val session = session
             if (session != null) {
-                setMetadata(session, state, progress)
+                setMetadata(session, currentState, progress)
             }
             lastIdentity = ""
-            notify(buildNotification(state))
+            notify(buildNotification(currentState))
         }
     }
 
     /** Covers are public CDN images; ~512px is all a notification card wants. */
-    private fun fetchArt(url: String): Bitmap? = runCatching {
-        val connection = URL(url).openConnection() as HttpURLConnection
+    private fun fetchArt(rawUrl: String): Bitmap? = runCatching {
+        val resolved = resolveRemoteImageUrl(rawUrl) ?: return null
+        val connection = URL(resolved).openConnection() as HttpURLConnection
         connection.connectTimeout = 8_000
         connection.readTimeout = 8_000
+        connection.instanceFollowRedirects = true
         try {
             val bytes = connection.inputStream.use { it.readBytes() }
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -610,10 +663,18 @@ class PlaybackService : MediaBrowserServiceCompat() {
                 )
                 .build()
         }
+        val effectiveCover = state.coverUrl.ifBlank { PlaybackHost.bridge?.coverUrlFor(state.trackUri).orEmpty() }
+        val resolvedCover = resolveRemoteImageUrl(effectiveCover).orEmpty()
+        val matchingArt = if (currentArt != null && currentArtTrackUri == state.trackUri && currentArtUrl == resolvedCover) {
+            currentArt
+        } else {
+            null
+        }
+
         builder
             .setContentTitle(state.title.ifBlank { "Unknown track" })
             .setContentText(state.artist.ifBlank { "Unknown artist" })
-            .setLargeIcon(art)
+            .setLargeIcon(matchingArt)
         if (state.contextLabel.isNotBlank()) {
             builder.setSubText(state.contextLabel)
         }
