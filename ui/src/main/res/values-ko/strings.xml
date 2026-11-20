@@ -337,6 +337,7 @@
     <string name="create_a_playlist_with_songs_or_episodes">곡이나 에피소드로 플레이리스트 만들기</string>
     <string name="current_cover">현재 커버</string>
     <string name="custom_order">사용자 지정 순서</string>
+    <string name="default_order">기본</string>
     <string name="dark">어둡게</string>
     <string name="default_option">기본</string>
     <string name="discard">버리기</string>

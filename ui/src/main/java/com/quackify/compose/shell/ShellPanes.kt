@@ -764,9 +764,12 @@ internal fun ShellPlaylistPane(
     onPlaybackOrigin: (PlaybackOrigin?) -> Unit = {}
 ) {
     androidx.compose.runtime.key(activePlaylistUri.ifEmpty { activePlaylistTitle }) {
-        LaunchedEffect(playlistTracks, activePlaylistUri) {
-            if (!playlistTracks.isNullOrEmpty()) {
-                playerListener?.onListRendered(playlistTracks.map { it.uri })
+        var sortedOrder by remember { mutableStateOf<List<TrackItem>>(emptyList()) }
+        val renderedTracks = sortedOrder.ifEmpty { playlistTracks.orEmpty() }
+        // the play queue follows the order the screen renders, sort included
+        LaunchedEffect(renderedTracks, activePlaylistUri) {
+            if (renderedTracks.isNotEmpty()) {
+                playerListener?.onListRendered(renderedTracks.map { it.uri })
             }
         }
         val resolvedPlaylistCover = activePlaylistCoverUrl ?: playlistTracks?.firstOrNull { !it.imageUrl.isNullOrBlank() }?.imageUrl
@@ -787,6 +790,7 @@ internal fun ShellPlaylistPane(
         )
         EncorePlaylistScreen(
             sortKey = activePlaylistUri,
+            onSortedOrderChange = { sortedOrder = it },
             title = playlistDetail?.title?.takeIf { it.isNotBlank() } ?: activePlaylistTitle,
             description = playlistDetail?.description.orEmpty(),
             creator = playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: if (activePlaylistUri.startsWith("spotiduck:local:playlist:") || activePlaylistUri.isEmpty()) userDisplayName else "",
@@ -824,8 +828,7 @@ internal fun ShellPlaylistPane(
                 if (playerListener != null) {
                     if (activePlaylistUri.isNotEmpty() && !isPlaying) {
                         onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
-                        val firstTrack = playlistTracks
-                            ?.firstOrNull { it.uri.startsWith("spotify:track:") }
+                        val firstTrack = renderedTracks.firstOrNull { it.uri.startsWith("spotify:track:") }
                         if (firstTrack != null &&
                             (activePlaylistUri.startsWith("spotify:playlist:") || isCollectionUri(activePlaylistUri))
                         ) {
@@ -845,7 +848,7 @@ internal fun ShellPlaylistPane(
                 onPlaybackOrigin(PlaybackOrigin(ShellScreen.PLAYLIST, activePlaylistTitle))
                 if (playerListener != null) {
                     if (track.uri.isNotEmpty()) {
-                        val index = playlistTracks.orEmpty().indexOfFirst { it.uri == track.uri }
+                        val index = renderedTracks.indexOfFirst { it.uri == track.uri }
                         if (index >= 0 &&
                             (activePlaylistUri.startsWith("spotify:playlist:") || isCollectionUri(activePlaylistUri))
                         ) {

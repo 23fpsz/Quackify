@@ -129,6 +129,7 @@
     <string name="current_cover">Current cover</string>
     <string name="current_device">Current Device</string>
     <string name="custom_order">Custom order</string>
+    <string name="default_order">Default</string>
     <string name="dark">Dark</string>
     <string name="default_option">Default</string>
     <string name="delete_folder">Delete folder</string>

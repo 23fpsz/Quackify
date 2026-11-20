@@ -160,10 +160,57 @@ enum class PlaylistSort(
     val defaultDirection: SortDirection = SortDirection.ASCENDING
 ) {
     CUSTOM(R.string.custom_order, reversible = false, defaultDirection = SortDirection.ASCENDING),
+    DEFAULT(R.string.default_order, reversible = false, defaultDirection = SortDirection.ASCENDING),
     TITLE(R.string.title, reversible = true, defaultDirection = SortDirection.ASCENDING),
     ARTIST(R.string.artist, reversible = true, defaultDirection = SortDirection.ASCENDING),
     ALBUM(R.string.album, reversible = true, defaultDirection = SortDirection.ASCENDING),
     RECENTLY_ADDED(R.string.recently_added, reversible = true, defaultDirection = SortDirection.DESCENDING)
+}
+
+private fun applyPlaylistSort(
+    base: List<TrackItem>,
+    option: PlaylistSort,
+    direction: SortDirection,
+): List<TrackItem> = when (option) {
+    PlaylistSort.TITLE -> {
+        if (direction == SortDirection.ASCENDING) {
+            base.sortedBy { it.title.lowercase() }
+        } else {
+            base.sortedByDescending { it.title.lowercase() }
+        }
+    }
+    PlaylistSort.ARTIST -> {
+        if (direction == SortDirection.ASCENDING) {
+            base.sortedBy { it.artist.lowercase() }
+        } else {
+            base.sortedByDescending { it.artist.lowercase() }
+        }
+    }
+    PlaylistSort.ALBUM -> {
+        if (direction == SortDirection.ASCENDING) {
+            base.sortedBy { it.albumName.lowercase() }
+        } else {
+            base.sortedByDescending { it.albumName.lowercase() }
+        }
+    }
+    PlaylistSort.RECENTLY_ADDED -> {
+        if (base.any { it.addedAt > 0L }) {
+            if (direction == SortDirection.DESCENDING) {
+                base.sortedByDescending { it.addedAt }
+            } else {
+                base.sortedBy { it.addedAt }
+            }
+        } else if (direction == SortDirection.DESCENDING) {
+            base.reversed()
+        } else {
+            base
+        }
+    }
+    // this client adds rows at the top of a playlist, so without stamps the stored order runs newest-first
+    PlaylistSort.DEFAULT -> {
+        if (base.any { it.addedAt > 0L }) base.sortedBy { it.addedAt } else base.reversed()
+    }
+    PlaylistSort.CUSTOM -> base
 }
 
 /**
@@ -224,6 +271,8 @@ fun EncorePlaylistScreen(
     loadFailed: Boolean = false,
     onRetry: () -> Unit = {},
     sortKey: String = "",
+    /** The full sorted order behind the list, search filtering excluded; the host feeds it to the play queue. */
+    onSortedOrderChange: (List<TrackItem>) -> Unit = {},
     contextUri: String = "",
     currentContextUri: String = ""
 ) {
@@ -259,50 +308,19 @@ fun EncorePlaylistScreen(
         mutableStateListOf<TrackItem>().apply { addAll(tracks) }
     }
 
-    val displayedTracks = remember(tracks, currentTracks, searchQuery, sortOption, sortDirection, searchFilters) {
+    val sortedTracks = remember(tracks, currentTracks, sortOption, sortDirection) {
+        applyPlaylistSort(currentTracks.toList(), sortOption, sortDirection)
+    }
+    val displayedTracks = remember(sortedTracks, searchQuery, searchFilters) {
         val query = searchQuery.trim()
-        val base = if (query.isEmpty()) {
-            currentTracks.toList()
+        if (query.isEmpty()) {
+            sortedTracks
         } else {
-            trackSearchEngine.filter(currentTracks, query, trackSearchFields(searchFilters))
+            trackSearchEngine.filter(sortedTracks, query, trackSearchFields(searchFilters))
         }
-        when (sortOption) {
-            PlaylistSort.TITLE -> {
-                if (sortDirection == SortDirection.ASCENDING) {
-                    base.sortedBy { it.title.lowercase() }
-                } else {
-                    base.sortedByDescending { it.title.lowercase() }
-                }
-            }
-            PlaylistSort.ARTIST -> {
-                if (sortDirection == SortDirection.ASCENDING) {
-                    base.sortedBy { it.artist.lowercase() }
-                } else {
-                    base.sortedByDescending { it.artist.lowercase() }
-                }
-            }
-            PlaylistSort.ALBUM -> {
-                if (sortDirection == SortDirection.ASCENDING) {
-                    base.sortedBy { it.albumName.lowercase() }
-                } else {
-                    base.sortedByDescending { it.albumName.lowercase() }
-                }
-            }
-            PlaylistSort.RECENTLY_ADDED -> {
-                if (base.any { it.addedAt > 0L }) {
-                    if (sortDirection == SortDirection.DESCENDING) {
-                        base.sortedByDescending { it.addedAt }
-                    } else {
-                        base.sortedBy { it.addedAt }
-                    }
-                } else if (sortDirection == SortDirection.DESCENDING) {
-                    base.reversed()
-                } else {
-                    base
-                }
-            }
-            PlaylistSort.CUSTOM -> base
-        }
+    }
+    LaunchedEffect(sortedTracks) {
+        onSortedOrderChange(sortedTracks)
     }
 
     val listState = rememberLazyListState()

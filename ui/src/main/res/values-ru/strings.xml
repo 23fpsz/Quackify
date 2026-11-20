@@ -343,6 +343,7 @@
     <string name="create_a_playlist_with_songs_or_episodes">Создайте плейлист с треками или эпизодами</string>
     <string name="current_cover">Текущая обложка</string>
     <string name="custom_order">Свой порядок</string>
+    <string name="default_order">По умолчанию</string>
     <string name="dark">Тёмная</string>
     <string name="default_option">По умолчанию</string>
     <string name="discard">Отменить</string>
