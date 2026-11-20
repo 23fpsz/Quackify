@@ -337,6 +337,7 @@
     <string name="create_a_playlist_with_songs_or_episodes">Erstelle eine Playlist mit Songs oder Folgen</string>
     <string name="current_cover">Aktuelles Cover</string>
     <string name="custom_order">Eigene Reihenfolge</string>
+    <string name="default_order">Standard</string>
     <string name="dark">Dunkel</string>
     <string name="default_option">Standard</string>
     <string name="discard">Verwerfen</string>
