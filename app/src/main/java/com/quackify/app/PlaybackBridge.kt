@@ -490,6 +490,12 @@ class PlaybackBridge(private val context: Context) {
 
     private val decorated = java.util.concurrent.ConcurrentHashMap<String, TrackItem>()
 
+    fun coverUrlFor(uri: String): String =
+        state.coverUrl.takeIf { it.isNotBlank() && state.trackUri == uri }
+            ?: (decorated[uri]?.imageUrl?.takeIf { it.isNotBlank() })
+            ?: (queuedTail.firstOrNull { it.uri == uri }?.imageUrl?.takeIf { it.isNotBlank() })
+            ?: ""
+
     private val undecoratable = java.util.Collections.newSetFromMap(
         java.util.concurrent.ConcurrentHashMap<String, Boolean>()
     )
@@ -899,6 +905,14 @@ class PlaybackBridge(private val context: Context) {
                     isEnhanced = enhancedCached(uri),
                 )
             }
+            val currentDecorated = rows[state.trackUri]
+            if (currentDecorated != null && currentDecorated.imageUrl?.isNotBlank() == true && state.coverUrl.isBlank()) {
+                state = state.copy(
+                    coverUrl = currentDecorated.imageUrl.orEmpty(),
+                    title = state.title.ifBlank { currentDecorated.title },
+                    artist = state.artist.ifBlank { currentDecorated.artists },
+                )
+            }
         }
         val tracks = uris.mapNotNull { uri -> known[uri] ?: clusterRowFor(uri) }
         if (tracks.size != uris.size) {
@@ -1070,17 +1084,38 @@ class PlaybackBridge(private val context: Context) {
                     }
                     val nextUris = if (engineOwns && engineUri != state.trackUri) artistUrisOf(engineUri)
                     else state.artistUris
+                    val sameTrack = !engineOwns || engineUri == state.trackUri
+                    val candidate = if (!sameTrack) {
+                        decorated[engineUri] ?: queuedTail.firstOrNull { it.uri == engineUri }
+                    } else null
+                    if (!sameTrack && (candidate == null || candidate.imageUrl.isNullOrBlank())) {
+                        scheduleDecorate(listOf(engineUri))
+                    }
                     val next = state.copy(
-                        title = if (local && waiting != null) waiting.name else state.title,
-                        artist = if (local && waiting != null) waiting.artists else state.artist,
-                        coverUrl = if (local && waiting != null) waiting.imageUrl else state.coverUrl,
+                        title = when {
+                            local && waiting != null && waiting.name.isNotBlank() -> waiting.name
+                            !sameTrack -> candidate?.title.orEmpty()
+                            else -> state.title
+                        },
+                        artist = when {
+                            local && waiting != null && waiting.artists.isNotBlank() -> waiting.artists
+                            !sameTrack -> candidate?.artist.orEmpty()
+                            else -> state.artist
+                        },
+                        coverUrl = when {
+                            local && waiting != null && waiting.imageUrl.isNotBlank() -> waiting.imageUrl
+                            !sameTrack -> candidate?.imageUrl.orEmpty()
+                            else -> state.coverUrl
+                        },
                         trackUri = if (engineOwns) engineUri else state.trackUri,
-                        artistUri = if (engineOwns && engineUri != state.trackUri) artistUriOf(engineUri)
-                        else state.artistUri,
+                        artistUri = if (engineOwns && engineUri != state.trackUri) {
+                            candidate?.artistUri?.takeIf { it.isNotBlank() } ?: artistUriOf(engineUri)
+                        } else state.artistUri,
                         artistUris = nextUris,
                         artistNames = state.artistNames.takeIf { nextUris == state.artistUris }.orEmpty(),
-                        albumUri = if (engineOwns && engineUri != state.trackUri) albumUriOf(engineUri)
-                        else state.albumUri,
+                        albumUri = if (engineOwns && engineUri != state.trackUri) {
+                            candidate?.albumUri?.takeIf { it.isNotBlank() } ?: albumUriOf(engineUri)
+                        } else state.albumUri,
                         isPlaying = if (engineOwns) playing.playing else state.isPlaying,
                         isBuffering = if (engineOwns) playing.buffering else false,
                     )
@@ -3305,10 +3340,10 @@ class PlaybackBridge(private val context: Context) {
             pendingReasonEnd = "endplay"
             pendingReasonStart = "click"
         }
-        if ((contextUri.isBlank() || contextUri == uri) && collectionContext(uri)) {
+        if ((contextUri.isBlank() || contextUri == uri) && isContainerUri(uri)) {
             val first = runCatching { rowsOf(uri).firstOrNull() }.getOrNull()
             if (!first.isNullOrBlank() && first != uri) {
-                log.i("playTrack '$uri' is a collection, starting at '${first.takeLast(12)}'")
+                log.i("playTrack '$uri' is a container, starting at '${first.takeLast(12)}'")
                 captureChain(uri)
                 playTrack(first, uri, 0)
                 return
@@ -3347,7 +3382,7 @@ class PlaybackBridge(private val context: Context) {
             at >= 0 -> at
             known >= 0 -> known
             hint >= 0 -> hint
-            else -> 0
+            else -> -1
         }
         val uid = TrackUid.get(uri)
         log.i("playTrack '$uri' outside the cluster window, '$context' ctxIdx=$index " +
@@ -3910,7 +3945,9 @@ class PlaybackBridge(private val context: Context) {
         state = state.copy(
             title = cluster.track.title.ifBlank { if (sameTrack) state.title else "" },
             artist = cluster.track.artistName.ifBlank { if (sameTrack) state.artist else "" },
-            coverUrl = cluster.track.imageUrl.ifBlank { if (sameTrack) state.coverUrl else "" },
+            coverUrl = cluster.track.imageUrl
+                .ifBlank { decorated[cluster.track.uri]?.imageUrl.orEmpty() }
+                .ifBlank { if (sameTrack) state.coverUrl else "" },
             trackUri = cluster.track.uri,
             artistUri = cluster.track.artistUri
                 .ifBlank { if (sameTrack) state.artistUri else "" }
@@ -4362,6 +4399,13 @@ class PlaybackBridge(private val context: Context) {
             ?.let { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
     }
 
+    private fun isContainerUri(uri: String): Boolean =
+        collectionContext(uri) ||
+            uri.startsWith("spotify:playlist:") ||
+            uri.startsWith("spotify:album:") ||
+            uri.startsWith("spotify:artist:") ||
+            uri.startsWith("spotify:show:")
+
     private fun collectionContext(uri: String): Boolean =
         uri.startsWith("spotify:collection:") ||
             (uri.startsWith("spotify:user:") && uri.endsWith(":collection"))
@@ -4410,6 +4454,14 @@ class PlaybackBridge(private val context: Context) {
                     artistUris = track.artistUris,
                     hasVideo = track.video,
                     isEnhanced = enhancedCached(uri),
+                )
+            }
+            val currentDecorated = rows[state.trackUri]
+            if (currentDecorated != null && currentDecorated.imageUrl?.isNotBlank() == true && state.coverUrl.isBlank()) {
+                state = state.copy(
+                    coverUrl = currentDecorated.imageUrl.orEmpty(),
+                    title = state.title.ifBlank { currentDecorated.title },
+                    artist = state.artist.ifBlank { currentDecorated.artists },
                 )
             }
             log.i("decorated ${rows.size} of ${uris.size} upcoming row(s)")
