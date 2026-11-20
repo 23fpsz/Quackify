@@ -83,10 +83,9 @@ internal fun ShellEntitySheets(
                 )
             },
             onCopyLink = { onCopyEntityLink(entity.uri) },
-            onSleepTimerClick = when {
-                entity.uri.startsWith("spotify:episode:") -> { { flags.isSleepTimerOpen = true } }
-                else -> null
-            },
+            // The sleep timer lives only in the fullscreen player's
+            // three-dot menu, not in every episode's option sheet.
+            onSleepTimerClick = null,
             onAddToQueue = when {
                 entity.uri.startsWith("spotify:episode:") -> {
                     { onQueueAdd(entity.uri) }

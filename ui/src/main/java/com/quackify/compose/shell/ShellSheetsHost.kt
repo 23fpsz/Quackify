@@ -499,7 +499,12 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             local.sleepTimer = if (option == SleepTimerOption.OFF) null else option
             env.playerListener?.onSleepTimer(option)
         },
-        onSleepTimerClick = { flags.isSleepTimerOpen = true },
+        // The sleep timer row only belongs to the fullscreen player's own
+        // three-dot menu; list rows and episode option sheets share this
+        // callback, so it stays null unless the sheet was opened from there.
+        onSleepTimerClick = if (flags.isTrackOptionsFromPlayer) {
+            { flags.isSleepTimerOpen = true }
+        } else null,
         onRemoveTrackFromPlaylist = if (env.currentScreen == ShellScreen.PLAYLIST && active.playlistUri.startsWith("spotify:playlist:") && env.playlistDetail?.editable == true && active.playlistUri.isNotBlank()) {
             {
                 val trackUri = local.trackForOptions?.uri.orEmpty()
