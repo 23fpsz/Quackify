@@ -41,7 +41,6 @@ import kotlinx.coroutines.launch
 import com.quackify.backend.connect.command.AudioFile
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
-import com.quackify.backend.api.AudioFeatures
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.store.AppPrefs
 
@@ -78,6 +77,10 @@ private const val CLIENT_STORE = "quackify.client"
 private const val CROSSFADE_MS_PREF = "crossfadeMs"
 
 private const val AUTOMIX_PREF = "automix"
+
+private const val SPEC_MARGIN_MS = 24_000L
+
+private const val MAX_SPEC_BUDGET_MS = 120_000L
 
 sealed interface PlayerEvent {
     data class Started(val uri: String = "") : PlayerEvent
@@ -165,6 +168,8 @@ class KrespotPlayer(private val context: Context) {
     private var refusedFrom: Long = 0L
 
     private val focus = AudioFocus(context)
+
+    private val automixAnalysis = AutomixAnalysis(context)
 
     private val video = VideoEngine(context, { spclient }, scope) { event ->
         if (videoActive && event !is PlayerEvent.Progress) {
@@ -297,10 +302,12 @@ class KrespotPlayer(private val context: Context) {
         AppPrefs.getBoolean(context, CLIENT_STORE, AUTOMIX_PREF, false)
 
     /**
-     * Plans the DJ transition into [next] when automix is on and both sides
-     * have a beat grid, so the fade the engine holds is already sized in whole
-     * bars with the incoming track's tempo stretch decided. Null leaves the
-     * plain crossfade in charge.
+     * Plans the DJ transition into [next] when automix is on and a beat grid
+     * was measured on the device for the sides of the transition, so the fade
+     * the engine holds is already sized in whole bars with the incoming
+     * track's tempo stretch decided. The analysis runs inside the time the
+     * current track has left; a window that does not finish in it returns
+     * null and the plain crossfade stays in charge.
      */
     private suspend fun automixSpecFor(next: CommandTrack, nextSource: AudioSource): TransitionSpec? {
         if (!automixEnabled()) return null
@@ -308,13 +315,29 @@ class KrespotPlayer(private val context: Context) {
         val currentUri = _state.value.trackUri
         if (!currentUri.startsWith("spotify:track:")) return null
         if (!next.uri.startsWith("spotify:track:")) return null
-        val outGrid = AudioFeatures.grid(context, currentUri) ?: return null
-        val inGrid = AudioFeatures.grid(context, next.uri) ?: return null
+        val currentSource = sourceFor(currentUri) ?: return null
+        val outDurationMs = _state.value.durationMs
+        if (outDurationMs <= 0L) return null
         val nextDurationMs = nextSource.seektable.totalDuration * 1000L / nextSource.seektable.timescale
+        val ticket = queueTicket.get()
+        val stillWanted = {
+            queueTicket.get() == ticket && _state.value.trackUri == currentUri
+        }
+        val remaining = outDurationMs - _state.value.positionMs
+        val budget = (remaining - SPEC_MARGIN_MS).coerceIn(0L, MAX_SPEC_BUDGET_MS)
+        val startedAt = SystemClock.elapsedRealtime()
+        val outGrid = automixAnalysis.tailGrid(currentSource, currentUri, outDurationMs, budget, stillWanted)
+        val inGrid = if (outGrid != null) {
+            val left = (budget - (SystemClock.elapsedRealtime() - startedAt)).coerceAtLeast(0L)
+            automixAnalysis.headGrid(nextSource, next.uri, nextDurationMs, left, stillWanted)
+        } else {
+            null
+        }
+        if (outGrid == null && inGrid == null) return null
         val spec = AutomixPlanner.plan(
             outGrid,
             inGrid,
-            _state.value.durationMs,
+            outDurationMs,
             nextDurationMs,
             AppPrefs.getInt(context, CLIENT_STORE, CROSSFADE_MS_PREF, 0).toLong(),
         )
@@ -898,6 +921,7 @@ class KrespotPlayer(private val context: Context) {
         queuedNextUri = ""
         queuedNextTrack = null
         refused = null
+        automixAnalysis.interrupt()
         stopVideo()
         deepJob?.cancel()
         deepTarget = ""
@@ -915,6 +939,7 @@ class KrespotPlayer(private val context: Context) {
         stop()
         engine?.release()
         engine = null
+        automixAnalysis.release()
         LicenseEndpoint.reset()
     }
 
