@@ -1161,9 +1161,11 @@ class MainActivity : ComponentActivity() {
         if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
             val saved = Library.setSaved(applicationContext, listOf(trackUri), true)
             log.i("add '$trackTitle' to Liked Songs ok=$saved")
+            if (saved) refreshLoadedPlaylist(choice.uri)
         } else {
             val added = Krespot.playlists.addTrack(applicationContext, choice.uri, trackUri)
             log.i("add '$trackTitle' to '${choice.name}' ok=$added")
+            if (added) refreshLoadedPlaylist(choice.uri)
         }
     }
 
@@ -1177,9 +1179,11 @@ class MainActivity : ComponentActivity() {
             val host = PlaybackHost.bridge
             if (trackUri == host?.state?.trackUri && host.state.isLiked != shouldAdd) {
                 host.listener.onLikeToggle()
+                refreshLoadedPlaylist(choice.uri)
             } else {
                 val saved = Library.setSaved(applicationContext, listOf(trackUri), shouldAdd)
                 log.i("${if (shouldAdd) "add" else "remove"} '$trackTitle' to/from Liked Songs ok=$saved")
+                if (saved) refreshLoadedPlaylist(choice.uri)
             }
         } else {
             val res = if (shouldAdd) {
@@ -1188,7 +1192,17 @@ class MainActivity : ComponentActivity() {
                 Krespot.playlists.removeTrack(applicationContext, choice.uri, trackUri)
             }
             log.i("${if (shouldAdd) "add" else "remove"} '$trackTitle' to/from '${choice.name}' ok=$res")
+            if (res) refreshLoadedPlaylist(choice.uri)
         }
+    }
+
+    internal fun refreshLoadedPlaylist(uri: String) {
+        if (uri != playlistUri) return
+        playlistDetail = null
+        playlistTracks = null
+        playlistHasMore = false
+        playlistLoading = true
+        playlistFetch++
     }
 
     internal suspend fun createPlaylistWithTrack(trackUri: String) {
