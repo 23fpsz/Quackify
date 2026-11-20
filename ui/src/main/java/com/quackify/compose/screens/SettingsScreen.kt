@@ -45,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import android.app.Activity
 import android.content.Context
@@ -67,6 +68,7 @@ import androidx.core.content.pm.PackageInfoCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import android.widget.Toast
 import kotlin.math.roundToInt
 import com.quackify.compose.R
@@ -83,6 +85,7 @@ import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MAX
 import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MIN
 import com.quackify.compose.player.TRANSLATION_DEVICE_LANGUAGE
 import com.quackify.compose.sheets.AppLanguageSheet
+import com.quackify.compose.sheets.EncoreCreateNameDialog
 import com.quackify.compose.sheets.LyricsProviderSheet
 import com.quackify.compose.sheets.PlayerButtonsConfigSheet
 import com.quackify.compose.sheets.TranslationLanguageSheet
@@ -93,6 +96,7 @@ import java.util.Locale
 import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.theme.rememberBottomPadding
 import androidx.compose.ui.res.stringResource
+import org.json.JSONObject
 
 data class AppUpdate(
     val version: String,
@@ -137,6 +141,7 @@ fun SettingsScreen(
     onCheckUpdates: () -> Unit = {},
     onAppIconChange: (String) -> Unit = {},
     onOpenLogcat: () -> Unit = {},
+    onSpDcSignedIn: () -> Unit = {},
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
@@ -220,6 +225,8 @@ fun SettingsScreen(
     var playerButtonsConfig by remember { mutableStateOf(PlayerButtonsStore.load(context)) }
     var playerButtonsSheetOpen by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf<Int?>(null) }
+    var spDcDialogOpen by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val disableDebug = {
         debugUnlocked = false
         debugLogging = false
@@ -895,11 +902,70 @@ fun SettingsScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(EncoreColors.Card)
+                                .clickable { spDcDialogOpen = true }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.sign_in_with_sp_dc),
+                                    style = EncoreTheme.typography.bodyMediumBold
+                                )
+                                Text(
+                                    text = stringResource(R.string.sign_in_with_sp_dc_subtitle),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
+                            Icon(
+                                painter = painterResource(R.drawable.encore_icon_chevron_right_24),
+                                contentDescription = null,
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
         }
     }
+
+    EncoreCreateNameDialog(
+        isOpen = spDcDialogOpen,
+        title = stringResource(R.string.sign_in_with_sp_dc),
+        initialName = "",
+        confirmLabel = stringResource(R.string.sign_in),
+        onConfirm = { value ->
+            spDcDialogOpen = false
+            val spDc = value.trim().removePrefix("sp_dc=").substringBefore(";").trim()
+            if (spDc.isNotBlank()) {
+                scope.launch {
+                    val token = EncoreAuth.fetchToken(context, spDc)
+                    val account = token?.let { EncoreAuth.fetchAccount(it) }
+                    if (account != null) {
+                        val cookies = JSONObject()
+                            .put("https://open.spotify.com", "sp_dc=$spDc")
+                            .toString()
+                        EncoreAuth.saveLogin(context, cookies, account)
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.sp_dc_signed_in, account.name),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        onSpDcSignedIn()
+                    } else {
+                        Toast.makeText(context, R.string.sp_dc_rejected, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        },
+        onDismiss = { spDcDialogOpen = false }
+    )
 }
 
 private const val GITHUB_URL = "https://github.com/23fpsz/Quackify"

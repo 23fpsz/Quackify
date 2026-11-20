@@ -196,6 +196,7 @@ fun EncoreAppShell(
     searchSavedOverrides: Map<String, Boolean> = emptyMap(),
     homeLoading: Boolean = false,
     onLogout: (() -> Unit)? = null,
+    onSpDcSignedIn: (() -> Unit)? = null,
     settingsSwitches: SettingsSwitches = SettingsSwitches(),
     settingsLocks: SettingsLocks = SettingsLocks(),
     settingsProduct: String = "",
@@ -1071,6 +1072,7 @@ fun EncoreAppShell(
                         updateVersion = updateVersion,
                         onCheckUpdates = onCheckUpdates,
                         onLogout = onLogout,
+                        onSpDcSignedIn = onSpDcSignedIn,
                     )
     
                     ShellScreen.NOTIFICATIONS -> ShellNotificationsRoute(

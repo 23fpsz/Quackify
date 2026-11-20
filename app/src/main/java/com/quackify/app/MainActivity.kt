@@ -2169,6 +2169,11 @@ class MainActivity : ComponentActivity() {
                     (context as? Activity)?.recreate()
                 }
             },
+            onSpDcSignedIn = {
+                log.i("sp_dc sign-in finished, recreating")
+                finishLogin()
+                (context as? Activity)?.recreate()
+            },
             savedAccounts = savedAccountsList,
             activeAccountId = activeAccountId,
             onSwitchAccount = { id ->

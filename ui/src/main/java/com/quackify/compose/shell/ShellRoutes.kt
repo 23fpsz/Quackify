@@ -519,6 +519,7 @@ internal fun ShellSettingsRoute(
     updateVersion: String?,
     onCheckUpdates: (() -> Unit)?,
     onLogout: (() -> Unit)?,
+    onSpDcSignedIn: (() -> Unit)? = null,
 ) {
     ShellSettingsPane(
         onBackClick = env.handleBack,
@@ -531,6 +532,7 @@ internal fun ShellSettingsRoute(
         onToggleSetting = onToggleSetting,
         onAppIconChange = { onAppIconChange?.invoke(it) },
         onOpenLogcat = env.handleOpenLogcat,
+        onSpDcSignedIn = { onSpDcSignedIn?.invoke() },
         updateChecking = updateChecking,
         updateChecked = updateChecked,
         updateError = updateError,
