@@ -120,3 +120,21 @@ data class EpisodeComments(
     val nextToken: String,
     val comments: List<EpisodeComment>,
 )
+
+data class EpisodeCommentReply(
+    val uri: String,
+    val authorName: String,
+    val authorUri: String,
+    val avatarUrl: String,
+    val text: String,
+    val createdAtIso: String,
+    val reactionCount: Int,
+    val topReaction: String,
+)
+
+data class EpisodeCommentReplies(
+    val commentUri: String,
+    val total: Int,
+    val nextToken: String,
+    val replies: List<EpisodeCommentReply>,
+)

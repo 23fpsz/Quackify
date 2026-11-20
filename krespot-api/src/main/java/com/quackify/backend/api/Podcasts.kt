@@ -42,6 +42,7 @@ object Podcasts {
     private const val OP_RELATED_SHOWS = "internalLinkRecommenderShow"
     private const val OP_EPISODE_COMMENTS = "getCommentsForEntity"
     private const val OP_ADD_EPISODE_COMMENT = "addComment"
+    private const val OP_COMMENT_REPLIES = "getReplies"
     private const val PAGE = 50
 
     suspend fun show(context: Context, uri: String): ShowDetail? {
@@ -188,6 +189,61 @@ object Podcasts {
             payload?.optBoolean("success", false) == true
         log.i("addEpisodeComment $episodeUri ok=$ok")
         return ok
+    }
+
+    suspend fun commentReplies(
+        context: Context,
+        commentUri: String,
+        pageToken: String? = null,
+    ): EpisodeCommentReplies? {
+        val auth = EncoreAuth.token(context)
+        if (auth.isBlank()) {
+            log.w("commentReplies: no token")
+            return null
+        }
+        val variables = JSONObject()
+            .put("commentUri", commentUri)
+            .put("pageToken", pageToken ?: JSONObject.NULL)
+            .toString()
+        val page = Pathfinder.queryPost(context, auth, OP_COMMENT_REPLIES, variables)
+            ?.optJSONObject("data")
+            ?.optJSONArray("commentReplies")
+            ?.optJSONObject(0)
+            ?: run {
+                log.w("commentReplies: no page for $commentUri")
+                return null
+            }
+        val raw = page.optJSONArray("items") ?: JSONArray()
+        val rows = (0 until raw.length()).mapNotNull { index -> reply(raw.optJSONObject(index)) }
+        val replies = EpisodeCommentReplies(
+            commentUri = commentUri,
+            total = page.optInt("totalCount", rows.size),
+            nextToken = page.optString("nextPageToken").orEmpty(),
+            replies = rows,
+        )
+        log.i("commentReplies $commentUri ${replies.replies.size}/${replies.total} " +
+                "next=${replies.nextToken.ifBlank { "none" }}"
+        )
+        return replies
+    }
+
+    private fun reply(node: JSONObject): EpisodeCommentReply? {
+        val uri = node.optString("uri")
+        val text = node.optString("replyString").plainText()
+        if (uri.isBlank() || text.isBlank()) return null
+        val author = node.optJSONObject("author")?.optJSONObject("data")
+        val reactions = node.optJSONObject("reactionsMetadata")
+        val top = reactions?.optJSONArray("topReactionUnicode")
+        return EpisodeCommentReply(
+            uri = uri,
+            authorName = author?.optString("name").orEmpty().plainText(),
+            authorUri = author?.optString("uri").orEmpty(),
+            avatarUrl = GraphQl.userAvatar(author),
+            text = text,
+            createdAtIso = node.optJSONObject("createDate")?.optString("isoString").orEmpty(),
+            reactionCount = reactions?.optInt("numberOfReactions", 0) ?: 0,
+            topReaction = top?.optString(0).orEmpty(),
+        )
     }
 
     private fun comment(node: JSONObject): EpisodeComment? {
