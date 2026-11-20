@@ -188,6 +188,7 @@ internal class CrossfadeEngine(
                 false
             }
             phase == Phase.ARMING -> {
+                log.i("crossfade bailed: the track ended before the blend could start")
                 bail()
                 false
             }
@@ -301,6 +302,7 @@ internal class CrossfadeEngine(
         }
         val gateOn = if (hold.smart) automixOn() else fadeMs() > 0L
         if (!gateOn) {
+            log.i("crossfade dropped: the transition's toggle was turned off")
             held = null
             return
         }
@@ -375,7 +377,10 @@ internal class CrossfadeEngine(
         }
         val expired = SystemClock.elapsedRealtime() > armDeadline
         val ready = into.playbackState == Player.STATE_READY
-        if (expired && !ready) return bail()
+        if (expired && !ready) {
+            log.i("crossfade bailed: '${armed.item.mediaId.takeLast(12)}' never became playable in time")
+            return bail()
+        }
         val atFadePoint = sessionDurationMs() - out.currentPosition <= armed.fadeMs
         if (atFadePoint && ready) startFade()
     }

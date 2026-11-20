@@ -83,7 +83,10 @@ internal class AutomixAnalysis(private val context: Context) {
         stillWanted: () -> Boolean,
     ): TrackGrid? {
         val durationSec = durationMs / 1000.0
-        if (durationSec < MIN_TRACK_SECONDS) return null
+        if (durationSec < MIN_TRACK_SECONDS) {
+            log.i("automix: '${uri.takeLast(12)}' is too short to grid")
+            return null
+        }
         val head = GridCache.get(context, "$uri#head")
         if (head != null && durationSec <= FULL_WINDOW_SECONDS) return head
         return windowGrid(source, uri, durationSec - FULL_WINDOW_SECONDS, "$uri#tail", budgetMs, stillWanted)
@@ -97,7 +100,10 @@ internal class AutomixAnalysis(private val context: Context) {
         stillWanted: () -> Boolean,
     ): TrackGrid? {
         val durationSec = durationMs / 1000.0
-        if (durationSec < MIN_TRACK_SECONDS) return null
+        if (durationSec < MIN_TRACK_SECONDS) {
+            log.i("automix: '${uri.takeLast(12)}' is too short to grid")
+            return null
+        }
         val tail = GridCache.get(context, "$uri#tail")
         if (tail != null && durationSec <= FULL_WINDOW_SECONDS) return tail
         return windowGrid(source, uri, 0.0, "$uri#head", budgetMs, stillWanted)
@@ -126,7 +132,10 @@ internal class AutomixAnalysis(private val context: Context) {
         stillWanted: () -> Boolean,
     ): TrackGrid? {
         GridCache.get(context, cacheKey)?.let { return it }
-        if (budgetMs < MIN_DECODE_BUDGET_MS) return null
+        if (budgetMs < MIN_DECODE_BUDGET_MS) {
+            log.i("automix: only ${budgetMs}ms left to decode '${uri.takeLast(12)}', skipped")
+            return null
+        }
         if (!stillWanted()) return null
         val token = generation.get()
         val startedAt = SystemClock.elapsedRealtime()

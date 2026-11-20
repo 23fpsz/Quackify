@@ -243,12 +243,18 @@ class PlaybackBridge(private val context: Context) {
             val rest = if (sessionQueue.firstOrNull() == ended) sessionQueue.drop(1) else sessionQueue
             rest.firstOrNull { it != ended && !bannedCachedUri(it) }?.let { return commandFor(it, context) }
         }
-        if (shuffleOn(server) && !smartOn(server)) return null
+        if (shuffleOn(server) && !smartOn(server)) {
+            log.i("seamless: shuffle is on, the next pick is not predictable yet")
+            return null
+        }
         val at = rowOf(rows, ended)
         if (at >= 0) {
             var next = at + 1
             while (next in rows.indices && bannedCachedUri(rows[next])) next++
             if (next in rows.indices) return commandFor(rows[next], context)
+            log.i("seamless: '${ended.takeLast(12)}' is the last playable row, nothing pre-queued")
+        } else {
+            log.i("seamless: '${ended.takeLast(12)}' is not in the context rows, nothing pre-queued")
         }
         return null
     }
@@ -292,9 +298,15 @@ class PlaybackBridge(private val context: Context) {
     /** Queues the next track into the live engine so the handoff is seamless. */
     private fun queueGaplessNext(currentUri: String) {
         if (!seamlessEnabled()) return
-        if (sleepEndOfTrackArmed) return
+        if (sleepEndOfTrackArmed) {
+            log.i("seamless: the sleep timer stops at this track, nothing pre-queued")
+            return
+        }
         val next = peekNextTrack(currentUri) ?: return
-        if (!next.uri.startsWith("spotify:track:")) return
+        if (!next.uri.startsWith("spotify:track:")) {
+            log.i("seamless: '${next.uri.takeLast(12)}' is not a track, nothing pre-queued")
+            return
+        }
         if (!player.hasSourceFor(next.uri)) player.prefetch(next.uri, connect.spclientHost)
         player.queueNext(next, connect.spclientHost)
         gaplessQueuedUri = next.uri

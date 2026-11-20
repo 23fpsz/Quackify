@@ -282,14 +282,20 @@ class KrespotPlayer(private val context: Context) {
         val cached = sourceFor(track.uri)
         val ticket = queueTicket.incrementAndGet()
         scope.launch {
-            val source = cached ?: warmSource(track.uri, spclient) ?: return@launch
+            val source = cached ?: warmSource(track.uri, spclient) ?: run {
+                log.w("seamless: '${track.name}' could not be resolved, the pre-queue was dropped")
+                return@launch
+            }
             if (ticket != queueTicket.get()) return@launch
             val still = engine
             if (still !== live || still.currentUri != askedFor || _state.value.trackUri != askedFor) {
                 return@launch
             }
             val spec = automixSpecFor(track, source)
-            if (!still.queueNext(track.uri, source, askedFor, file?.gainDb ?: 0.0, spec)) return@launch
+            if (!still.queueNext(track.uri, source, askedFor, file?.gainDb ?: 0.0, spec)) {
+                log.i("seamless: the engine left '${askedFor.takeLast(12)}' before '${track.name}' landed")
+                return@launch
+            }
             SongCache.touch(track.uri, context)
             queuedNextUri = track.uri
             queuedNextTrack = track
@@ -310,14 +316,32 @@ class KrespotPlayer(private val context: Context) {
      * null and the plain crossfade stays in charge.
      */
     private suspend fun automixSpecFor(next: CommandTrack, nextSource: AudioSource): TransitionSpec? {
-        if (!automixEnabled()) return null
-        if (AutomixPlanner.unmixable(next.name)) return null
+        if (!automixEnabled()) {
+            log.i("automix declined: the toggle is off")
+            return null
+        }
+        if (AutomixPlanner.unmixable(next.name)) {
+            log.i("automix declined: '${next.name}' is spoken word or live")
+            return null
+        }
         val currentUri = _state.value.trackUri
-        if (!currentUri.startsWith("spotify:track:")) return null
-        if (!next.uri.startsWith("spotify:track:")) return null
-        val currentSource = sourceFor(currentUri) ?: return null
+        if (!currentUri.startsWith("spotify:track:")) {
+            log.i("automix declined: the playing item is not a track")
+            return null
+        }
+        if (!next.uri.startsWith("spotify:track:")) {
+            log.i("automix declined: '${next.name}' is not a track")
+            return null
+        }
+        val currentSource = sourceFor(currentUri) ?: run {
+            log.i("automix declined: no resolved source for the playing track")
+            return null
+        }
         val outDurationMs = _state.value.durationMs
-        if (outDurationMs <= 0L) return null
+        if (outDurationMs <= 0L) {
+            log.i("automix declined: the playing duration is unknown")
+            return null
+        }
         val nextDurationMs = nextSource.seektable.totalDuration * 1000L / nextSource.seektable.timescale
         val ticket = queueTicket.get()
         val stillWanted = {
