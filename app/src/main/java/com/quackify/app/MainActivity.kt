@@ -130,128 +130,128 @@ private val log = Logs.of(Logs.Module.MAIN)
 class MainActivity : ComponentActivity() {
 
     internal var canvasResolution by mutableStateOf(1080)
-    private val clientPrefs by lazy {
+    internal val clientPrefs by lazy {
         com.quackify.backend.core.store.AppPrefs.prefs(applicationContext, CLIENT_PREFS)
     }
     private var resumeSignal by mutableStateOf(0)
-    private var pendingLink by mutableStateOf<SpotLink?>(null)
-    private var videoFullscreen by mutableStateOf(false)
-    private var videoAutoExitSignal by mutableStateOf(0)
+    internal var pendingLink by mutableStateOf<SpotLink?>(null)
+    internal var videoFullscreen by mutableStateOf(false)
+    internal var videoAutoExitSignal by mutableStateOf(0)
 
     /** Bumped every time the playback notification's body is tapped; the
      * shell watches it and slides the Now Playing view over whatever is
      * on screen. */
-    private var openPlayerSignal by mutableStateOf(0)
+    internal var openPlayerSignal by mutableStateOf(0)
     private var pausedAt = 0L
     private var sawStop = false
 
-    private var homeGreeting by mutableStateOf("")
-    private var homeFacet by mutableStateOf("")
+    internal var homeGreeting by mutableStateOf("")
+    internal var homeFacet by mutableStateOf("")
     internal var loading by mutableStateOf(true)
     internal var playHistory by mutableStateOf<List<PlayedTrack>>(emptyList())
     internal var playStats by mutableStateOf(PlayStatsSnapshot())
-    private var searchTerm by mutableStateOf("")
-    private var searchLoading by mutableStateOf(false)
-    private var searchFailed by mutableStateOf(false)
-    private var searchFetch by mutableStateOf(0)
-    private var searchDataFor by mutableStateOf("")
-    private var showUri by mutableStateOf("")
-    private var showLoading by mutableStateOf(false)
-    private var showFetch by mutableStateOf(0)
-    private var episodeUri by mutableStateOf("")
-    private var episodeLoading by mutableStateOf(false)
-    private var episodeFetch by mutableStateOf(0)
-    private var browseUri by mutableStateOf("")
-    private var categoryUri by mutableStateOf("")
-    private var folderUri by mutableStateOf("")
-    private var folderFetch by mutableStateOf(0)
-    private var settingsSwitches by mutableStateOf(SettingsSwitches())
-    private var settingsLocks by mutableStateOf(SettingsLocks())
-    private var settingsProduct by mutableStateOf("")
-    private var settingsCountry by mutableStateOf("")
-    private var settingsLoading by mutableStateOf(false)
-    private var whatsNewLoading by mutableStateOf(false)
-    private var whatsNewFailed by mutableStateOf(false)
-    private var whatsNewFetch by mutableStateOf(0)
-    private var browseFetch by mutableStateOf(0)
-    private var savedAccountsList by mutableStateOf<List<EncoreAuth.Account>>(emptyList())
-    private var addingAccount by mutableStateOf(false)
-    private var userProfileColorHex by mutableStateOf("")
-    private var profileLoading by mutableStateOf(false)
-    private var profileFailed by mutableStateOf(false)
-    private var profileFetch by mutableStateOf(0)
-    private var profileUserId by mutableStateOf("")
-    private var profileFollowLoading by mutableStateOf(false)
-    private var profileFollowFetch by mutableStateOf(0)
-    private var playlistUri by mutableStateOf("")
-    private var playlistLoading by mutableStateOf(false)
-    private var playlistHasMore by mutableStateOf(false)
-    private var playlistLoadingMore by mutableStateOf(false)
-    private var playlistFetch by mutableStateOf(0)
-    private var recommendationsLoading by mutableStateOf(false)
-    private var recommendationsNonce by mutableStateOf(0)
-    private var playlistCanRemoveCover by mutableStateOf(false)
-    private var albumUri by mutableStateOf("")
-    private var albumLoading by mutableStateOf(false)
-    private var albumFailed by mutableStateOf(false)
-    private var albumRetry by mutableStateOf(0)
-    private var albumHasMore by mutableStateOf(false)
-    private var albumLoadingMore by mutableStateOf(false)
-    private var artistUri by mutableStateOf("")
-    private var artistLoading by mutableStateOf(false)
-    private var artistFailed by mutableStateOf(false)
-    private var artistRetry by mutableStateOf(0)
-    private var addTracksLoading by mutableStateOf(false)
-    private var addTracksFetch by mutableStateOf(0)
+    internal var searchTerm by mutableStateOf("")
+    internal var searchLoading by mutableStateOf(false)
+    internal var searchFailed by mutableStateOf(false)
+    internal var searchFetch by mutableStateOf(0)
+    internal var searchDataFor by mutableStateOf("")
+    internal var showUri by mutableStateOf("")
+    internal var showLoading by mutableStateOf(false)
+    internal var showFetch by mutableStateOf(0)
+    internal var episodeUri by mutableStateOf("")
+    internal var episodeLoading by mutableStateOf(false)
+    internal var episodeFetch by mutableStateOf(0)
+    internal var browseUri by mutableStateOf("")
+    internal var categoryUri by mutableStateOf("")
+    internal var folderUri by mutableStateOf("")
+    internal var folderFetch by mutableStateOf(0)
+    internal var settingsSwitches by mutableStateOf(SettingsSwitches())
+    internal var settingsLocks by mutableStateOf(SettingsLocks())
+    internal var settingsProduct by mutableStateOf("")
+    internal var settingsCountry by mutableStateOf("")
+    internal var settingsLoading by mutableStateOf(false)
+    internal var whatsNewLoading by mutableStateOf(false)
+    internal var whatsNewFailed by mutableStateOf(false)
+    internal var whatsNewFetch by mutableStateOf(0)
+    internal var browseFetch by mutableStateOf(0)
+    internal var savedAccountsList by mutableStateOf<List<EncoreAuth.Account>>(emptyList())
+    internal var addingAccount by mutableStateOf(false)
+    internal var userProfileColorHex by mutableStateOf("")
+    internal var profileLoading by mutableStateOf(false)
+    internal var profileFailed by mutableStateOf(false)
+    internal var profileFetch by mutableStateOf(0)
+    internal var profileUserId by mutableStateOf("")
+    internal var profileFollowLoading by mutableStateOf(false)
+    internal var profileFollowFetch by mutableStateOf(0)
+    internal var playlistUri by mutableStateOf("")
+    internal var playlistLoading by mutableStateOf(false)
+    internal var playlistHasMore by mutableStateOf(false)
+    internal var playlistLoadingMore by mutableStateOf(false)
+    internal var playlistFetch by mutableStateOf(0)
+    internal var recommendationsLoading by mutableStateOf(false)
+    internal var recommendationsNonce by mutableStateOf(0)
+    internal var playlistCanRemoveCover by mutableStateOf(false)
+    internal var albumUri by mutableStateOf("")
+    internal var albumLoading by mutableStateOf(false)
+    internal var albumFailed by mutableStateOf(false)
+    internal var albumRetry by mutableStateOf(0)
+    internal var albumHasMore by mutableStateOf(false)
+    internal var albumLoadingMore by mutableStateOf(false)
+    internal var artistUri by mutableStateOf("")
+    internal var artistLoading by mutableStateOf(false)
+    internal var artistFailed by mutableStateOf(false)
+    internal var artistRetry by mutableStateOf(0)
+    internal var addTracksLoading by mutableStateOf(false)
+    internal var addTracksFetch by mutableStateOf(0)
     private var sawOffline by mutableStateOf(false)
-    private var canvasEnabled by mutableStateOf(true)
+    internal var canvasEnabled by mutableStateOf(true)
 
     internal var feed by mutableStateOf<List<HomeSection>>(emptyList())
-    private var homeChips by mutableStateOf<List<HomeChip>>(emptyList())
-    private var searchData by mutableStateOf<SearchResults?>(null)
-    private var searchHits by mutableStateOf<List<SearchHit>>(emptyList())
-    private val searchSavedOverrides = mutableStateMapOf<String, Boolean>()
+    internal var homeChips by mutableStateOf<List<HomeChip>>(emptyList())
+    internal var searchData by mutableStateOf<SearchResults?>(null)
+    internal var searchHits by mutableStateOf<List<SearchHit>>(emptyList())
+    internal val searchSavedOverrides = mutableStateMapOf<String, Boolean>()
     private var recentsSyncedAccount by mutableStateOf<String?>(null)
     private var recentsSyncedAt = 0L
-    private var submittedSearchQuery by mutableStateOf<String?>(null)
-    private var showDetail by mutableStateOf<ShowDetail?>(null)
-    private var episodeDetail by mutableStateOf<EpisodeDetail?>(null)
-    private var browsePage by mutableStateOf<BrowsePage?>(null)
-    private var browseLoadingMore by mutableStateOf(false)
-    private var categoryShelves by mutableStateOf<List<CategoryShelf>?>(null)
-    private var browseCategories by mutableStateOf<List<BrowseCard>>(emptyList())
+    internal var submittedSearchQuery by mutableStateOf<String?>(null)
+    internal var showDetail by mutableStateOf<ShowDetail?>(null)
+    internal var episodeDetail by mutableStateOf<EpisodeDetail?>(null)
+    internal var browsePage by mutableStateOf<BrowsePage?>(null)
+    internal var browseLoadingMore by mutableStateOf(false)
+    internal var categoryShelves by mutableStateOf<List<CategoryShelf>?>(null)
+    internal var browseCategories by mutableStateOf<List<BrowseCard>>(emptyList())
     internal val homeArtistImages = mutableStateMapOf<String, String>()
     internal val artistCache = mutableMapOf<String, ArtistDetail>()
-    private var folderItems by mutableStateOf<List<LibraryItem>?>(null)
-    private var libraryItems by mutableStateOf<List<LibraryItem>?>(null)
-    private var whatsNew by mutableStateOf<List<EncoreNotification>>(emptyList())
-    private var profileDetail by mutableStateOf<UserProfile?>(null)
-    private var profileTop by mutableStateOf<ProfileTopContent?>(null)
-    private var profileTopUnavailable by mutableStateOf(false)
-    private var profileContexts by mutableStateOf<List<ProfileContextCard>>(emptyList())
-    private var profileFollowers by mutableStateOf<List<ProfileUser>>(emptyList())
-    private var profileFollowing by mutableStateOf<List<ProfileUser>>(emptyList())
-    private var playlistDetail by mutableStateOf<CollectionDetail?>(null)
-    private var playlistTracks by mutableStateOf<List<TrackItem>?>(null)
-    private var playlistRecommendations by mutableStateOf<List<TrackItem>>(emptyList())
-    private var playlistSaved by mutableStateOf<Boolean?>(null)
-    private var playlistEditDraft by mutableStateOf<PlaylistEditDraft?>(null)
-    private var editableUris by mutableStateOf<Set<String>>(emptySet())
-    private var albumDetail by mutableStateOf<AlbumDetail?>(null)
-    private var albumTracks by mutableStateOf<List<TrackItem>?>(null)
-    private var albumSaved by mutableStateOf<Boolean?>(null)
-    private var artistDetail by mutableStateOf<ArtistDetail?>(null)
-    private var trackCredits by mutableStateOf<Credits?>(null)
-    private var addToPlaylistChoices by mutableStateOf<List<PlaylistChoice>?>(null)
-    private var addTracksSongs by mutableStateOf<List<TrackItem>>(emptyList())
-    private var addTracksEpisodes by mutableStateOf<List<TrackItem>>(emptyList())
-    private var addTracksLiked by mutableStateOf<List<TrackItem>>(emptyList())
-    private var addTracksRecent by mutableStateOf<List<TrackItem>>(emptyList())
-    private var artistTracks by mutableStateOf<List<PopularTrack>?>(null)
-    private var artistReleases by mutableStateOf<List<ArtistRelease>?>(null)
-    private var artistListeners by mutableStateOf<String?>(null)
-    private var artistFollowed by mutableStateOf<Boolean?>(null)
-    private var artistBanned by mutableStateOf<Boolean?>(null)
+    internal var folderItems by mutableStateOf<List<LibraryItem>?>(null)
+    internal var libraryItems by mutableStateOf<List<LibraryItem>?>(null)
+    internal var whatsNew by mutableStateOf<List<EncoreNotification>>(emptyList())
+    internal var profileDetail by mutableStateOf<UserProfile?>(null)
+    internal var profileTop by mutableStateOf<ProfileTopContent?>(null)
+    internal var profileTopUnavailable by mutableStateOf(false)
+    internal var profileContexts by mutableStateOf<List<ProfileContextCard>>(emptyList())
+    internal var profileFollowers by mutableStateOf<List<ProfileUser>>(emptyList())
+    internal var profileFollowing by mutableStateOf<List<ProfileUser>>(emptyList())
+    internal var playlistDetail by mutableStateOf<CollectionDetail?>(null)
+    internal var playlistTracks by mutableStateOf<List<TrackItem>?>(null)
+    internal var playlistRecommendations by mutableStateOf<List<TrackItem>>(emptyList())
+    internal var playlistSaved by mutableStateOf<Boolean?>(null)
+    internal var playlistEditDraft by mutableStateOf<PlaylistEditDraft?>(null)
+    internal var editableUris by mutableStateOf<Set<String>>(emptySet())
+    internal var albumDetail by mutableStateOf<AlbumDetail?>(null)
+    internal var albumTracks by mutableStateOf<List<TrackItem>?>(null)
+    internal var albumSaved by mutableStateOf<Boolean?>(null)
+    internal var artistDetail by mutableStateOf<ArtistDetail?>(null)
+    internal var trackCredits by mutableStateOf<Credits?>(null)
+    internal var addToPlaylistChoices by mutableStateOf<List<PlaylistChoice>?>(null)
+    internal var addTracksSongs by mutableStateOf<List<TrackItem>>(emptyList())
+    internal var addTracksEpisodes by mutableStateOf<List<TrackItem>>(emptyList())
+    internal var addTracksLiked by mutableStateOf<List<TrackItem>>(emptyList())
+    internal var addTracksRecent by mutableStateOf<List<TrackItem>>(emptyList())
+    internal var artistTracks by mutableStateOf<List<PopularTrack>?>(null)
+    internal var artistReleases by mutableStateOf<List<ArtistRelease>?>(null)
+    internal var artistListeners by mutableStateOf<String?>(null)
+    internal var artistFollowed by mutableStateOf<Boolean?>(null)
+    internal var artistBanned by mutableStateOf<Boolean?>(null)
     internal var nowPlayingArtist by mutableStateOf<ArtistDetail?>(null)
     internal var nowPlayingArtistFollowed by mutableStateOf<Boolean?>(null)
     internal var nowPlayingLyrics by mutableStateOf<TrackLyrics?>(null)
@@ -1097,14 +1097,14 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    private suspend fun loadMorePlaylistTracks(currentSize: Int): Pair<List<TrackItem>, Boolean>? {
+    internal suspend fun loadMorePlaylistTracks(currentSize: Int): Pair<List<TrackItem>, Boolean>? {
         val page = Krespot.collections.collectionMore(applicationContext, playlistUri, currentSize)
             ?: return null
         log.i("playlist more '$playlistUri' -> ${page.rows.size} rows hasMore=${page.hasMore}")
         return page.rows.map { it.toTrackItem() } to page.hasMore
     }
 
-    private suspend fun loadMoreAlbumTracks(currentSize: Int, coverUrl: String): Pair<List<TrackItem>, Boolean>? {
+    internal suspend fun loadMoreAlbumTracks(currentSize: Int, coverUrl: String): Pair<List<TrackItem>, Boolean>? {
         val page = Krespot.albums.albumMore(
             applicationContext,
             albumUri,
@@ -1116,14 +1116,14 @@ class MainActivity : ComponentActivity() {
         return withSavedStates(applicationContext, rows) to page.hasMore
     }
 
-    private suspend fun addRecommendedToPlaylist(trackUri: String, trackTitle: String): CollectionDetail? {
+    internal suspend fun addRecommendedToPlaylist(trackUri: String, trackTitle: String): CollectionDetail? {
         val ok = Krespot.playlists.addTrack(applicationContext, playlistUri, trackUri)
         log.i("recommend '$trackTitle' into playlist ok=$ok")
         if (!ok) return null
         return Krespot.collections.collection(applicationContext, playlistUri)
     }
 
-    private suspend fun savePlaylistOrderMoves(
+    internal suspend fun savePlaylistOrderMoves(
         before: List<TrackItem>,
         uri: String,
         target: List<String>,
@@ -1151,13 +1151,13 @@ class MainActivity : ComponentActivity() {
         return moved
     }
 
-    private suspend fun fetchCredits(uri: String): Credits? =
+    internal suspend fun fetchCredits(uri: String): Credits? =
         if (uri.isBlank()) null else Krespot.albums.credits(applicationContext, uri)
 
-    private suspend fun fetchEditablePlaylists(trackUri: String): List<PlaylistChoice> =
+    internal suspend fun fetchEditablePlaylists(trackUri: String): List<PlaylistChoice> =
         if (trackUri.isBlank()) emptyList() else Krespot.playlists.editable(applicationContext, trackUri)
 
-    private suspend fun addToPlaylistTarget(choice: PlaylistChoice, trackUri: String, trackTitle: String) {
+    internal suspend fun addToPlaylistTarget(choice: PlaylistChoice, trackUri: String, trackTitle: String) {
         if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
             val saved = Library.setSaved(applicationContext, listOf(trackUri), true)
             log.i("add '$trackTitle' to Liked Songs ok=$saved")
@@ -1167,7 +1167,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun togglePlaylistMembership(
+    internal suspend fun togglePlaylistMembership(
         choice: PlaylistChoice,
         trackUri: String,
         trackTitle: String,
@@ -1191,27 +1191,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun createPlaylistWithTrack(trackUri: String) {
+    internal suspend fun createPlaylistWithTrack(trackUri: String) {
         val name = Krespot.playlists.defaultName(applicationContext)
         val uri = Krespot.playlists.create(applicationContext, name, trackUri)
         log.i("create playlist '$name' ok=${uri != null}")
         if (uri != null) Krespot.library.invalidate()
     }
 
-    private suspend fun setPlaylistSaved(uri: String, saved: Boolean): Boolean {
+    internal suspend fun setPlaylistSaved(uri: String, saved: Boolean): Boolean {
         val ok = Krespot.rootlist.setSaved(applicationContext, uri, saved)
         log.i("playlist '$uri' in library -> $saved ok=$ok")
         if (ok) Krespot.library.invalidate()
         return ok
     }
 
-    private suspend fun removeTrackFromPlaylist(pUri: String, tUri: String): Boolean {
+    internal suspend fun removeTrackFromPlaylist(pUri: String, tUri: String): Boolean {
         val ok = Krespot.playlists.removeTrack(applicationContext, pUri, tUri)
         log.i("remove track '$tUri' from playlist '$pUri' ok=$ok")
         return ok
     }
 
-    private suspend fun removeFromLibrary(uri: String) {
+    internal suspend fun removeFromLibrary(uri: String) {
         val ok = if (uri.startsWith("spotify:playlist:")) {
             Krespot.rootlist.remove(applicationContext, uri)
         } else {
@@ -1220,7 +1220,7 @@ class MainActivity : ComponentActivity() {
         log.i("remove '$uri' from library ok=$ok")
     }
 
-    private suspend fun setLibraryItemPinned(uri: String, pinned: Boolean) {
+    internal suspend fun setLibraryItemPinned(uri: String, pinned: Boolean) {
         val ok = Krespot.library.setPinned(applicationContext, uri, pinned)
         log.i("pin '$uri' -> $pinned ok=$ok")
         if (!ok) {
@@ -1232,17 +1232,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun renameFolder(uri: String, name: String) {
+    internal suspend fun renameFolder(uri: String, name: String) {
         val ok = Krespot.folders.renameFolder(applicationContext, uri, name)
         log.i("rename folder '$uri' -> '$name' ok=$ok")
     }
 
-    private suspend fun deleteFolder(uri: String) {
+    internal suspend fun deleteFolder(uri: String) {
         val ok = Krespot.folders.deleteFolder(applicationContext, uri)
         log.i("delete folder '$uri' ok=$ok")
     }
 
-    private suspend fun moveTrackToFolder(playlistUri: String, targetFolderUri: String): Boolean {
+    internal suspend fun moveTrackToFolder(playlistUri: String, targetFolderUri: String): Boolean {
         val ok = if (targetFolderUri.isBlank()) {
             Krespot.folders.removeFromFolder(applicationContext, playlistUri)
         } else {
@@ -1252,13 +1252,13 @@ class MainActivity : ComponentActivity() {
         return ok
     }
 
-    private suspend fun setArtistFollow(uri: String, follow: Boolean): Boolean {
+    internal suspend fun setArtistFollow(uri: String, follow: Boolean): Boolean {
         val ok = Library.setSaved(applicationContext, listOf(uri), follow)
         log.i("artist follow '$uri' -> $follow ok=$ok")
         return ok
     }
 
-    private suspend fun toggleSearchSaved(uri: String, next: Boolean): Boolean {
+    internal suspend fun toggleSearchSaved(uri: String, next: Boolean): Boolean {
         val ok = Library.setSaved(applicationContext, listOf(uri), next)
         log.i("search heart '$uri' -> $next ok=$ok")
         return ok
@@ -1305,7 +1305,7 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun serverRecentUri(uri: String, title: String): String? = when {
+    internal fun serverRecentUri(uri: String, title: String): String? = when {
         uri.startsWith("spotify:search:") ->
             Search.searchUriOf(Search.queryOfSearchUri(uri).ifBlank { title })
         uri.startsWith("spotify:") -> uri
@@ -1352,7 +1352,7 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private suspend fun buildPlaylistEditDraft(
+    internal suspend fun buildPlaylistEditDraft(
         uri: String,
         loaded: CollectionDetail?,
         canRemoveCover: Boolean,
@@ -1376,7 +1376,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun editPlaylistDetails(
+    internal suspend fun editPlaylistDetails(
         uri: String,
         name: String,
         description: String,
@@ -1395,14 +1395,14 @@ class MainActivity : ComponentActivity() {
         return ok
     }
 
-    private suspend fun applySettingChange(field: String, value: Boolean, accountId: String): Boolean =
+    internal suspend fun applySettingChange(field: String, value: Boolean, accountId: String): Boolean =
         when (field) {
             "showFollows" -> Settings.setPrivacy(applicationContext, accountId, showFollows = !value)
             "showPublishedPlaylists" -> Settings.setPrivacy(applicationContext, accountId, showPublishedPlaylists = !value)
             else -> Settings.setAttribute(applicationContext, field, value)
         }
 
-    private fun switchAccountNow(id: String) {
+    internal fun switchAccountNow(id: String) {
         log.i("switch account tapped id=$id")
         PlaybackHost.reset(applicationContext)
         if (EncoreAuth.switchAccount(applicationContext, id)) {
@@ -1411,7 +1411,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun beginAddAccountFlow(): List<EncoreAuth.Account> {
+    internal suspend fun beginAddAccountFlow(): List<EncoreAuth.Account> {
         // Snapshot the current account first so cancelling the flow can
         // restore it, then empty the WebView cookie jar: the live sp_dc
         // otherwise makes the login page auto-redirect into the player,
@@ -1423,7 +1423,7 @@ class MainActivity : ComponentActivity() {
         return EncoreAuth.savedAccounts(applicationContext)
     }
 
-    private fun forgetAccountAndSwitch(id: String): Boolean =
+    internal fun forgetAccountAndSwitch(id: String): Boolean =
         EncoreAuth.forgetAccount(applicationContext, id)
 
     private fun finishAddAccount() {
@@ -1506,708 +1506,21 @@ class MainActivity : ComponentActivity() {
             loading = loading,
             urls = splashUrls,
         ) {
-            EncoreAppShell(
-                deeplink = pendingLink?.let { ShellDeepLink(it.kind, it.uri, it.query) },
-                onDeeplinkConsumed = { pendingLink = null },
-                onDeeplinkSearch = { q -> if (searchTerm == q) searchFetch++ else searchTerm = q },
-                updateChecking = updates.checking,
-                updateChecked = updates.checked,
-                updateError = updates.error,
-                updateVersion = updates.appUpdate?.version,
-                onCheckUpdates = updates::requestManualCheck,
-                onHomeEntered = updates::onHomeEntered,
-                userDisplayName = account?.name?.takeIf { it.isNotBlank() } ?: "Quackify",
-                userAvatarUrl = account?.imageUrl.orEmpty(),
-                userProfileColorHex = userProfileColorHex,
-            playbackState = bridge.state,
-            progressState = bridge.progress,
-            playerListener = bridge.listener,
-            expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
-            queueEditResult = bridge.queueEditResult,
-                homeQuickAccessItems = home.quick,
-            homeShelves = if (homeFacet.isBlank() && !loading) home.historyShelves + home.shelves else home.shelves,
-            homeChips = homeChips,
-            homeFacet = homeFacet,
-            homeGreeting = homeGreeting,
-            onHomeFacetSelected = { facet -> homeFacet = facet },
-            libraryItems = libraryItems,
-            libraryLoading = libraryItems == null,
-            playlistTracks = playlistTracks,
-            playlistDetail = playlistDetail,
-            playlistLoading = playlistLoading,
-            playlistHasMore = playlistHasMore,
-            playlistLoadingMore = playlistLoadingMore,
-            onLoadMorePlaylistTracks = {
-                val current = playlistTracks
-                if (!playlistLoadingMore && playlistHasMore && current != null) {
-                    scope.launch {
-                        playlistLoadingMore = true
-                        val page = loadMorePlaylistTracks(current.size)
-                        if (page != null) {
-                            playlistTracks = current + page.first
-                            playlistHasMore = page.second
-                        }
-                        playlistLoadingMore = false
-                    }
-                }
-            },
-            playlistRecommendations = playlistRecommendations,
-            recommendationsLoading = recommendationsLoading,
-            onRefreshRecommendations = { recommendationsNonce++ },
-            onAddRecommended = { track ->
-                scope.launch {
-                    val detail = addRecommendedToPlaylist(track.uri, track.title)
-                    if (detail != null) {
-                        playlistDetail = detail
-                        playlistTracks = detail.tracks.map { it.toTrackItem() }
-                    }
-                }
-            },
-            onSavePlaylistOrder = { uri, order ->
-                scope.launch {
-                    val moved = savePlaylistOrderMoves(playlistTracks.orEmpty(), uri, order.map { it.uid })
-                    if (moved > 0) {
-                        val detail = Krespot.collections.collection(context, uri)
-                        playlistDetail = detail
-                        playlistTracks = detail?.tracks?.map { it.toTrackItem() }
-                    }
-                }
-            },
-            albumTracks = albumTracks,
-            albumDetail = albumDetail,
-            albumLoading = albumLoading,
-            albumFailed = albumFailed,
-            albumHasMore = albumHasMore,
-            albumLoadingMore = albumLoadingMore,
-            onLoadMoreAlbumTracks = {
-                val current = albumTracks
-                if (!albumLoadingMore && albumHasMore && current != null) {
-                    scope.launch {
-                        albumLoadingMore = true
-                        val page = loadMoreAlbumTracks(current.size, albumDetail?.imageUrl.orEmpty())
-                        if (page != null) {
-                            albumTracks = current + page.first
-                            albumHasMore = page.second
-                        }
-                        albumLoadingMore = false
-                    }
-                }
-            },
-        onRetryAlbum = { albumRetry++ },
-        nowPlayingArtistBio = nowPlayingArtist?.biography.orEmpty(),
-        nowPlayingMonthlyListeners = nowPlayingArtist?.monthlyListeners
-            ?.takeIf { it > 0L }?.let { formatCount(it) + " monthly listeners" }.orEmpty(),
-        nowPlayingArtistImageUrl = nowPlayingArtist?.imageUrl?.takeIf { it.isNotBlank() },
-        nowPlayingShow = nowPlaying.showDetail,
-        nowPlayingComments = nowPlaying.episodeComments?.comments.orEmpty(),
-        onCommentsRefresh = { episodeCommentsNonce++ },
-        onEpisodeComment = { text ->
-            val uri = PlaybackHost.bridge?.state?.trackUri.orEmpty()
-            if (!uri.startsWith("spotify:episode:")) {
-                false
-            } else {
-                Podcasts.addEpisodeComment(context, uri, text)
-            }
-        },
-        onLoadCommentReplies = { commentUri, pageToken ->
-            Podcasts.commentReplies(context, commentUri, pageToken)
-        },
-        onCommentReaction = { commentUri, emoji ->
-            Podcasts.addCommentReaction(context, commentUri, emoji)
-        },
-        onRemoveCommentReaction = { commentUri ->
-            Podcasts.deleteCommentReaction(context, commentUri)
-        },
-        onLoadCommentReactions = { commentUri ->
-            Podcasts.commentReactions(context, commentUri)
-        },
-        onDeleteComment = { commentUri ->
-            Podcasts.deleteComment(context, commentUri)
-        },
-        nowPlayingArtistFollowed = nowPlayingArtistFollowed,
-        nowPlayingLyrics = remember(nowPlayingLyrics) {
-            val lyrics = nowPlayingLyrics
-            lyrics?.lines?.mapIndexed { index, line ->
-                val timings = lyrics.wordTimings.getOrNull(index)
-                TimeSyncedLyric(
-                    startTimeMs = line.startTimeMs,
-                    text = line.text,
-                    words = timings?.words?.map { word ->
-                        LyricWordSpan(
-                            startMs = word.startMs,
-                            endMs = word.endMs,
-                            text = word.text,
-                            syllables = word.syllables.map { s ->
-                                LyricSyllableSpan(s.startMs, s.endMs, s.startChar, s.endChar)
-                            },
-                        )
-                    }.orEmpty(),
-                    sungUntilMs = timings?.sungUntilMs,
-                    translation = line.translation,
-                )
-            }.orEmpty()
-        },
-        lyricsProviderName = nowPlayingLyrics?.provider.orEmpty(),
-        nowPlayingTranscript = remember(nowPlayingTranscript) {
-            nowPlayingTranscript?.lines?.map { line ->
-                TranscriptLine(
-                    startMs = line.startMs,
-                    text = line.text,
-                    speaker = line.speaker,
-                    words = line.words.map { span ->
-                        TranscriptWordSpan(span.startMs, span.startChar, span.endChar)
-                    },
-                )
-            }.orEmpty()
-        },
-        canvasFilePath = canvasFile,
-        isCanvasAllowed = nowPlaying.canvasAllowed,
-        isCanvasEnabled = canvasEnabled,
-        onCanvasToggle = { on ->
-            canvasEnabled = on
-            clientPrefs.edit().putBoolean("canvasNpvEnabled", on).apply()
-            bridge.setCanvas(on)
-        },
-        canvasResolution = canvasResolution,
-        onCanvasResolution = { height ->
-            canvasResolution = height
-            clientPrefs.edit().putInt("canvasResolution", height).apply()
-        },
-        artistDetail = artistDetail,
-        artistLoading = artistLoading,
-        artistFailed = artistFailed,
-        onRetryArtist = { artistRetry++ },
-        trackCredits = trackCredits,
-        addToPlaylistChoices = addToPlaylistChoices,
-        addTracksSongs = addTracksSongs,
-        addTracksEpisodes = addTracksEpisodes,
-        addTracksLiked = addTracksLiked,
-        addTracksRecent = addTracksRecent,
-        addTracksLoading = addTracksLoading,
-        onAddTracksOpen = { addTracksFetch++ },
-        onAddTrack = { trackUri ->
-            val ok = if (playlistUri == "spotify:collection:tracks") {
-                val host = PlaybackHost.bridge
-                if (trackUri == host?.state?.trackUri && !host.state.isLiked) {
-                    host.listener.onLikeToggle()
-                    true
-                } else {
-                    Library.setSaved(context, listOf(trackUri), true)
-                }
-            } else {
-                Krespot.playlists.addTrack(context, playlistUri, trackUri)
-            }
-            log.i("add '$trackUri' -> '$playlistUri' ok=$ok")
-            ok
-        },
-            onShowCredits = { uri ->
-                trackCredits = null
-                scope.launch {
-                    trackCredits = fetchCredits(uri)
-                }
-            },
-            onAddToPlaylist = { track ->
-                addToPlaylistChoices = null
-                scope.launch {
-                    addToPlaylistChoices = fetchEditablePlaylists(track.uri)
-                }
-            },
-            onPickPlaylist = { choice, track ->
-                scope.launch { addToPlaylistTarget(choice, track.uri, track.title) }
-            },
-            onTogglePlaylist = { choice, track, shouldAdd ->
-                scope.launch {
-                    togglePlaylistMembership(choice, track.uri, track.title, shouldAdd)
-                }
-            },
-            onLoadPlaylistFolder = { trackUri, folderUri ->
-                Krespot.playlists.editable(context, trackUri, folderUri)
-            },
-            onLoadTrackCount = { playlistUri ->
-                Krespot.playlists.trackCount(context, playlistUri)
-            },
-            onCreatePlaylistWith = { track ->
-                scope.launch { createPlaylistWithTrack(track.uri) }
-            },
-            onPlaylistDefaultName = { Krespot.playlists.defaultName(context) },
-            onCreatePlaylist = { name, description, cover ->
-                val uri = Krespot.playlists.create(context, name, "")
-                log.i("create playlist '$name' ok=${uri != null}")
-                if (uri != null) {
-                    val picture = cover?.let { Krespot.playlists.uploadCover(context, uri, it) }
-                    if (description.isNotBlank() || picture != null) {
-                        Krespot.playlists.edit(context, uri, name, description, picture)
-                    }
-                    Krespot.library.invalidate()
-                }
-                uri
-            },
-            playlistSaved = playlistSaved,
-            playlistPermissions = contributors.permissions,
-            contributorsLoading = contributors.loading,
-            contributorBusyIds = contributors.busyIds,
-            onLoadPlaylistContributors = contributors::refresh,
-            onSearchUsers = { term ->
-                Search.section(context, SearchKind.USER, term)
-            },
-            onAddPlaylistContributor = contributors::add,
-            onRemovePlaylistContributor = contributors::removeAsContributor,
-            onRemovePlaylistMember = contributors::removeFromPlaylist,
-            playlistEditDraft = playlistEditDraft,
-            editablePlaylistUris = editableUris,
-            onEditPlaylist = { uri ->
-                playlistEditDraft = null
-                scope.launch {
-                    val loaded = if (uri == playlistUri) playlistDetail else null
-                    playlistEditDraft = buildPlaylistEditDraft(
-                        uri, loaded, playlistCanRemoveCover,
-                    )
-                }
-            },
-            onDismissEditPlaylist = { playlistEditDraft = null },
-            onEditPlaylistDetails = { uri, name, description, cover, clearCover ->
-                val ok = editPlaylistDetails(uri, name, description, cover, clearCover)
-                if (ok) playlistDetail = Krespot.collections.collection(context, uri)
-                ok
-            },
-            onDeletePlaylist = { uri ->
-                val ok = Krespot.playlists.delete(context, uri)
-                log.i("delete playlist '$uri' ok=$ok")
-                if (ok) {
-                    playlistUri = ""
-                    playlistDetail = null
-                    playlistTracks = null
-                    Krespot.library.invalidate()
-                }
-                ok
-            },
-            onTogglePlaylistSaved = { uri, saved ->
-                scope.launch {
-                    if (setPlaylistSaved(uri, saved)) playlistSaved = saved
-                }
-            },
-            onRemoveTrackFromPlaylist = { pUri, tUri ->
-                scope.launch {
-                    val ok = removeTrackFromPlaylist(pUri, tUri)
-                    if (ok && pUri == playlistUri) {
-                        playlistTracks = playlistTracks?.filterNot { it.uri == tUri }
-                    }
-                }
-            },
-            onRemoveLibraryItem = { uri ->
-                scope.launch { removeFromLibrary(uri) }
-            },
-            onSetLibraryItemPinned = { uri, pinned ->
-                scope.launch { setLibraryItemPinned(uri, pinned) }
-            },
-            onCreateFolder = { name ->
-                val uri = Krespot.folders.createFolder(context, name)
-                log.i("create folder '$name' ok=${uri != null}")
-                uri
-            },
-            onRenameFolder = { uri, name ->
-                scope.launch { renameFolder(uri, name) }
-            },
-            onDeleteFolder = { uri ->
-                scope.launch { deleteFolder(uri) }
-            },
-            onMoveToFolder = { playlistUri, targetFolderUri ->
-                scope.launch {
-                    val ok = moveTrackToFolder(playlistUri, targetFolderUri)
-                    if (ok && folderUri.isNotBlank()) {
-                        folderItems = null
-                        folderFetch++
-                    }
-                }
-            },
-            artistTracks = artistTracks,
-            artistReleases = artistReleases,
-            artistMonthlyListeners = artistListeners,
-            artistFollowed = artistFollowed,
-            artistBanned = artistBanned,
-            onArtistUnban = { uri ->
-                scope.launch {
-                    val ok = Collection2.setArtistBanned(context, uri, false)
-                    if (ok && uri == artistUri) artistBanned = false
-                    if (ok) {
-                        ArtistBanStore.invalidate()
-                        com.quackify.compose.bans.ArtistBans.setBanned(uri, false)
-                    }
-                }
-            },
-            onArtistBanChanged = { uri, banned ->
-                if (uri == artistUri) artistBanned = banned
-            },
-            onArtistFollowToggle = { uri, follow ->
-                scope.launch {
-                    val ok = setArtistFollow(uri, follow)
-                    if (!ok) return@launch
-                    if (uri == artistUri) artistFollowed = follow
-                    if (uri == nowPlaying.artistUri) nowPlayingArtistFollowed = follow
-                }
-            },
-            onArtistFollowed = { uri ->
-                val saved = runCatching { Library.saved(context, listOf(uri)) }.getOrNull()
-                saved?.let { if (it.isEmpty()) null else uri in it }
-            },
-            onArtistImage = { uri ->
-                artistCache[uri]?.imageUrl?.takeIf { it.isNotBlank() }
-                    ?: runCatching { Krespot.artists.artist(context, uri) }.getOrNull()
-                        ?.also {
-                            if (artistCache.size >= 24) artistCache.clear()
-                            artistCache[uri] = it
-                        }
-                        ?.imageUrl?.takeIf { it.isNotBlank() }
-            },
-            onShowFollowToggle = { uri, follow ->
-                scope.launch {
-                    val ok = Library.setSaved(applicationContext, listOf(uri), follow)
-                    log.i("show follow '$uri' -> $follow ok=$ok")
-                    if (ok && uri == showUri) showDetail = showDetail?.copy(saved = follow)
-                }
-            },
-            onArtistTrackLikeToggle = { track ->
-                toggleArtistTrackLike(context, scope, track, { artistTracks }) { artistTracks = it }
-            },
-            onAlbumTrackLikeToggle = { track ->
-                toggleAlbumTrackLike(context, scope, track, { albumTracks }) { albumTracks = it }
-            },
-            albumSaved = albumSaved,
-            onAlbumSavedToggle = { uri, saved ->
-                scope.launch {
-                    val ok = Library.setSaved(applicationContext, listOf(uri), saved)
-                    log.i("album save '$uri' -> $saved ok=$ok")
-                    if (ok && uri == albumUri) albumSaved = saved
-                }
-            },
-            onPlaylistTrackLikeToggle = { track ->
-                togglePlaylistTrackLike(
-                    context, scope, playlistUri, track,
-                    getTracks = { playlistTracks }, setTracks = { playlistTracks = it },
-                    getDetail = { playlistDetail }, setDetail = { playlistDetail = it },
-                )
-            },
-            onArtistRadio = { uri ->
-                val radio = Krespot.artists.artistRadio(context, uri)
-                log.i("artist radio '$uri' -> '$radio'")
-                if (radio == null) {
-                    Toast.makeText(
-                        context,
-                        "Couldn't load the radio",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                radio
-            },
-            profile = profileDetail,
-            profileTop = profileTop,
-            profileTopUnavailable = profileTopUnavailable,
-            profileContexts = profileContexts,
-            profileLoading = profileLoading,
-            profileFailed = profileFailed,
-            onLoadProfile = {
-                if (profileUserId.isNotBlank()) {
-                    profileUserId = ""
-                    profileDetail = null
-                    profileTop = null
-                    profileTopUnavailable = false
-                    profileContexts = emptyList()
-                }
-                profileFetch++
-            },
-            onRetryProfile = {
-                profileDetail = null
-                profileTop = null
-                profileTopUnavailable = false
-                profileContexts = emptyList()
-                profileFetch++
-            },
-            onOpenUserProfile = { uri, _ ->
-                if (profileUserId != uri) {
-                    profileUserId = uri
-                    profileDetail = null
-                    profileTop = null
-                    profileTopUnavailable = false
-                    profileContexts = emptyList()
-                }
-                profileFetch++
-            },
-            profileFollowers = profileFollowers,
-            profileFollowing = profileFollowing,
-            profileFollowLoading = profileFollowLoading,
-            onLoadProfileFollows = { profileFollowFetch++ },
-            homeLoading = loading,
-            searchResults = remember(searchHits) {
-                searchHits.map { hit ->
-                    com.quackify.compose.playlist.TrackItem(
-                        title = hit.title,
-                        artist = hit.subtitle,
-                        uri = hit.uri,
-                        imageUrl = hit.imageUrl,
-                    )
-                }
-            },
-            onSearchQueryChange = { query -> searchTerm = query },
-            onSearchSubmit = { query ->
-                RecentSearches.recordQuery(context, query)
-                submittedSearchQuery = query
-                scope.launch { Search.saveRecent(context, listOf(Search.searchUriOf(query))) }
-            },
-            searchSuggestionHits = searchHits,
-            browseCategories = browseCategories,
-            searchSuggestions = remember(searchHits) {
-                searchHits.map { hit ->
-                    TrackItem(
-                        title = hit.title,
-                        artist = hit.subtitle,
-                        uri = hit.uri,
-                        imageUrl = hit.imageUrl,
-                    )
-                }
-            },
-            searchRecent = remember(recents) {
-                recents.map { entry ->
-                    SearchHistoryItem(
-                        title = entry.title,
-                        subtitle = entry.subtitle,
-                        kind = runCatching { SearchKind.valueOf(entry.kind) }
-                            .getOrDefault(SearchKind.QUERY),
-                        colorHex = entry.colorHex,
-                        uri = entry.uri,
-                        imageUrl = entry.imageUrl,
-                    )
-                }
-            },
-            searchLoading = searchLoading,
-            searchFailed = searchFailed,
-            onRetrySearch = { searchFetch++ },
-            searchQuery = searchTerm,
-            searchData = searchData,
-            onClearRecentSearches = {
-                val uris = RecentSearches.all(context)
-                    .mapNotNull { serverRecentUri(it.uri, it.title) }
-                    .distinct()
-                RecentSearches.clear(context)
-                log.i("cleared the recent searches on this device")
-                if (uris.isNotEmpty()) {
-                    scope.launch { Search.removeRecent(context, uris) }
-                }
-            },
-            onRemoveRecentSearch = { item ->
-                RecentSearches.remove(context, item.uri.ifBlank { item.title })
-                log.i("removed '${item.title}' from the recent searches")
-                serverRecentUri(item.uri, item.title)?.let { uri ->
-                    scope.launch { Search.removeRecent(context, listOf(uri)) }
-                }
-            },
-            onPromoteRecentSearch = { item ->
-                RecentSearches.promote(context, item.uri.ifBlank { item.title })
-                log.i("promoted '${item.title}' in the recent searches")
-            },
-            onRecordRecentSearch = { hit ->
-                RecentSearches.record(context, hit)
-                log.i("recorded '${hit.title}' in the recent searches")
-                if (hit.uri.isNotBlank()) {
-                    scope.launch { Search.saveRecent(context, listOf(hit.uri)) }
-                }
-                val submitted = submittedSearchQuery
-                if (submitted != null && searchTerm.trim() == submitted) {
-                    RecentSearches.remove(context, submitted)
-                }
-                submittedSearchQuery = null
-            },
-            onLoadSearchSection = { kind, offset ->
-                Search.section(context, kind, searchTerm, offset)
-            },
-            onToggleSaved = { uri, saved ->
-                scope.launch {
-                    val next = !saved
-                    val ok = toggleSearchSaved(uri, next)
-                    if (ok) {
-                        searchSavedOverrides[uri] = next
-                        searchData = searchData?.withSaved(uri, next)
-                    }
-                }
-            },
-            searchSavedOverrides = searchSavedOverrides.toMap(),
-            browsePage = browsePage,
-            browseLoadingMore = browseLoadingMore,
-            categoryShelves = categoryShelves,
-            videoFullscreen = videoFullscreen,
-            videoAutoExitSignal = videoAutoExitSignal,
-            onToggleVideoFullscreen = { on ->
-                videoFullscreen = on
-                requestedOrientation = if (on) {
-                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                } else {
-                    ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                }
-            },
-            onAppIconChange = { option ->
-                applyLauncherIcon(context, option)
-            },
-            onOpenCategory = { category ->
-                categoryUri = "spotify:genre:" + category.lowercase().replace(" ", "-")
-                categoryShelves = null
-            },
-            showDetail = showDetail,
-            showLoading = showLoading,
-            episodeDetail = episodeDetail,
-            episodeLoading = episodeLoading,
-            onOpenShow = { uri ->
-                showUri = uri
-                showFetch++
-                showDetail = null
-            },
-            onOpenEpisode = { uri ->
-                episodeUri = uri
-                episodeFetch++
-                episodeDetail = null
-            },
-            onOpenBrowse = { uri ->
-                browseUri = uri
-                browseFetch++
-                browsePage = null
-            },
-            onLoadMoreBrowse = {
-                val current = browsePage
-                if (current != null && !browseLoadingMore) {
-                    val next = current.nextOffset
-                    val uri = browseUri
-                    if (next != null && uri.isNotBlank()) {
-                        scope.launch {
-                            browseLoadingMore = true
-                            val more = Browse.page(context, uri, next)
-                            if (more != null && browsePage === current) {
-                                browsePage = current.copy(
-                                    sections = current.sections + more.sections,
-                                    nextOffset = more.nextOffset,
-                                )
-                            }
-                            browseLoadingMore = false
-                        }
-                    }
-                }
-            },
-            folderItems = folderItems,
-            folderLoading = folderItems == null,
-            onOpenFolder = { uri ->
-                folderUri = uri
-                folderFetch++
-                folderItems = null
-            },
-            onLoadPlaylist = { uri ->
-                if (uri != playlistUri) {
-                    playlistUri = uri
-                    playlistDetail = null
-                    playlistTracks = null
-                    playlistHasMore = false
-                    playlistLoading = true
-                    playlistRecommendations = emptyList()
-                    playlistSaved = null
-                }
-            },
-            onRetryPlaylist = {
-                playlistDetail = null
-                playlistTracks = null
-                playlistLoading = true
-                playlistFetch++
-            },
-            onLoadAlbum = { uri, _ -> albumUri = uri },
-            onLoadArtist = { uri, _ -> artistUri = uri },
-            settingsSwitches = settingsSwitches,
-            settingsLocks = settingsLocks,
-            settingsProduct = settingsProduct,
-            settingsCountry = settingsCountry,
-            settingsLoading = settingsLoading,
-            onToggleSetting = { field, value ->
-                val before = settingsSwitches
-                settingsSwitches = when (field) {
-                    "canvasDisabled" -> before.copy(canvas = !value)
-                    "musicVideoDisabled" -> before.copy(musicVideos = !value)
-                    "otherVideoDisabled" -> before.copy(otherVideos = !value)
-                    "showFollows" -> before.copy(showFollows = !value)
-                    "showPublishedPlaylists" -> before.copy(showPlaylists = !value)
-                    else -> before
-                }
-                scope.launch {
-                    val ok = applySettingChange(field, value, account?.id.orEmpty())
-                    log.i("settings $field -> $value ok=$ok")
-                    if (!ok) settingsSwitches = before
-                }
-            },
-            notifications = whatsNew,
-            notificationsLoading = whatsNewLoading,
-            notificationsFailed = whatsNewFailed,
-            onRefreshWhatsNew = { whatsNewFetch++ },
-            activityState = ActivityFeedState(
-                feed = activity.feed,
-                loading = activity.loading,
-                failed = activity.failed,
-                self = activity.self,
-                unread = activity.unread,
-                onOpen = activity::open,
-                onRetry = activity::open,
-                onLeave = activity::leave,
-                onDrawerOpened = activity::refreshUnread,
-            ),
-            historyToday = home.historyToday,
-            historyYesterday = home.historyYesterday,
-            historyEarlier = home.historyEarlier,
-            historyStats = home.historyStats,
-            historyLoading = false,
-            onLogout = {
-                log.i("logout tapped")
-                PlaybackHost.reset(context)
-                EncoreAuth.logout(context)
-                Krespot.library.invalidate()
-                val remaining = EncoreAuth.savedAccounts(context)
-                if (remaining.isNotEmpty()) {
-                    EncoreAuth.switchAccount(context, remaining.last().id)
-                    (context as? Activity)?.recreate()
-                } else {
-                    (context as? Activity)?.recreate()
-                }
-            },
-            onSpDcSignedIn = {
-                log.i("sp_dc sign-in finished, recreating")
-                finishLogin()
-                (context as? Activity)?.recreate()
-            },
-            savedAccounts = savedAccountsList,
-            activeAccountId = activeAccountId,
-            onSwitchAccount = { id ->
-                resetHomeSplash()
-                switchAccountNow(id)
-            },
-            onAddAccount = {
-                log.i("add account tapped")
-                scope.launch {
-                    savedAccountsList = beginAddAccountFlow()
-                    addingAccount = true
-                }
-            },
-            onRemoveAccount = { id ->
-                log.i("remove account tapped id=$id")
-                resetHomeSplash()
-                AccountSignOut.begin(context, id)
-                if (forgetAccountAndSwitch(id)) {
-                    PlaybackHost.reset(context)
-                    val remaining = EncoreAuth.savedAccounts(context)
-                    if (remaining.isNotEmpty()) {
-                        EncoreAuth.switchAccount(context, remaining.last().id)
-                        Krespot.library.invalidate()
-                        recreate()
-                    } else {
-                        EncoreAuth.logout(context)
-                        Krespot.library.invalidate()
-                        onSignedOut()
-                    }
-                } else {
-                    savedAccountsList = EncoreAuth.savedAccounts(context)
-                }
-            }
-        )
+            ShellAppHostSection(
+                bridge = bridge,
+                account = account,
+                context = context,
+                loggedIn = loggedIn,
+                activeAccountId = activeAccountId,
+                onSignedOut = onSignedOut,
+                updates = updates,
+                scope = scope,
+                home = home,
+                nowPlaying = nowPlaying,
+                contributors = contributors,
+                activity = activity,
+                recents = recents,
+            )
         }
         }
 
