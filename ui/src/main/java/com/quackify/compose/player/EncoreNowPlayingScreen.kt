@@ -314,6 +314,8 @@ fun EncoreNowPlayingScreen(
     onCommentReaction: suspend (String, String) -> Boolean = { _, _ -> false },
     onRemoveCommentReaction: suspend (String) -> Boolean = { false },
     onLoadCommentReactions: suspend (String) -> com.quackify.backend.model.EpisodeCommentReactions? = { null },
+    selfUserUri: String = "",
+    onDeleteComment: suspend (String) -> Boolean = { false },
     lyrics: List<TimeSyncedLyric> = emptyList(),
     transcript: List<TranscriptLine> = emptyList(),
     lyricsProviderName: String = "",
@@ -902,7 +904,9 @@ fun EncoreNowPlayingScreen(
                                     onLoadReplies = onLoadCommentReplies,
                                     onReact = onCommentReaction,
                                     onRemoveReaction = onRemoveCommentReaction,
-                                    onLoadReactions = onLoadCommentReactions
+                                    onLoadReactions = onLoadCommentReactions,
+                                    selfUserUri = selfUserUri,
+                                    onDeleteComment = onDeleteComment
                                 )
                             }
 
@@ -1167,7 +1171,9 @@ fun EncoreNowPlayingScreen(
                                                 onLoadReplies = onLoadCommentReplies,
                                                 onReact = onCommentReaction,
                                                 onRemoveReaction = onRemoveCommentReaction,
-                                                onLoadReactions = onLoadCommentReactions
+                                                onLoadReactions = onLoadCommentReactions,
+                                                selfUserUri = selfUserUri,
+                                                onDeleteComment = onDeleteComment
                                             )
                                         }
 
@@ -3555,6 +3561,8 @@ private fun NowPlayingEpisodeCommentsCard(
     onReact: suspend (String, String) -> Boolean,
     onRemoveReaction: suspend (String) -> Boolean,
     onLoadReactions: suspend (String) -> com.quackify.backend.model.EpisodeCommentReactions?,
+    selfUserUri: String,
+    onDeleteComment: suspend (String) -> Boolean,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -3563,6 +3571,7 @@ private fun NowPlayingEpisodeCommentsCard(
     val replyStates = remember { mutableStateMapOf<String, CommentReplyState>() }
     val reactionViews = remember { mutableStateMapOf<String, ReactionViewState>() }
     var reactionPickerFor by remember { mutableStateOf<String?>(null) }
+    var deleteAskFor by remember { mutableStateOf<String?>(null) }
 
     fun toggleReplies(commentUri: String) {
         val current = replyStates[commentUri]
@@ -3635,6 +3644,14 @@ private fun NowPlayingEpisodeCommentsCard(
         }
     }
 
+    fun deleteComment(commentUri: String) {
+        deleteAskFor = null
+        scope.launch {
+            onDeleteComment(commentUri)
+            onRefresh()
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -3676,7 +3693,9 @@ private fun NowPlayingEpisodeCommentsCard(
                         repliesExpanded = replyStates[comment.uri]?.expanded == true,
                         onToggleReplies = { toggleReplies(comment.uri) },
                         onReactClick = { toggleReactionPicker(comment.uri) },
-                        onToggleReactions = { toggleReactionsView(comment.uri) }
+                        onToggleReactions = { toggleReactionsView(comment.uri) },
+                        isOwn = selfUserUri.isNotBlank() && comment.authorUri == selfUserUri,
+                        onDeleteClick = { deleteAskFor = comment.uri }
                     )
                     if (reactionPickerFor == comment.uri) {
                         ReactionPickerRow(
@@ -3706,7 +3725,9 @@ private fun NowPlayingEpisodeCommentsCard(
                                 EpisodeReplyRow(
                                     reply = reply,
                                     onReactClick = { toggleReactionPicker(reply.uri) },
-                                    onToggleReactions = { toggleReactionsView(reply.uri) }
+                                    onToggleReactions = { toggleReactionsView(reply.uri) },
+                                    isOwn = selfUserUri.isNotBlank() && reply.authorUri == selfUserUri,
+                                    onDeleteClick = { deleteAskFor = reply.uri }
                                 )
                                 if (reactionPickerFor == reply.uri) {
                                     ReactionPickerRow(
@@ -3814,6 +3835,15 @@ private fun NowPlayingEpisodeCommentsCard(
             }
         }
     }
+
+    deleteAskFor?.let { uri ->
+        com.quackify.compose.sheets.DeleteConfirmDialog(
+            title = stringResource(R.string.delete_comment_title),
+            message = stringResource(R.string.delete_comment_message),
+            onConfirm = { deleteComment(uri) },
+            onDismiss = { deleteAskFor = null }
+        )
+    }
 }
 
 @Composable
@@ -3823,6 +3853,8 @@ private fun EpisodeCommentRow(
     onToggleReplies: () -> Unit = {},
     onReactClick: () -> Unit = {},
     onToggleReactions: () -> Unit = {},
+    isOwn: Boolean = false,
+    onDeleteClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -3911,6 +3943,16 @@ private fun EpisodeCommentRow(
                         .size(16.dp)
                         .clickable { onReactClick() }
                 )
+                if (isOwn) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_trash_24),
+                        contentDescription = stringResource(R.string.delete_comment_title),
+                        tint = EncoreColors.TextSecondary,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clickable { onDeleteClick() }
+                    )
+                }
             }
         }
     }
@@ -3921,6 +3963,8 @@ private fun EpisodeReplyRow(
     reply: com.quackify.backend.model.EpisodeCommentReply,
     onReactClick: () -> Unit = {},
     onToggleReactions: () -> Unit = {},
+    isOwn: Boolean = false,
+    onDeleteClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -3987,6 +4031,16 @@ private fun EpisodeReplyRow(
                         .size(14.dp)
                         .clickable { onReactClick() }
                 )
+                if (isOwn) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.encore_icon_trash_24),
+                        contentDescription = stringResource(R.string.delete_comment_title),
+                        tint = EncoreColors.TextSecondary,
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clickable { onDeleteClick() }
+                    )
+                }
             }
         }
     }

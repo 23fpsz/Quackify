@@ -46,6 +46,7 @@ object Podcasts {
     private const val OP_ADD_COMMENT_REACTION = "addCommentReaction"
     private const val OP_COMMENT_REACTIONS = "getReactions"
     private const val OP_DELETE_COMMENT_REACTION = "deleteCommentReaction"
+    private const val OP_DELETE_COMMENT = "deleteComment"
     private const val PAGE = 50
 
     suspend fun show(context: Context, uri: String): ShowDetail? {
@@ -318,6 +319,24 @@ object Podcasts {
             ?.optJSONObject("deleteCommentReaction")
         val ok = payload?.optString("__typename").orEmpty() == "SuccessDeleteCommentReaction"
         log.i("deleteCommentReaction $commentUri ok=$ok")
+        return ok
+    }
+
+    suspend fun deleteComment(context: Context, commentUri: String): Boolean {
+        if (!commentUri.startsWith("spotify:comment:")) return false
+        val auth = EncoreAuth.token(context)
+        if (auth.isBlank()) {
+            log.w("deleteComment: no token")
+            return false
+        }
+        val variables = JSONObject()
+            .put("commentUri", commentUri)
+            .toString()
+        val payload = Pathfinder.queryPost(context, auth, OP_DELETE_COMMENT, variables, fallbackToGet = false)
+            ?.optJSONObject("data")
+            ?.optJSONObject("deleteComment")
+        val ok = payload?.optString("__typename").orEmpty() == "SuccessDeleteComment"
+        log.i("deleteComment $commentUri ok=$ok")
         return ok
     }
 

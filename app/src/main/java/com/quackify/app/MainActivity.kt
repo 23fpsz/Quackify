@@ -1603,6 +1603,9 @@ class MainActivity : ComponentActivity() {
         onLoadCommentReactions = { commentUri ->
             Podcasts.commentReactions(context, commentUri)
         },
+        onDeleteComment = { commentUri ->
+            Podcasts.deleteComment(context, commentUri)
+        },
         nowPlayingArtistFollowed = nowPlayingArtistFollowed,
         nowPlayingLyrics = remember(nowPlayingLyrics) {
             val lyrics = nowPlayingLyrics
