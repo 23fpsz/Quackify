@@ -83,6 +83,10 @@ internal fun ShellEntitySheets(
                 )
             },
             onCopyLink = { onCopyEntityLink(entity.uri) },
+            onSleepTimerClick = when {
+                entity.uri.startsWith("spotify:episode:") -> { { flags.isSleepTimerOpen = true } }
+                else -> null
+            },
             onAddToQueue = when {
                 entity.uri.startsWith("spotify:episode:") -> {
                     { onQueueAdd(entity.uri) }

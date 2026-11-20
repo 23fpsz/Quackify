@@ -79,6 +79,7 @@ fun TrackOptionsSheet(
     onToggleTasteExclusion: (Boolean) -> Unit = {},
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onSongRadio: (() -> Unit)? = null,
+    onSleepTimerClick: (() -> Unit)? = null,
     /** Opens the "Save in" picker; null hides the row (non-track entities). */
     onAddToPlaylist: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -273,6 +274,17 @@ fun TrackOptionsSheet(
                     onShowCredits()
                 }
             )
+
+            if (onSleepTimerClick != null) {
+                ContextMenuRowItem(
+                    title = stringResource(R.string.sleep_timer),
+                    iconRes = R.drawable.encore_icon_time_24,
+                    onClick = {
+                        onDismiss()
+                        onSleepTimerClick()
+                    }
+                )
+            }
 
             if (canvasAvailable) {
                 ContextMenuRowItem(

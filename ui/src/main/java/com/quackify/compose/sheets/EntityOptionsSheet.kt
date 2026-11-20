@@ -69,6 +69,7 @@ fun EntityOptionsSheet(
     canDeletePlaylist: Boolean = false,
     onDeletePlaylist: () -> Unit = {},
     onSeeDescription: (() -> Unit)? = null,
+    onSleepTimerClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || entity == null) return
@@ -156,6 +157,17 @@ fun EntityOptionsSheet(
                     onClick = {
                         onDismiss()
                         onSeeDescription()
+                    }
+                )
+            }
+
+            if (isEpisode && onSleepTimerClick != null) {
+                EntityRow(
+                    title = stringResource(R.string.sleep_timer),
+                    iconRes = R.drawable.encore_icon_time_24,
+                    onClick = {
+                        onDismiss()
+                        onSleepTimerClick()
                     }
                 )
             }
