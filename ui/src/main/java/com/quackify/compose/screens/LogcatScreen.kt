@@ -66,6 +66,7 @@ import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.theme.DmMono
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreTheme
+import com.quackify.backend.core.store.AppPrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -95,6 +96,13 @@ private val LEVEL_COLORS = mapOf(
 
 private const val MAX_BUFFER = 12000
 private const val TRIM_TO = 10000
+private const val CLIENT_PREFS = "quackify.client"
+private const val KEY_LOGCAT_EPOCH_MS = "logcatEpochMs"
+
+private fun markLogcatCleared(context: Context) {
+    AppPrefs.edit(context, CLIENT_PREFS)
+        .putLong(KEY_LOGCAT_EPOCH_MS, System.currentTimeMillis()).apply()
+}
 
 @Composable
 fun LogcatScreen(
@@ -119,9 +127,17 @@ fun LogcatScreen(
     }
 
     DisposableEffect(readerGeneration) {
-        val process = ProcessBuilder(
-            listOf("logcat", "-v", "threadtime", "--pid", Process.myPid().toString())
-        ).redirectErrorStream(true).start()
+        val command = mutableListOf(
+            "logcat", "-v", "threadtime", "--pid", Process.myPid().toString()
+        )
+        // Clearing the system buffer needs a permission the app does not hold,
+        // so a cleared log is a timestamp the reader resumes from instead.
+        val clearedAt = AppPrefs.prefs(context, CLIENT_PREFS).getLong(KEY_LOGCAT_EPOCH_MS, 0L)
+        if (clearedAt in 1 until System.currentTimeMillis()) {
+            command.add("-T")
+            command.add(SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US).format(Date(clearedAt)))
+        }
+        val process = ProcessBuilder(command).redirectErrorStream(true).start()
         val scope = CoroutineScope(Dispatchers.IO)
         val job = scope.launch {
             try {
@@ -319,8 +335,12 @@ fun LogcatScreen(
                             )
                         },
                         onClick = {
+                            markLogcatCleared(context)
+                            entries.clear()
                             filter = ""
                             selectedLevels = emptySet()
+                            followTail = true
+                            readerGeneration++
                             resetMenuOpen = false
                         }
                     )

@@ -220,6 +220,17 @@ fun SettingsScreen(
     var playerButtonsConfig by remember { mutableStateOf(PlayerButtonsStore.load(context)) }
     var playerButtonsSheetOpen by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf<Int?>(null) }
+    val disableDebug = {
+        debugUnlocked = false
+        debugLogging = false
+        versionTaps = 0
+        clientPrefs.edit().putBoolean("debugUnlocked", false).apply()
+        clientPrefs.edit().putBoolean("debugLogging", false).apply()
+        Logs.floor = Logs.Level.INFO
+        clientPrefs.edit().putLong("logcatEpochMs", System.currentTimeMillis()).apply()
+        if (category == 3) category = null
+        Toast.makeText(context, R.string.debug_disabled, Toast.LENGTH_SHORT).show()
+    }
     var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
     var translationLanguageSheetOpen by remember { mutableStateOf(false) }
     var appLanguageSheetOpen by remember { mutableStateOf(false) }
@@ -314,7 +325,8 @@ fun SettingsScreen(
                             SettingsCategoryRow(
                                 title = stringResource(R.string.debug),
                                 description = stringResource(R.string.developer_tools_and_diagnostics),
-                                onClick = { category = 3 }
+                                onClick = { category = 3 },
+                                onLongClick = disableDebug
                             )
                         }
                     }
@@ -784,16 +796,7 @@ fun SettingsScreen(
                                     }
                                 },
                                 onLongClick = {
-                                    if (debugUnlocked || debugLogging) {
-                                        debugUnlocked = false
-                                        debugLogging = false
-                                        versionTaps = 0
-                                        clientPrefs.edit().putBoolean("debugUnlocked", false).apply()
-                                        clientPrefs.edit().putBoolean("debugLogging", false).apply()
-                                        Logs.floor = Logs.Level.INFO
-                                        if (category == 3) category = null
-                                        Toast.makeText(context, R.string.debug_disabled, Toast.LENGTH_SHORT).show()
-                                    }
+                                    if (debugUnlocked || debugLogging) disableDebug()
                                 }
                             ),
                         )
@@ -1203,17 +1206,19 @@ private fun SettingsIconOption(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SettingsCategoryRow(
     title: String,
     description: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
