@@ -67,6 +67,9 @@ internal class ShellPlayerEnv(
     val onCommentsRefresh: (() -> Unit)? = null,
     val onEpisodeComment: (suspend (String) -> Boolean)? = null,
     val onLoadCommentReplies: (suspend (String, String?) -> com.quackify.backend.model.EpisodeCommentReplies?)? = null,
+    val onCommentReaction: (suspend (String, String) -> Boolean)? = null,
+    val onRemoveCommentReaction: (suspend (String) -> Boolean)? = null,
+    val onLoadCommentReactions: (suspend (String) -> com.quackify.backend.model.EpisodeCommentReactions?)? = null,
     val nowPlayingLyrics: List<TimeSyncedLyric>,
     val nowPlayingTranscript: List<TranscriptLine>,
     val lyricsProviderName: String = "",
@@ -276,6 +279,15 @@ private fun NowPlayingScreenLayer(
         onEpisodeComment = { text -> env.onEpisodeComment?.invoke(text) ?: false },
         onLoadCommentReplies = { commentUri, pageToken ->
             env.onLoadCommentReplies?.invoke(commentUri, pageToken)
+        },
+        onCommentReaction = { commentUri, emoji ->
+            env.onCommentReaction?.invoke(commentUri, emoji) ?: false
+        },
+        onRemoveCommentReaction = { commentUri ->
+            env.onRemoveCommentReaction?.invoke(commentUri) ?: false
+        },
+        onLoadCommentReactions = { commentUri ->
+            env.onLoadCommentReactions?.invoke(commentUri)
         },
         onArtistFollowToggle = { follow ->
             if (playbackState?.trackUri.orEmpty().startsWith("spotify:episode:")) {

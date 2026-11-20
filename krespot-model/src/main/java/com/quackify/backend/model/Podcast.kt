@@ -111,6 +111,7 @@ data class EpisodeComment(
     val reactionCount: Int,
     val topReaction: String,
     val replyCount: Int,
+    val myReaction: String = "",
 )
 
 data class EpisodeComments(
@@ -130,6 +131,7 @@ data class EpisodeCommentReply(
     val createdAtIso: String,
     val reactionCount: Int,
     val topReaction: String,
+    val myReaction: String = "",
 )
 
 data class EpisodeCommentReplies(
@@ -137,4 +139,22 @@ data class EpisodeCommentReplies(
     val total: Int,
     val nextToken: String,
     val replies: List<EpisodeCommentReply>,
+)
+
+data class CommentReactionCount(
+    val reactionUnicode: String,
+    val count: Int,
+)
+
+data class CommentReactionEntry(
+    val authorName: String,
+    val authorUri: String,
+    val avatarUrl: String,
+    val reactionUnicode: String,
+)
+
+data class EpisodeCommentReactions(
+    val commentUri: String,
+    val counts: List<CommentReactionCount>,
+    val entries: List<CommentReactionEntry>,
 )
