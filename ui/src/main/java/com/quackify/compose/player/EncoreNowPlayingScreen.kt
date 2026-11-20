@@ -184,6 +184,12 @@ private const val CANVAS_ZOOM = 1.06f
 private val HEADER_ROW_HEIGHT = 60.dp
 private val PEEK_HEIGHT = 44.dp
 
+/** Episode comments render at most this many rows before the thread scrolls. */
+private const val MAX_VISIBLE_COMMENTS = 5
+
+/** Height cap for the scrollable thread: MAX_VISIBLE_COMMENTS rows. */
+private val COMMENT_THREAD_MAX_HEIGHT = 380.dp
+
 private val LANDSCAPE_LYRICS_PEEK_HEIGHT = 200.dp
 
 private val InkDark = Color(0xFF191414)
@@ -3787,6 +3793,22 @@ private fun NowPlayingEpisodeCommentsCard(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
             ) {
+                // The thread is capped at roughly five comments so a long
+                // episode no longer stretches the extras column (and the
+                // screen behind it) to the full comment count; anything
+                // beyond that scrolls inside the card instead. Replies stay
+                // inside the same scroll so the composer below stays put.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (comments.size > MAX_VISIBLE_COMMENTS)
+                                Modifier
+                                    .heightIn(max = COMMENT_THREAD_MAX_HEIGHT)
+                                    .verticalScroll(rememberScrollState())
+                            else Modifier
+                        )
+                ) {
                 comments.forEach { comment ->
                     EpisodeCommentRow(
                         comment = comment,
@@ -3860,6 +3882,7 @@ private fun NowPlayingEpisodeCommentsCard(
                         style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
                     )
                     Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
+                }
                 }
 
                 Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
