@@ -386,6 +386,16 @@ fun EncoreNowPlayingScreen(
         isPlaying = isPlaying,
         trackKey = lyrics.firstOrNull()?.startTimeMs,
     )
+    // The transcript preview strip and the peek card sweep against the same
+    // frame clock as the fullscreen view, with the transcript's own offset
+    // rather than the lyrics one, so the spoken words travel smoothly in all
+    // three surfaces instead of jumping a word per position report.
+    val transcriptClock = rememberLyricClock(
+        reportedPositionMs = { currentPositionMs },
+        isPlaying = isPlaying,
+        trackKey = transcript.firstOrNull()?.startMs,
+        offsetMs = { LyricsOptions.transcriptOffsetMs },
+    )
 
     val activeTranscriptIndex = remember(currentPositionMs, transcript) {
         transcript.indexOfLast { currentPositionMs >= it.startMs }.coerceAtLeast(0)
@@ -756,7 +766,7 @@ fun EncoreNowPlayingScreen(
 
                         NowPlayingTranscriptLine(
                             line = previewTranscriptRow,
-                            positionMs = currentPositionMs,
+                            clockMs = transcriptClock,
                             ink = contrastInk(dynamicArtworkColor),
                             visible = previewTranscriptVisible,
                             height = if (previewTranscriptVisible) 44.dp else 0.dp,
@@ -856,7 +866,7 @@ fun EncoreNowPlayingScreen(
                             visible = transcriptAvailable,
                             lines = transcript,
                             activeIndex = activeTranscriptIndex,
-                            positionMs = currentPositionMs,
+                            clockMs = transcriptClock,
                             dominantColor = dynamicArtworkColor,
                             peekHeight = LANDSCAPE_LYRICS_PEEK_HEIGHT,
                             onOpenTranscript = { isTranscriptFullscreen = true }
@@ -991,7 +1001,7 @@ fun EncoreNowPlayingScreen(
                                 )
                                 NowPlayingTranscriptLine(
                                     line = previewTranscriptRow,
-                                    positionMs = currentPositionMs,
+                                    clockMs = transcriptClock,
                                     ink = contrastInk(dynamicArtworkColor),
                                     visible = previewTranscriptVisible,
                                     height = transcriptLineHeight,
@@ -1112,7 +1122,7 @@ fun EncoreNowPlayingScreen(
                                 visible = transcriptAvailable && canvasControlsShown,
                                 lines = transcript,
                                 activeIndex = activeTranscriptIndex,
-                                positionMs = currentPositionMs,
+                                clockMs = transcriptClock,
                                 dominantColor = dynamicArtworkColor,
                                 onOpenTranscript = { isTranscriptFullscreen = true }
                             )
@@ -2958,7 +2968,7 @@ private fun spokenPrefixEnd(line: TranscriptLine, positionMs: Long): Int {
 @Composable
 private fun NowPlayingTranscriptLine(
     line: TranscriptLine?,
-    positionMs: Long,
+    clockMs: State<Long>,
     ink: Color,
     visible: Boolean,
     height: Dp,
@@ -2987,24 +2997,46 @@ private fun NowPlayingTranscriptLine(
                 },
                 label = "transcriptPreviewContent"
             ) { row ->
-                Text(
-                    text = buildAnnotatedString {
-                        append(row?.text.orEmpty())
-                        val prefixEnd = row?.let { spokenPrefixEnd(it, positionMs) } ?: 0
-                        if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
-                    },
-                    style = EncoreTheme.typography.titleMedium.copy(
-                        fontSize = 15.sp,
-                        lineHeight = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ink.copy(alpha = 0.55f)
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenTranscript() }
-                )
+                // Same sweep as the fullscreen view when the smooth animation
+                // is on: the boundary is clipped in the draw phase against the
+                // frame clock, so the one-line strip never recomposes per frame.
+                if (row != null && LyricsOptions.transcriptSmoothSweep && row.words.isNotEmpty()) {
+                    TranscriptSweepText(
+                        line = row,
+                        positionMs = clockMs,
+                        sungColor = ink,
+                        unsungColor = ink.copy(alpha = 0.55f),
+                        style = EncoreTheme.typography.titleMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenTranscript() }
+                    )
+                } else {
+                    Text(
+                        text = buildAnnotatedString {
+                            append(row?.text.orEmpty())
+                            val prefixEnd = row?.let { spokenPrefixEnd(it, clockMs.value) } ?: 0
+                            if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
+                        },
+                        style = EncoreTheme.typography.titleMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = ink.copy(alpha = 0.55f)
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenTranscript() }
+                    )
+                }
             }
         }
     }
@@ -3015,7 +3047,7 @@ private fun NowPlayingTranscriptCard(
     visible: Boolean,
     lines: List<TranscriptLine>,
     activeIndex: Int,
-    positionMs: Long,
+    clockMs: State<Long>,
     dominantColor: Color,
     onOpenTranscript: () -> Unit,
     modifier: Modifier = Modifier,
@@ -3091,28 +3123,45 @@ private fun NowPlayingTranscriptCard(
                             )
                         } else {
                             val isActive = i == activeIndex
-                            Text(
-                                text = buildAnnotatedString {
-                                    append(line.text)
-                                    if (isActive) {
-                                        val prefixEnd = spokenPrefixEnd(line, positionMs)
-                                        if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
-                                    }
-                                },
-                                style = EncoreTheme.typography.titleMedium.copy(
-                                    fontSize = 17.sp,
-                                    lineHeight = 26.sp,
-                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
-                                    color = when {
-                                        isActive -> ink.copy(alpha = 0.5f)
-                                        i < activeIndex -> ink.copy(alpha = 0.45f)
-                                        else -> ink.copy(alpha = 0.55f)
-                                    }
-                                ),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
+                            if (isActive && LyricsOptions.transcriptSmoothSweep && line.words.isNotEmpty()) {
+                                TranscriptSweepText(
+                                    line = line,
+                                    positionMs = clockMs,
+                                    sungColor = ink,
+                                    unsungColor = ink.copy(alpha = 0.5f),
+                                    style = EncoreTheme.typography.titleMedium.copy(
+                                        fontSize = 17.sp,
+                                        lineHeight = 26.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = buildAnnotatedString {
+                                        append(line.text)
+                                        if (isActive) {
+                                            val prefixEnd = spokenPrefixEnd(line, clockMs.value)
+                                            if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
+                                        }
+                                    },
+                                    style = EncoreTheme.typography.titleMedium.copy(
+                                        fontSize = 17.sp,
+                                        lineHeight = 26.sp,
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = when {
+                                            isActive -> ink.copy(alpha = 0.5f)
+                                            i < activeIndex -> ink.copy(alpha = 0.45f)
+                                            else -> ink.copy(alpha = 0.55f)
+                                        }
+                                    ),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -3289,17 +3338,23 @@ private fun TranscriptSweepText(
     unsungColor: Color,
     style: TextStyle,
     modifier: Modifier = Modifier,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
 ) {
     var layout by remember(line.text) { mutableStateOf<TextLayoutResult?>(null) }
     Box(modifier = modifier.fillMaxWidth()) {
         Text(
             text = line.text,
             style = style.copy(color = unsungColor),
+            maxLines = maxLines,
+            overflow = overflow,
             onTextLayout = { layout = it },
         )
         Text(
             text = line.text,
             style = style.copy(color = sungColor),
+            maxLines = maxLines,
+            overflow = overflow,
             onTextLayout = { layout = it },
             modifier = Modifier
                 .matchParentSize()
