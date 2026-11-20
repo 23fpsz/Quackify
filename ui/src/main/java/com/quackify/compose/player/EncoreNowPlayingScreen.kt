@@ -72,6 +72,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -309,6 +310,7 @@ fun EncoreNowPlayingScreen(
     nowPlayingComments: List<com.quackify.backend.model.EpisodeComment> = emptyList(),
     onCommentsRefresh: () -> Unit = {},
     onEpisodeComment: suspend (String) -> Boolean = { false },
+    onLoadCommentReplies: suspend (String, String?) -> com.quackify.backend.model.EpisodeCommentReplies? = { _, _ -> null },
     lyrics: List<TimeSyncedLyric> = emptyList(),
     transcript: List<TranscriptLine> = emptyList(),
     lyricsProviderName: String = "",
@@ -893,7 +895,8 @@ fun EncoreNowPlayingScreen(
                                 NowPlayingEpisodeCommentsCard(
                                     comments = nowPlayingComments,
                                     onRefresh = { commentsRefreshTick++ },
-                                    onPostComment = onEpisodeComment
+                                    onPostComment = onEpisodeComment,
+                                    onLoadReplies = onLoadCommentReplies
                                 )
                             }
 
@@ -1154,7 +1157,8 @@ fun EncoreNowPlayingScreen(
                                             NowPlayingEpisodeCommentsCard(
                                                 comments = nowPlayingComments,
                                                 onRefresh = { commentsRefreshTick++ },
-                                                onPostComment = onEpisodeComment
+                                                onPostComment = onEpisodeComment,
+                                                onLoadReplies = onLoadCommentReplies
                                             )
                                         }
 
@@ -3509,22 +3513,69 @@ private fun formatTime(ms: Long): String {
     return String.format("%d:%02d", minutes, seconds)
 }
 
+private data class CommentReplyState(
+    val loading: Boolean = false,
+    val expanded: Boolean = false,
+    val replies: List<com.quackify.backend.model.EpisodeCommentReply> = emptyList(),
+    val total: Int = 0,
+    val nextToken: String = "",
+)
+
 /**
  * Episode comments under the About card: the same 16dp rounded card as the
  * rest of the now-playing extras, a composer pinned at its bottom and the
  * thread below. Posting goes through [onPostComment]; the caller refetches
- * the thread, so the list below updates on the next composition.
+ * the thread, so the list below updates on the next composition. Tapping a
+ * comment's reply count expands its replies inline, fetched page by page
+ * through [onLoadReplies].
  */
 @Composable
 private fun NowPlayingEpisodeCommentsCard(
     comments: List<com.quackify.backend.model.EpisodeComment>,
     onRefresh: () -> Unit,
     onPostComment: suspend (String) -> Boolean,
+    onLoadReplies: suspend (String, String?) -> com.quackify.backend.model.EpisodeCommentReplies?,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     var draft by remember { mutableStateOf("") }
     var posting by remember { mutableStateOf(false) }
+    val replyStates = remember { mutableStateMapOf<String, CommentReplyState>() }
+
+    fun toggleReplies(commentUri: String) {
+        val current = replyStates[commentUri]
+        if (current != null && (current.replies.isNotEmpty() || current.expanded)) {
+            replyStates[commentUri] = current.copy(expanded = !current.expanded)
+            return
+        }
+        replyStates[commentUri] = CommentReplyState(loading = true, expanded = true)
+        scope.launch {
+            val page = onLoadReplies(commentUri, null)
+            val state = replyStates[commentUri] ?: return@launch
+            replyStates[commentUri] = state.copy(
+                loading = false,
+                replies = page?.replies.orEmpty(),
+                total = page?.total ?: 0,
+                nextToken = page?.nextToken.orEmpty(),
+            )
+        }
+    }
+
+    fun loadMoreReplies(commentUri: String) {
+        val current = replyStates[commentUri] ?: return
+        if (current.loading || current.nextToken.isBlank()) return
+        replyStates[commentUri] = current.copy(loading = true)
+        scope.launch {
+            val page = onLoadReplies(commentUri, current.nextToken)
+            val state = replyStates[commentUri] ?: return@launch
+            replyStates[commentUri] = state.copy(
+                loading = false,
+                replies = state.replies + page?.replies.orEmpty(),
+                total = page?.total ?: state.total,
+                nextToken = page?.nextToken.orEmpty(),
+            )
+        }
+    }
 
     Box(
         modifier = modifier
@@ -3562,7 +3613,40 @@ private fun NowPlayingEpisodeCommentsCard(
                     .padding(horizontal = 16.dp)
             ) {
                 comments.forEach { comment ->
-                    EpisodeCommentRow(comment = comment)
+                    EpisodeCommentRow(
+                        comment = comment,
+                        repliesExpanded = replyStates[comment.uri]?.expanded == true,
+                        onToggleReplies = { toggleReplies(comment.uri) }
+                    )
+                    val replyState = replyStates[comment.uri]
+                    if (replyState?.expanded == true) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 40.dp)
+                        ) {
+                            if (replyState.replies.isEmpty() && replyState.loading) {
+                                Text(
+                                    text = stringResource(R.string.loading_replies),
+                                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+                            }
+                            replyState.replies.forEach { reply ->
+                                EpisodeReplyRow(reply = reply)
+                                Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
+                            }
+                            if (replyState.nextToken.isNotBlank()) {
+                                Text(
+                                    text = stringResource(R.string.show_more_replies),
+                                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.Green),
+                                    modifier = Modifier
+                                        .padding(top = 2.dp, bottom = 4.dp)
+                                        .clickable(enabled = !replyState.loading) { loadMoreReplies(comment.uri) }
+                                )
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(EncoreSpacers.Tighter))
                 }
                 if (comments.isEmpty()) {
@@ -3651,6 +3735,8 @@ private fun NowPlayingEpisodeCommentsCard(
 @Composable
 private fun EpisodeCommentRow(
     comment: com.quackify.backend.model.EpisodeComment,
+    repliesExpanded: Boolean = false,
+    onToggleReplies: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -3704,12 +3790,82 @@ private fun EpisodeCommentRow(
                         )
                     }
                     if (comment.replyCount > 0) {
-                        Text(
-                            text = stringResource(R.string.comment_replies, comment.replyCount),
-                            style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clickable { onToggleReplies() }
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.comment_replies, comment.replyCount),
+                                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                            )
+                            Icon(
+                                painter = painterResource(
+                                    id = if (repliesExpanded) R.drawable.encore_icon_chevron_up_24
+                                    else R.drawable.encore_icon_chevron_down_24
+                                ),
+                                contentDescription = null,
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeReplyRow(
+    reply: com.quackify.backend.model.EpisodeCommentReply,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF535353)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (reply.avatarUrl.isNotBlank()) {
+                EncoreArtworkImage(
+                    imageUrl = reply.avatarUrl,
+                    contentDescription = reply.authorName,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 12.dp
+                )
+            } else {
+                Text(
+                    text = reply.authorName.firstOrNull()?.uppercase() ?: "?",
+                    style = EncoreTheme.typography.marginal.copy(color = Color.White)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(EncoreSpacers.Tighter4))
+        Column {
+            Text(
+                text = reply.authorName,
+                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.TextPrimary)
+            )
+            Text(
+                text = reply.text,
+                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+            )
+            if (reply.reactionCount > 0) {
+                Text(
+                    text = if (reply.topReaction.isNotBlank()) {
+                        "${reply.topReaction} ${reply.reactionCount}"
+                    } else {
+                        reply.reactionCount.toString()
+                    },
+                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+                )
             }
         }
     }

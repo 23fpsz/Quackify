@@ -29,6 +29,8 @@
     <string name="write_a_comment">Write a comment…</string>
     <string name="post_comment">Post comment</string>
     <string name="comment_replies">%1$d replies</string>
+    <string name="loading_replies">Loading replies…</string>
+    <string name="show_more_replies">Show more replies</string>
     <string name="see_episode_description">See Episode Description</string>
     <string name="chapters">Chapters</string>
     <string name="episode_description">Episode description</string>

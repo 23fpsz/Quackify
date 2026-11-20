@@ -1591,6 +1591,9 @@ class MainActivity : ComponentActivity() {
                 Podcasts.addEpisodeComment(context, uri, text)
             }
         },
+        onLoadCommentReplies = { commentUri, pageToken ->
+            Podcasts.commentReplies(context, commentUri, pageToken)
+        },
         nowPlayingArtistFollowed = nowPlayingArtistFollowed,
         nowPlayingLyrics = remember(nowPlayingLyrics) {
             val lyrics = nowPlayingLyrics
