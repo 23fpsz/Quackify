@@ -337,6 +337,7 @@
     <string name="create_a_playlist_with_songs_or_episodes">Crée une playlist avec des morceaux ou des épisodes</string>
     <string name="current_cover">Pochette actuelle</string>
     <string name="custom_order">Ordre personnalisé</string>
+    <string name="default_order">Par défaut</string>
     <string name="dark">Sombre</string>
     <string name="default_option">Par défaut</string>
     <string name="discard">Abandonner</string>

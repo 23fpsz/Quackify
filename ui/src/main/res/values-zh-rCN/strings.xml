@@ -337,6 +337,7 @@
     <string name="create_a_playlist_with_songs_or_episodes">用歌曲或单集创建歌单</string>
     <string name="current_cover">当前封面</string>
     <string name="custom_order">自定义顺序</string>
+    <string name="default_order">默认</string>
     <string name="dark">深色</string>
     <string name="default_option">默认</string>
     <string name="discard">放弃</string>

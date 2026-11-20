@@ -76,6 +76,7 @@
     <string name="current_cover">Copertina attuale</string>
     <string name="current_device">Dispositivo corrente</string>
     <string name="custom_order">Ordine personalizzato</string>
+    <string name="default_order">Predefinito</string>
     <string name="dark">Scuro</string>
     <string name="default_option">Predefinito</string>
     <string name="delete_folder">Elimina cartella</string>
