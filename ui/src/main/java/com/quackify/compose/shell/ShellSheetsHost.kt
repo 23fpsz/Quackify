@@ -387,7 +387,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             env.setIsPlayerExpanded(false)
             val track = local.trackForOptions
             val episodeUri = track?.uri.orEmpty()
-            if (episodeUri.startsWith("spotify:episode:")) {
+            if (track != null && episodeUri.startsWith("spotify:episode:")) {
                 val known = track.albumUri.takeIf { it.startsWith("spotify:show:") }
                     ?: track.artistUri.takeIf { it.startsWith("spotify:show:") }
                 if (known != null) {
