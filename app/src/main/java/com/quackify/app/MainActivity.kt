@@ -883,7 +883,7 @@ class MainActivity : ComponentActivity() {
                             playHistory = recordNowPlaying(
                                 playback.trackUri, playback.title, playback.artist, playback.artistUri,
                                 playback.albumUri, cover.orEmpty(), playback.contextUri, playback.contextLabel,
-                                playback.explicit, playlistNames,
+                                playback.explicit, playlistNames, playback.artistUris,
                             )
                             playStats = PlayStats.snapshot(context)
                         }
@@ -893,7 +893,7 @@ class MainActivity : ComponentActivity() {
                             val missing = playHistory
                                 .map { it.item }
                                 .filter {
-                                    it.albumUri.isBlank() &&
+                                    (it.albumUri.isBlank() || it.artistUris.isEmpty()) &&
                                         it.uri.startsWith("spotify:track:") &&
                                         it.uri !in historyAlbumAttempts
                                 }
@@ -1259,6 +1259,7 @@ class MainActivity : ComponentActivity() {
         contextLabel: String,
         explicit: Boolean,
         playlistNames: java.util.concurrent.ConcurrentHashMap<String, String>,
+        artistUris: List<String> = emptyList(),
     ): List<PlayedTrack> = withContext(Dispatchers.Default) {
         PlayStats.recordListen(applicationContext)
         PlayStats.tallyArtist(applicationContext, artistUri, artist)
@@ -1280,6 +1281,7 @@ class MainActivity : ComponentActivity() {
                 uri = trackUri,
                 imageUrl = coverUrl,
                 artistUri = artistUri,
+                artistUris = artistUris,
                 albumUri = albumUri,
                 isExplicit = explicit,
             ),
@@ -1812,6 +1814,10 @@ class MainActivity : ComponentActivity() {
                     if (uri == artistUri) artistFollowed = follow
                     if (uri == nowPlaying.artistUri) nowPlayingArtistFollowed = follow
                 }
+            },
+            onArtistFollowed = { uri ->
+                val saved = runCatching { Library.saved(context, listOf(uri)) }.getOrNull()
+                saved?.let { if (it.isEmpty()) null else uri in it }
             },
             onShowFollowToggle = { uri, follow ->
                 scope.launch {

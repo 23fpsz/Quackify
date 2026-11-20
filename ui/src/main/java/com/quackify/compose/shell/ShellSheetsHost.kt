@@ -96,6 +96,7 @@ internal class ShellSheetsEnv(
     val onRemoveAccount: ((String) -> Unit)?,
     val onLogout: (() -> Unit)?,
     val onArtistFollowToggle: ((String, Boolean) -> Unit)?,
+    val onArtistFollowed: (suspend (String) -> Boolean?)?,
     val onArtistRadio: (suspend (String) -> String?)?,
     val onCanvasToggle: ((Boolean) -> Unit)?,
     val onCanvasResolution: ((Int) -> Unit)?,
@@ -124,7 +125,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
     val trackRadioTitle = stringResource(R.string.radio_title, local.trackForOptions?.title.orEmpty())
     val albumRadioTitle = stringResource(R.string.radio_title, active.albumTitle)
 
-    val sheetArtistFromPlayer = flags.isArtistOptionsFromPlayer
+    val sheetArtistFromPlayer = flags.isArtistOptionsFromPlayer || flags.isArtistOptionsFromList
     val sheetArtistName = if (sheetArtistFromPlayer) local.artistOptionsName else active.artistName
     val sheetArtistUri = if (sheetArtistFromPlayer) local.artistOptionsUri else active.artistUri
     val sheetArtistAvatarUrl = if (sheetArtistFromPlayer) {
@@ -140,6 +141,14 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         if (!flags.isArtistOptionsOpen) return@LaunchedEffect
         if (!sheetArtistUri.startsWith("spotify:artist:")) return@LaunchedEffect
         artistBannedState = runCatching { Collection2.artistBanned(env.context, sheetArtistUri) }.getOrNull()
+    }
+    LaunchedEffect(flags.isArtistOptionsOpen, sheetArtistUri) {
+        if (!flags.isArtistOptionsOpen) return@LaunchedEffect
+        if (!sheetArtistFromPlayer) return@LaunchedEffect
+        if (!sheetArtistUri.startsWith("spotify:artist:")) return@LaunchedEffect
+        if (local.artistOptionsFollowed == null) {
+            local.artistOptionsFollowed = env.onArtistFollowed?.invoke(sheetArtistUri)
+        }
     }
 
     val playlistEntity = if (active.playlistUri.isBlank() && active.playlistTitle.isBlank()) null
@@ -213,11 +222,15 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         artistName = sheetArtistName,
         artistAvatarUrl = sheetArtistAvatarUrl,
         artistUri = sheetArtistUri,
-        artistFollowing = env.artistFollowed == true,
+        artistFollowing = if (sheetArtistFromPlayer) local.artistOptionsFollowed == true
+        else env.artistFollowed == true,
         artistBanned = artistBannedState == true,
         onArtistFollowToggle = {
             if (sheetArtistUri.startsWith("spotify:artist:")) {
-                env.onArtistFollowToggle?.invoke(sheetArtistUri, env.artistFollowed != true)
+                val next = if (sheetArtistFromPlayer) local.artistOptionsFollowed != true
+                else env.artistFollowed != true
+                if (sheetArtistFromPlayer) local.artistOptionsFollowed = next
+                env.onArtistFollowToggle?.invoke(sheetArtistUri, next)
             }
         },
         onDontPlayArtist = toggle@{
@@ -293,6 +306,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         onDismissArtistOptions = {
             flags.isArtistOptionsOpen = false
             flags.isArtistOptionsFromPlayer = false
+            flags.isArtistOptionsFromList = false
         },
         onDismissSort = { flags.isSortSheetOpen = false },
         onDismissCreate = { flags.isCreateSheetOpen = false },
@@ -436,6 +450,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             local.sleepTimer = if (option == SleepTimerOption.OFF) null else option
             env.playerListener?.onSleepTimer(option)
         },
+        onSleepTimerClick = { flags.isSleepTimerOpen = true },
         onRemoveTrackFromPlaylist = if (env.currentScreen == ShellScreen.PLAYLIST && active.playlistUri.startsWith("spotify:playlist:") && env.playlistDetail?.editable == true && active.playlistUri.isNotBlank()) {
             {
                 val trackUri = local.trackForOptions?.uri.orEmpty()

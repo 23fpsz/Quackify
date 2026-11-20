@@ -45,6 +45,9 @@ object PlayHistory {
                     albumUri = node.optString("albumUri"),
                     albumName = node.optString("albumName"),
                     artistUri = node.optString("artistUri"),
+                    artistUris = node.optJSONArray("artistUris")
+                        ?.let { uris -> (0 until uris.length()).map { uris.optString(it) } }
+                        .orEmpty(),
                     isExplicit = node.optBoolean("explicit", false),
                     durationMs = node.optLong("durationMs", 0L),
                 ),
@@ -73,11 +76,13 @@ object PlayHistory {
 
         val previous = all(context)
 
-        val enriched = if (track.imageUrl.isNullOrBlank()) {
+        val enriched = if (track.imageUrl.isNullOrBlank() || track.artistUris.isEmpty()) {
             track.copy(
-                imageUrl = previous
-                    .firstOrNull { it.item.uri == track.uri }
-                    ?.item?.imageUrl
+                imageUrl = track.imageUrl
+                    ?: previous.firstOrNull { it.item.uri == track.uri }?.item?.imageUrl,
+                artistUris = track.artistUris.ifEmpty {
+                    previous.firstOrNull { it.item.uri == track.uri }?.item?.artistUris.orEmpty()
+                },
             )
         } else {
             track
@@ -119,6 +124,7 @@ object PlayHistory {
                     albumUri = played.item.albumUri.ifBlank { row.albumUri },
                     albumName = played.item.albumName.ifBlank { row.album },
                     imageUrl = played.item.imageUrl ?: row.imageUrl.takeIf { it.isNotBlank() },
+                    artistUris = played.item.artistUris.ifEmpty { row.artistUris },
                 )
             )
         }
@@ -167,6 +173,7 @@ object PlayHistory {
                     .put("albumUri", played.item.albumUri)
                     .put("albumName", played.item.albumName)
                     .put("artistUri", played.item.artistUri)
+                    .put("artistUris", JSONArray(played.item.artistUris))
                     .put("explicit", played.item.isExplicit)
                     .put("durationMs", played.item.durationMs)
                     .put("at", played.playedAtMs)

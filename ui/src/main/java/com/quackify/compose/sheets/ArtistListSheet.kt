@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -21,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,7 +44,9 @@ data class ArtistListEntry(
  * The multi-artist picker: tapping the artist line (or the about-the-artist
  * card) on a track credited to two or more artists opens this sheet instead
  * of jumping straight into the first one. Each row names the artist and a
- * "View artist" affordance that opens their page.
+ * "View artist" affordance that opens their page; the trailing three-dot
+ * button opens the same follow / ban / radio / share options sheet the artist
+ * page's own three-dot button shows.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +54,7 @@ fun ArtistListSheet(
     artists: List<ArtistListEntry>,
     onDismiss: () -> Unit,
     onViewArtist: (ArtistListEntry) -> Unit,
+    onArtistOptions: ((ArtistListEntry) -> Unit)? = null,
 ) {
     if (artists.isEmpty()) {
         onDismiss()
@@ -91,7 +97,8 @@ fun ArtistListSheet(
                     onClick = {
                         onDismiss()
                         onViewArtist(artist)
-                    }
+                    },
+                    onOptionsClick = onArtistOptions?.let { handler -> { handler(artist) } }
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -103,6 +110,7 @@ fun ArtistListSheet(
 private fun ArtistListRow(
     artist: ArtistListEntry,
     onClick: () -> Unit,
+    onOptionsClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -136,5 +144,17 @@ private fun ArtistListRow(
             ),
             modifier = Modifier.padding(start = 8.dp)
         )
+        if (onOptionsClick != null) {
+            Icon(
+                painter = painterResource(id = R.drawable.encore_icon_more_android_24),
+                contentDescription = stringResource(R.string.more_options),
+                tint = EncoreColors.TextSecondary,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onOptionsClick)
+            )
+        }
     }
 }
