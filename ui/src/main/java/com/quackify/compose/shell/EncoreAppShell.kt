@@ -203,6 +203,7 @@ fun EncoreAppShell(
     settingsLoading: Boolean = false,
     onToggleSetting: ((String, Boolean) -> Unit)? = null,
     videoFullscreen: Boolean = false,
+    videoAutoExitSignal: Int = 0,
     onToggleVideoFullscreen: ((Boolean) -> Unit)? = null,
     onAppIconChange: ((String) -> Unit)? = null,
     updateChecking: Boolean = false,
@@ -507,6 +508,11 @@ fun EncoreAppShell(
                 else removedFromQueueLabel
             )
         }
+    }
+
+    val noMusicVideoLabel = stringResource(R.string.no_music_video_for_this_track)
+    LaunchedEffect(videoAutoExitSignal) {
+        if (videoAutoExitSignal > 0) toast.show(noMusicVideoLabel)
     }
 
     val actions = ShellActions(
