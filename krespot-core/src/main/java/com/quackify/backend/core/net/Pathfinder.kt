@@ -156,6 +156,12 @@ object Pathfinder {
             "504a54dcb144fc345869c93887152f53450bd41298b6edb57d9e3b1c5aae92e6",
         "getReplies" to
             "4c45f55fdfd691e08ad983d5c914baf5581824a81b2da1cdb8a9dad747c012bf",
+        "addCommentReaction" to
+            "0af9821ff5cc680412c61c470d55493fe26e6cf938101a93b18c7cc8e5590acb",
+        "getReactions" to
+            "0d209bf9507779887fe2b3032d1afd8f35de8425b01aead094698ff1abecda71",
+        "deleteCommentReaction" to
+            "b93a40eaa470fcaaa886352e3268e3e5c6e303e11e8b849490e98ba158796cca",
         "queryWhatsNewFeed" to
             "d889c8c936ab192af8ced595427f5ba2acdf63478fdc0a181c8d477f8322630e",
         "whatsNewFeedNewItems" to

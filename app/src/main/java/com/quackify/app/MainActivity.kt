@@ -1594,6 +1594,15 @@ class MainActivity : ComponentActivity() {
         onLoadCommentReplies = { commentUri, pageToken ->
             Podcasts.commentReplies(context, commentUri, pageToken)
         },
+        onCommentReaction = { commentUri, emoji ->
+            Podcasts.addCommentReaction(context, commentUri, emoji)
+        },
+        onRemoveCommentReaction = { commentUri ->
+            Podcasts.deleteCommentReaction(context, commentUri)
+        },
+        onLoadCommentReactions = { commentUri ->
+            Podcasts.commentReactions(context, commentUri)
+        },
         nowPlayingArtistFollowed = nowPlayingArtistFollowed,
         nowPlayingLyrics = remember(nowPlayingLyrics) {
             val lyrics = nowPlayingLyrics

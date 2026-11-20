@@ -311,6 +311,9 @@ fun EncoreNowPlayingScreen(
     onCommentsRefresh: () -> Unit = {},
     onEpisodeComment: suspend (String) -> Boolean = { false },
     onLoadCommentReplies: suspend (String, String?) -> com.quackify.backend.model.EpisodeCommentReplies? = { _, _ -> null },
+    onCommentReaction: suspend (String, String) -> Boolean = { _, _ -> false },
+    onRemoveCommentReaction: suspend (String) -> Boolean = { false },
+    onLoadCommentReactions: suspend (String) -> com.quackify.backend.model.EpisodeCommentReactions? = { null },
     lyrics: List<TimeSyncedLyric> = emptyList(),
     transcript: List<TranscriptLine> = emptyList(),
     lyricsProviderName: String = "",
@@ -896,7 +899,10 @@ fun EncoreNowPlayingScreen(
                                     comments = nowPlayingComments,
                                     onRefresh = { commentsRefreshTick++ },
                                     onPostComment = onEpisodeComment,
-                                    onLoadReplies = onLoadCommentReplies
+                                    onLoadReplies = onLoadCommentReplies,
+                                    onReact = onCommentReaction,
+                                    onRemoveReaction = onRemoveCommentReaction,
+                                    onLoadReactions = onLoadCommentReactions
                                 )
                             }
 
@@ -1158,7 +1164,10 @@ fun EncoreNowPlayingScreen(
                                                 comments = nowPlayingComments,
                                                 onRefresh = { commentsRefreshTick++ },
                                                 onPostComment = onEpisodeComment,
-                                                onLoadReplies = onLoadCommentReplies
+                                                onLoadReplies = onLoadCommentReplies,
+                                                onReact = onCommentReaction,
+                                                onRemoveReaction = onRemoveCommentReaction,
+                                                onLoadReactions = onLoadCommentReactions
                                             )
                                         }
 
@@ -3521,6 +3530,14 @@ private data class CommentReplyState(
     val nextToken: String = "",
 )
 
+private data class ReactionViewState(
+    val loading: Boolean = false,
+    val expanded: Boolean = false,
+    val entries: List<com.quackify.backend.model.CommentReactionEntry> = emptyList(),
+)
+
+private val QUICK_REACTIONS = listOf("❤️", "👍", "😂", "😮", "😢", "🔥")
+
 /**
  * Episode comments under the About card: the same 16dp rounded card as the
  * rest of the now-playing extras, a composer pinned at its bottom and the
@@ -3535,12 +3552,17 @@ private fun NowPlayingEpisodeCommentsCard(
     onRefresh: () -> Unit,
     onPostComment: suspend (String) -> Boolean,
     onLoadReplies: suspend (String, String?) -> com.quackify.backend.model.EpisodeCommentReplies?,
+    onReact: suspend (String, String) -> Boolean,
+    onRemoveReaction: suspend (String) -> Boolean,
+    onLoadReactions: suspend (String) -> com.quackify.backend.model.EpisodeCommentReactions?,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     var draft by remember { mutableStateOf("") }
     var posting by remember { mutableStateOf(false) }
     val replyStates = remember { mutableStateMapOf<String, CommentReplyState>() }
+    val reactionViews = remember { mutableStateMapOf<String, ReactionViewState>() }
+    var reactionPickerFor by remember { mutableStateOf<String?>(null) }
 
     fun toggleReplies(commentUri: String) {
         val current = replyStates[commentUri]
@@ -3573,6 +3595,42 @@ private fun NowPlayingEpisodeCommentsCard(
                 replies = state.replies + page?.replies.orEmpty(),
                 total = page?.total ?: state.total,
                 nextToken = page?.nextToken.orEmpty(),
+            )
+        }
+    }
+
+    fun toggleReactionPicker(commentUri: String) {
+        reactionPickerFor = if (reactionPickerFor == commentUri) null else commentUri
+    }
+
+    // Picking the emoji the account already reacted with removes the reaction,
+    // picking any other swaps it; the refetch brings back the new counts and
+    // the caller's own reaction marker.
+    fun react(commentUri: String, currentReaction: String, emoji: String) {
+        reactionPickerFor = null
+        scope.launch {
+            if (currentReaction == emoji) {
+                onRemoveReaction(commentUri)
+            } else {
+                onReact(commentUri, emoji)
+            }
+            onRefresh()
+        }
+    }
+
+    fun toggleReactionsView(commentUri: String) {
+        val current = reactionViews[commentUri]
+        if (current != null && (current.entries.isNotEmpty() || current.expanded)) {
+            reactionViews[commentUri] = current.copy(expanded = !current.expanded)
+            return
+        }
+        reactionViews[commentUri] = ReactionViewState(loading = true, expanded = true)
+        scope.launch {
+            val page = onLoadReactions(commentUri)
+            val state = reactionViews[commentUri] ?: return@launch
+            reactionViews[commentUri] = state.copy(
+                loading = false,
+                entries = page?.entries.orEmpty(),
             )
         }
     }
@@ -3616,8 +3674,20 @@ private fun NowPlayingEpisodeCommentsCard(
                     EpisodeCommentRow(
                         comment = comment,
                         repliesExpanded = replyStates[comment.uri]?.expanded == true,
-                        onToggleReplies = { toggleReplies(comment.uri) }
+                        onToggleReplies = { toggleReplies(comment.uri) },
+                        onReactClick = { toggleReactionPicker(comment.uri) },
+                        onToggleReactions = { toggleReactionsView(comment.uri) }
                     )
+                    if (reactionPickerFor == comment.uri) {
+                        ReactionPickerRow(
+                            current = comment.myReaction,
+                            onPick = { emoji -> react(comment.uri, comment.myReaction, emoji) }
+                        )
+                    }
+                    val reactionView = reactionViews[comment.uri]
+                    if (reactionView?.expanded == true) {
+                        ReactionEntriesList(state = reactionView)
+                    }
                     val replyState = replyStates[comment.uri]
                     if (replyState?.expanded == true) {
                         Column(
@@ -3633,7 +3703,21 @@ private fun NowPlayingEpisodeCommentsCard(
                                 )
                             }
                             replyState.replies.forEach { reply ->
-                                EpisodeReplyRow(reply = reply)
+                                EpisodeReplyRow(
+                                    reply = reply,
+                                    onReactClick = { toggleReactionPicker(reply.uri) },
+                                    onToggleReactions = { toggleReactionsView(reply.uri) }
+                                )
+                                if (reactionPickerFor == reply.uri) {
+                                    ReactionPickerRow(
+                                        current = reply.myReaction,
+                                        onPick = { emoji -> react(reply.uri, reply.myReaction, emoji) }
+                                    )
+                                }
+                                val replyReactionView = reactionViews[reply.uri]
+                                if (replyReactionView?.expanded == true) {
+                                    ReactionEntriesList(state = replyReactionView)
+                                }
                                 Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
                             }
                             if (replyState.nextToken.isNotBlank()) {
@@ -3737,6 +3821,8 @@ private fun EpisodeCommentRow(
     comment: com.quackify.backend.model.EpisodeComment,
     repliesExpanded: Boolean = false,
     onToggleReplies: () -> Unit = {},
+    onReactClick: () -> Unit = {},
+    onToggleReactions: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -3774,44 +3860,57 @@ private fun EpisodeCommentRow(
                 text = comment.text,
                 style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
-            if (comment.reactionCount > 0 || comment.replyCount > 0) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter4)
-                ) {
-                    if (comment.reactionCount > 0) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter4)
+            ) {
+                if (comment.reactionCount > 0) {
+                    Text(
+                        text = if (comment.topReaction.isNotBlank()) {
+                            "${comment.topReaction} ${comment.reactionCount}"
+                        } else {
+                            comment.reactionCount.toString()
+                        },
+                        style = EncoreTheme.typography.marginal.copy(
+                            color = if (comment.myReaction.isNotBlank()) EncoreColors.Green
+                            else EncoreColors.TextSecondary
+                        ),
+                        modifier = Modifier
+                            .clickable { onToggleReactions() }
+                            .padding(vertical = 2.dp)
+                    )
+                }
+                if (comment.replyCount > 0) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clickable { onToggleReplies() }
+                            .padding(vertical = 2.dp)
+                    ) {
                         Text(
-                            text = if (comment.topReaction.isNotBlank()) {
-                                "${comment.topReaction} ${comment.reactionCount}"
-                            } else {
-                                comment.reactionCount.toString()
-                            },
+                            text = stringResource(R.string.comment_replies, comment.replyCount),
                             style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
                         )
-                    }
-                    if (comment.replyCount > 0) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clickable { onToggleReplies() }
-                                .padding(vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.comment_replies, comment.replyCount),
-                                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
-                            )
-                            Icon(
-                                painter = painterResource(
-                                    id = if (repliesExpanded) R.drawable.encore_icon_chevron_up_24
-                                    else R.drawable.encore_icon_chevron_down_24
-                                ),
-                                contentDescription = null,
-                                tint = EncoreColors.TextSecondary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
+                        Icon(
+                            painter = painterResource(
+                                id = if (repliesExpanded) R.drawable.encore_icon_chevron_up_24
+                                else R.drawable.encore_icon_chevron_down_24
+                            ),
+                            contentDescription = null,
+                            tint = EncoreColors.TextSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
                     }
                 }
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_add_reaction_24),
+                    contentDescription = stringResource(R.string.add_reaction),
+                    tint = if (comment.myReaction.isNotBlank()) EncoreColors.Green else EncoreColors.TextSecondary,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clickable { onReactClick() }
+                )
             }
         }
     }
@@ -3820,6 +3919,8 @@ private fun EpisodeCommentRow(
 @Composable
 private fun EpisodeReplyRow(
     reply: com.quackify.backend.model.EpisodeCommentReply,
+    onReactClick: () -> Unit = {},
+    onToggleReactions: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -3857,16 +3958,98 @@ private fun EpisodeReplyRow(
                 text = reply.text,
                 style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
-            if (reply.reactionCount > 0) {
-                Text(
-                    text = if (reply.topReaction.isNotBlank()) {
-                        "${reply.topReaction} ${reply.reactionCount}"
-                    } else {
-                        reply.reactionCount.toString()
-                    },
-                    style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter4)
+            ) {
+                if (reply.reactionCount > 0) {
+                    Text(
+                        text = if (reply.topReaction.isNotBlank()) {
+                            "${reply.topReaction} ${reply.reactionCount}"
+                        } else {
+                            reply.reactionCount.toString()
+                        },
+                        style = EncoreTheme.typography.marginal.copy(
+                            color = if (reply.myReaction.isNotBlank()) EncoreColors.Green
+                            else EncoreColors.TextSecondary
+                        ),
+                        modifier = Modifier
+                            .clickable { onToggleReactions() }
+                            .padding(vertical = 2.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    painter = painterResource(id = R.drawable.encore_icon_add_reaction_24),
+                    contentDescription = stringResource(R.string.add_reaction),
+                    tint = if (reply.myReaction.isNotBlank()) EncoreColors.Green else EncoreColors.TextSecondary,
+                    modifier = Modifier
+                        .size(14.dp)
+                        .clickable { onReactClick() }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ReactionPickerRow(
+    current: String,
+    onPick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        QUICK_REACTIONS.forEach { emoji ->
+            val selected = emoji == current
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) EncoreColors.Green.copy(alpha = 0.25f)
+                        else EncoreColors.PureBlack.copy(alpha = 0.3f)
+                    )
+                    .clickable { onPick(emoji) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = emoji,
+                    style = EncoreTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReactionEntriesList(
+    state: ReactionViewState,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        if (state.entries.isEmpty() && state.loading) {
+            Text(
+                text = stringResource(R.string.loading_reactions),
+                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary)
+            )
+        }
+        state.entries.forEach { entry ->
+            Text(
+                text = "${entry.reactionUnicode} ${entry.authorName}",
+                style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(vertical = 1.dp)
+            )
         }
     }
 }

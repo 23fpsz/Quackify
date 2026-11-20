@@ -43,6 +43,9 @@ object Podcasts {
     private const val OP_EPISODE_COMMENTS = "getCommentsForEntity"
     private const val OP_ADD_EPISODE_COMMENT = "addComment"
     private const val OP_COMMENT_REPLIES = "getReplies"
+    private const val OP_ADD_COMMENT_REACTION = "addCommentReaction"
+    private const val OP_COMMENT_REACTIONS = "getReactions"
+    private const val OP_DELETE_COMMENT_REACTION = "deleteCommentReaction"
     private const val PAGE = 50
 
     suspend fun show(context: Context, uri: String): ShowDetail? {
@@ -227,6 +230,97 @@ object Podcasts {
         return replies
     }
 
+    suspend fun addCommentReaction(context: Context, commentUri: String, reactionUnicode: String): Boolean {
+        if (!commentUri.startsWith("spotify:comment:") || reactionUnicode.isBlank()) return false
+        val auth = EncoreAuth.token(context)
+        if (auth.isBlank()) {
+            log.w("addCommentReaction: no token")
+            return false
+        }
+        val variables = JSONObject()
+            .put("commentUri", commentUri)
+            .put("reactionUnicode", reactionUnicode)
+            .toString()
+        val payload = Pathfinder.queryPost(context, auth, OP_ADD_COMMENT_REACTION, variables, fallbackToGet = false)
+            ?.optJSONObject("data")
+            ?.optJSONObject("putCommentReaction")
+        val ok = payload?.optString("__typename").orEmpty() == "SuccessPutCommentReaction" &&
+            payload?.optBoolean("success", false) == true
+        log.i("addCommentReaction $commentUri '$reactionUnicode' ok=$ok")
+        return ok
+    }
+
+    suspend fun commentReactions(
+        context: Context,
+        commentUri: String,
+        pageToken: String? = null,
+    ): EpisodeCommentReactions? {
+        val auth = EncoreAuth.token(context)
+        if (auth.isBlank()) {
+            log.w("commentReactions: no token")
+            return null
+        }
+        val variables = JSONObject()
+            .put("uri", commentUri)
+            .put("token", pageToken ?: JSONObject.NULL)
+            .put("reactionUnicode", JSONObject.NULL)
+            .toString()
+        val page = Pathfinder.queryPost(context, auth, OP_COMMENT_REACTIONS, variables)
+            ?.optJSONObject("data")
+            ?.optJSONArray("commentReactions")
+            ?.optJSONObject(0)
+            ?: run {
+                log.w("commentReactions: no page for $commentUri")
+                return null
+            }
+        val rawCounts = page.optJSONArray("reactionCounts") ?: JSONArray()
+        val counts = (0 until rawCounts.length()).mapNotNull { index ->
+            val node = rawCounts.optJSONObject(index) ?: return@mapNotNull null
+            val emoji = node.optString("reactionUnicode")
+            if (emoji.isBlank()) null
+            else CommentReactionCount(reactionUnicode = emoji, count = node.optInt("numberOfReactions", 0))
+        }
+        val rawEntries = page.optJSONArray("items") ?: JSONArray()
+        val entries = (0 until rawEntries.length()).mapNotNull { index -> reactionEntry(rawEntries.optJSONObject(index)) }
+        val reactions = EpisodeCommentReactions(
+            commentUri = commentUri,
+            counts = counts,
+            entries = entries,
+        )
+        log.i("commentReactions $commentUri entries=${reactions.entries.size} counts=${reactions.counts.size}")
+        return reactions
+    }
+
+    private fun reactionEntry(node: JSONObject): CommentReactionEntry? {
+        val emoji = node.optString("reactionUnicode")
+        val author = node.optJSONObject("author")?.optJSONObject("data")
+        if (emoji.isBlank() || author == null) return null
+        return CommentReactionEntry(
+            authorName = author.optString("name").orEmpty().plainText(),
+            authorUri = author.optString("uri").orEmpty(),
+            avatarUrl = GraphQl.userAvatar(author),
+            reactionUnicode = emoji,
+        )
+    }
+
+    suspend fun deleteCommentReaction(context: Context, commentUri: String): Boolean {
+        if (!commentUri.startsWith("spotify:comment:")) return false
+        val auth = EncoreAuth.token(context)
+        if (auth.isBlank()) {
+            log.w("deleteCommentReaction: no token")
+            return false
+        }
+        val variables = JSONObject()
+            .put("commentUri", commentUri)
+            .toString()
+        val payload = Pathfinder.queryPost(context, auth, OP_DELETE_COMMENT_REACTION, variables, fallbackToGet = false)
+            ?.optJSONObject("data")
+            ?.optJSONObject("deleteCommentReaction")
+        val ok = payload?.optString("__typename").orEmpty() == "SuccessDeleteCommentReaction"
+        log.i("deleteCommentReaction $commentUri ok=$ok")
+        return ok
+    }
+
     private fun reply(node: JSONObject): EpisodeCommentReply? {
         val uri = node.optString("uri")
         val text = node.optString("replyString").plainText()
@@ -243,6 +337,7 @@ object Podcasts {
             createdAtIso = node.optJSONObject("createDate")?.optString("isoString").orEmpty(),
             reactionCount = reactions?.optInt("numberOfReactions", 0) ?: 0,
             topReaction = top?.optString(0).orEmpty(),
+            myReaction = reactions?.optString("usersReactionUnicode").orEmpty(),
         )
     }
 
@@ -263,6 +358,7 @@ object Podcasts {
             reactionCount = reactions?.optInt("numberOfReactions", 0) ?: 0,
             topReaction = top?.optString(0).orEmpty(),
             replyCount = node.optInt("numberOfRepliesWithThreads", 0),
+            myReaction = reactions?.optString("usersReactionUnicode").orEmpty(),
         )
     }
 
