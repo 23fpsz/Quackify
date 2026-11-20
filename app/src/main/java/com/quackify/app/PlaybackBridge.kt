@@ -1248,6 +1248,7 @@ class PlaybackBridge(private val context: Context) {
                 }
                 if ((!episode && !audioUri.startsWith("spotify:track:")) || !hasVideo) {
                     log.i("video switch ignored, '${audioUri.takeLast(12)}' has no music video")
+                    state = state.copy(videoSwitching = false)
                     return@launch
                 }
                 val at = player.positionMs
@@ -3687,6 +3688,7 @@ class PlaybackBridge(private val context: Context) {
                 artistUris = row.artistUris.ifEmpty { state.artistUris.takeIf { state.trackUri == uri }.orEmpty() },
                 albumUri = row.albumUri.ifBlank { state.albumUri.takeIf { state.trackUri == uri }.orEmpty() },
             )
+            refreshVideoFlags()
         }
     }
 
@@ -4400,6 +4402,7 @@ class PlaybackBridge(private val context: Context) {
             }
             log.i("decorated ${rows.size} of ${uris.size} upcoming row(s)")
             publishQueue(connect.cluster.value)
+            refreshVideoFlags()
         }
     }
 
