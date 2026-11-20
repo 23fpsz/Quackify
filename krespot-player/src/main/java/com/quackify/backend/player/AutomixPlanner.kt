@@ -20,7 +20,6 @@
 
 package com.quackify.backend.player
 
-import com.quackify.backend.api.AudioFeatures
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.roundToLong
@@ -31,17 +30,18 @@ internal class TransitionSpec(
     val cueMs: Long,
     val incomingRate: Double,
     val phaseLock: Boolean,
-    val outGrid: AudioFeatures.TrackGrid?,
-    val inGrid: AudioFeatures.TrackGrid?,
+    val outGrid: TrackGrid?,
+    val inGrid: TrackGrid?,
 )
 
 /**
- * Sizes a DJ-style transition from one track's beat grid into the next: the
- * overlap is whole bars of the outgoing track, its start lands on the
- * outgoing grid's own bar line, and the incoming track is tempo-stretched to
- * the outgoing tempo when a stretch within the transparent window can reach
- * it. Without grids - or with tempi too far apart - the plan falls back to a
- * plain crossfade of the manually configured length.
+ * Sizes a DJ-style transition from one track's beat grid into the next. The
+ * ambition follows the evidence in explicit steps: a trusted grid on both
+ * sides and a stretch that can reach the outgoing tempo gets the full blend
+ * (whole bars, tempo stretch, phase lock); a trusted grid on the outgoing
+ * side alone gets the fade still cut on its bar lines without stretching;
+ * anything less - no grid, weak confidence, or tempi too far apart - falls
+ * back to a plain crossfade of the manually configured length.
  */
 internal object AutomixPlanner {
 
@@ -54,6 +54,10 @@ internal object AutomixPlanner {
     private const val MIN_INCOMING_RATE = 0.9
 
     private const val MAX_INCOMING_RATE = 1.25
+
+    private const val MIN_BEATMATCH_CONFIDENCE = 0.55
+
+    private const val MIN_DJ_CONFIDENCE = 0.2
 
     private const val DEFAULT_FALLBACK_MS = 6_000L
 
@@ -76,8 +80,8 @@ internal object AutomixPlanner {
         SPOKEN_TEXT.containsMatchIn(title) || LIVE_TEXT.containsMatchIn(title)
 
     fun plan(
-        out: AudioFeatures.TrackGrid?,
-        into: AudioFeatures.TrackGrid?,
+        out: TrackGrid?,
+        into: TrackGrid?,
         outDurationMs: Long,
         inDurationMs: Long,
         fallbackFadeMs: Long,
@@ -88,14 +92,18 @@ internal object AutomixPlanner {
             return plain(out, into, fallbackFadeMs, outDuration, inDuration)
         }
         val outBpm = localBpm(out, outDuration - LOCAL_WINDOW_SECONDS)
+        if (out == null || outBpm <= 0.0 || out.beatStarts.size < 2 || out.confidence < MIN_DJ_CONFIDENCE) {
+            return plain(out, into, fallbackFadeMs, outDuration, inDuration)
+        }
         val inBpm = localBpm(into, 0.0)
-        if (out == null || into == null || outBpm <= 0.0 || inBpm <= 0.0) {
-            return plain(out, into, fallbackFadeMs, outDuration, inDuration)
-        }
-        val rate = 1.0 / foldedRatio(outBpm, inBpm)
-        if (rate < MIN_INCOMING_RATE || rate > MAX_INCOMING_RATE) {
-            return plain(out, into, fallbackFadeMs, outDuration, inDuration)
-        }
+        val rate = if (inBpm > 0.0) 1.0 / foldedRatio(outBpm, inBpm) else 1.0
+        val beatmatched = into != null &&
+            inBpm > 0.0 &&
+            into.beatStarts.size >= 2 &&
+            out.confidence >= MIN_BEATMATCH_CONFIDENCE &&
+            into.confidence >= MIN_BEATMATCH_CONFIDENCE &&
+            rate >= MIN_INCOMING_RATE &&
+            rate <= MAX_INCOMING_RATE
         val beatSeconds = 60.0 / outBpm
         val fade = (DEFAULT_FADE_BEATS * beatSeconds).coerceIn(MIN_FADE_SECONDS, MAX_FADE_SECONDS)
         val start = barStartNear(out, outDuration, outDuration - fade, beatSeconds)
@@ -103,16 +111,16 @@ internal object AutomixPlanner {
         return TransitionSpec(
             fadeMs = (span * 1000.0).roundToLong(),
             cueMs = 0L,
-            incomingRate = roundRate(rate),
-            phaseLock = !out.beatStarts.isEmpty() && !into.beatStarts.isEmpty(),
+            incomingRate = if (beatmatched) roundRate(rate) else 1.0,
+            phaseLock = beatmatched,
             outGrid = out,
             inGrid = into,
         )
     }
 
     private fun plain(
-        out: AudioFeatures.TrackGrid?,
-        into: AudioFeatures.TrackGrid?,
+        out: TrackGrid?,
+        into: TrackGrid?,
         fallbackFadeMs: Long,
         outDuration: Double,
         inDuration: Double,
@@ -134,7 +142,7 @@ internal object AutomixPlanner {
     }
 
     /** The tempo around [atSec] read off the grid's own beats, so drift is honoured; the reported tempo otherwise. */
-    private fun localBpm(grid: AudioFeatures.TrackGrid?, atSec: Double): Double {
+    private fun localBpm(grid: TrackGrid?, atSec: Double): Double {
         if (grid == null) return 0.0
         val beats = grid.beatStarts
         if (beats.size < 2) return grid.bpm.takeIf { it > 0.0 } ?: 0.0
@@ -152,7 +160,7 @@ internal object AutomixPlanner {
      * bar of it and leaves a usable fade before the track ends.
      */
     private fun barStartNear(
-        out: AudioFeatures.TrackGrid?,
+        out: TrackGrid?,
         outDuration: Double,
         target: Double,
         beatSeconds: Double,

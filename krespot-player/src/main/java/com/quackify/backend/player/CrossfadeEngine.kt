@@ -25,7 +25,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
-import com.quackify.backend.api.AudioFeatures
 import com.quackify.backend.core.log.Logs
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -85,8 +84,8 @@ internal class CrossfadeEngine(
         val cueMs: Long,
         val incomingRate: Double,
         val phaseLock: Boolean,
-        val outGrid: AudioFeatures.TrackGrid?,
-        val inGrid: AudioFeatures.TrackGrid?,
+        val outGrid: TrackGrid?,
+        val inGrid: TrackGrid?,
         val smart: Boolean,
     )
 
@@ -526,7 +525,7 @@ internal class CrossfadeEngine(
         return diff
     }
 
-    private fun beatPhase(grid: AudioFeatures.TrackGrid, positionSec: Double): BeatPhase? {
+    private fun beatPhase(grid: TrackGrid, positionSec: Double): BeatPhase? {
         val beats = grid.beatStarts
         if (beats.size < 2) return null
         val index = AutomixPlanner.indexAtOrAfter(beats, positionSec)
