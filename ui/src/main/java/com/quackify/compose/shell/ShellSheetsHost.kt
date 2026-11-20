@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.quackify.backend.api.ArtistBanStore
 import com.quackify.backend.api.Collection2
+import com.quackify.backend.api.Podcasts
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
@@ -273,7 +274,11 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         // (LyricsOptions.preview), so they always read the same value. It
         // only shows while the master lyrics switch is on too - toggling the
         // line with lyrics themselves off is a no-op that reads as broken.
-        lyricsUnderCoverAvailable = flags.isTrackOptionsFromPlayer && LyricsOptions.enabled,
+        // Episodes carry a transcript instead of lyrics, and the transcript
+        // preview is not gated by the master lyrics switch, so for them the
+        // row reads "transcript under cover" and is always offered.
+        lyricsUnderCoverAvailable = flags.isTrackOptionsFromPlayer &&
+            (local.trackForOptions?.uri.orEmpty().startsWith("spotify:episode:") || LyricsOptions.enabled),
         isLyricsUnderCoverEnabled = LyricsOptions.preview,
         onLyricsUnderCoverToggle = { LyricsOptions.setPreview(env.context, !LyricsOptions.preview) },
         canvasResolution = env.canvasResolution,
@@ -359,6 +364,39 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             flags.isTrackOptionsOpen = false
             env.setIsPlayerExpanded(false)
             env.openAlbum(album, local.trackForOptions?.artist ?: "", uri)
+        },
+        // History rows for episodes carry the show uri in either the artist or
+        // the album slot depending on which path decorated them; when neither
+        // does, the episode detail fetch is the only source left.
+        onViewShow = {
+            flags.isTrackOptionsOpen = false
+            env.setIsPlayerExpanded(false)
+            val track = local.trackForOptions
+            val episodeUri = track?.uri.orEmpty()
+            if (episodeUri.startsWith("spotify:episode:")) {
+                val known = track.albumUri.takeIf { it.startsWith("spotify:show:") }
+                    ?: track.artistUri.takeIf { it.startsWith("spotify:show:") }
+                if (known != null) {
+                    env.navController.openShow(known)
+                } else {
+                    env.shellScope.launch {
+                        val showUri = runCatching {
+                            Podcasts.episode(env.context, episodeUri)?.showUri
+                        }.getOrNull().orEmpty()
+                        if (showUri.startsWith("spotify:show:")) {
+                            env.navController.openShow(showUri)
+                        }
+                    }
+                }
+            }
+        },
+        onViewEpisode = {
+            flags.isTrackOptionsOpen = false
+            env.setIsPlayerExpanded(false)
+            val episodeUri = local.trackForOptions?.uri.orEmpty()
+            if (episodeUri.startsWith("spotify:episode:")) {
+                env.navController.openEpisode(episodeUri)
+            }
         },
         onSortSelected = { selected, direction -> local.sortOption = selected; local.sortDirection = direction },
         onGoToArtist = { artist ->
