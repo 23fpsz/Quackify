@@ -27,6 +27,7 @@ import com.quackify.backend.core.net.ConnectivityMonitor
 import com.quackify.app.widget.WidgetSync
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.settings.PlayerButtonAction
 import com.quackify.compose.settings.PlayerButtonsConfig
 import com.quackify.compose.settings.PlayerButtonsStore
@@ -388,6 +389,29 @@ class PlaybackService : MediaBrowserServiceCompat() {
         }
         if (state.isPlaying) {
             promoteForeground(state)
+            if (hasTrack && state.trackUri.isNotBlank()) {
+                runCatching {
+                    PlayHistory.record(
+                        applicationContext,
+                        TrackItem(
+                            title = state.title,
+                            artist = state.artist,
+                            uri = state.trackUri,
+                            imageUrl = state.coverUrl.takeIf { it.isNotBlank() },
+                            artistUri = state.artistUri,
+                            albumUri = state.albumUri,
+                            isExplicit = state.explicit,
+                            durationMs = progress.durationMs,
+                        ),
+                        System.currentTimeMillis(),
+                    )
+                }
+                val ctxUri = state.contextUri
+                if (ctxUri.startsWith("spotify:playlist:")) {
+                    val title = state.contextLabel.ifBlank { "Playlist" }
+                    PlayStats.tallyPlaylist(applicationContext, ctxUri, title)
+                }
+            }
         }
         notify(buildNotification(state))
     }

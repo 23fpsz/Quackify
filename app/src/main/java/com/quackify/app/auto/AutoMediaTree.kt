@@ -11,6 +11,7 @@ import com.quackify.app.R
 import com.quackify.backend.api.Browse
 import com.quackify.backend.api.HomeFeed
 import com.quackify.backend.api.Podcasts
+import com.quackify.backend.api.Profile
 import com.quackify.backend.api.Search
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.library.Krespot
@@ -18,6 +19,7 @@ import com.quackify.backend.model.ShelfKind
 import com.quackify.compose.settings.PlayerButtonsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Builds and serves the entire Android Auto browse hierarchy:
@@ -69,95 +71,193 @@ class AutoMediaTree(private val context: Context) {
                 val items = mutableListOf<MediaBrowserCompat.MediaItem>()
                 when (parentId) {
                     TAB_HOME -> {
+                        val seen = mutableSetOf<String>()
                         val cached = HomeFeed.cachedPayload
                         val feed = cached ?: runCatching { HomeFeed.load(context) }.getOrNull()
                         feed?.sections?.forEach { section ->
                             if (section.kind !in listOf("HomeShortsSectionData", "HomeWatchFeedSectionData")) {
                                 section.items.forEach { item ->
-                                    val isTrack = item.uri.startsWith("spotify:track:") || item.uri.startsWith("spotify:episode:")
-                                    if (isTrack) {
-                                        items.add(
-                                            createPlayableItem(
-                                                id = item.uri,
-                                                title = item.title,
-                                                subtitle = item.subtitle,
-                                                iconUri = item.imageUrl.takeIf { it.isNotBlank() }
+                                    if (seen.add(item.uri)) {
+                                        val isTrack = item.uri.startsWith("spotify:track:") || item.uri.startsWith("spotify:episode:")
+                                        if (isTrack) {
+                                            items.add(
+                                                createPlayableItem(
+                                                    id = item.uri,
+                                                    title = item.title,
+                                                    subtitle = item.subtitle,
+                                                    iconUri = item.imageUrl.takeIf { it.isNotBlank() }
+                                                )
                                             )
+                                        } else {
+                                            items.add(
+                                                createBrowsableOrPlayableItem(
+                                                    id = item.uri,
+                                                    title = item.title,
+                                                    subtitle = item.subtitle,
+                                                    iconUri = item.imageUrl.takeIf { it.isNotBlank() },
+                                                    groupTitle = section.title.takeIf { it.isNotBlank() }
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (items.isEmpty()) {
+                            val page = runCatching { Krespot.library.page(context) }.getOrNull()
+                            if (seen.add("spotify:collection:tracks")) {
+                                items.add(
+                                    createBrowsableOrPlayableItem(
+                                        id = "spotify:collection:tracks",
+                                        title = context.getString(R.string.collection_liked_songs_title),
+                                        subtitle = "Playlist",
+                                        iconUri = "https://misc.scdn.co/liked-songs/liked-songs-640.png"
+                                    )
+                                )
+                            }
+                            page?.items?.take(15)?.forEach { shelf ->
+                                if (seen.add(shelf.uri)) {
+                                    items.add(
+                                        createBrowsableOrPlayableItem(
+                                            id = shelf.uri,
+                                            title = shelf.title,
+                                            subtitle = shelf.subtitle.ifBlank { "Library" },
+                                            iconUri = shelf.imageUrl.takeIf { it.isNotBlank() }
                                         )
-                                    } else {
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    TAB_RECENTS -> {
+                        val seen = mutableSetOf<String>()
+
+                        // 1. Spotify's server-side recently played contexts (playlists, albums, artists, shows)
+                        val recentContexts = runCatching {
+                            withTimeoutOrNull(2500) {
+                                Profile.recentlyPlayed(context)
+                            }
+                        }.getOrNull()
+                        recentContexts?.forEach { entry ->
+                            if (seen.add(entry.uri)) {
+                                when {
+                                    entry.uri.startsWith("spotify:playlist:") -> {
+                                        val col = runCatching { Krespot.collections.collection(context, entry.uri) }.getOrNull()
+                                        if (col != null) {
+                                            items.add(
+                                                createBrowsableOrPlayableItem(
+                                                    id = col.uri,
+                                                    title = col.title,
+                                                    subtitle = "Playlist",
+                                                    iconUri = col.imageUrl.takeIf { it.isNotBlank() }
+                                                )
+                                            )
+                                        }
+                                    }
+                                    entry.uri.startsWith("spotify:album:") -> {
+                                        val alb = runCatching { Krespot.albums.album(context, entry.uri) }.getOrNull()
+                                        if (alb != null) {
+                                            items.add(
+                                                createBrowsableOrPlayableItem(
+                                                    id = alb.uri,
+                                                    title = alb.title,
+                                                    subtitle = if (alb.artists.isNotBlank()) "Album • by ${alb.artists}" else "Album",
+                                                    iconUri = alb.imageUrl.takeIf { it.isNotBlank() }
+                                                )
+                                            )
+                                        }
+                                    }
+                                    entry.uri.startsWith("spotify:artist:") -> {
+                                        val art = runCatching { Krespot.artists.artist(context, entry.uri) }.getOrNull()
+                                        if (art != null) {
+                                            items.add(
+                                                createBrowsableOrPlayableItem(
+                                                    id = art.uri,
+                                                    title = art.name,
+                                                    subtitle = "Artist",
+                                                    iconUri = art.imageUrl.takeIf { it.isNotBlank() }
+                                                )
+                                            )
+                                        }
+                                    }
+                                    entry.uri.startsWith("spotify:show:") -> {
+                                        val show = runCatching { Podcasts.show(context, entry.uri) }.getOrNull()
+                                        if (show != null) {
+                                            items.add(
+                                                createBrowsableOrPlayableItem(
+                                                    id = show.uri,
+                                                    title = show.name,
+                                                    subtitle = if (show.publisher.isNotBlank()) "Podcast • by ${show.publisher}" else "Podcast",
+                                                    iconUri = show.imageUrl.takeIf { it.isNotBlank() }
+                                                )
+                                            )
+                                        }
+                                    }
+                                    entry.uri == "spotify:collection:tracks" -> {
                                         items.add(
                                             createBrowsableOrPlayableItem(
-                                                id = item.uri,
-                                                title = item.title,
-                                                subtitle = item.subtitle,
-                                                iconUri = item.imageUrl.takeIf { it.isNotBlank() },
-                                                groupTitle = section.title.takeIf { it.isNotBlank() }
+                                                id = "spotify:collection:tracks",
+                                                title = context.getString(R.string.collection_liked_songs_title),
+                                                subtitle = "Playlist",
+                                                iconUri = "https://misc.scdn.co/liked-songs/liked-songs-640.png"
                                             )
                                         )
                                     }
                                 }
                             }
                         }
-                        if (items.isEmpty()) {
-                            items.add(
-                                createBrowsableOrPlayableItem(
-                                    id = "spotify:collection:tracks",
-                                    title = context.getString(R.string.collection_liked_songs_title),
-                                    subtitle = "Playlist",
-                                    iconUri = "https://misc.scdn.co/liked-songs/liked-songs-640.png"
-                                )
-                            )
-                            val page = runCatching { Krespot.library.page(context) }.getOrNull()
-                            page?.items?.take(15)?.forEach { shelf ->
-                                items.add(
-                                    createBrowsableOrPlayableItem(
-                                        id = shelf.uri,
-                                        title = shelf.title,
-                                        subtitle = shelf.subtitle.ifBlank { "Library" },
-                                        iconUri = shelf.imageUrl.takeIf { it.isNotBlank() }
-                                    )
-                                )
+
+                        // 3. Home feed recent & quick-access items (HomeShortsSectionData & HomeRecentlyPlayedSectionData)
+                        val feed = HomeFeed.cachedPayload ?: runCatching {
+                            withTimeoutOrNull(2000) { HomeFeed.load(context) }
+                        }.getOrNull()
+                        feed?.sections?.forEach { section ->
+                            val isRecentOrShorts = section.kind == HomeFeed.RECENT ||
+                                    section.kind == "HomeShortsSectionData" ||
+                                    section.title.contains("Recent", ignoreCase = true) ||
+                                    section.title.contains("Jump back in", ignoreCase = true)
+                            if (isRecentOrShorts) {
+                                section.items.forEach { item ->
+                                    if (seen.add(item.uri)) {
+                                        val isTrack = item.uri.startsWith("spotify:track:") || item.uri.startsWith("spotify:episode:")
+                                        if (isTrack) {
+                                            items.add(
+                                                createPlayableItem(
+                                                    id = item.uri,
+                                                    title = item.title,
+                                                    subtitle = item.subtitle.ifBlank { "Recently Played" },
+                                                    iconUri = item.imageUrl.takeIf { it.isNotBlank() }
+                                                )
+                                            )
+                                        } else {
+                                            items.add(
+                                                createBrowsableOrPlayableItem(
+                                                    id = item.uri,
+                                                    title = item.title,
+                                                    subtitle = item.subtitle.ifBlank { "Recently Played" },
+                                                    iconUri = item.imageUrl.takeIf { it.isNotBlank() }
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
-                    TAB_RECENTS -> {
-                        val feed = HomeFeed.cachedPayload ?: runCatching { HomeFeed.load(context) }.getOrNull()
-                        val recentSection = feed?.sections?.firstOrNull {
-                            it.kind == HomeFeed.RECENT || it.title.contains("Recent", ignoreCase = true)
-                        }
-                        recentSection?.items?.forEach { item ->
-                            val isTrack = item.uri.startsWith("spotify:track:") || item.uri.startsWith("spotify:episode:")
-                            if (isTrack) {
-                                items.add(
-                                    createPlayableItem(
-                                        id = item.uri,
-                                        title = item.title,
-                                        subtitle = item.subtitle.ifBlank { "Recently Played" },
-                                        iconUri = item.imageUrl.takeIf { it.isNotBlank() }
-                                    )
-                                )
-                            } else {
-                                items.add(
-                                    createBrowsableOrPlayableItem(
-                                        id = item.uri,
-                                        title = item.title,
-                                        subtitle = item.subtitle.ifBlank { "Recently Played" },
-                                        iconUri = item.imageUrl.takeIf { it.isNotBlank() }
-                                    )
-                                )
-                            }
-                        }
+
+                        // 3. Fallback to library only if still empty
                         if (items.isEmpty()) {
                             val page = runCatching { Krespot.library.page(context) }.getOrNull()
                             page?.items?.take(12)?.forEach { shelf ->
-                                items.add(
-                                    createBrowsableOrPlayableItem(
-                                        id = shelf.uri,
-                                        title = shelf.title,
-                                        subtitle = shelf.subtitle.ifBlank { "Recently Played" },
-                                        iconUri = shelf.imageUrl.takeIf { it.isNotBlank() }
+                                if (seen.add(shelf.uri)) {
+                                    items.add(
+                                        createBrowsableOrPlayableItem(
+                                            id = shelf.uri,
+                                            title = shelf.title,
+                                            subtitle = shelf.subtitle.ifBlank { "Recently Played" },
+                                            iconUri = shelf.imageUrl.takeIf { it.isNotBlank() }
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }
@@ -182,17 +282,20 @@ class AutoMediaTree(private val context: Context) {
                         items.add(createCategoryListItem(NODE_LIBRARY_PODCASTS, context.getString(R.string.your_library_content_filter_podcasts), R.drawable.ic_eis_podcasts))
                     }
                     NODE_LIBRARY_PLAYLISTS -> {
-                        items.add(
-                            createBrowsableOrPlayableItem(
-                                id = "spotify:collection:tracks",
-                                title = context.getString(R.string.collection_liked_songs_title),
-                                subtitle = "Playlist",
-                                iconUri = "https://misc.scdn.co/liked-songs/liked-songs-640.png"
+                        val seen = mutableSetOf<String>()
+                        if (seen.add("spotify:collection:tracks")) {
+                            items.add(
+                                createBrowsableOrPlayableItem(
+                                    id = "spotify:collection:tracks",
+                                    title = context.getString(R.string.collection_liked_songs_title),
+                                    subtitle = "Playlist",
+                                    iconUri = "https://misc.scdn.co/liked-songs/liked-songs-640.png"
+                                )
                             )
-                        )
+                        }
                         val page = runCatching { Krespot.library.page(context) }.getOrNull()
                         page?.items?.forEach { shelf ->
-                            if (shelf.kind == ShelfKind.PLAYLIST || shelf.kind == ShelfKind.FOLDER) {
+                            if ((shelf.kind == ShelfKind.PLAYLIST || shelf.kind == ShelfKind.FOLDER) && seen.add(shelf.uri)) {
                                 items.add(
                                     createBrowsableOrPlayableItem(
                                         id = shelf.uri,

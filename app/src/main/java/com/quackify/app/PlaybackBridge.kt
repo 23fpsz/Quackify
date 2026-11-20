@@ -3305,10 +3305,10 @@ class PlaybackBridge(private val context: Context) {
             pendingReasonEnd = "endplay"
             pendingReasonStart = "click"
         }
-        if ((contextUri.isBlank() || contextUri == uri) && collectionContext(uri)) {
+        if ((contextUri.isBlank() || contextUri == uri) && isContainerUri(uri)) {
             val first = runCatching { rowsOf(uri).firstOrNull() }.getOrNull()
             if (!first.isNullOrBlank() && first != uri) {
-                log.i("playTrack '$uri' is a collection, starting at '${first.takeLast(12)}'")
+                log.i("playTrack '$uri' is a container, starting at '${first.takeLast(12)}'")
                 captureChain(uri)
                 playTrack(first, uri, 0)
                 return
@@ -3347,7 +3347,7 @@ class PlaybackBridge(private val context: Context) {
             at >= 0 -> at
             known >= 0 -> known
             hint >= 0 -> hint
-            else -> 0
+            else -> -1
         }
         val uid = TrackUid.get(uri)
         log.i("playTrack '$uri' outside the cluster window, '$context' ctxIdx=$index " +
@@ -4361,6 +4361,13 @@ class PlaybackBridge(private val context: Context) {
             ?.asTrackItem()
             ?.let { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
     }
+
+    private fun isContainerUri(uri: String): Boolean =
+        collectionContext(uri) ||
+            uri.startsWith("spotify:playlist:") ||
+            uri.startsWith("spotify:album:") ||
+            uri.startsWith("spotify:artist:") ||
+            uri.startsWith("spotify:show:")
 
     private fun collectionContext(uri: String): Boolean =
         uri.startsWith("spotify:collection:") ||
