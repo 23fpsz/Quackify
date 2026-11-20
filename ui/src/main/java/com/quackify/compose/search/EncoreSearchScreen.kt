@@ -8,6 +8,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -163,6 +165,7 @@ data class SearchHistoryItem(
  * - Recent Searches list with stringResource(R.string.clear_recent_searches) button
  * - 2-column colorful Browse All categories grid with angled album peek (96dp category_card_max_height)
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EncoreSearchScreen(
     onCategoryClick: (CategoryCard) -> Unit,
@@ -908,6 +911,8 @@ fun EncoreSearchScreen(
                                 val isThisPlaying = isPlaying && matchesCurrent(
                                     top.uri, currentTrackUri, top.title, currentTrackTitle
                                 )
+                                val openTopOptions = { onTrackOptionsClick(top) }
+                                val topLongPress = if (topHit == null || topHit.kind == SearchKind.TRACK) openTopOptions else null
 
                                 Text(
                                     text = stringResource(R.string.top_result),
@@ -920,7 +925,10 @@ fun EncoreSearchScreen(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(EncoreColors.Card)
-                                        .clickable { openTopResult() }
+                                        .combinedClickable(
+                                            onClick = { openTopResult() },
+                                            onLongClick = topLongPress
+                                        )
                                         .padding(16.dp)
                                 ) {
                                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1403,6 +1411,7 @@ fun EncoreSearchScreen(
  *
  * Search results display cover artwork, NOT album track numbers (1, 2, 3...)!
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SearchTrackRow(
     track: TrackItem,
@@ -1421,7 +1430,11 @@ private fun SearchTrackRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = !isBanned, onClick = onClick)
+                .combinedClickable(
+                    enabled = !isBanned,
+                    onClick = onClick,
+                    onLongClick = onMoreClick
+                )
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
