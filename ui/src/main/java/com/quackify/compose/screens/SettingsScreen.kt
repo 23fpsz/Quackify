@@ -48,6 +48,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.ui.Alignment
@@ -803,6 +805,11 @@ fun SettingsScreen(
                                     }
                                 },
                                 onLongClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                    if (clipboard != null) {
+                                        clipboard.setPrimaryClip(ClipData.newPlainText("Version", version))
+                                        Toast.makeText(context, R.string.version_copied, Toast.LENGTH_SHORT).show()
+                                    }
                                     if (debugUnlocked || debugLogging) disableDebug()
                                 }
                             ),

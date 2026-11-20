@@ -399,6 +399,7 @@
     <string name="not_signed_in">Sesión no iniciada</string>
     <string name="copyright">© 2026 Quackify Team</string>
     <string name="link_copied">Enlace copiado</string>
+    <string name="version_copied">Versión copiada</string>
     <string name="track_link">Enlace de la canción</string>
     <string name="will_be_deleted_from_library"> se eliminará de Tu Biblioteca.</string>
     <string name="will_be_deleted_playlists_stay"> se eliminará. Las playlists dentro permanecerán en Tu Biblioteca.</string>
