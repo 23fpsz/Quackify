@@ -36,7 +36,7 @@ import androidx.compose.ui.res.stringResource
 
 /**
  * - sort_filter_bottom_sheet_layout.xml
- * - Options: Title, Artist, Album, Recently added (no selection means the playlist's own order)
+ * - Options: Default, Title, Artist, Album, Recently added (no selection means the playlist's own order)
  * - Tapping the active option clears it; the arrow toggles the direction on its own
  */
 @OptIn(ExperimentalMaterial3Api::class)

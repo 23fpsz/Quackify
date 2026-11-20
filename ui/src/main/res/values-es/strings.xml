@@ -76,6 +76,7 @@
     <string name="current_cover">Portada actual</string>
     <string name="current_device">Dispositivo actual</string>
     <string name="custom_order">Orden personalizado</string>
+    <string name="default_order">Predeterminado</string>
     <string name="dark">Oscuro</string>
     <string name="default_option">Predeterminado</string>
     <string name="delete_folder">Eliminar carpeta</string>
