@@ -388,22 +388,27 @@ private fun NowPlayingScreenLayer(
         },
         onArtistClick = {
             // A track credited to two or more artists opens the picker sheet
-            // so each artist has their own row; a single artist still jumps
-            // straight into their page.
+            // so each artist has their own row; a single artist opens the
+            // follow / ban / radio / share options sheet instead.
             val uris = env.playbackState?.artistUris.orEmpty()
                 .filter { it.startsWith("spotify:artist:") }
             if (uris.size > 1) {
                 env.local.artistListTrack = null
                 env.flags.isArtistListOpen = true
             } else {
-                env.setIsPlayerExpanded(false)
-                env.openArtist(env.currentArtist, env.resolvedArtistUri)
+                env.local.artistOptionsName = env.currentArtist
+                env.local.artistOptionsUri = env.resolvedArtistUri
+                env.local.artistOptionsAvatarUrl = env.nowPlayingArtistImageUrl
+                env.local.artistOptionsFollowed = env.nowPlayingArtistFollowed
+                env.flags.isArtistOptionsFromPlayer = true
+                env.flags.isArtistOptionsOpen = true
             }
         },
         onArtistLongClick = {
             env.local.artistOptionsName = env.currentArtist
             env.local.artistOptionsUri = env.resolvedArtistUri
             env.local.artistOptionsAvatarUrl = env.nowPlayingArtistImageUrl
+            env.local.artistOptionsFollowed = env.nowPlayingArtistFollowed
             env.flags.isArtistOptionsFromPlayer = true
             env.flags.isArtistOptionsOpen = true
         }

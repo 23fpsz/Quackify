@@ -310,6 +310,17 @@ internal fun ShellOverlaySheets(
                     local.artistListTrack = null
                     setIsPlayerExpanded(false)
                     openArtist(entry.name, entry.uri)
+                },
+                onArtistOptions = { entry ->
+                    flags.isArtistListOpen = false
+                    local.artistListTrack = null
+                    local.artistOptionsName = entry.name
+                    local.artistOptionsUri = entry.uri
+                    local.artistOptionsAvatarUrl = null
+                    local.artistOptionsFollowed = null
+                    flags.isArtistOptionsFromPlayer = false
+                    flags.isArtistOptionsFromList = true
+                    flags.isArtistOptionsOpen = true
                 }
             )
         } else {
