@@ -290,6 +290,7 @@ class MainActivity : ComponentActivity() {
         userProfileColorHex = EncoreAuth.account(applicationContext)?.colorHex.orEmpty()
         canvasEnabled = clientPrefs.getBoolean("canvasNpvEnabled", true)
         com.quackify.compose.player.LyricsOptions.load(applicationContext)
+        com.quackify.compose.player.PlayerViewOptions.load(applicationContext)
         syncLauncherIcon(applicationContext)
         canvasResolution = clientPrefs.getInt("canvasResolution", 1080)
         val appContext = applicationContext

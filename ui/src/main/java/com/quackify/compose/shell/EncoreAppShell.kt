@@ -934,7 +934,8 @@ fun EncoreAppShell(
         val paneShape = RoundedCornerShape(SPLIT_PLAYER_CORNER_DP.dp)
         val landscapeDualPlayer = !splitPlayer &&
             LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE &&
-            isPlayerExpanded && !flags.isLogcatOpen
+            isPlayerExpanded && !flags.isLogcatOpen &&
+            com.quackify.compose.player.PlayerViewOptions.landscapeDualView
         val screenHost: @Composable () -> Unit = {
             ShellScreenSlot(currentScreen) { screen ->
                 when (screen) {

@@ -101,6 +101,7 @@ import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
+import android.content.res.Configuration
 import android.app.Activity
 import android.view.WindowManager
 import androidx.compose.ui.platform.LocalContext
@@ -338,6 +339,14 @@ fun EncoreNowPlayingScreen(
     DisposableEffect(videoActive) {
         view.keepScreenOn = videoActive
         onDispose { view.keepScreenOn = false }
+    }
+
+    val appContext = LocalContext.current.applicationContext
+    val realLandscape = view.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val onToggleViewLayout: (() -> Unit)? = if (realLandscape) {
+        { PlayerViewOptions.setLandscapeDualView(appContext, !PlayerViewOptions.landscapeDualView) }
+    } else {
+        null
     }
 
     if (videoFullscreen && videoActive) {
@@ -763,7 +772,8 @@ fun EncoreNowPlayingScreen(
                             onCollapseClick = onCollapseClick,
                             onMoreClick = onMoreClick,
                             dominantColor = animatedDominantColor,
-                            dragModifier = headerDragModifier
+                            dragModifier = headerDragModifier,
+                            onToggleViewLayout = onToggleViewLayout
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -945,7 +955,8 @@ fun EncoreNowPlayingScreen(
                                     onCollapseClick = onCollapseClick,
                                     onMoreClick = onMoreClick,
                                     dominantColor = animatedDominantColor,
-                                    dragModifier = headerDragModifier
+                                    dragModifier = headerDragModifier,
+                                    onToggleViewLayout = onToggleViewLayout
                                 )
                             }
 
@@ -1432,7 +1443,8 @@ private fun NowPlayingHeaderRow(
     onCollapseClick: () -> Unit,
     onMoreClick: () -> Unit,
     dominantColor: Color,
-    dragModifier: Modifier = Modifier
+    dragModifier: Modifier = Modifier,
+    onToggleViewLayout: (() -> Unit)? = null
 ) {
     val ink = contrastInk(dominantColor)
     Row(
@@ -1484,6 +1496,21 @@ private fun NowPlayingHeaderRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        }
+
+        if (onToggleViewLayout != null) {
+            EncoreIconButton(
+                iconRes = if (PlayerViewOptions.landscapeDualView) R.drawable.encore_icon_list_view_24
+                else R.drawable.encore_icon_grid_view_24,
+                contentDescription = stringResource(
+                    if (PlayerViewOptions.landscapeDualView) R.string.switch_to_full_view
+                    else R.string.switch_to_dual_view
+                ),
+                onClick = onToggleViewLayout,
+                tint = ink,
+                size = 48.dp,
+                iconSize = 24.dp
+            )
         }
 
         EncoreIconButton(
