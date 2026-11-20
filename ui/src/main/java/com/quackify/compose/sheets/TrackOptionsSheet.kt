@@ -64,6 +64,8 @@ fun TrackOptionsSheet(
     canAddToQueue: Boolean = true,
     onViewArtist: (String, String) -> Unit = { _, _ -> },
     onViewAlbum: (String, String) -> Unit = { _, _ -> },
+    onViewShow: () -> Unit = {},
+    onViewEpisode: () -> Unit = {},
     onShare: () -> Unit = {},
     onShowCredits: () -> Unit = {},
     canvasAvailable: Boolean = false,
@@ -85,6 +87,7 @@ fun TrackOptionsSheet(
 ) {
     if (!isOpen || track == null) return
 
+    val isEpisode = track.uri.startsWith("spotify:episode:")
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
@@ -236,7 +239,7 @@ fun TrackOptionsSheet(
                 )
             }
 
-            if (onSongRadio != null) {
+            if (onSongRadio != null && !isEpisode) {
                 ContextMenuRowItem(
                     title = stringResource(R.string.go_to_song_radio),
                     iconRes = R.drawable.encore_icon_radio_24,
@@ -247,32 +250,54 @@ fun TrackOptionsSheet(
                 )
             }
 
-            ContextMenuRowItem(
-                title = stringResource(R.string.go_to_artist),
-                iconRes = R.drawable.encore_icon_artist_24,
-                onClick = {
-                    onDismiss()
-                    onViewArtist(track.artist, track.artistUri)
-                }
-            )
+            if (isEpisode) {
+                ContextMenuRowItem(
+                    title = stringResource(R.string.go_to_show),
+                    iconRes = R.drawable.encore_icon_podcasts_24,
+                    onClick = {
+                        onDismiss()
+                        onViewShow()
+                    }
+                )
 
-            ContextMenuRowItem(
-                title = stringResource(R.string.go_to_album),
-                iconRes = R.drawable.encore_icon_album_24,
-                onClick = {
-                    onDismiss()
-                    onViewAlbum(track.albumName.ifBlank { track.title }, track.albumUri)
-                }
-            )
+                ContextMenuRowItem(
+                    title = stringResource(R.string.go_to_episode),
+                    iconRes = R.drawable.encore_icon_audio_24,
+                    onClick = {
+                        onDismiss()
+                        onViewEpisode()
+                    }
+                )
+            } else {
+                ContextMenuRowItem(
+                    title = stringResource(R.string.go_to_artist),
+                    iconRes = R.drawable.encore_icon_artist_24,
+                    onClick = {
+                        onDismiss()
+                        onViewArtist(track.artist, track.artistUri)
+                    }
+                )
 
-            ContextMenuRowItem(
-                title = stringResource(R.string.view_song_credits),
-                iconRes = R.drawable.encore_icon_user_24,
-                onClick = {
-                    onDismiss()
-                    onShowCredits()
-                }
-            )
+                ContextMenuRowItem(
+                    title = stringResource(R.string.go_to_album),
+                    iconRes = R.drawable.encore_icon_album_24,
+                    onClick = {
+                        onDismiss()
+                        onViewAlbum(track.albumName.ifBlank { track.title }, track.albumUri)
+                    }
+                )
+            }
+
+            if (!isEpisode) {
+                ContextMenuRowItem(
+                    title = stringResource(R.string.view_song_credits),
+                    iconRes = R.drawable.encore_icon_user_24,
+                    onClick = {
+                        onDismiss()
+                        onShowCredits()
+                    }
+                )
+            }
 
             if (canvasAvailable) {
                 ContextMenuRowItem(
@@ -312,8 +337,13 @@ fun TrackOptionsSheet(
 
             if (lyricsUnderCoverAvailable) {
                 ContextMenuRowItem(
-                    title = if (isLyricsUnderCoverEnabled) stringResource(R.string.turn_off_lyrics_under_cover)
-                    else stringResource(R.string.turn_on_lyrics_under_cover),
+                    title = when {
+                        isEpisode && isLyricsUnderCoverEnabled ->
+                            stringResource(R.string.turn_off_transcript_under_cover)
+                        isEpisode -> stringResource(R.string.turn_on_transcript_under_cover)
+                        isLyricsUnderCoverEnabled -> stringResource(R.string.turn_off_lyrics_under_cover)
+                        else -> stringResource(R.string.turn_on_lyrics_under_cover)
+                    },
                     iconRes = R.drawable.encore_icon_mic_24,
                     iconTint = if (isLyricsUnderCoverEnabled) EncoreColors.Green else EncoreColors.TextPrimary,
                     onClick = {

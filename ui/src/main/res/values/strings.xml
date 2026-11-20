@@ -234,6 +234,8 @@
     <string name="more_podcasts_like_this">More podcasts like this</string>
     <string name="turn_off_lyrics_under_cover">Turn off lyrics under cover</string>
     <string name="turn_on_lyrics_under_cover">Turn on lyrics under cover</string>
+    <string name="turn_off_transcript_under_cover">Turn off transcript under cover</string>
+    <string name="turn_on_transcript_under_cover">Turn on transcript under cover</string>
     <string name="most_replayed">Most replayed</string>
     <string name="move">Move</string>
     <string name="move_to_folder">Move to folder</string>
