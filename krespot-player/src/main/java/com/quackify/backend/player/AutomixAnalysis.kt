@@ -353,7 +353,9 @@ private class PcmTap : BaseAudioProcessor() {
         if (channels > 0 && sessionRate > 0) {
             tap(inputBuffer)
         }
-        replaceOutputBuffer(inputBuffer.remaining()).put(inputBuffer).flip()
+        if (inputBuffer.hasRemaining()) {
+            replaceOutputBuffer(inputBuffer.remaining()).put(inputBuffer).flip()
+        }
     }
 
     private fun tap(input: ByteBuffer) {
