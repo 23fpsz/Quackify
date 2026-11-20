@@ -3182,6 +3182,29 @@ class PlaybackBridge(private val context: Context) {
         log.w("skip: the cluster still names '${state.trackUri.takeLast(12)}' after ${SKIP_TRIES} reads")
     }
 
+    /**
+     * Waits for the remote device to name the track we asked it to play. The
+     * server answers 202 even when the target drops the command, so the only
+     * reliable signal is the cluster moving to the requested row.
+     */
+    private suspend fun awaitRemoteTrack(uri: String, remoteId: String): Boolean {
+        repeat(PLAY_LAND_TRIES) { attempt ->
+            delay(if (attempt == 0) SKIP_SETTLE_MS else SKIP_RETRY_MS)
+            val at = connect.cluster.value
+            if (at != null && at.track.uri == uri && at.activeDevice?.id == remoteId) {
+                log.i("play '$uri' landed on the remote at attempt ${attempt + 1}")
+                return true
+            }
+            connect.refreshCluster()
+            val after = connect.cluster.value
+            if (after != null && after.track.uri == uri && after.activeDevice?.id == remoteId) {
+                log.i("play '$uri' landed on the remote after refresh ${attempt + 1}")
+                return true
+            }
+        }
+        return false
+    }
+
     private suspend fun previous(force: Boolean = false) {
         pendingReasonEnd = "backbtn"
         pendingReasonStart = "backbtn"
@@ -3348,12 +3371,31 @@ class PlaybackBridge(private val context: Context) {
         val remote = remoteTarget()
         if (remote.isNotBlank()) {
             markPending(uri, index, context)
-            val sent = if (sameMachine && uid.isNotBlank()) {
-                connect.skipToRow(remote, uri, uid)
-            } else {
-                connect.play(context, uri, uid, index, targetDeviceId = remote)
+            if (sameMachine && uid.isNotBlank()) {
+                if (connect.skipToRow(remote, uri, uid) && awaitRemoteTrack(uri, remote)) return
+                connect.refreshCluster(force = true)
+                val fresh = connect.cluster.value?.window()?.firstOrNull { it.uri == uri }?.uid.orEmpty()
+                if (fresh.isNotBlank() && fresh != uid) {
+                    log.w("play '$uri': skip_to never landed, retrying on a fresh machine read")
+                    markPending(uri, index, context)
+                    if (connect.skipToRow(remote, uri, fresh) && awaitRemoteTrack(uri, remote)) return
+                }
+                log.w("play '$uri': the remote kept its machine, rebuilding it with play")
             }
-            if (!sent) {
+            if (connect.play(context, uri, uid, index, targetDeviceId = remote)) {
+                if (awaitRemoteTrack(uri, remote)) return
+                if (uid.isNotBlank()) {
+                    log.w("play '$uri': the remote ignored the uid from another machine, retrying without it")
+                    markPending(uri, index, context)
+                    if (connect.play(context, uri, "", index, targetDeviceId = remote) &&
+                        awaitRemoteTrack(uri, remote)
+                    ) {
+                        return
+                    }
+                }
+                clearPending()
+                log.w("play '$uri': the remote never started it, dropping the wait")
+            } else {
                 clearPending()
                 log.w("playFromCluster: the server refused '${uri.takeLast(12)}', dropping the wait")
             }
@@ -5415,6 +5457,7 @@ class PlaybackBridge(private val context: Context) {
 
         const val SKIP_TRIES = 5
         const val SKIP_RETRY_MS = 400L
+        const val PLAY_LAND_TRIES = 4
         const val CLUSTER_RETRY_MS = 400L
         const val RESTART_MS = 3000L
         const val PENDING_MS = 10_000L
