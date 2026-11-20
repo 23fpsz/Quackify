@@ -136,6 +136,7 @@ class MainActivity : ComponentActivity() {
     private var resumeSignal by mutableStateOf(0)
     private var pendingLink by mutableStateOf<SpotLink?>(null)
     private var videoFullscreen by mutableStateOf(false)
+    private var videoAutoExitSignal by mutableStateOf(0)
 
     /** Bumped every time the playback notification's body is tapped; the
      * shell watches it and slides the Now Playing view over whatever is
@@ -837,11 +838,25 @@ class MainActivity : ComponentActivity() {
                         val bridge = remember(hostGeneration) { PlaybackHost.ensure(context) }
                         val playback = bridge.state
 
-                        LaunchedEffect(playback.videoActive) {
-                            if (!playback.videoActive && videoFullscreen) {
-                                videoFullscreen = false
-                                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                        LaunchedEffect(playback.videoActive, playback.trackUri) {
+                            if (playback.videoActive || !videoFullscreen) return@LaunchedEffect
+                            var waited = 0
+                            while (waited < VIDEO_AUTO_EXIT_MAX_MS) {
+                                if (!videoFullscreen || bridge.state.videoActive) return@LaunchedEffect
+                                if (waited >= VIDEO_AUTO_EXIT_MIN_MS &&
+                                    !bridge.state.videoSwitching &&
+                                    !bridge.state.musicVideoAvailable
+                                ) {
+                                    break
+                                }
+                                delay(250L)
+                                waited += 250
                             }
+                            if (!videoFullscreen || bridge.state.videoActive) return@LaunchedEffect
+                            val hasVideo = bridge.state.musicVideoAvailable
+                            videoFullscreen = false
+                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                            if (!hasVideo) videoAutoExitSignal++
                         }
 
                         LaunchedEffect(videoFullscreen) {
@@ -2009,6 +2024,7 @@ class MainActivity : ComponentActivity() {
             browseLoadingMore = browseLoadingMore,
             categoryShelves = categoryShelves,
             videoFullscreen = videoFullscreen,
+            videoAutoExitSignal = videoAutoExitSignal,
             onToggleVideoFullscreen = { on ->
                 videoFullscreen = on
                 requestedOrientation = if (on) {
@@ -2194,6 +2210,8 @@ class MainActivity : ComponentActivity() {
         const val TOKEN_STILL_GOOD_MS = 60_000L
         const val RECENTS_SYNC_THROTTLE_MS = 5 * 60_000L
         const val RECENT_SEARCH_SETTLE_MS = 4_000L
+        const val VIDEO_AUTO_EXIT_MIN_MS = 1_500L
+        const val VIDEO_AUTO_EXIT_MAX_MS = 3_000L
     }
 }
 

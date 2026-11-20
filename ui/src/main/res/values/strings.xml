@@ -257,6 +257,7 @@
     <string name="next_in_queue">Next in queue</string>
     <string name="no_contributors_yet">No contributors yet</string>
     <string name="no_credits_for_this_track">No credits for this track</string>
+    <string name="no_music_video_for_this_track">No music video for this track</string>
     <string name="no_folders_yet_create_one_from_the_button">No folders yet. Create one from the + button.</string>
     <string name="no_notifications_yet">No notifications yet</string>
     <string name="no_release_notes">No release notes.</string>
@@ -361,6 +362,7 @@
     <string name="to_top">To top</string>
     <string name="today">Today</string>
     <string name="toggle_fullscreen_video">Toggle fullscreen video</string>
+    <string name="exit_fullscreen_video">Exit fullscreen video</string>
     <string name="top_artist">Top artist</string>
     <string name="top_artists_this_month">Top artists this month</string>
     <string name="top_playlist">Top playlist</string>

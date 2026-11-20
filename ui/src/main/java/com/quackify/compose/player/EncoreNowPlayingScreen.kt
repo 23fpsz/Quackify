@@ -366,6 +366,11 @@ fun EncoreNowPlayingScreen(
                 isLoading = isLoading,
                 canSeek = canSeek,
                 chapters = chapters,
+                isPlaying = isPlaying,
+                canSkipPrevious = canSkipPrevious,
+                onPlayPause = onPlayPauseClick,
+                onSkipPrevious = onSkipToPreviousClick,
+                onSkipNext = onSkipNextClick,
                 onExit = { onToggleVideoFullscreen(false) }
             )
         }
@@ -1886,6 +1891,11 @@ private fun VideoFullscreenLayout(
     isLoading: Boolean,
     canSeek: Boolean,
     chapters: List<ChapterMarker>,
+    isPlaying: Boolean,
+    canSkipPrevious: Boolean,
+    onPlayPause: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onSkipNext: () -> Unit,
     onExit: () -> Unit,
 ) {
     var overlayVisible by remember { mutableStateOf(true) }
@@ -1921,18 +1931,76 @@ private fun VideoFullscreenLayout(
             visible = overlayVisible,
             enter = fadeIn(tween(durationMillis = 250)),
             exit = fadeOut(tween(durationMillis = 250)),
+            modifier = Modifier.align(Alignment.TopStart)
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(10.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable(onClick = onExit)
+                    .padding(7.dp)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.encore_icon_chevron_down_24),
+                    contentDescription = stringResource(R.string.exit_fullscreen_video),
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = overlayVisible,
+            enter = fadeIn(tween(durationMillis = 250)),
+            exit = fadeOut(tween(durationMillis = 250)),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            NowPlayingSeekBarSection(
-                progress = progress,
-                durationMs = durationMs,
-                currentPositionMs = currentPositionMs,
-                onSeek = onSeek,
-                isLoading = isLoading,
-                canSeek = canSeek,
-                markers = chapterFractions(chapters, durationMs),
-                modifier = Modifier.padding(bottom = 20.dp)
-            )
+            Column(
+                modifier = Modifier.padding(bottom = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(28.dp)
+                ) {
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_skip_back_24,
+                        contentDescription = stringResource(R.string.previous),
+                        onClick = onSkipPrevious,
+                        tint = Color.White,
+                        size = 48.dp,
+                        iconSize = 30.dp,
+                        enabled = canSkipPrevious
+                    )
+                    EncorePlayButton(
+                        isPlaying = isPlaying,
+                        onClick = onPlayPause,
+                        size = 64.dp,
+                        iconSize = 32.dp,
+                        backgroundColor = Color.White,
+                        iconColor = EncoreColors.PureBlack,
+                        isLoading = isLoading
+                    )
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_skip_forward_24,
+                        contentDescription = stringResource(R.string.next),
+                        onClick = onSkipNext,
+                        tint = Color.White,
+                        size = 48.dp,
+                        iconSize = 30.dp
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                NowPlayingSeekBarSection(
+                    progress = progress,
+                    durationMs = durationMs,
+                    currentPositionMs = currentPositionMs,
+                    onSeek = onSeek,
+                    isLoading = isLoading,
+                    canSeek = canSeek,
+                    markers = chapterFractions(chapters, durationMs)
+                )
+            }
         }
     }
 }
