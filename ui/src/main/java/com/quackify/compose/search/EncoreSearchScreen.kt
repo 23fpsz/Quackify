@@ -745,24 +745,30 @@ fun EncoreSearchScreen(
                 contentPadding = PaddingValues(top = 4.dp, bottom = bottomPadding)
             ) {
                 items(dropHits.distinctBy { it.uri }, key = { it.uri.ifBlank { it.title } }) { hit ->
+                    val openSuggestion = {
+                        if (hit.kind == SearchKind.QUERY) {
+                            suggestionsPinned = false
+                            isSearchBarFocused = false
+                            searchQuery = hit.title
+                            focusManager.clearFocus()
+                            onRecordRecent(hit)
+                            onSearchQueryChange(hit.title)
+                        } else {
+                            if (hit.kind == SearchKind.TRACK) suggestionsPinned = true
+                            isSearchBarFocused = false
+                            focusManager.clearFocus()
+                            openHit(hit)
+                        }
+                    }
+                    val openSuggestionOptions = { onTrackOptionsClick(hit.toTrackItem()) }
+                    val suggestionLongPress = if (hit.kind == SearchKind.TRACK) openSuggestionOptions else null
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                if (hit.kind == SearchKind.QUERY) {
-                                    suggestionsPinned = false
-                                    isSearchBarFocused = false
-                                    searchQuery = hit.title
-                                    focusManager.clearFocus()
-                                    onRecordRecent(hit)
-                                    onSearchQueryChange(hit.title)
-                                } else {
-                                    if (hit.kind == SearchKind.TRACK) suggestionsPinned = true
-                                    isSearchBarFocused = false
-                                    focusManager.clearFocus()
-                                    openHit(hit)
-                                }
-                            }
+                            .combinedClickable(
+                                onClick = openSuggestion,
+                                onLongClick = suggestionLongPress
+                            )
                             .padding(horizontal = 16.dp)
                             .height(56.dp),
                         verticalAlignment = Alignment.CenterVertically
