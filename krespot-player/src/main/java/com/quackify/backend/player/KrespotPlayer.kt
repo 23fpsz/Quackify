@@ -312,8 +312,10 @@ class KrespotPlayer(private val context: Context) {
      * was measured on the device for the sides of the transition, so the fade
      * the engine holds is already sized in whole bars with the incoming
      * track's tempo stretch decided. The analysis runs inside the time the
-     * current track has left; a window that does not finish in it returns
-     * null and the plain crossfade stays in charge.
+     * current track has left; a window that does not finish in it simply
+     * leaves the planner without grids and the plan falls back to the plain
+     * fade, so the settings warning's promised crossfade happens even with
+     * the crossfade slider at zero.
      */
     private suspend fun automixSpecFor(next: CommandTrack, nextSource: AudioSource): TransitionSpec? {
         if (!automixEnabled()) {
@@ -357,7 +359,9 @@ class KrespotPlayer(private val context: Context) {
         } else {
             null
         }
-        if (outGrid == null && inGrid == null) return null
+        if (outGrid == null && inGrid == null) {
+            log.i("automix: no grid on either side of '${next.name}', blending with the plain fade")
+        }
         val spec = AutomixPlanner.plan(
             outGrid,
             inGrid,
