@@ -33,6 +33,8 @@
     <string name="show_more_replies">Show more replies</string>
     <string name="add_reaction">Add reaction</string>
     <string name="loading_reactions">Loading reactions…</string>
+    <string name="delete_comment_title">Delete comment</string>
+    <string name="delete_comment_message">This comment will be permanently deleted.</string>
     <string name="see_episode_description">See Episode Description</string>
     <string name="chapters">Chapters</string>
     <string name="episode_description">Episode description</string>
