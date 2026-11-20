@@ -98,6 +98,7 @@ internal class ShellSheetsEnv(
     val onLogout: (() -> Unit)?,
     val onArtistFollowToggle: ((String, Boolean) -> Unit)?,
     val onArtistFollowed: (suspend (String) -> Boolean?)?,
+    val onArtistImage: (suspend (String) -> String?)?,
     val onArtistRadio: (suspend (String) -> String?)?,
     val onCanvasToggle: ((Boolean) -> Unit)?,
     val onCanvasResolution: ((Int) -> Unit)?,
@@ -149,6 +150,16 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         if (!sheetArtistUri.startsWith("spotify:artist:")) return@LaunchedEffect
         if (local.artistOptionsFollowed == null) {
             local.artistOptionsFollowed = env.onArtistFollowed?.invoke(sheetArtistUri)
+        }
+    }
+    // The picker sheet's three-dot hands over an artist the local state knows
+    // nothing about, so the avatar arrives here instead of riding it in.
+    LaunchedEffect(flags.isArtistOptionsOpen, sheetArtistUri) {
+        if (!flags.isArtistOptionsOpen) return@LaunchedEffect
+        if (!flags.isArtistOptionsFromList) return@LaunchedEffect
+        if (!sheetArtistUri.startsWith("spotify:artist:")) return@LaunchedEffect
+        if (local.artistOptionsAvatarUrl.isNullOrBlank()) {
+            local.artistOptionsAvatarUrl = env.onArtistImage?.invoke(sheetArtistUri)
         }
     }
 

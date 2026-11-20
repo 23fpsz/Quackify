@@ -1834,6 +1834,15 @@ class MainActivity : ComponentActivity() {
                 val saved = runCatching { Library.saved(context, listOf(uri)) }.getOrNull()
                 saved?.let { if (it.isEmpty()) null else uri in it }
             },
+            onArtistImage = { uri ->
+                artistCache[uri]?.imageUrl?.takeIf { it.isNotBlank() }
+                    ?: runCatching { Krespot.artists.artist(context, uri) }.getOrNull()
+                        ?.also {
+                            if (artistCache.size >= 24) artistCache.clear()
+                            artistCache[uri] = it
+                        }
+                        ?.imageUrl?.takeIf { it.isNotBlank() }
+            },
             onShowFollowToggle = { uri, follow ->
                 scope.launch {
                     val ok = Library.setSaved(applicationContext, listOf(uri), follow)
