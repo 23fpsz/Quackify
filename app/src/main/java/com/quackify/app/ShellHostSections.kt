@@ -1264,6 +1264,7 @@ val ok = if (playlistUri == "spotify:collection:tracks") {
     Krespot.playlists.addTrack(context, playlistUri, trackUri)
 }
 log.i("add '$trackUri' -> '$playlistUri' ok=$ok")
+if (ok) refreshLoadedPlaylist(playlistUri)
 return ok
 }
 
