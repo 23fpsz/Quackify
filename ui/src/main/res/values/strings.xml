@@ -343,6 +343,11 @@
     <string name="shuffle_artist">Shuffle artist</string>
     <string name="switch_to_dual_view">Switch to dual view</string>
     <string name="switch_to_full_view">Switch to full screen player</string>
+    <string name="sign_in">Sign in</string>
+    <string name="sign_in_with_sp_dc">Sign in with sp_dc</string>
+    <string name="sign_in_with_sp_dc_subtitle">Paste a sp_dc cookie value to skip the web login</string>
+    <string name="sp_dc_rejected">That sp_dc did not sign in</string>
+    <string name="sp_dc_signed_in">Signed in as %1$s</string>
     <string name="singles_and_eps">Singles &amp; EPs</string>
     <string name="sleep_timer">Sleep timer</string>
     <string name="smart_shuffle_on">Smart Shuffle on</string>
