@@ -88,6 +88,7 @@ internal fun ShellSheets(
     sortOption: LibrarySortOption,
     sortDirection: SortDirection = SortDirection.DESCENDING,
     sleepTimer: SleepTimerOption?,
+    sleepTimerEndsAtMs: Long = 0L,
     userDisplayName: String,
     userAvatarUrl: String,
     userColorHex: String = "",
@@ -250,6 +251,7 @@ internal fun ShellSheets(
         onAddPlaylistToAnother = onAddPlaylistToAnother,
         onPlaylistMoveToFolder = onPlaylistMoveToFolder,
         canPlaylistMoveToFolder = canPlaylistMoveToFolder,
+        sleepTimer = sleepTimer,
     )
 
     ShellLibrarySheets(
@@ -258,6 +260,7 @@ internal fun ShellSheets(
         sortOption = sortOption,
         sortDirection = sortDirection,
         sleepTimer = sleepTimer,
+        sleepTimerEndsAtMs = sleepTimerEndsAtMs,
         devices = devices,
         connectedDevice = connectedDevice,
         userQueue = userQueue,
@@ -403,6 +406,7 @@ private fun ShellEntityOptionsSheets(
     onRemoveTrackFromPlaylist: (() -> Unit)?,
     onSongRadio: (() -> Unit)?,
     onSleepTimerClick: (() -> Unit)? = null,
+    sleepTimer: SleepTimerOption? = null,
     onAlbumRadio: (() -> Unit)?,
     onAddToPlaylistFromAlbum: (() -> Unit)?,
     onAddToPlaylistFromTrack: (() -> Unit)? = null,
@@ -434,6 +438,7 @@ private fun ShellEntityOptionsSheets(
         onAddToPlaylist = onAddToPlaylistFromTrack,
         onSongRadio = onSongRadio,
         onSleepTimerClick = onSleepTimerClick,
+        sleepTimer = sleepTimer,
         lyricsUnderCoverAvailable = lyricsUnderCoverAvailable,
         isLyricsUnderCoverEnabled = isLyricsUnderCoverEnabled,
         onLyricsUnderCoverToggle = onLyricsUnderCoverToggle
@@ -507,6 +512,7 @@ private fun ShellLibrarySheets(
     sortOption: LibrarySortOption,
     sortDirection: SortDirection,
     sleepTimer: SleepTimerOption?,
+    sleepTimerEndsAtMs: Long = 0L,
     devices: List<ConnectDevice>,
     connectedDevice: String,
     userQueue: List<TrackItem>,
@@ -594,6 +600,7 @@ private fun ShellLibrarySheets(
     if (flags.sleepTimer) {
         SleepTimerSheet(
             activeOption = sleepTimer,
+            endsAtMs = sleepTimerEndsAtMs,
             onOptionSelected = onSleepTimerSelected,
             onDismiss = onDismissSleepTimer
         )

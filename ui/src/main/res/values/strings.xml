@@ -351,6 +351,13 @@
     <string name="sp_dc_signed_in">Signed in as %1$s</string>
     <string name="singles_and_eps">Singles &amp; EPs</string>
     <string name="sleep_timer">Sleep timer</string>
+    <string name="sleep_timer_custom">Custom</string>
+    <string name="sleep_timer_custom_hint">Between 3 minutes and 24 hours</string>
+    <string name="sleep_timer_custom_unit">minutes</string>
+    <string name="sleep_timer_end_of_track_info">Playback stops at the end of the current track</string>
+    <string name="sleep_timer_set">Set timer</string>
+    <string name="sleep_timer_stops_at">Stops at %1$s</string>
+    <string name="sleep_timer_with_duration">Sleep timer (%1$s)</string>
     <string name="smart_shuffle_on">Smart Shuffle on</string>
     <string name="smart_shuffle_recommendation">Smart Shuffle recommendation</string>
     <string name="songs">Songs</string>
@@ -586,6 +593,14 @@
     <plurals name="play_count">
         <item quantity="one">1 play</item>
         <item quantity="other">%1$s plays</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
     </plurals>
     <string name="player_controls">Player controls</string>
     <string name="notification_and_car_controls">Notification &amp; Android Auto controls</string>

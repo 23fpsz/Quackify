@@ -287,6 +287,13 @@
     <string name="try_searching_again_using_a_different_spelling_o">Riprova la ricerca con un termine o una grafia diversa.</string>
     <string name="try_searching_for_a_different_track_title_or_art">Prova a cercare un titolo di brano o un artista diverso</string>
     <string name="turn_off_timer">Disattiva timer</string>
+    <string name="sleep_timer_custom">Personalizzato</string>
+    <string name="sleep_timer_custom_hint">Tra 3 minuti e 24 ore</string>
+    <string name="sleep_timer_custom_unit">minuti</string>
+    <string name="sleep_timer_end_of_track_info">La riproduzione si fermerà alla fine del brano corrente</string>
+    <string name="sleep_timer_set">Imposta timer</string>
+    <string name="sleep_timer_stops_at">Si ferma alle %1$s</string>
+    <string name="sleep_timer_with_duration">Timer di spegnimento (%1$s)</string>
     <string name="undo">Annulla</string>
     <string name="update_available">Aggiornamento disponibile</string>
     <string name="verified_artist">Artista verificato</string>
@@ -484,6 +491,14 @@
     <plurals name="play_count">
         <item quantity="one">1 riproduzione</item>
         <item quantity="other">%1$s riproduzioni</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="one">%1$d ora</item>
+        <item quantity="other">%1$d ore</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%1$d minuto</item>
+        <item quantity="other">%1$d minuti</item>
     </plurals>
     <string name="a_thin_playback_line_on_the_3x2_and_3x3_widgets">Una linea sottile di riproduzione nei widget 3x2 e 3x3.</string>
     <string name="debug">Debug</string>

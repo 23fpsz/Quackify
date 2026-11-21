@@ -238,6 +238,13 @@
     <string name="forty_five_minutes">45 minutes</string>
     <string name="one_hour">1 heure</string>
     <string name="turn_off_timer">Désactiver le minuteur</string>
+    <string name="sleep_timer_custom">Personnalisé</string>
+    <string name="sleep_timer_custom_hint">Entre 3 minutes et 24 heures</string>
+    <string name="sleep_timer_custom_unit">minutes</string>
+    <string name="sleep_timer_end_of_track_info">La lecture s\'arrêtera à la fin du titre actuel</string>
+    <string name="sleep_timer_set">Définir la minuterie</string>
+    <string name="sleep_timer_stops_at">S\'arrête à %1$s</string>
+    <string name="sleep_timer_with_duration">Minuterie de sommeil (%1$s)</string>
     <string name="stop_audio_in">Arrêter l\'audio dans</string>
     <string name="back_15_seconds">Reculer de 15 secondes</string>
     <string name="forward_15_seconds">Avancer de 15 secondes</string>
@@ -276,6 +283,15 @@
     <plurals name="play_count">
         <item quantity="one">1 lecture</item>
         <item quantity="other">%1$s lectures</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="one">%1$d heure</item>
+        <item quantity="many">%1$d heures</item>
+        <item quantity="other">%1$d heures</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
     </plurals>
     <string name="a_thin_playback_line_on_the_3x2_and_3x3_widgets">Une fine ligne de lecture sur les widgets 3x2 et 3x3.</string>
     <string name="debug">Debug</string>

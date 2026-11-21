@@ -156,6 +156,7 @@ data class ComposePlaybackState(
     val playbackSpeed: Float = 1f,
     val chapters: List<ChapterMarker> = emptyList(),
     val sleepTimer: SleepTimerOption? = null,
+    val sleepTimerEndsAtMs: Long = 0L,
 )
 
 data class ChapterMarker(
@@ -318,6 +319,7 @@ internal class ShellLocalState {
     var artistListTrack by mutableStateOf<TrackItem?>(null)
     var addTrackTarget by mutableStateOf<TrackItem?>(null)
     var sleepTimer by mutableStateOf<SleepTimerOption?>(null)
+    var sleepTimerEndsAtMs by mutableLongStateOf(0L)
 }
 
 
