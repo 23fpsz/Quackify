@@ -9,7 +9,9 @@ plugins {
 android {
     namespace = "com.quackify.app"
     compileSdk {
-        version = release(37)
+        version = release(37) {
+            minorApiLevel = 2
+        }
     }
 
     val keystoreProperties = Properties()
