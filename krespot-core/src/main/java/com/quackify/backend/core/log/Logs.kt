@@ -80,6 +80,7 @@ object Logs {
         SOURCE("source"),
         DRM("drm"),
         MP3("mp3"),
+        YTM("ytm"),
 
         BRIDGE("bridge"),
         HOST("host"),

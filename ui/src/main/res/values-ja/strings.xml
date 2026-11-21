@@ -242,6 +242,15 @@
     <string name="sleep_timer_custom_hint">3分から24時間の間で設定してください</string>
     <string name="sleep_timer_custom_unit">分</string>
     <string name="sleep_timer_end_of_track_info">現在のトラックの終わりで再生を停止します</string>
+    <string name="stream_sources">ストリームソース</string>
+    <string name="stream_sources_desc">再生はこの順序で各ソースを試し、失敗すると次のソースへ切り替えます</string>
+    <string name="stream_sources_row_desc">最初に試す音声ソースを選択します</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">メイン</string>
+    <string name="stream_source_fallback">フォールバック</string>
+    <string name="stream_source_move_up">上へ移動</string>
+    <string name="stream_source_move_down">下へ移動</string>
     <string name="sleep_timer_set">タイマーを設定</string>
     <string name="sleep_timer_stops_at">%1$s に停止します</string>
     <string name="sleep_timer_with_duration">スリープタイマー（%1$s）</string>

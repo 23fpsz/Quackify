@@ -78,6 +78,8 @@ import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.locale.AppLocale
 import com.quackify.backend.core.log.DeviceInfo
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.store.StreamSource
+import com.quackify.backend.core.store.StreamSources
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
@@ -90,6 +92,7 @@ import com.quackify.compose.sheets.AppLanguageSheet
 import com.quackify.compose.sheets.EncoreCreateNameDialog
 import com.quackify.compose.sheets.LyricsProviderSheet
 import com.quackify.compose.sheets.PlayerButtonsConfigSheet
+import com.quackify.compose.sheets.StreamSourcesSheet
 import com.quackify.compose.sheets.TranslationLanguageSheet
 import com.quackify.compose.settings.PlayerButtonsConfig
 import com.quackify.compose.settings.PlayerButtonsStore
@@ -243,6 +246,18 @@ fun SettingsScreen(
     var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
     var translationLanguageSheetOpen by remember { mutableStateOf(false) }
     var appLanguageSheetOpen by remember { mutableStateOf(false) }
+    var streamSources by remember { mutableStateOf(StreamSources.order(context)) }
+    var streamSourcesSheetOpen by remember { mutableStateOf(false) }
+    val streamSourcesLabel = remember(streamSources) {
+        streamSources.joinToString(" → ") { source ->
+            context.getString(
+                when (source) {
+                    StreamSource.SPOTIFY -> R.string.stream_source_spotify
+                    StreamSource.YT_MUSIC -> R.string.stream_source_ytmusic
+                }
+            )
+        }
+    }
     val appLanguage = remember { AppLocale.current(context) }
 
     BackHandler(enabled = category != null) {
@@ -692,6 +707,43 @@ fun SettingsScreen(
                 if (target == 2) {
                     item {
                         SettingsSectionHeader(title = stringResource(R.string.playback))
+                        if (streamSourcesSheetOpen) {
+                            StreamSourcesSheet(
+                                orderedSources = streamSources,
+                                onOrderSelected = { order ->
+                                    streamSources = order
+                                    StreamSources.save(context, order)
+                                },
+                                onDismiss = { streamSourcesSheetOpen = false }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { streamSourcesSheetOpen = true }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                                Text(
+                                    text = stringResource(R.string.stream_sources),
+                                    style = EncoreTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        color = EncoreColors.TextPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = stringResource(R.string.stream_sources_row_desc),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
+                            Text(
+                                text = streamSourcesLabel,
+                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.Green)
+                            )
+                        }
                         SettingsToggleRow(
                             title = stringResource(R.string.autoplay_on_startup),
                             subtitle = stringResource(R.string.when_you_open_the_app_the_loaded_track_starts_pl),

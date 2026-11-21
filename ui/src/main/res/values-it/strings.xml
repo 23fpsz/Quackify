@@ -291,6 +291,15 @@
     <string name="sleep_timer_custom_hint">Tra 3 minuti e 24 ore</string>
     <string name="sleep_timer_custom_unit">minuti</string>
     <string name="sleep_timer_end_of_track_info">La riproduzione si fermerà alla fine del brano corrente</string>
+    <string name="stream_sources">Sorgenti di riproduzione</string>
+    <string name="stream_sources_desc">La riproduzione prova ogni sorgente in questo ordine e passa alla successiva quando una fallisce</string>
+    <string name="stream_sources_row_desc">Sceglie quale sorgente audio provare per prima</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">Principale</string>
+    <string name="stream_source_fallback">Riserva</string>
+    <string name="stream_source_move_up">Sposta su</string>
+    <string name="stream_source_move_down">Sposta giù</string>
     <string name="sleep_timer_set">Imposta timer</string>
     <string name="sleep_timer_stops_at">Si ferma alle %1$s</string>
     <string name="sleep_timer_with_duration">Timer di spegnimento (%1$s)</string>
