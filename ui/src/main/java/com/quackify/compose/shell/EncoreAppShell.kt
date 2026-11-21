@@ -13,6 +13,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -430,6 +431,10 @@ fun EncoreAppShell(
             },
         )
     }
+
+    // The shell body lives in a composable lambda and the hosts wiring in a local
+    // function: inlining either would push EncoreAppShell past the ART JIT method limit.
+    val rootContent: @Composable BoxScope.() -> Unit = {
     var currentScreen by navController.nav::currentScreen
     var selectedNavIndex by navController.nav::selectedNavIndex
     var isPlayerExpanded by navController.nav::isPlayerExpanded
@@ -768,13 +773,7 @@ fun EncoreAppShell(
         navController.openFolder(item, onOpenFolder)
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(EncoreColors.PureBlack)
-    ) {
-
-        val hosts = ShellHosts(
+    fun buildHosts() = ShellHosts(
             active = active,
             flags = flags,
             local = local,
@@ -936,6 +935,7 @@ fun EncoreAppShell(
             onCreatePlaylist = onCreatePlaylist,
             playlistDescription = playlistDetail?.description.orEmpty(),
         )
+        val hosts = buildHosts()
         val splitPlayer = isSplitPlayerLayout() &&
             com.quackify.compose.player.PlayerViewOptions.landscapeDualView
         val splitFraction = splitPlayerWidthFraction()
@@ -1256,6 +1256,13 @@ fun EncoreAppShell(
                 .fillMaxWidth(contentFraction)
                 .padding(bottom = rememberBottomPadding())
         )
+    }
 
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(EncoreColors.PureBlack)
+    ) {
+        this.rootContent()
     }
 }
