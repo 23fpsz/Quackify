@@ -569,6 +569,11 @@ class PlaybackBridge(private val context: Context) {
     var queueEditResult by mutableStateOf(QueueEditResult())
         private set
 
+    /** Bumped whenever the licence endpoint answers 429, so the shell can
+     * toast why playback is stalling while the gate retries on its own. */
+    var licenceRateLimitedSignal by mutableStateOf(0)
+        private set
+
     val progress = PlaybackProgress()
 
     val progressSnapshot: PlaybackProgressSnapshot
@@ -963,6 +968,9 @@ class PlaybackBridge(private val context: Context) {
         player.onFocusDuck = { ducked ->
             if (ducked) log.i("another app is talking over us, the volume is down") else
                 log.i("the other app is done, the volume is back")
+        }
+        player.onLicenceRateLimited = {
+            scope.launch { licenceRateLimitedSignal++ }
         }
         player.warm()
         if (autoplayOnStartup) {
