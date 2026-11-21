@@ -376,7 +376,7 @@ class MainActivity : ComponentActivity() {
                             while (true) {
                                 delay(TOKEN_CHECK_INTERVAL_MS)
                                 val previous = EncoreAuth.token(context)
-                                SilentTokenRefresh.ensureFresh(context, "hourly")
+                                SilentTokenRefresh.ensureFresh(context, "periodic")
                                 if (EncoreAuth.token(context) != previous) retryScreensLeftEmpty()
                             }
                         }
@@ -1576,7 +1576,7 @@ class MainActivity : ComponentActivity() {
         const val CLIENT_PREFS = "quackify.client"
         const val RESUME_REFRESH_AFTER_MS = 60_000L
         const val TOKEN_STILL_GOOD_MS = 60_000L
-        const val TOKEN_CHECK_INTERVAL_MS = 60L * 60 * 1000L
+        const val TOKEN_CHECK_INTERVAL_MS = 48L * 60 * 60 * 1000L
         const val RECENTS_SYNC_THROTTLE_MS = 5 * 60_000L
         const val RECENT_SEARCH_SETTLE_MS = 4_000L
         const val VIDEO_AUTO_EXIT_MIN_MS = 1_500L
