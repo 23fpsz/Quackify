@@ -46,7 +46,7 @@ private val blockedFormats = mutableSetOf<Int>()
 private const val SEEKTABLE_HOST = "https://seektables.spotifycdn.com/v1/seektable/"
 private const val LICENSE_PATH = "widevine-license/v1/audio/license"
 private const val LICENSE_QUERY =
-    "keysystem=com.widevine.alpha&mediatype=audio&sdk_name=harmony&sdk_version=4.81.1"
+    "keysystem=com.widevine.alpha&mediatype=audio&sdk_name=harmony&sdk_version=4.82.0"
 private const val APP_VERSION = "1.3.8.509.g26b6eac7300d"
 private const val ENDPOINT_FALLBACK_SECONDS = 60L
 
@@ -159,21 +159,21 @@ internal object SourceResolver {
             log.w("no candidate left for '${uri.takeLast(12)}'")
             return null
         }
-        for (file in candidates) {
+        for ((fileId1, format1, bitrate, quality) in candidates) {
             val (table, url) = coroutineScope {
-                val table = async { seektable(file.fileId) }
-                val url = async { cdnUrl(context, file.fileId, file.format) }
+                val table = async { seektable(fileId1) }
+                val url = async { cdnUrl(context, fileId1, format1) }
                 table.await() to url.await()
             }
             if (table == null || url == null) {
-                log.w("source ${file.fileId.take(12)} fmt=${file.format} unusable, trying the next one")
+                log.w("source ${fileId1.take(12)} fmt=$format1 unusable, trying the next one")
                 continue
             }
-            log.i("source ${file.fileId} fmt=${file.format} segs=${table.count} " +
+            log.i("source $fileId1 fmt=$format1 segs=${table.count} " +
                     "len=${"%.3f".format(table.totalDuration.toDouble() / table.timescale)}s " +
                     "offset=${table.offset} pssh=${table.pssh.length}B"
             )
-            return AudioSource(file.fileId, file.format, file.bitrate, file.quality, url, table)
+            return AudioSource(fileId1, format1, bitrate, quality, url, table)
         }
         return null
     }
@@ -193,7 +193,7 @@ internal object SourceResolver {
         }
         val media = json.optJSONObject("media") ?: return emptyList()
         val entry = media.optJSONObject(uri)
-            ?: media.keys().asSequence().mapNotNull { media.optJSONObject(it) }.firstOrNull()
+            ?: media.keys().asSequence().firstNotNullOfOrNull { media.optJSONObject(it) }
             ?: return emptyList()
         val files = entry.optJSONObject("item")
             ?.optJSONObject("manifest")
@@ -240,7 +240,7 @@ internal object SourceResolver {
         val durations = usable.map { it.optLong("duration", 0L) }
         val pssh = json.optJSONObject("pssh")?.optString("widevine").orEmpty()
         if (sizes.isEmpty()) {
-            log.w("seektable incomplete segs=${sizes.size}")
+            log.w("seektable incomplete segs=0")
             return null
         }
         return Seektable(
