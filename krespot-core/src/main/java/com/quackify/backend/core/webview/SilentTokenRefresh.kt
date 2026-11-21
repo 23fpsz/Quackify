@@ -44,6 +44,8 @@ private const val COOKIE_TRIES = 40
 private const val COOKIE_POLL_MS = 50L
 private const val PROACTIVE_AFTER_MS = 50 * 60 * 1000L
 
+private const val RENEW_BEFORE_MS = 5 * 60 * 1000L
+
 object SilentTokenRefresh {
 
     private val lock = Mutex()
@@ -54,6 +56,31 @@ object SilentTokenRefresh {
         if (age in 0 until PROACTIVE_AFTER_MS) return false
         log.i("token is ${age / 1000}s old, refreshing before it 401s")
         return refresh(context, "proactive")
+    }
+
+    /**
+     * Renews the access token when it is missing or about to expire, unlike
+     * [maybeRefresh] which only looks at its age. A blank stored token (left
+     * over from an invalidation) or a known expiry under [RENEW_BEFORE_MS]
+     * triggers a refresh, so the app recovers on its own instead of failing
+     * every fetch until the user re-logs in.
+     */
+    suspend fun ensureFresh(context: Context, reason: String): Boolean {
+        if (!EncoreAuth.isLoggedIn(context)) return false
+        val token = EncoreAuth.token(context)
+        if (token.isBlank()) {
+            log.i("no stored access token, renewing ($reason)")
+            return refresh(context, reason)
+        }
+        val remaining = EncoreAuth.tokenRemainingMs(context)
+        if (remaining != -1L && remaining < RENEW_BEFORE_MS) {
+            log.i(
+                "access token ${if (remaining <= 0L) "expired" else "expires in ${remaining / 1000}s"}, " +
+                        "renewing ($reason)"
+            )
+            return refresh(context, reason)
+        }
+        return true
     }
 
     suspend fun refresh(context: Context, reason: String): Boolean {
