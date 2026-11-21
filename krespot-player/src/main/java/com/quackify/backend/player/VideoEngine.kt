@@ -32,7 +32,6 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
 import androidx.media3.exoplayer.drm.DrmSessionManager
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
@@ -42,10 +41,6 @@ import androidx.media3.exoplayer.drm.MediaDrmCallback
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
-import java.io.File
-import java.io.IOException
-import java.util.UUID
-import java.util.concurrent.CountDownLatch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -54,6 +49,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.IOException
+import java.net.URLEncoder
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
@@ -82,7 +83,7 @@ internal class EncoreVideoDrmCallback(
     override fun executeProvisionRequest(uuid: UUID, request: ExoMediaDrm.ProvisionRequest): MediaDrmCallback.Response {
         val signed = String(request.data, Charsets.UTF_8)
         val separator = if (request.defaultUrl.contains("?")) "&" else "?"
-        val url = request.defaultUrl + separator + "signedRequest=" + java.net.URLEncoder.encode(signed, "UTF-8")
+        val url = request.defaultUrl + separator + "signedRequest=" + URLEncoder.encode(signed, "UTF-8")
         val response = runBlocking {
             Net.postBlob(url, ByteArray(0), "application/octet-stream", emptyMap(), tag = "provision")
         }
@@ -184,9 +185,9 @@ internal object VideoDash {
     }
 
     private fun template(raw: String): String = raw
-        .replace("{{profile_id}}", "\$RepresentationID\$")
+        .replace("{{profile_id}}", $$"$RepresentationID$")
         .replace("{{file_type}}", "mp4")
-        .replace("{{segment_timestamp}}", "\$Time\$")
+        .replace("{{segment_timestamp}}", $$"$Time$")
 
     private fun representation(
         id: Int,
@@ -274,7 +275,7 @@ internal class VideoEngine(
             }
             runCatching { drm.setPropertyString("securityLevel", "L3") }
             try {
-                var session: ByteArray? = try {
+                val session: ByteArray? = try {
                     drm.openSession()
                 } catch (missing: android.media.NotProvisionedException) {
                     val bytes = provisionDevice(drm)
@@ -341,6 +342,8 @@ internal class VideoEngine(
                     if (existing != null) return@DrmSessionManagerProvider existing
                     DefaultDrmSessionManager.Builder()
                         .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, l3Provider())
+                        .setMultiSession(true)
+                        .setSessionKeepaliveMs(600_000)
                         .build(drmCallback)
                         .also { cachedManager = it }
                 })
@@ -419,7 +422,7 @@ internal class VideoEngine(
                     lastPositionMs = position
                     onEvent(PlayerEvent.Progress(position, durationMs))
                 }
-                delay(PROGRESS_MS)
+                delay(PROGRESS_MS.milliseconds)
             }
         }
     }
@@ -473,10 +476,14 @@ internal class VideoEngine(
 }
 
 internal suspend fun provisionDevice(instance: android.media.MediaDrm): ByteArray? {
-    val request = runCatching { instance.getProvisionRequest() }.getOrNull() ?: return null
+    val request = runCatching { instance.provisionRequest }.getOrNull() ?: return null
     val signed = String(request.data, Charsets.UTF_8)
     val separator = if (request.defaultUrl.contains("?")) "&" else "?"
-    val url = request.defaultUrl + separator + "signedRequest=" + java.net.URLEncoder.encode(signed, "UTF-8")
+    val url = request.defaultUrl + separator + "signedRequest=" + withContext(
+        Dispatchers.IO
+    ) {
+        URLEncoder.encode(signed, "UTF-8")
+    }
     val response = Net.postBlob(url, ByteArray(0), "application/octet-stream", tag = "provision")
     return response?.takeIf { it.ok }?.bytes
 }

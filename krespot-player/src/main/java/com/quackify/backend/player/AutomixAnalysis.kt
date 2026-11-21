@@ -50,6 +50,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
@@ -217,7 +218,7 @@ internal class AutomixAnalysis(private val context: Context) {
                         return@withContext null
                     }
                 }
-                delay(POLL_MS)
+                delay(POLL_MS.milliseconds)
             }
             val rate = tap.sessionRate
             val collected = tap.collected()
@@ -266,6 +267,7 @@ internal class AutomixAnalysis(private val context: Context) {
         val manager = DefaultDrmSessionManager.Builder()
             .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
             .setMultiSession(true)
+            .setSessionKeepaliveMs(600_000)
             .build(AudioDrmCallback(context) { LicenseEndpoint.of(context) })
         factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { manager })
         sourceFactory = factory

@@ -25,7 +25,6 @@ import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
@@ -51,6 +50,8 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
+import kotlin.math.pow
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
@@ -281,7 +282,7 @@ internal class AudioEngine(
                 if (reused) "licence reused for '${source.fileId.take(12)}' and its ${licensedFiles.size} sibling(s)"
                 else "audio drm session asked for '${source.fileId.take(12)}'"
             )
-            gainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
+            gainFactor = 10.0.pow(gainDb / 20.0).toFloat().coerceIn(0f, 1f)
             durationMs = totalMs
             announced = false
             lastItemUri = uri
@@ -318,6 +319,7 @@ internal class AudioEngine(
         val manager = DefaultDrmSessionManager.Builder()
             .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
             .setMultiSession(true)
+            .setSessionKeepaliveMs(600_000)
             .build(AudioDrmCallback(context) { LicenseEndpoint.of(context) })
         factory.setDrmSessionManagerProvider(DrmSessionManagerProvider { manager })
         log.i("$role drm kit built")
@@ -388,7 +390,7 @@ internal class AudioEngine(
         if (!added) return false
         if (uri.isNotBlank()) itemDurations[uri] = totalMs
         if (heldForFade) {
-            spareGainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
+            spareGainFactor = 10.0.pow(gainDb / 20.0).toFloat().coerceIn(0f, 1f)
             crossfadeEngine()?.hold(item, totalMs, spec)
             log.i(
                 "audio held next '$uri' '${source.fileId.take(12)}' for a crossfade " +
@@ -475,7 +477,7 @@ internal class AudioEngine(
     }
 
     fun retune(gainDb: Double) {
-        gainFactor = Math.pow(10.0, gainDb / 20.0).toFloat().coerceIn(0f, 1f)
+        gainFactor = 10.0.pow(gainDb / 20.0).toFloat().coerceIn(0f, 1f)
         applyVolume()
     }
 
@@ -611,7 +613,7 @@ internal class AudioEngine(
                     lastPositionMs = position
                     onEvent?.invoke(PlayerEvent.Progress(position, durationMs))
                 }
-                delay(PROGRESS_MS)
+                delay(PROGRESS_MS.milliseconds)
             }
         }
     }
