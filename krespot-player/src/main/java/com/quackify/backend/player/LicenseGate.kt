@@ -56,6 +56,11 @@ internal object LicenseGate {
     @Volatile
     var onOpen: (() -> Unit)? = null
 
+    /** Fired every time the licence endpoint answers 429, so the app can
+     * tell the listener why playback is stalling instead of failing quietly. */
+    @Volatile
+    var onRateLimited: (() -> Unit)? = null
+
     @Volatile
     var rateLimited = false
 
@@ -68,6 +73,7 @@ internal object LicenseGate {
         strikes++
         lastStatus = status
         rateLimited = status == 429
+        if (rateLimited) onRateLimited?.invoke()
         log.w("licence refused $status, strike $strikes")
         val escalated = (GATE_BASE_MS shl (strikes - 1).coerceAtMost(GATE_STEPS))
             .coerceAtMost(GATE_MAX_MS)
