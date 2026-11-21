@@ -192,6 +192,11 @@ class KrespotPlayer(private val context: Context) {
 
     var onFocusDuck: ((Boolean) -> Unit)? = null
 
+    /** Fired whenever the licence endpoint rate limits a request, so the
+     * layer above can surface it (the gate keeps retrying on its own). */
+    @Volatile
+    var onLicenceRateLimited: (() -> Unit)? = null
+
     @Volatile
     private var licenceRetrying = false
 
@@ -209,6 +214,7 @@ class KrespotPlayer(private val context: Context) {
                 licenceRetrying = false
             }
         }
+        LicenseGate.onRateLimited = { onLicenceRateLimited?.invoke() }
     }
 
     private val manifests = java.util.concurrent.ConcurrentHashMap<String, Deferred<List<AudioFile>>>()

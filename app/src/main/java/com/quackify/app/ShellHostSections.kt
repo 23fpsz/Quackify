@@ -444,6 +444,7 @@ internal fun MainActivity.ShellAppHostSection(
     playerListener = bridge.listener,
     expandPlayerSignal = if (loggedIn) openPlayerSignal else 0,
     queueEditResult = bridge.queueEditResult,
+    licenceRateLimitedSignal = bridge.licenceRateLimitedSignal,
         homeQuickAccessItems = home.quick,
     homeShelves = if (homeFacet.isBlank() && !loading) home.historyShelves + home.shelves else home.shelves,
     homeChips = homeChips,

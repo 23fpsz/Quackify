@@ -163,6 +163,7 @@ fun EncoreAppShell(
     playerListener: ComposePlayerListener? = null,
     expandPlayerSignal: Int = 0,
     queueEditResult: QueueEditResult = QueueEditResult(),
+    licenceRateLimitedSignal: Int = 0,
     isComposeUiEnabled: Boolean = true,
     onToggleComposeUi: (Boolean) -> Unit = {},
     onOpenQuackifySettings: (() -> Unit)? = null,
@@ -515,6 +516,11 @@ fun EncoreAppShell(
     val noMusicVideoLabel = stringResource(R.string.no_music_video_for_this_track)
     LaunchedEffect(videoAutoExitSignal) {
         if (videoAutoExitSignal > 0) toast.show(noMusicVideoLabel)
+    }
+
+    val licenseRateLimitedLabel = stringResource(R.string.license_rate_limited)
+    LaunchedEffect(licenceRateLimitedSignal) {
+        if (licenceRateLimitedSignal > 0) toast.show(licenseRateLimitedLabel)
     }
 
     val actions = ShellActions(
