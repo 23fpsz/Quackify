@@ -350,7 +350,9 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(Unit) {
                             playStats = PlayStats.recordLogin(context)
                         }
-                        LaunchedEffect(resumeSignal, homeFacet) {
+                        var tokenChecked by remember { mutableStateOf(false) }
+                        LaunchedEffect(tokenChecked, resumeSignal, homeFacet) {
+                            if (!tokenChecked) return@LaunchedEffect
                             if (resumeSignal == 0) loading = true
                             val payload = HomeFeed.load(context, homeFacet)
                             if (payload.sections.isNotEmpty() || resumeSignal == 0) {
@@ -365,6 +367,18 @@ class MainActivity : ComponentActivity() {
                         }
                         LaunchedEffect(resumeSignal) {
                             if (resumeSignal > 0) SilentTokenRefresh.maybeRefresh(context)
+                        }
+                        LaunchedEffect(Unit) {
+                            val before = EncoreAuth.token(context)
+                            SilentTokenRefresh.ensureFresh(context, "startup")
+                            tokenChecked = true
+                            if (EncoreAuth.token(context) != before) retryScreensLeftEmpty()
+                            while (true) {
+                                delay(TOKEN_CHECK_INTERVAL_MS)
+                                val previous = EncoreAuth.token(context)
+                                SilentTokenRefresh.ensureFresh(context, "hourly")
+                                if (EncoreAuth.token(context) != previous) retryScreensLeftEmpty()
+                            }
                         }
                         val account = remember(loggedIn) { EncoreAuth.account(context) }
                         LaunchedEffect(feed) {
@@ -1096,6 +1110,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Refetches the top-level screens that came back empty because they ran
+     * with the dead token before a renewal landed: home, the library,
+     * what's new and browse all retry the same way the offline recovery does.
+     */
+    private fun retryScreensLeftEmpty() {
+        if (!loading && feed.isEmpty()) resumeSignal++
+        if (libraryItems.isNullOrEmpty()) Krespot.library.invalidate()
+        if (whatsNew.isEmpty()) whatsNewFetch++
+        if (browseCategories.isEmpty()) browseFetch++
+    }
+
 
     internal suspend fun loadMorePlaylistTracks(currentSize: Int): Pair<List<TrackItem>, Boolean>? {
         val page = Krespot.collections.collectionMore(applicationContext, playlistUri, currentSize)
@@ -1550,6 +1576,7 @@ class MainActivity : ComponentActivity() {
         const val CLIENT_PREFS = "quackify.client"
         const val RESUME_REFRESH_AFTER_MS = 60_000L
         const val TOKEN_STILL_GOOD_MS = 60_000L
+        const val TOKEN_CHECK_INTERVAL_MS = 60L * 60 * 1000L
         const val RECENTS_SYNC_THROTTLE_MS = 5 * 60_000L
         const val RECENT_SEARCH_SETTLE_MS = 4_000L
         const val VIDEO_AUTO_EXIT_MIN_MS = 1_500L
