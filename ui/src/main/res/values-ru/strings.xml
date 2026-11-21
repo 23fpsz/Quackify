@@ -238,6 +238,13 @@
     <string name="forty_five_minutes">45 минут</string>
     <string name="one_hour">1 час</string>
     <string name="turn_off_timer">Выключить таймер</string>
+    <string name="sleep_timer_custom">Своё время</string>
+    <string name="sleep_timer_custom_hint">От 3 минут до 24 часов</string>
+    <string name="sleep_timer_custom_unit">минут</string>
+    <string name="sleep_timer_end_of_track_info">Воспроизведение остановится в конце текущего трека</string>
+    <string name="sleep_timer_set">Установить таймер</string>
+    <string name="sleep_timer_stops_at">Остановится в %1$s</string>
+    <string name="sleep_timer_with_duration">Таймер сна (%1$s)</string>
     <string name="stop_audio_in">Звук остановится через</string>
     <string name="back_15_seconds">Назад на 15 секунд</string>
     <string name="forward_15_seconds">Вперёд на 15 секунд</string>
@@ -282,6 +289,18 @@
         <item quantity="few">%1$s воспроизведения</item>
         <item quantity="many">%1$s воспроизведений</item>
         <item quantity="other">%1$s воспроизведения</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="one">%1$d час</item>
+        <item quantity="few">%1$d часа</item>
+        <item quantity="many">%1$d часов</item>
+        <item quantity="other">%1$d часа</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%1$d минута</item>
+        <item quantity="few">%1$d минуты</item>
+        <item quantity="many">%1$d минут</item>
+        <item quantity="other">%1$d минуты</item>
     </plurals>
     <string name="a_thin_playback_line_on_the_3x2_and_3x3_widgets">Тонкая строка воспроизведения на виджетах 3x2 и 3x3.</string>
     <string name="debug">Отладка</string>

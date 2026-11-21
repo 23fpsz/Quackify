@@ -238,6 +238,13 @@
     <string name="forty_five_minutes">45分</string>
     <string name="one_hour">1時間</string>
     <string name="turn_off_timer">タイマーをオフ</string>
+    <string name="sleep_timer_custom">カスタム</string>
+    <string name="sleep_timer_custom_hint">3分から24時間の間で設定してください</string>
+    <string name="sleep_timer_custom_unit">分</string>
+    <string name="sleep_timer_end_of_track_info">現在のトラックの終わりで再生を停止します</string>
+    <string name="sleep_timer_set">タイマーを設定</string>
+    <string name="sleep_timer_stops_at">%1$s に停止します</string>
+    <string name="sleep_timer_with_duration">スリープタイマー（%1$s）</string>
     <string name="stop_audio_in">音声を停止するまで</string>
     <string name="back_15_seconds">15秒戻る</string>
     <string name="forward_15_seconds">15秒進む</string>
@@ -276,6 +283,12 @@
     <plurals name="play_count">
         <item quantity="one">%1$s次播放</item>
         <item quantity="other">%1$s次播放</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="other">%1$d 時間</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="other">%1$d 分</item>
     </plurals>
     <string name="a_thin_playback_line_on_the_3x2_and_3x3_widgets">3x2 と 3x3 ウィジェットに細い再生バーを表示します。</string>
     <string name="debug">デバッグ</string>

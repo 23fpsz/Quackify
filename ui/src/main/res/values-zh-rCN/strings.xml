@@ -238,6 +238,13 @@
     <string name="forty_five_minutes">45 分钟</string>
     <string name="one_hour">1 小时</string>
     <string name="turn_off_timer">关闭定时器</string>
+    <string name="sleep_timer_custom">自定义</string>
+    <string name="sleep_timer_custom_hint">介于 3 分钟到 24 小时之间</string>
+    <string name="sleep_timer_custom_unit">分钟</string>
+    <string name="sleep_timer_end_of_track_info">播放将在当前曲目结束时停止</string>
+    <string name="sleep_timer_set">设置定时器</string>
+    <string name="sleep_timer_stops_at">将于 %1$s 停止</string>
+    <string name="sleep_timer_with_duration">睡眠定时器（%1$s）</string>
     <string name="stop_audio_in">音频将在以下时间后停止</string>
     <string name="back_15_seconds">后退 15 秒</string>
     <string name="forward_15_seconds">前进 15 秒</string>
@@ -276,6 +283,12 @@
     <plurals name="play_count">
         <item quantity="one">%1$s次播放</item>
         <item quantity="other">%1$s次播放</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="other">%1$d 小时</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="other">%1$d 分钟</item>
     </plurals>
     <string name="a_thin_playback_line_on_the_3x2_and_3x3_widgets">在 3x2 和 3x3 小组件上显示细播放进度线。</string>
     <string name="debug">调试</string>

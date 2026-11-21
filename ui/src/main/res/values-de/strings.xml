@@ -238,6 +238,13 @@
     <string name="forty_five_minutes">45 Minuten</string>
     <string name="one_hour">1 Stunde</string>
     <string name="turn_off_timer">Timer ausschalten</string>
+    <string name="sleep_timer_custom">Benutzerdefiniert</string>
+    <string name="sleep_timer_custom_hint">Zwischen 3 Minuten und 24 Stunden</string>
+    <string name="sleep_timer_custom_unit">Minuten</string>
+    <string name="sleep_timer_end_of_track_info">Die Wiedergabe stoppt am Ende des aktuellen Titels</string>
+    <string name="sleep_timer_set">Timer festlegen</string>
+    <string name="sleep_timer_stops_at">Stoppt um %1$s</string>
+    <string name="sleep_timer_with_duration">Einschlaf-Timer (%1$s)</string>
     <string name="stop_audio_in">Audio stoppt in</string>
     <string name="back_15_seconds">15 Sekunden zurück</string>
     <string name="forward_15_seconds">15 Sekunden vor</string>
@@ -276,6 +283,14 @@
     <plurals name="play_count">
         <item quantity="one">1 Wiedergabe</item>
         <item quantity="other">%1$s Wiedergaben</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="one">%1$d Stunde</item>
+        <item quantity="other">%1$d Stunden</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%1$d Minute</item>
+        <item quantity="other">%1$d Minuten</item>
     </plurals>
     <string name="a_thin_playback_line_on_the_3x2_and_3x3_widgets">Eine schmale Wiedergabezeile auf den Widgets 3x2 und 3x3.</string>
     <string name="debug">Debug</string>
