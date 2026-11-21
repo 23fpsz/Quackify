@@ -1059,14 +1059,14 @@ class PlaybackBridge(private val context: Context) {
                     if (!sleepEndOfTrackArmed) return@collect
                     if (uri.isBlank()) {
                         sleepEndOfTrackArmed = false
-                        state = state.copy(sleepTimer = null)
+                        state = state.copy(sleepTimer = null, sleepTimerEndsAtMs = 0L)
                         return@collect
                     }
                     if (uri == sleepArmedTrackUri) return@collect
                     sleepEndOfTrackArmed = false
                     log.i("sleep timer: the armed track gave way to '${uri.takeLast(12)}', stopping")
                     fireSleepTimer()
-                    state = state.copy(sleepTimer = null)
+                    state = state.copy(sleepTimer = null, sleepTimerEndsAtMs = 0L)
                 }
             }
             launch {
@@ -2079,24 +2079,26 @@ class PlaybackBridge(private val context: Context) {
         sleepEndOfTrackArmed = false
         sleepArmedTrackUri = ""
         when (option) {
-            SleepTimerOption.OFF -> {
-                state = if (state.sleepTimer == null) state else state.copy(sleepTimer = null)
+            SleepTimerOption.Off -> {
+                state = if (state.sleepTimer == null) state
+                else state.copy(sleepTimer = null, sleepTimerEndsAtMs = 0L)
                 log.i("sleep timer off")
             }
-            SleepTimerOption.END_OF_TRACK -> {
+            SleepTimerOption.EndOfTrack -> {
                 sleepEndOfTrackArmed = true
                 sleepArmedTrackUri = state.trackUri
-                state = state.copy(sleepTimer = option)
+                state = state.copy(sleepTimer = option, sleepTimerEndsAtMs = 0L)
                 log.i("sleep timer armed at the end of '${state.trackUri.takeLast(12)}'")
             }
-            else -> {
-                state = state.copy(sleepTimer = option)
+            is SleepTimerOption.Timed -> {
+                val endsAtMs = System.currentTimeMillis() + option.minutes * 60_000L
+                state = state.copy(sleepTimer = option, sleepTimerEndsAtMs = endsAtMs)
                 log.i("sleep timer armed for ${option.minutes} minutes")
                 sleepTimerJob = scope.launch {
                     delay(option.minutes * 60_000L)
                     log.i("sleep timer fired after ${option.minutes}m")
                     fireSleepTimer()
-                    state = state.copy(sleepTimer = null)
+                    state = state.copy(sleepTimer = null, sleepTimerEndsAtMs = 0L)
                 }
             }
         }
@@ -5285,7 +5287,7 @@ class PlaybackBridge(private val context: Context) {
             log.i("sleep timer: '${ended.takeLast(12)}' ended, stopping instead of advancing")
             player.pause()
             reportPaused()
-            state = state.copy(sleepTimer = null)
+            state = state.copy(sleepTimer = null, sleepTimerEndsAtMs = 0L)
             return
         }
         val rows = chainFor()

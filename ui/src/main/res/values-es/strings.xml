@@ -287,6 +287,13 @@
     <string name="try_searching_again_using_a_different_spelling_o">Inténtalo de nuevo con otra palabra o grafía.</string>
     <string name="try_searching_for_a_different_track_title_or_art">Prueba a buscar otro título de canción o artista</string>
     <string name="turn_off_timer">Desactivar temporizador</string>
+    <string name="sleep_timer_custom">Personalizado</string>
+    <string name="sleep_timer_custom_hint">Entre 3 minutos y 24 horas</string>
+    <string name="sleep_timer_custom_unit">minutos</string>
+    <string name="sleep_timer_end_of_track_info">La reproducción se detendrá al final de la pista actual</string>
+    <string name="sleep_timer_set">Establecer temporizador</string>
+    <string name="sleep_timer_stops_at">Se detendrá a las %1$s</string>
+    <string name="sleep_timer_with_duration">Temporizador de apagado (%1$s)</string>
     <string name="undo">Deshacer</string>
     <string name="update_available">Actualización disponible</string>
     <string name="verified_artist">Artista verificado</string>
@@ -484,6 +491,16 @@
     <plurals name="play_count">
         <item quantity="one">1 reproducción</item>
         <item quantity="other">%1$s reproducciones</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="one">%1$d hora</item>
+        <item quantity="many">%1$d horas</item>
+        <item quantity="other">%1$d horas</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%1$d minuto</item>
+        <item quantity="many">%1$d minutos</item>
+        <item quantity="other">%1$d minutos</item>
     </plurals>
     <string name="a_thin_playback_line_on_the_3x2_and_3x3_widgets">Una línea fina de reproducción en los widgets 3x2 y 3x3.</string>
     <string name="debug">Depuración</string>
