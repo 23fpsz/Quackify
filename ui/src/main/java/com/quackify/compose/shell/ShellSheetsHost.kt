@@ -285,6 +285,11 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         sortOption = local.sortOption,
         sortDirection = local.sortDirection,
         sleepTimer = if (env.playerListener != null) playbackState?.sleepTimer else local.sleepTimer,
+        sleepTimerEndsAtMs = if (env.playerListener != null) {
+            playbackState?.sleepTimerEndsAtMs ?: 0L
+        } else {
+            local.sleepTimerEndsAtMs
+        },
         userDisplayName = env.userDisplayName,
         userAvatarUrl = env.userAvatarUrl,
         userColorHex = env.userColorHex,
@@ -496,7 +501,9 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             env.playerListener?.onQueueSet(reordered.map { it.uri }.filter { it.isNotBlank() } + hidden)
         },
         onSleepTimerSelected = { option ->
-            local.sleepTimer = if (option == SleepTimerOption.OFF) null else option
+            local.sleepTimer = if (option == SleepTimerOption.Off) null else option
+            local.sleepTimerEndsAtMs = (option as? SleepTimerOption.Timed)
+                ?.let { System.currentTimeMillis() + it.minutes * 60_000L } ?: 0L
             env.playerListener?.onSleepTimer(option)
         },
         // The sleep timer row only belongs to the fullscreen player's own

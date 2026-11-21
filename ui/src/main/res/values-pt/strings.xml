@@ -238,6 +238,13 @@
     <string name="forty_five_minutes">45 minutos</string>
     <string name="one_hour">1 hora</string>
     <string name="turn_off_timer">Desligar timer</string>
+    <string name="sleep_timer_custom">Personalizado</string>
+    <string name="sleep_timer_custom_hint">Entre 3 minutos e 24 horas</string>
+    <string name="sleep_timer_custom_unit">minutos</string>
+    <string name="sleep_timer_end_of_track_info">A reprodução para no fim da faixa atual</string>
+    <string name="sleep_timer_set">Definir temporizador</string>
+    <string name="sleep_timer_stops_at">Para às %1$s</string>
+    <string name="sleep_timer_with_duration">Temporizador de sono (%1$s)</string>
     <string name="stop_audio_in">Parar áudio em</string>
     <string name="back_15_seconds">Voltar 15 segundos</string>
     <string name="forward_15_seconds">Avançar 15 segundos</string>
@@ -276,6 +283,14 @@
     <plurals name="play_count">
         <item quantity="one">1 reprodução</item>
         <item quantity="other">%1$s reproduções</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="one">%1$d hora</item>
+        <item quantity="other">%1$d horas</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%1$d minuto</item>
+        <item quantity="other">%1$d minutos</item>
     </plurals>
     <string name="a_thin_playback_line_on_the_3x2_and_3x3_widgets">Uma linha fina de reprodução nos widgets 3x2 e 3x3.</string>
     <string name="debug">Depuração</string>

@@ -238,6 +238,13 @@
     <string name="forty_five_minutes">45분</string>
     <string name="one_hour">1시간</string>
     <string name="turn_off_timer">타이머 끄기</string>
+    <string name="sleep_timer_custom">사용자 지정</string>
+    <string name="sleep_timer_custom_hint">3분에서 24시간 사이</string>
+    <string name="sleep_timer_custom_unit">분</string>
+    <string name="sleep_timer_end_of_track_info">현재 트랙이 끝나면 재생이 중지됩니다</string>
+    <string name="sleep_timer_set">타이머 설정</string>
+    <string name="sleep_timer_stops_at">%1$s에 중지됩니다</string>
+    <string name="sleep_timer_with_duration">수면 타이머(%1$s)</string>
     <string name="stop_audio_in">오디오 중지까지</string>
     <string name="back_15_seconds">15초 뒤로</string>
     <string name="forward_15_seconds">15초 앞으로</string>
@@ -276,6 +283,12 @@
     <plurals name="play_count">
         <item quantity="one">%1$s次播放</item>
         <item quantity="other">%1$s次播放</item>
+    </plurals>
+    <plurals name="sleep_timer_hours">
+        <item quantity="other">%1$d시간</item>
+    </plurals>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="other">%1$d분</item>
     </plurals>
     <string name="a_thin_playback_line_on_the_3x2_and_3x3_widgets">3x2 및 3x3 위젯에 얇은 재생 표시줄을 표시합니다.</string>
     <string name="debug">디버그</string>

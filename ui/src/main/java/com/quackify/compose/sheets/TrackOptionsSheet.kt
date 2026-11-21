@@ -82,6 +82,7 @@ fun TrackOptionsSheet(
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onSongRadio: (() -> Unit)? = null,
     onSleepTimerClick: (() -> Unit)? = null,
+    sleepTimer: SleepTimerOption? = null,
     /** Opens the "Save in" picker; null hides the row (non-track entities). */
     onAddToPlaylist: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -301,9 +302,16 @@ fun TrackOptionsSheet(
             }
 
             if (onSleepTimerClick != null) {
+                val activeTimer = sleepTimer?.takeIf { it != SleepTimerOption.Off }
                 ContextMenuRowItem(
-                    title = stringResource(R.string.sleep_timer),
+                    title = if (activeTimer != null) {
+                        stringResource(R.string.sleep_timer_with_duration, sleepTimerOptionLabel(activeTimer))
+                    } else {
+                        stringResource(R.string.sleep_timer)
+                    },
                     iconRes = R.drawable.encore_icon_time_24,
+                    iconTint = if (activeTimer != null) EncoreColors.Green else EncoreColors.TextPrimary,
+                    textColor = if (activeTimer != null) EncoreColors.Green else EncoreColors.TextPrimary,
                     onClick = {
                         onDismiss()
                         onSleepTimerClick()
