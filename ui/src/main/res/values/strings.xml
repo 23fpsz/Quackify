@@ -355,6 +355,15 @@
     <string name="sleep_timer_custom_hint">Between 3 minutes and 24 hours</string>
     <string name="sleep_timer_custom_unit">minutes</string>
     <string name="sleep_timer_end_of_track_info">Playback stops at the end of the current track</string>
+    <string name="stream_sources">Stream sources</string>
+    <string name="stream_sources_desc">Playback tries each source in this order and falls through to the next one when a source fails</string>
+    <string name="stream_sources_row_desc">Choose which audio source is tried first</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">Primary</string>
+    <string name="stream_source_fallback">Fallback</string>
+    <string name="stream_source_move_up">Move up</string>
+    <string name="stream_source_move_down">Move down</string>
     <string name="sleep_timer_set">Set timer</string>
     <string name="sleep_timer_stops_at">Stops at %1$s</string>
     <string name="sleep_timer_with_duration">Sleep timer (%1$s)</string>

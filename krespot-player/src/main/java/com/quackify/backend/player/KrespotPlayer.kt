@@ -43,6 +43,8 @@ import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.store.AppPrefs
+import com.quackify.backend.core.store.StreamSource
+import com.quackify.backend.core.store.StreamSources
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
@@ -706,8 +708,24 @@ class KrespotPlayer(private val context: Context) {
         job = scope.launch {
             var player: AudioEngine? = null
             try {
+                val stack = StreamSources.order(context)
+                if (stack.firstOrNull() == StreamSource.YT_MUSIC) {
+                    val alternate = YtMusicStreams.resolve(track)
+                    if (alternate != null) {
+                        playYtMusic(track, alternate)
+                        return@launch
+                    }
+                    log.w("youtube music leads the stack but the track did not resolve, trying spotify")
+                }
                 val source = sourceFor(track.uri) ?: warmSource(track.uri, spclient)
                 if (source == null) {
+                    if (stack.firstOrNull() != StreamSource.YT_MUSIC) {
+                        val alternate = YtMusicStreams.resolve(track)
+                        if (alternate != null) {
+                            playYtMusic(track, alternate)
+                            return@launch
+                        }
+                    }
                     if (id == generation) settleStopped()
                     _events.emit(PlayerEvent.Failed("no source"))
                     return@launch
@@ -752,11 +770,14 @@ class KrespotPlayer(private val context: Context) {
                                 licencePending = waiting
                                 licenceFrom = if (movedTo) 0L else fromMs
                             } else if (LicenseGate.remainingMs() > 0L) {
-                                refused = waiting
-                                refusedFrom = if (movedTo) 0L else player?.currentPositionMs ?: 0L
-                                log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
-                                        "keeping '${waiting.name.ifBlank { waiting.uri }}' for a retry"
-                                )
+                                val from = if (movedTo) 0L else player?.currentPositionMs ?: 0L
+                                if (!divertToAlternate(waiting, from)) {
+                                    refused = waiting
+                                    refusedFrom = from
+                                    log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
+                                            "keeping '${waiting.name.ifBlank { waiting.uri }}' for a retry"
+                                    )
+                                }
                             } else {
                                 mirror(event, player?.durationMs ?: totalMs)
                                 if (event !is PlayerEvent.Progress) _events.tryEmit(event)
@@ -820,16 +841,81 @@ class KrespotPlayer(private val context: Context) {
                     return@launch
                 }
                 if (LicenseGate.remainingMs() > 0L) {
-                    refused = track
-                    refusedFrom = fromMs
-                    licencePending = track
-                    licenceFrom = fromMs
-                    log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
-                            "keeping '${track.name.ifBlank { track.uri }}' for a retry"
-                    )
+                    if (!divertToAlternate(track, fromMs)) {
+                        refused = track
+                        refusedFrom = fromMs
+                        licencePending = track
+                        licenceFrom = fromMs
+                        log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
+                                "keeping '${track.name.ifBlank { track.uri }}' for a retry"
+                        )
+                    }
                     return@launch
                 }
                 _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
+            }
+        }
+    }
+
+    private fun divertToAlternate(track: CommandTrack, fromMs: Long): Boolean {
+        if (!LicenseGate.rateLimited) return false
+        if (StreamSources.after(context, StreamSource.SPOTIFY).isEmpty()) return false
+        refused = track
+        refusedFrom = fromMs
+        licencePending = track
+        licenceFrom = fromMs
+        scope.launch {
+            val alternate = YtMusicStreams.resolve(track)
+            if (alternate == null) {
+                log.w("the licence is rate limited and youtube music did not resolve, the track stays parked")
+                return@launch
+            }
+            licencePending = null
+            refused = null
+            log.i("the licence is rate limited, diverting '${track.name.ifBlank { track.uri }}' to youtube music")
+            playYtMusic(track, alternate)
+        }
+        return true
+    }
+
+    private fun playYtMusic(track: CommandTrack, stream: YtStream) {
+        stop()
+        if (!focus.acquire()) {
+            log.w("play youtube music refused, another app holds the audio focus")
+            _events.tryEmit(PlayerEvent.Failed("focus"))
+            return
+        }
+        val id = ++generation
+        pendingPause = false
+        pendingSeekMs = -1L
+        _state.value = PlayerState(
+            playing = true,
+            buffering = true,
+            durationMs = track.durationMs,
+            bitrate = stream.bitrate,
+            trackUri = track.uri,
+        )
+        log.i("play youtube music '${track.name.ifBlank { track.uri }}' " +
+                "${stream.bitrate}b video=${stream.videoId}"
+        )
+        job = scope.launch {
+            var player: Mp3Engine? = null
+            try {
+                player = Mp3Engine(stream.url, { event ->
+                    if (id == generation) {
+                        mirror(event, _state.value.durationMs)
+                        if (event !is PlayerEvent.Progress) _events.tryEmit(event)
+                    }
+                }, stream.headers)
+                mp3 = player
+                player.run()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Throwable) {
+                log.e("play youtube music failed ${failure.javaClass.simpleName}: ${failure.message}")
+                _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
+            } finally {
+                if (player != null && mp3 === player) mp3 = null
             }
         }
     }
@@ -856,12 +942,12 @@ class KrespotPlayer(private val context: Context) {
         job = scope.launch {
             var player: Mp3Engine? = null
             try {
-                player = Mp3Engine(url) { event ->
+                player = Mp3Engine(url, { event ->
                     if (id == generation) {
                         mirror(event, _state.value.durationMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                     }
-                }
+                })
                 mp3 = player
                 _state.value = PlayerState(playing = true, buffering = true, trackUri = track.uri)
                 player.run()

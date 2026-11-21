@@ -52,6 +52,7 @@ private class BytesSource(private val data: ByteArray) : MediaDataSource() {
 internal class Mp3Engine(
     private val url: String,
     private val emit: (PlayerEvent) -> Unit,
+    private val headers: Map<String, String> = mapOf("referer" to "https://open.spotify.com/"),
 ) {
 
     @Volatile
@@ -100,7 +101,7 @@ internal class Mp3Engine(
     suspend fun run() {
         stopped = false
         val bytes = withContext(Dispatchers.IO) {
-            Net.blob(url, mapOf("referer" to "https://open.spotify.com/"), tag = "ad").also {
+            Net.blob(url, headers, tag = "ad").also {
                 log.i("ad bytes ${it?.code ?: "no response"} ${it?.size ?: 0}B")
             }
         }?.takeIf { it.ok }?.bytes

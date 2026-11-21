@@ -242,6 +242,15 @@
     <string name="sleep_timer_custom_hint">介于 3 分钟到 24 小时之间</string>
     <string name="sleep_timer_custom_unit">分钟</string>
     <string name="sleep_timer_end_of_track_info">播放将在当前曲目结束时停止</string>
+    <string name="stream_sources">流媒体源</string>
+    <string name="stream_sources_desc">播放按此顺序尝试每个音源，某个音源失败时自动切换到下一个</string>
+    <string name="stream_sources_row_desc">选择优先使用的音频源</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">主源</string>
+    <string name="stream_source_fallback">备用</string>
+    <string name="stream_source_move_up">上移</string>
+    <string name="stream_source_move_down">下移</string>
     <string name="sleep_timer_set">设置定时器</string>
     <string name="sleep_timer_stops_at">将于 %1$s 停止</string>
     <string name="sleep_timer_with_duration">睡眠定时器（%1$s）</string>

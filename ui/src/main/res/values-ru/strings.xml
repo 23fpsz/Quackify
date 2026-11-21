@@ -242,6 +242,15 @@
     <string name="sleep_timer_custom_hint">От 3 минут до 24 часов</string>
     <string name="sleep_timer_custom_unit">минут</string>
     <string name="sleep_timer_end_of_track_info">Воспроизведение остановится в конце текущего трека</string>
+    <string name="stream_sources">Источники потока</string>
+    <string name="stream_sources_desc">Воспроизведение опрашивает источники в этом порядке и переходит к следующему при сбое</string>
+    <string name="stream_sources_row_desc">Выбирает первый источник аудио</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">Основной</string>
+    <string name="stream_source_fallback">Резервный</string>
+    <string name="stream_source_move_up">Переместить вверх</string>
+    <string name="stream_source_move_down">Переместить вниз</string>
     <string name="sleep_timer_set">Установить таймер</string>
     <string name="sleep_timer_stops_at">Остановится в %1$s</string>
     <string name="sleep_timer_with_duration">Таймер сна (%1$s)</string>
