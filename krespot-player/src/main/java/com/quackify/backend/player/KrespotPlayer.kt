@@ -202,6 +202,12 @@ class KrespotPlayer(private val context: Context) {
     @Volatile
     private var licenceRetrying = false
 
+    /** The track whose playback already spent its mid-song source divert: a
+     *  fresh playback clears it, a divert re-entry keeps it, so the two
+     *  sources cannot hand a dying track back and forth forever. */
+    @Volatile
+    private var transportDivertUri: String? = null
+
     init {
         LicenseGate.onOpen = {
             val track = licencePending ?: refused
@@ -681,6 +687,7 @@ class KrespotPlayer(private val context: Context) {
         track: CommandTrack,
         spclient: String,
         fromMs: Long = 0L,
+        divert: Boolean = false,
     ) {
         if (!licenceRetrying) LicenseGate.resetStrikes()
         val sinceLast = System.currentTimeMillis() - lastPlayAt
@@ -692,6 +699,7 @@ class KrespotPlayer(private val context: Context) {
         }
         val file = track.best() ?: track.files.firstOrNull()
         this.spclient = spclient
+        if (!divert) transportDivertUri = null
         stop()
         if (!focus.acquire()) {
             log.w("play refused, another app holds the audio focus")
@@ -715,7 +723,7 @@ class KrespotPlayer(private val context: Context) {
             var player: AudioEngine? = null
             try {
                 val stack = StreamSources.order(context)
-                if (stack.firstOrNull() == StreamSource.YT_MUSIC) {
+                if (!divert && stack.firstOrNull() == StreamSource.YT_MUSIC) {
                     val alternate = YtMusicStreams.resolve(context, track)
                     if (alternate != null) {
                         playYtMusic(track, alternate, fromMs)
@@ -791,6 +799,10 @@ class KrespotPlayer(private val context: Context) {
                         } else {
                             mirror(event, player?.durationMs ?: totalMs)
                             if (event !is PlayerEvent.Progress) _events.tryEmit(event)
+                            if (event is PlayerEvent.Failed && transportDivertUri == null) {
+                                val parkedAt = _state.value.positionMs
+                                if (parkedAt > 0L) divertTransport(track, StreamSource.SPOTIFY, id, parkedAt)
+                            }
                         }
                     }
                 }
@@ -884,7 +896,36 @@ class KrespotPlayer(private val context: Context) {
         return true
     }
 
-    private fun playYtMusic(track: CommandTrack, stream: YtStream, fromMs: Long = 0L) {
+    /**
+     * A transport failure mid-song hands the track to the next source in the
+     * user's order at the parked position, so a stream that dies partway
+     * carries on from where it stopped instead of surfacing a dead player.
+     * One divert per playback: a source that dies on both ends reports its
+     * failure rather than the two handing the track back and forth.
+     */
+    private fun divertTransport(track: CommandTrack, from: StreamSource, id: Int, positionMs: Long) {
+        val next = StreamSources.after(context, from).firstOrNull() ?: return
+        transportDivertUri = track.uri
+        log.w("the ${from.key} stream died at ${positionMs}ms, handing " +
+                "'${track.name.ifBlank { track.uri }}' to ${next.key}"
+        )
+        scope.launch {
+            if (id != generation) return@launch
+            if (next == StreamSource.YT_MUSIC) {
+                val alternate = YtMusicStreams.resolve(context, track)
+                if (alternate == null) {
+                    log.w("the alternate did not resolve, the failure stands")
+                    return@launch
+                }
+                playYtMusic(track, alternate, positionMs, divert = true)
+            } else {
+                play(track, spclient, positionMs, divert = true)
+            }
+        }
+    }
+
+    private fun playYtMusic(track: CommandTrack, stream: YtStream, fromMs: Long = 0L, divert: Boolean = false) {
+        if (!divert) transportDivertUri = null
         val parked = pendingSeekMs.takeIf { it >= 0L }?.also { pendingSeekMs = -1L } ?: -1L
         stop()
         if (!focus.acquire()) {
@@ -911,6 +952,10 @@ class KrespotPlayer(private val context: Context) {
                     if (id == generation) {
                         mirror(event, _state.value.durationMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
+                        if (event is PlayerEvent.Failed && transportDivertUri == null) {
+                            val parkedAt = _state.value.positionMs
+                            if (parkedAt > 0L) divertTransport(track, StreamSource.YT_MUSIC, id, parkedAt)
+                        }
                     }
                 }, stream.headers, if (parked >= 0L) parked else fromMs, context.cacheDir)
                 mp3 = player
