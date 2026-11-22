@@ -158,6 +158,7 @@ fun SettingsScreen(
     val lyricsPrioritizeWordSynced = LyricsOptions.prioritizeWordSynced
     val lyricsProviderOrder = LyricsOptions.providerOrder
     val lyricsKeepScreenOn = LyricsOptions.keepScreenOn
+    val lyricsNextTrackPeek = LyricsOptions.nextTrackPeek
     val lyricsOffsetTenths = LyricsOptions.offsetTenths + LYRICS_OFFSET_TENTHS_MAX
     val lyricsOffsetLabel = remember(LyricsOptions.offsetTenths) {
         val seconds = LyricsOptions.offsetTenths / 10f
@@ -423,6 +424,15 @@ fun SettingsScreen(
                             enabled = lyricsEnabled,
                             onCheckedChange = { on ->
                                 LyricsOptions.setKeepScreenOn(context, on)
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = stringResource(R.string.lyrics_next_up),
+                            subtitle = stringResource(R.string.lyrics_next_up_desc),
+                            isChecked = lyricsNextTrackPeek,
+                            enabled = lyricsEnabled,
+                            onCheckedChange = { on ->
+                                LyricsOptions.setNextTrackPeek(context, on)
                             }
                         )
                         SettingsSliderRow(
