@@ -583,8 +583,8 @@ class MainActivity : ComponentActivity() {
                                 }
                                 profileDetail = profile
                                 if (isSelf && !profile?.colorHex.isNullOrBlank()) {
-                                    userProfileColorHex = profile!!.colorHex
-                                    EncoreAuth.saveProfileColor(context, profile!!.colorHex)
+                                    userProfileColorHex = profile.colorHex
+                                    EncoreAuth.saveProfileColor(context, profile.colorHex)
                                 }
                                 profileTop = top
                                 profileTopUnavailable = !isSelf && top == null

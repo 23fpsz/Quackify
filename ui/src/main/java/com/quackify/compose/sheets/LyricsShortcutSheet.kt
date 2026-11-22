@@ -25,7 +25,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -303,6 +305,7 @@ private fun ShortcutToggleRow(
  * the lyrics feel late, so the sweep is shifted earlier by that much.
  * Applies live — the open reader retimes on the next frame.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ShortcutOffsetRow(
     offsetTenths: Int,
@@ -332,16 +335,24 @@ private fun ShortcutOffsetRow(
             text = stringResource(R.string.lyrics_offset_desc),
             style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
         )
-        Slider(
+        val offsetSliderState = rememberSliderState(
             value = (offsetTenths + LYRICS_OFFSET_TENTHS_MAX).toFloat(),
+            steps = LYRICS_OFFSET_TENTHS_MAX * 2 - 1,
+            trackRange = 0f..(LYRICS_OFFSET_TENTHS_MAX * 2).toFloat()
+        )
+        // Keep the thumb honest when the offset is changed outside this
+        // sheet — the settings screen writes the same preference.
+        LaunchedEffect(offsetTenths) {
+            offsetSliderState.value = (offsetTenths + LYRICS_OFFSET_TENTHS_MAX).toFloat()
+        }
+        Slider(
+            state = offsetSliderState,
             onValueChange = { raw ->
                 onOffsetChange((raw.toInt() - LYRICS_OFFSET_TENTHS_MAX).coerceIn(
                     LYRICS_OFFSET_TENTHS_MIN,
                     LYRICS_OFFSET_TENTHS_MAX,
                 ))
             },
-            valueRange = 0f..(LYRICS_OFFSET_TENTHS_MAX * 2).toFloat(),
-            steps = LYRICS_OFFSET_TENTHS_MAX * 2 - 1,
             colors = SliderDefaults.colors(
                 thumbColor = EncoreColors.Green,
                 activeTrackColor = EncoreColors.Green,

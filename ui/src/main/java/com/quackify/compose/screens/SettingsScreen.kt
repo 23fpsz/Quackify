@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
@@ -40,6 +41,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -1313,6 +1315,7 @@ private fun SettingsSectionHeader(title: String) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsSliderRow(
     title: String,
@@ -1351,11 +1354,20 @@ private fun SettingsSliderRow(
                 style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
         }
-        Slider(
+        val sliderState = rememberSliderState(
             value = value.toFloat(),
-            onValueChange = { onValueChange(it.roundToInt().coerceIn(0, maxValue)) },
-            valueRange = 0f..maxValue.toFloat(),
             steps = maxValue - 1,
+            trackRange = 0f..maxValue.toFloat()
+        )
+        // The state owns the thumb position; when the value is rewritten
+        // from outside (prefs reset, another screen changing it) the state
+        // is nudged back in sync.
+        LaunchedEffect(value) {
+            sliderState.value = value.toFloat()
+        }
+        Slider(
+            state = sliderState,
+            onValueChange = { onValueChange(it.roundToInt().coerceIn(0, maxValue)) },
             colors = SliderDefaults.colors(
                 thumbColor = EncoreColors.Green,
                 activeTrackColor = EncoreColors.Green,
