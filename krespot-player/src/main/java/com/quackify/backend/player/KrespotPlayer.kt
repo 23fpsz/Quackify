@@ -216,7 +216,13 @@ class KrespotPlayer(private val context: Context) {
                 licenceRetrying = false
             }
         }
-        LicenseGate.onRateLimited = { onLicenceRateLimited?.invoke() }
+        LicenseGate.onRateLimited = {
+            // With another source after spotify the player diverts there and
+            // playback carries on, so a refusal is quiet; the toast only
+            // matters when spotify is the last source standing and the
+            // rate limit is what actually parks the track.
+            if (StreamSources.after(context, StreamSource.SPOTIFY).isEmpty()) onLicenceRateLimited?.invoke()
+        }
     }
 
     private val manifests = java.util.concurrent.ConcurrentHashMap<String, Deferred<List<AudioFile>>>()
