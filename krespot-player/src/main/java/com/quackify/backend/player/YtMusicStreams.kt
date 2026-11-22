@@ -103,19 +103,6 @@ private val CLIENTS = listOf(
         userAgent = "com.google.ios.youtube/21.29.1 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X)",
         clientNumber = "5",
     ),
-    YtClient(
-        clientName = "ANDROID_VR",
-        clientVersion = "1.65.10",
-        userAgent = "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 14) gzip",
-        androidSdk = 34,
-    ),
-    YtClient(
-        clientName = "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
-        clientVersion = "2.0",
-        userAgent = "Mozilla/5.0 (SMART-TV; LINUX; Tizen 4.0) AppleWebKit/537.36 (KHTML, like Gecko) 76.0.3809.146/7.0 TV Safari/537.36",
-        embed = true,
-        browserOrigin = true,
-    ),
 )
 
 private class YtCandidate(val videoId: String, val title: String)
