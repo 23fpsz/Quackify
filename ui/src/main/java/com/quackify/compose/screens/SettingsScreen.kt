@@ -254,6 +254,11 @@ fun SettingsScreen(
     // Bumped after a sp_dc is installed so the row's subtitle — which reads
     // prefs, not snapshot state — recomposes and picks the new length up.
     var spDcRevision by remember { mutableStateOf(0) }
+    // The custom sp_dc the door installed, or blank on a web login; it gates
+    // the logout row and feeds the door's prefilled field.
+    val activeSpDc = remember(spDcRevision) {
+        if (EncoreAuth.customSpDc(context)) EncoreAuth.spDc(context) else ""
+    }
     val scope = rememberCoroutineScope()
     val disableDebug = {
         debugUnlocked = false
@@ -726,11 +731,17 @@ fun SettingsScreen(
                         }
                         Text(
                             text = stringResource(R.string.log_out),
-                            style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Error),
+                            style = EncoreTheme.typography.bodyMediumBold.copy(
+                                color = if (activeSpDc.isNotBlank()) {
+                                    EncoreColors.TextSecondary
+                                } else {
+                                    EncoreColors.Error
+                                }
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable { onLogout() }
+                                .clickable(enabled = activeSpDc.isBlank()) { onLogout() }
                                 .padding(vertical = 12.dp)
                         )
                     }
@@ -1044,9 +1055,6 @@ fun SettingsScreen(
         }
     }
 
-    val activeSpDc = remember(spDcRevision) {
-        if (EncoreAuth.customSpDc(context)) EncoreAuth.spDc(context) else ""
-    }
     SpDcSignInDialog(
         isOpen = spDcDialogOpen,
         initialSpDc = activeSpDc,

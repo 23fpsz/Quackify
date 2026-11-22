@@ -25,6 +25,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -53,6 +54,7 @@ fun ProfileDrawerSheet(
     onNotificationsClick: (() -> Unit)? = null,
     notificationsUnread: Boolean = false,
     onLogoutClick: (() -> Unit)? = null,
+    accountsLocked: Boolean = false,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
     userColorHex: String = "",
@@ -88,7 +90,8 @@ fun ProfileDrawerSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
+                    .alpha(if (accountsLocked) 0.45f else 1f)
+                    .clickable(enabled = !accountsLocked) {
                         onDismiss()
                         onAccountsClick()
                     }
@@ -99,8 +102,10 @@ fun ProfileDrawerSheet(
                     userDisplayName = userDisplayName,
                     avatarUrl = userAvatarUrl.ifBlank { null },
                     onClick = {
-                        onDismiss()
-                        onAccountsClick()
+                        if (!accountsLocked) {
+                            onDismiss()
+                            onAccountsClick()
+                        }
                     },
                     size = 54.dp,
                     colorHex = userColorHex
@@ -191,6 +196,7 @@ fun ProfileDrawerSheet(
                     title = stringResource(R.string.log_out),
                     iconRes = R.drawable.encore_icon_arrow_left_24,
                     destructive = true,
+                    enabled = !accountsLocked,
                     onClick = {
                         onDismiss()
                         onLogoutClick()
@@ -210,12 +216,14 @@ private fun ProfileDrawerItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     showUnreadDot: Boolean = false,
-    destructive: Boolean = false
+    destructive: Boolean = false,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .alpha(if (enabled) 1f else 0.45f)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
