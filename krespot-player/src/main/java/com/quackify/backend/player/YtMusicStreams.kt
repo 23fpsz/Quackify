@@ -4,6 +4,7 @@ import android.content.Context
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
+import com.quackify.backend.core.store.AppPrefs
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -34,6 +35,10 @@ private const val DURATION_TOLERANCE_MS = 40_000L
 private const val CANDIDATES = 4
 
 private const val VIDEO_CACHE = 32
+
+private const val VIDEO_STORE = "quackify.ytm"
+
+private const val VIDEO_INDEX = "video.keys"
 
 private const val STREAM_CACHE = 8
 
@@ -190,6 +195,9 @@ private val CLIENTS = listOf(
 
 private class YtCandidate(val videoId: String, val title: String)
 
+/** A match that served before: the video it landed on and the visitor the search that found it rode. */
+private class VideoMatch(val videoId: String, val visitor: String)
+
 /** The search reply: its candidates plus the visitor the server handed out. */
 private class SearchMatch(val candidates: List<YtCandidate>, val visitorData: String)
 
@@ -201,6 +209,16 @@ internal object YtMusicStreams {
 
     suspend fun resolve(context: Context, track: CommandTrack): YtStream? {
         cached(track.uri)?.let { return it }
+        val remembered = recallVideo(context, track.uri)
+        if (remembered != null) {
+            val stream = streamOf(context, track, YtCandidate(remembered.videoId, track.name), remembered.visitor)
+            if (stream != null) {
+                remember(track.uri, stream)
+                return stream
+            }
+            log.w("the remembered video '${remembered.videoId}' stopped serving, searching fresh")
+            forgetVideo(context, track.uri)
+        }
         val found = search(track)
         if (found.candidates.isEmpty()) {
             log.w("no youtube music match for '${track.name.ifBlank { track.uri.takeLast(12) }}'")
@@ -210,6 +228,7 @@ internal object YtMusicStreams {
         for (candidate in ranked.take(CANDIDATES)) {
             val stream = streamOf(context, track, candidate, found.visitorData) ?: continue
             remember(track.uri, stream)
+            rememberVideo(context, track.uri, stream.videoId, found.visitorData)
             return stream
         }
         log.w("no stream for '${track.name.ifBlank { track.uri.takeLast(12) }}' after ${found.candidates.size} candidates")
@@ -231,6 +250,41 @@ internal object YtMusicStreams {
                 streamFor.remove(oldest)
                 expiresAt.remove(oldest)
             }
+        }
+    }
+
+    /** Persists the match so a later process start skips the search round trip. */
+    private fun rememberVideo(context: Context, uri: String, videoId: String, visitor: String) {
+        runCatching {
+            val prefs = AppPrefs.prefs(context, VIDEO_STORE)
+            val editor = prefs.edit()
+                .putString(uri, JSONObject().put("v", videoId).put("vis", visitor).toString())
+            val keys = prefs.getString(VIDEO_INDEX, "").orEmpty()
+                .split(',').filter { it.isNotBlank() }.toMutableList()
+            keys.remove(uri)
+            keys.add(uri)
+            while (keys.size > VIDEO_CACHE) editor.remove(keys.removeAt(0))
+            editor.putString(VIDEO_INDEX, keys.joinToString(","))
+            editor.apply()
+        }
+    }
+
+    private fun recallVideo(context: Context, uri: String): VideoMatch? {
+        val raw = runCatching {
+            AppPrefs.prefs(context, VIDEO_STORE).getString(uri, null)
+        }.getOrNull() ?: return null
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+        val videoId = json.optString("v").takeIf { it.isNotBlank() } ?: return null
+        return VideoMatch(videoId, json.optString("vis"))
+    }
+
+    private fun forgetVideo(context: Context, uri: String) {
+        runCatching {
+            val prefs = AppPrefs.prefs(context, VIDEO_STORE)
+            val keys = prefs.getString(VIDEO_INDEX, "").orEmpty()
+                .split(',').filter { it.isNotBlank() }.toMutableList()
+            if (!keys.remove(uri)) return
+            prefs.edit().remove(uri).putString(VIDEO_INDEX, keys.joinToString(",")).apply()
         }
     }
 
