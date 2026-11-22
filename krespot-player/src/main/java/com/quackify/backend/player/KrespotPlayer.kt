@@ -105,6 +105,8 @@ data class PlayerState(
     val quality: String = "",
     val trackUri: String = "",
     val isVideo: Boolean = false,
+    val source: StreamSource = StreamSource.SPOTIFY,
+    val videoId: String = "",
 )
 
 private fun resumeStoreFor(account: String): String =
@@ -995,6 +997,8 @@ class KrespotPlayer(private val context: Context) {
             durationMs = track.durationMs,
             bitrate = stream.bitrate,
             trackUri = track.uri,
+            source = StreamSource.YT_MUSIC,
+            videoId = stream.videoId,
         )
         log.i("play youtube music '${track.name.ifBlank { track.uri }}' " +
                 "${stream.bitrate}b video=${stream.videoId}"
