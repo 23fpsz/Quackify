@@ -323,10 +323,10 @@ internal class AutomixAnalysis(private val context: Context) {
             override fun buildAudioSink(
                 context: Context,
                 enableFloatOutput: Boolean,
-                enableAudioTrackPlaybackParams: Boolean,
+                enableAudioOutputPlaybackParams: Boolean,
             ): AudioSink = DefaultAudioSink.Builder(context)
                 .setEnableFloatOutput(enableFloatOutput)
-                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
                 .setAudioProcessors(arrayOf(tap))
                 .build()
         }
