@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.dp
 import java.util.Random
 import kotlin.math.PI
 import kotlin.math.sin
@@ -126,16 +125,16 @@ internal fun rememberDeepFeelFlowPhases(): DeepFeelFlowPhases {
     )
     val blobs = remember {
         val random = Random()
-        List(5 + random.nextInt(4)) {
+        List(7 + random.nextInt(4)) {
             DeepFeelBlob(
                 anchorX = 0.08f + random.nextFloat() * 0.84f,
-                anchorY = 0.60f + random.nextFloat() * 0.46f,
+                anchorY = 0.02f + random.nextFloat() * 0.96f,
                 radius = 0.26f + random.nextFloat() * 0.40f,
                 stretchX = 1.1f + random.nextFloat() * 1.7f,
                 stretchY = 0.55f + random.nextFloat() * 0.55f,
                 tiltDeg = -38f + random.nextFloat() * 76f,
                 driftAmpX = 0.05f + random.nextFloat() * 0.17f,
-                driftAmpY = 0.02f + random.nextFloat() * 0.08f,
+                driftAmpY = 0.03f + random.nextFloat() * 0.10f,
                 cyclesX = 1 + random.nextInt(3),
                 cyclesY = 1 + random.nextInt(3),
                 cyclesPulse = 1 + random.nextInt(2),
@@ -164,42 +163,32 @@ internal fun Modifier.deepFeelLineGlow(
         val breathe = phases.breathe.value
         val sweep = phases.sweep.value
         val pulse = sin(breathe * PI.toFloat())
-        val inset = 12.dp.toPx()
-        val topLeft = Offset(-inset, -inset * 0.75f)
-        val glowSize = Size(w + inset * 2f, h + inset * 1.5f)
-        val corner = CornerRadius(26.dp.toPx())
-        val wash = Brush.horizontalGradient(
-            0.0f to palette.accent.copy(alpha = 0.03f),
-            0.24f to palette.accent.copy(alpha = 0.22f),
-            0.5f to palette.base.copy(alpha = 0.38f),
-            0.76f to palette.accent.copy(alpha = 0.22f),
-            1.0f to palette.accent.copy(alpha = 0.03f),
-            startX = w * 0.14f * breathe,
-            endX = w * (1.02f - 0.14f * breathe)
+        val core = Offset(
+            w * 0.5f + w * 0.07f * sin(DEEP_FEEL_TAU * sweep),
+            h * 0.5f + h * 0.16f * sin(DEEP_FEEL_TAU * sweep * 2f + 1.7f)
         )
-        drawRoundRect(
-            brush = wash,
-            topLeft = topLeft,
-            size = glowSize,
-            cornerRadius = corner,
-            alpha = progress * (0.78f + 0.22f * pulse)
-        )
-        val bandWidth = w * 0.55f
-        val bandStart = -bandWidth + (w + bandWidth * 2f) * sweep
-        val sheen = Brush.horizontalGradient(
-            colors = listOf(
-                palette.glow.copy(alpha = 0f),
-                palette.glow.copy(alpha = 0.13f),
-                palette.glow.copy(alpha = 0f)
+        val halo = w * 0.46f
+        drawCircle(
+            brush = Brush.radialGradient(
+                0.0f to palette.accent.copy(alpha = 0.13f + 0.07f * pulse),
+                1.0f to palette.accent.copy(alpha = 0f),
+                center = core,
+                radius = halo
             ),
-            startX = bandStart,
-            endX = bandStart + bandWidth
+            center = core,
+            radius = halo,
+            alpha = progress
         )
         drawRoundRect(
-            brush = sheen,
-            topLeft = topLeft,
-            size = glowSize,
-            cornerRadius = corner,
+            brush = Brush.radialGradient(
+                0.0f to palette.base.copy(alpha = 0.34f + 0.10f * pulse),
+                0.5f to palette.accent.copy(alpha = 0.19f + 0.05f * pulse),
+                1.0f to palette.accent.copy(alpha = 0f),
+                center = core,
+                radius = w * 0.60f
+            ),
+            size = Size(w, h),
+            cornerRadius = CornerRadius(h * 0.5f),
             alpha = progress
         )
     }

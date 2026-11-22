@@ -29,6 +29,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -2698,50 +2700,54 @@ private fun NowPlayingLyricsCard(
                 ) {
                     itemsIndexed(lyrics) { i, lyric ->
                         val isActive = i == activeIndex
-                        if (isActive && lyric.isWordSynced) {
-                            WordSyncedLyricSweepText(
-                                lyric = lyric,
-                                positionMs = clockMs,
-                                sungColor = ink,
-                                unsungColor = ink.copy(alpha = 0.55f),
-                                style = EncoreTheme.typography.titleMedium.copy(
-                                    fontSize = lyricFontSize * 1.02f,
-                                    lineHeight = 31.sp,
-                                    fontWeight = FontWeight.Bold,
-                                ),
-                                maxLines = 2,
-                                modifier = Modifier.padding(bottom = 2.dp)
-                            )
-                        } else {
-                            Text(
-                                text = lyric.text,
-                                style = EncoreTheme.typography.titleMedium.copy(
-                                    fontSize = if (isActive) lyricFontSize * 1.02f else lyricFontSize,
-                                    lineHeight = 31.sp,
-                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
-                                    color = when {
-                                        isActive -> ink.copy(alpha = 0.95f)
-                                        i < activeIndex -> ink.copy(alpha = 0.45f)
-                                        else -> ink.copy(alpha = 0.55f)
-                                    }
-                                ),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(bottom = if (isActive && lyric.translation.isNotBlank()) 2.dp else 6.dp)
-                            )
-                        }
-                        if (isActive && lyric.translation.isNotBlank()) {
-                            Text(
-                                text = lyric.translation,
-                                style = EncoreTheme.typography.bodyMedium.copy(
-                                    fontSize = 14.sp,
-                                    lineHeight = 19.sp,
-                                    color = ink.copy(alpha = 0.65f)
-                                ),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(bottom = 6.dp)
-                            )
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isActive && lyric.isWordSynced) {
+                                WordSyncedLyricSweepText(
+                                    lyric = lyric,
+                                    positionMs = clockMs,
+                                    sungColor = ink,
+                                    unsungColor = ink.copy(alpha = 0.55f),
+                                    style = EncoreTheme.typography.titleMedium.copy(
+                                        fontSize = lyricFontSize * 1.02f,
+                                        lineHeight = 31.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    maxLines = 2,
+                                    modifier = Modifier.padding(bottom = 2.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = lyric.text,
+                                    style = EncoreTheme.typography.titleMedium.copy(
+                                        fontSize = if (isActive) lyricFontSize * 1.02f else lyricFontSize,
+                                        lineHeight = 31.sp,
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = when {
+                                            isActive -> ink.copy(alpha = 0.95f)
+                                            i < activeIndex -> ink.copy(alpha = 0.45f)
+                                            else -> ink.copy(alpha = 0.55f)
+                                        }
+                                    ),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(bottom = if (isActive && lyric.translation.isNotBlank()) 2.dp else 6.dp)
+                                )
+                            }
+                            if (isActive && lyric.translation.isNotBlank()) {
+                                Text(
+                                    text = lyric.translation,
+                                    style = EncoreTheme.typography.bodyMedium.copy(
+                                        fontSize = 14.sp,
+                                        lineHeight = 19.sp,
+                                        color = ink.copy(alpha = 0.65f)
+                                    ),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(bottom = 6.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -2940,6 +2946,7 @@ private fun FullscreenLyricsView(
     val deepFeelPalette = rememberDeepFeelPalette(artworkColor)
     val glowPhases = if (deepFeel) rememberDeepFeelGlowPhases() else null
     val flowPhases = if (deepFeel) rememberDeepFeelFlowPhases() else null
+    var heldLyricIndex by remember { mutableStateOf<Int?>(null) }
     val flowReveal by animateFloatAsState(
         targetValue = if (deepFeel) 1f else 0f,
         animationSpec = tween(durationMillis = 900, easing = EncoreAnimation.DecelerateInterpolator),
@@ -3082,6 +3089,8 @@ private fun FullscreenLyricsView(
                 val distance = (index - activeIndex).absoluteValue
                 val lineBlur by animateDpAsState(
                     targetValue = when {
+                        !deepFeel -> 0.dp
+                        heldLyricIndex == index -> 0.dp
                         distance > 4 -> 9.dp
                         distance > 2 -> 5.dp
                         else -> 0.dp
@@ -3090,9 +3099,35 @@ private fun FullscreenLyricsView(
                     label = "deepFeelLineBlur"
                 )
                 val lineBlurModifier = if (lineBlur > 0.dp) Modifier.blur(lineBlur) else Modifier
-                Box(
+                val lineFont by animateFloatAsState(
+                    targetValue = if (isCurrentLine) 28f else 23f,
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineFont"
+                )
+                val lineVerticalPadding by animateDpAsState(
+                    targetValue = if (isCurrentLine) 12.dp else 2.dp,
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineVerticalPadding"
+                )
+                val lineInteraction = remember { MutableInteractionSource() }
+                val linePressed by lineInteraction.collectIsPressedAsState()
+                val holdConsumed = remember { mutableStateOf(false) }
+                LaunchedEffect(linePressed) {
+                    if (linePressed) {
+                        delay(360)
+                        if (deepFeel) {
+                            holdConsumed.value = true
+                            heldLyricIndex = index
+                        }
+                    } else {
+                        heldLyricIndex = null
+                        holdConsumed.value = false
+                    }
+                }
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(vertical = lineVerticalPadding)
                         .then(lineBlurModifier)
                         .deepFeelLineGlow(
                             palette = deepFeelPalette,
@@ -3105,7 +3140,12 @@ private fun FullscreenLyricsView(
                             alpha = lineAlpha
                             transformOrigin = TransformOrigin(0f, 0.5f)
                         }
-                        .clickable { onSeekMs(line.startTimeMs) }
+                        .clickable(
+                            interactionSource = lineInteraction,
+                            indication = null
+                        ) {
+                            if (!holdConsumed.value) onSeekMs(line.startTimeMs)
+                        }
                 ) {
                     if (isCurrentLine && line.isWordSynced) {
                         WordSyncedLyricSweepText(
@@ -3114,32 +3154,22 @@ private fun FullscreenLyricsView(
                             sungColor = ink,
                             unsungColor = ink.copy(alpha = if (deepFeel) 0.42f else 0.35f),
                             style = EncoreTheme.typography.titleLarge.copy(
-                                fontSize = 24.sp,
-                                lineHeight = 34.sp,
+                                fontSize = lineFont.sp,
+                                lineHeight = (lineFont * 1.42f).sp,
                                 fontWeight = FontWeight.Bold,
                             ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    top = EncoreSpacers.Tighter,
-                                    bottom = if (line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
-                                )
+                            modifier = Modifier.fillMaxWidth()
                         )
                     } else {
                         Text(
                             text = line.text,
                             style = EncoreTheme.typography.titleLarge.copy(
-                                fontSize = 24.sp,
-                                lineHeight = 34.sp,
+                                fontSize = lineFont.sp,
+                                lineHeight = (lineFont * 1.42f).sp,
                                 fontWeight = FontWeight.Bold,
                                 color = ink
                             ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    top = EncoreSpacers.Tighter,
-                                    bottom = if (isCurrentLine && line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
-                                )
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                     if (isCurrentLine && line.translation.isNotBlank()) {
@@ -3152,7 +3182,7 @@ private fun FullscreenLyricsView(
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = EncoreSpacers.Tighter)
+                                .padding(top = 3.dp)
                         )
                     }
                 }
