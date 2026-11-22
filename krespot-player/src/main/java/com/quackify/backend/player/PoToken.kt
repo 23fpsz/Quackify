@@ -49,6 +49,10 @@ internal object PoTokenGate {
     @Volatile
     private var session: Session? = null
 
+    /** The process-wide BotGuard minter. Its webview is built on the
+     * application context, so the singleton cannot pin an activity behind it;
+     * it is closed on invalidate and whenever a bootstrap supersedes it. */
+    @SuppressLint("StaticFieldLeak")
     @Volatile
     private var page: PoTokenPage? = null
 
@@ -162,6 +166,9 @@ internal object PoTokenGate {
             val requestToken = fresh.mint(visitorData)
             log.i("att session primed, visitor ${visitorData.take(16)}… token ${requestToken.length}ch")
             val primed = Session(visitorData, requestToken, System.currentTimeMillis() + (ttl - 600L) * 1000L)
+            // a live page whose session ran out must not linger behind its
+            // replacement: the webview and its renderer close deterministically
+            page?.close()
             page = fresh
             session = primed
             return primed
@@ -203,7 +210,7 @@ internal object PoTokenGate {
 /**
  * The harness page: a WebView that carries the BotGuard VM. Kotlin feeds it
  * the challenge, the interpreter and the integrity token; it answers with
- * minted tokens through the [QuackToken] bridge.
+ * minted tokens through the `QuackToken` JavascriptInterface bridge.
  */
 @SuppressLint("SetJavaScriptEnabled")
 internal class PoTokenPage private constructor(context: Context) {
@@ -435,7 +442,7 @@ function bgMint(identifierBytes) {
             var created: PoTokenPage? = null
             try {
                 return withTimeout(LOAD_TIMEOUT_MS.milliseconds) {
-                    created = withContext(Dispatchers.Main) { PoTokenPage(context) }
+                    created = withContext(Dispatchers.Main) { PoTokenPage(context.applicationContext) }
                     created.load()
                     created
                 }
