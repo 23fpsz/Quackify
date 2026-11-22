@@ -91,6 +91,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -1231,6 +1232,7 @@ fun EncoreNowPlayingScreen(
                 currentPositionMs = currentPositionMs,
                 isPlaying = isPlaying,
                 dominantColor = dominantColor,
+                artworkColor = dynamicArtworkColor,
                 lyrics = lyrics,
                 lyricsProviderName = lyricsProviderName,
                 onSeekMs = { targetMs -> if (durationMs > 0L) onSeek(targetMs.toFloat() / durationMs.toFloat()) },
@@ -2913,6 +2915,7 @@ private fun FullscreenLyricsView(
     currentPositionMs: Long,
     isPlaying: Boolean,
     dominantColor: Color,
+    artworkColor: Color,
     lyrics: List<TimeSyncedLyric>,
     lyricsProviderName: String,
     onSeekMs: (Long) -> Unit,
@@ -2932,7 +2935,30 @@ private fun FullscreenLyricsView(
     )
     val activeIndex by rememberActiveLyricIndex(clockMs, lyrics)
     val listState = rememberLazyListState()
-    val ink = contrastInk(dominantColor)
+    val deepFeel = LyricsOptions.deepFeelEnabled
+    val deepFeelPalette = rememberDeepFeelPalette(artworkColor)
+    val glowPhases = if (deepFeel) rememberDeepFeelGlowPhases() else null
+    val flowPhases = if (deepFeel) rememberDeepFeelFlowPhases() else null
+    val flowReveal by animateFloatAsState(
+        targetValue = if (deepFeel) 1f else 0f,
+        animationSpec = tween(durationMillis = 900, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "deepFeelFlowReveal"
+    )
+    val ink by animateColorAsState(
+        targetValue = if (deepFeel) Color.White else contrastInk(dominantColor),
+        animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "deepFeelInk"
+    )
+    val backgroundTop by animateColorAsState(
+        targetValue = if (deepFeel) deepFeelPalette.deepTop else dominantColor,
+        animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "deepFeelBackgroundTop"
+    )
+    val backgroundBottom by animateColorAsState(
+        targetValue = if (deepFeel) deepFeelPalette.deepBottom else dominantColor,
+        animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "deepFeelBackgroundBottom"
+    )
     LaunchedEffect(activeIndex) {
         listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
     }
@@ -2952,26 +2978,57 @@ private fun FullscreenLyricsView(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(dominantColor)
+            .deepFeelBackdrop(
+                topColor = backgroundTop,
+                bottomColor = backgroundBottom,
+                palette = deepFeelPalette,
+                phases = flowPhases,
+                flowReveal = flowReveal
+            )
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(horizontal = EncoreSpacers.Looser2)
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = EncoreSpacers.Tighter2),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(vertical = EncoreSpacers.Tighter2)
         ) {
-            EncoreIconButton(
-                iconRes = R.drawable.encore_icon_chevron_down_24,
-                contentDescription = stringResource(R.string.close_lyrics),
-                onClick = onClose,
-                tint = ink
-            )
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                EncoreIconButton(
+                    iconRes = R.drawable.encore_icon_chevron_down_24,
+                    contentDescription = stringResource(R.string.close_lyrics),
+                    onClick = onClose,
+                    tint = ink
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_deepfeel_24,
+                        contentDescription = stringResource(R.string.lyrics_deepfeel),
+                        onClick = { LyricsOptions.setDeepFeelEnabled(context, !deepFeel) },
+                        tint = ink,
+                        isActive = deepFeel,
+                        activeTint = deepFeelPalette.accent
+                    )
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_more_android_24,
+                        contentDescription = stringResource(R.string.lyrics_menu),
+                        onClick = onLyricsMenuClick,
+                        tint = ink
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 96.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
                     text = title,
                     style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
@@ -2985,13 +3042,6 @@ private fun FullscreenLyricsView(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-
-            EncoreIconButton(
-                iconRes = R.drawable.encore_icon_more_android_24,
-                contentDescription = stringResource(R.string.lyrics_menu),
-                onClick = onLyricsMenuClick,
-                tint = ink
-            )
         }
 
         Spacer(modifier = Modifier.height(EncoreSpacers.Looser2))
@@ -3003,56 +3053,95 @@ private fun FullscreenLyricsView(
         ) {
             itemsIndexed(lyrics) { index, line ->
                 val isCurrentLine = index == activeIndex
-                if (isCurrentLine && line.isWordSynced) {
-                    WordSyncedLyricSweepText(
-                        lyric = line,
-                        positionMs = clockMs,
-                        sungColor = ink,
-                        unsungColor = ink.copy(alpha = 0.35f),
-                        style = EncoreTheme.typography.titleLarge.copy(
-                            fontSize = 24.sp,
-                            lineHeight = 34.sp,
-                            fontWeight = FontWeight.Bold,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSeekMs(line.startTimeMs) }
-                            .padding(
-                                top = EncoreSpacers.Tighter,
-                                bottom = if (isCurrentLine && line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
-                            )
-                    )
-                } else {
-                    Text(
-                        text = line.text,
-                        style = EncoreTheme.typography.titleLarge.copy(
-                            fontSize = 24.sp,
-                            lineHeight = 34.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isCurrentLine) ink else ink.copy(alpha = 0.35f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSeekMs(line.startTimeMs) }
-                            .padding(
-                                top = EncoreSpacers.Tighter,
-                                bottom = if (isCurrentLine && line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
-                            )
-                    )
-                }
-                if (isCurrentLine && line.translation.isNotBlank()) {
-                    Text(
-                        text = line.translation,
-                        style = EncoreTheme.typography.bodyMedium.copy(
-                            fontSize = 15.sp,
-                            lineHeight = 21.sp,
-                            color = ink.copy(alpha = 0.55f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSeekMs(line.startTimeMs) }
-                            .padding(bottom = EncoreSpacers.Tighter)
-                    )
+                val lineAlpha by animateFloatAsState(
+                    targetValue = when {
+                        !deepFeel -> if (isCurrentLine) 1f else 0.35f
+                        isCurrentLine -> 1f
+                        index < activeIndex -> 0.16f
+                        else -> 0.38f
+                    },
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineAlpha"
+                )
+                val lineScale by animateFloatAsState(
+                    targetValue = when {
+                        !deepFeel -> 1f
+                        isCurrentLine -> 1f
+                        index < activeIndex -> 0.82f
+                        else -> 0.87f
+                    },
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineScale"
+                )
+                val activation by animateFloatAsState(
+                    targetValue = if (deepFeel && isCurrentLine) 1f else 0f,
+                    animationSpec = tween(durationMillis = 520, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineActivation"
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .deepFeelLineGlow(
+                            palette = deepFeelPalette,
+                            phases = glowPhases,
+                            progress = activation
+                        )
+                        .graphicsLayer {
+                            scaleX = lineScale
+                            scaleY = lineScale
+                            alpha = lineAlpha
+                            transformOrigin = TransformOrigin(0f, 0.5f)
+                        }
+                        .clickable { onSeekMs(line.startTimeMs) }
+                ) {
+                    if (isCurrentLine && line.isWordSynced) {
+                        WordSyncedLyricSweepText(
+                            lyric = line,
+                            positionMs = clockMs,
+                            sungColor = ink,
+                            unsungColor = ink.copy(alpha = if (deepFeel) 0.42f else 0.35f),
+                            style = EncoreTheme.typography.titleLarge.copy(
+                                fontSize = 24.sp,
+                                lineHeight = 34.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    top = EncoreSpacers.Tighter,
+                                    bottom = if (line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
+                                )
+                        )
+                    } else {
+                        Text(
+                            text = line.text,
+                            style = EncoreTheme.typography.titleLarge.copy(
+                                fontSize = 24.sp,
+                                lineHeight = 34.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ink
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    top = EncoreSpacers.Tighter,
+                                    bottom = if (isCurrentLine && line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
+                                )
+                        )
+                    }
+                    if (isCurrentLine && line.translation.isNotBlank()) {
+                        Text(
+                            text = line.translation,
+                            style = EncoreTheme.typography.bodyMedium.copy(
+                                fontSize = 15.sp,
+                                lineHeight = 21.sp,
+                                color = ink.copy(alpha = if (deepFeel) 0.5f else 0.55f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = EncoreSpacers.Tighter)
+                        )
+                    }
                 }
             }
             if (lyricsProviderName.isNotBlank()) {

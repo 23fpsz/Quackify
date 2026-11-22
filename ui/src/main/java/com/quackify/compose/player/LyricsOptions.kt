@@ -37,6 +37,8 @@ object LyricsOptions {
     /** Screen stays awake while the fullscreen lyrics reader is open. */
     private const val KEY_KEEP_SCREEN_ON = "lyricsKeepScreenOn"
 
+    private const val KEY_DEEP_FEEL = "lyricsDeepFeel"
+
     private const val KEY_TRANSCRIPT_SMOOTH_SWEEP = "transcriptSmoothSweepEnabled"
 
     private const val KEY_TRANSCRIPT_OFFSET_TENTHS = "transcriptOffsetTenths"
@@ -72,6 +74,9 @@ object LyricsOptions {
     var keepScreenOn by mutableStateOf(false)
         private set
 
+    var deepFeelEnabled by mutableStateOf(false)
+        private set
+
     var transcriptSmoothSweep by mutableStateOf(true)
         private set
 
@@ -90,6 +95,7 @@ object LyricsOptions {
             ?: TRANSLATION_DEVICE_LANGUAGE
         offsetTenths = prefs.getInt(KEY_OFFSET_TENTHS, 0).coerceIn(LYRICS_OFFSET_TENTHS_MIN, LYRICS_OFFSET_TENTHS_MAX)
         keepScreenOn = prefs.getBoolean(KEY_KEEP_SCREEN_ON, false)
+        deepFeelEnabled = prefs.getBoolean(KEY_DEEP_FEEL, false)
         transcriptSmoothSweep = prefs.getBoolean(KEY_TRANSCRIPT_SMOOTH_SWEEP, true)
         transcriptOffsetTenths = prefs.getInt(KEY_TRANSCRIPT_OFFSET_TENTHS, 0)
             .coerceIn(LYRICS_OFFSET_TENTHS_MIN, LYRICS_OFFSET_TENTHS_MAX)
@@ -147,6 +153,11 @@ object LyricsOptions {
     fun setKeepScreenOn(context: Context, value: Boolean) {
         keepScreenOn = value
         AppPrefs.edit(context, PREFS).putBoolean(KEY_KEEP_SCREEN_ON, value).apply()
+    }
+
+    fun setDeepFeelEnabled(context: Context, value: Boolean) {
+        deepFeelEnabled = value
+        AppPrefs.edit(context, PREFS).putBoolean(KEY_DEEP_FEEL, value).apply()
     }
 
     fun setTranscriptSmoothSweep(context: Context, value: Boolean) {
