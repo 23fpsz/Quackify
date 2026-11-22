@@ -710,7 +710,7 @@ class KrespotPlayer(private val context: Context) {
             try {
                 val stack = StreamSources.order(context)
                 if (stack.firstOrNull() == StreamSource.YT_MUSIC) {
-                    val alternate = YtMusicStreams.resolve(track)
+                    val alternate = YtMusicStreams.resolve(context, track)
                     if (alternate != null) {
                         playYtMusic(track, alternate, fromMs)
                         return@launch
@@ -720,7 +720,7 @@ class KrespotPlayer(private val context: Context) {
                 val source = sourceFor(track.uri) ?: warmSource(track.uri, spclient)
                 if (source == null) {
                     if (stack.firstOrNull() != StreamSource.YT_MUSIC) {
-                        val alternate = YtMusicStreams.resolve(track)
+                        val alternate = YtMusicStreams.resolve(context, track)
                         if (alternate != null) {
                             playYtMusic(track, alternate, fromMs)
                             return@launch
@@ -865,7 +865,7 @@ class KrespotPlayer(private val context: Context) {
         licencePending = track
         licenceFrom = fromMs
         scope.launch {
-            val alternate = YtMusicStreams.resolve(track)
+            val alternate = YtMusicStreams.resolve(context, track)
             if (alternate == null) {
                 log.w("the licence is rate limited and youtube music did not resolve, the track stays parked")
                 return@launch
