@@ -535,6 +535,67 @@ internal class AudioEngine(
             .setCustomCacheKey(YtStreamTable.keyFor(uri))
             .build()
 
+    /**
+     * Plays a direct url - an ad body - on the same session player as the
+     * catalogue files and the alternates: the item carries the ad marker as
+     * its cache key, so its loads route to the stream buffer instead of the
+     * song cache, and no licence session is ever asked for it. The length
+     * is only known when the manifest carried it; the player settles it
+     * once its own parse reports one.
+     */
+    suspend fun prepareDirect(
+        uri: String,
+        url: String,
+        fromMs: Long,
+        autoplay: Boolean,
+        trackDurationMs: Long,
+    ): Boolean =
+        withContext(Dispatchers.Main) {
+            crossfade?.stop()
+            spareGainFactor = 1f
+            gainFactor = 1f
+            durationMs = trackDurationMs
+            announced = false
+            lastItemUri = uri
+            if (uri.isNotBlank() && trackDurationMs > 0L) itemDurations[uri] = trackDurationMs
+            // The player instance survives track changes: swapping the media
+            // source keeps the renderers, the codec and the audio sink warm, so
+            // only the first play pays the ExoPlayer build cost.
+            val live = player ?: ExoPlayer.Builder(context)
+                .setMediaSourceFactory(ensureSessionKit().factory)
+                .build()
+                .also {
+                    it.addListener(listener)
+                    player = it
+                }
+            live.setMediaSource(ensureSessionKit().factory.createMediaSource(itemForDirect(uri, url)))
+            live.prepare()
+            val bounded = if (trackDurationMs > 1_000L) {
+                fromMs.coerceIn(0L, trackDurationMs - 1_000L)
+            } else {
+                fromMs.coerceAtLeast(0L)
+            }
+            live.seekTo(bounded)
+            live.playWhenReady = autoplay
+            started = autoplay
+            loaded = true
+            applyVolume()
+            log.i("audio engine ready on the direct url at ${bounded}ms " +
+                    "autoplay=$autoplay reused=${player !== live}"
+            )
+            true
+        }
+
+    private fun itemForDirect(uri: String, url: String): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(uri)
+            .setUri(Uri.parse(url))
+            // The ad marker routes the loads to the stream buffer - the body
+            // is a one-shot impression url, it must not sit in the song
+            // cache - while the media id stays the ad's own track uri.
+            .setCustomCacheKey(uri + YtStreamTable.AD_SUFFIX)
+            .build()
+
     fun play() {
         started = true
         runOnMain { player?.play() }
@@ -558,7 +619,7 @@ internal class AudioEngine(
             crossfade?.onUserSeek()
             player?.seekTo(ms)
         }
-        onEvent?.invoke(PlayerEvent.Seeked(ms))
+        onEvent(PlayerEvent.Seeked(ms))
     }
 
     fun duck(level: Float) {
@@ -706,7 +767,7 @@ internal class AudioEngine(
                 val position = runOnMain { player?.currentPosition } ?: lastPositionMs
                 if (position >= 0L) {
                     lastPositionMs = position
-                    onEvent?.invoke(PlayerEvent.Progress(position, durationMs))
+                    onEvent(PlayerEvent.Progress(position, durationMs))
                 }
                 delay(PROGRESS_MS.milliseconds)
             }
@@ -718,7 +779,7 @@ internal class AudioEngine(
             val newUri = item?.mediaId.orEmpty()
             val auto = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
             if (auto && lastItemUri.isNotBlank()) {
-                onEvent?.invoke(PlayerEvent.Ended(lastItemUri))
+                onEvent(PlayerEvent.Ended(lastItemUri))
             }
             if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
                 announced = false
@@ -730,7 +791,7 @@ internal class AudioEngine(
                 val ready = runOnMain { player?.playbackState == Player.STATE_READY } ?: false
                 if (ready && !announced) {
                     announced = true
-                    onEvent?.invoke(PlayerEvent.Started(newUri))
+                    onEvent(PlayerEvent.Started(newUri))
                     if (started) startProgress()
                 }
             }
@@ -738,15 +799,27 @@ internal class AudioEngine(
 
         override fun onPlaybackStateChanged(state: Int) {
             when (state) {
-                Player.STATE_READY -> if (!announced) {
-                    announced = true
-                    onEvent?.invoke(PlayerEvent.Started(lastItemUri))
-                    if (started) startProgress()
+                Player.STATE_READY -> {
+                    // An item whose length nobody knew upfront - a direct url
+                    // - settles its duration as soon as the player reports
+                    // one, so the transport and the bridge stop guessing.
+                    if (durationMs <= 0L) {
+                        val real = runOnMain { player?.duration } ?: C.TIME_UNSET
+                        if (real != C.TIME_UNSET && real > 0L) {
+                            durationMs = real
+                            if (lastItemUri.isNotBlank()) itemDurations[lastItemUri] = real
+                        }
+                    }
+                    if (!announced) {
+                        announced = true
+                        onEvent(PlayerEvent.Started(lastItemUri))
+                        if (started) startProgress()
+                    }
                 }
                 Player.STATE_ENDED -> {
                     if (crossfade?.onSessionEnded() == true) return
                     lastPositionMs = durationMs
-                    onEvent?.invoke(PlayerEvent.Ended(lastItemUri))
+                    onEvent(PlayerEvent.Ended(lastItemUri))
                     lastItemUri = ""
                 }
                 else -> Unit
@@ -766,7 +839,7 @@ internal class AudioEngine(
                     log.w("dropped the offline licence for '${lastItemUri.takeLast(12)}' after a drm error")
                 }
             }
-            onEvent?.invoke(PlayerEvent.Failed("${error.errorCodeName}: ${error.message ?: "audio error"}"))
+            onEvent(PlayerEvent.Failed("${error.errorCodeName}: ${error.message ?: "audio error"}"))
         }
     }
 

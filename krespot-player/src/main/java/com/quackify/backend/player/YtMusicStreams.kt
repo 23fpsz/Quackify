@@ -105,15 +105,15 @@ private fun artistNames(credit: String): List<String> =
 
 data class YtStream(
     val videoId: String,
-    val url: String,
+    override val url: String,
     val bitrate: Int,
     val mime: String,
-    val headers: Map<String, String>,
-    val head: ByteArray,
-    val total: Long,
+    override val headers: Map<String, String>,
+    override val head: ByteArray,
+    override val total: Long,
     /** The video's own length in ms, so callers never have to fall back on the track metadata. */
     val lengthMs: Long,
-)
+) : StreamBody
 
 private class YtClient(
     val clientName: String,

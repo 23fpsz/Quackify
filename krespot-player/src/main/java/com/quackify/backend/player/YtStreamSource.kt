@@ -72,6 +72,9 @@ internal object YtStreamTable {
     /** Marks a cache key as the alternate rendition of a track uri. */
     const val SUFFIX = "#ytm"
 
+    /** Marks a cache key as a one-shot direct url that streams, never caches. */
+    const val AD_SUFFIX = "#ad"
+
     private const val LIMIT = 8
 
     private val table = LinkedHashMap<String, YtStream>()
@@ -92,27 +95,38 @@ internal object YtStreamTable {
     fun of(key: String): YtStream? = table[key]
 }
 
+/** The referer a direct url - an ad body - is served under. */
+private val AD_HEADERS = mapOf("referer" to "https://open.spotify.com/")
+
+/** A one-shot direct url streamed through the same pool the renditions use. */
+private class DirectBody(
+    override val url: String,
+    override val headers: Map<String, String>,
+) : StreamBody {
+    override val head: ByteArray? get() = null
+    override val total: Long get() = 0L
+}
+
 /**
- * The loading side of an alternate stream: ExoPlayer's progressive reads
- * pull straight out of the rendition's shared stream buffer, so
- * play-while-download carries over to the unified pipeline unchanged - the
- * probe at resolve time seeds the head, reads fetch ranges on demand and a
- * background pull runs ahead while a reader holds the buffer. One instance
- * per open, but every open of the same rendition - the session engine, the
- * crossfade spare, the muted analysis player, the re-open a seek performs
- * - attaches to the one buffer the pool holds for it, so each range
- * crosses the wire once and a seek re-opens warm instead of from a fresh
- * scratch file.
+ * The loading side of a streamed body: ExoPlayer's progressive reads pull
+ * straight out of the key's shared stream buffer, so play-while-download
+ * carries over to the unified pipeline unchanged - a resolve's probe seeds
+ * the head where one ran, reads fetch ranges on demand and a background
+ * pull runs ahead while a reader holds the buffer. One instance per open,
+ * but every open of the same key - the session engine, the crossfade
+ * spare, the muted analysis player, the re-open a seek performs - attaches
+ * to the one buffer the pool holds for it, so each range crosses the wire
+ * once and a seek re-opens warm instead of from a fresh scratch file.
  */
 internal class YtStreamSource(
     private val context: Context,
     private val key: String,
-    private val stream: YtStream,
+    private val body: StreamBody,
 ) : DataSource {
 
     private val listeners = ArrayList<TransferListener>()
 
-    private var body: MediaDataSource? = null
+    private var opened: MediaDataSource? = null
 
     private var cursor = 0L
 
@@ -123,27 +137,29 @@ internal class YtStreamSource(
     }
 
     override fun open(dataSpec: DataSpec): Long {
-        val total = stream.total
+        // Blocking is the loader thread's job; the pool hands back the key's
+        // shared buffer - a resolve's seed is already in it, and a body
+        // without one probes the wire here, learning its length the same
+        // open the extractor path always paid. The length only exists once
+        // the buffer is open, so the cursor math reads it off the body.
+        val opened = runBlocking { YtStreamPool.attach(key, body, context) }
+            ?: throw IOException("the alternate stream did not open")
+        this.opened = opened
+        val total = opened.size
         val from = dataSpec.position.coerceIn(0L, total)
         val until = if (dataSpec.length != C.LENGTH_UNSET.toLong()) {
             (from + dataSpec.length).coerceAtMost(total)
         } else {
             total
         }
-        // Blocking is the loader thread's job; the pool hands back the
-        // rendition's shared buffer - the seed the resolve probe carried is
-        // already in it, and every range a previous reader pulled is too.
-        val opened = runBlocking { YtStreamPool.attach(key, stream, context) }
-            ?: throw IOException("the alternate stream did not open")
-        body = opened
         cursor = from
         limit = until
-        log.i("ytm open at $from of $total, ${until - from}B to go")
+        log.i("${if (key.endsWith(YtStreamTable.AD_SUFFIX)) "ad" else "ytm"} open at $from of $total, ${until - from}B to go")
         return until - from
     }
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-        val source = body ?: throw IOException("the alternate stream was never opened")
+        val source = opened ?: throw IOException("the alternate stream was never opened")
         if (cursor >= limit) return C.RESULT_END_OF_INPUT
         val want = minOf(length.toLong(), limit - cursor).toInt()
         if (want <= 0) return C.RESULT_END_OF_INPUT
@@ -154,13 +170,13 @@ internal class YtStreamSource(
     }
 
     override fun getUri(): Uri? =
-        body?.let { Uri.parse(stream.url) }
+        opened?.let { Uri.parse(body.url) }
 
     override fun getResponseHeaders(): Map<String, List<String>> = emptyMap()
 
     override fun close() {
-        val source = body
-        body = null
+        val source = opened
+        opened = null
         if (source != null) runCatching { source.close() }
     }
 }
@@ -168,9 +184,10 @@ internal class YtStreamSource(
 /**
  * The one data source factory the engines share. Reads for a catalogue
  * item flow through the song cache exactly as before; reads whose data
- * spec carries an alternate rendition key open the stream buffer instead,
- * so both cuts of a track play through the same ExoPlayer session - the
- * queue, the crossfade and the blends never see the difference.
+ * spec carries an alternate rendition key or the direct-url marker open
+ * the stream buffer instead, so both cuts of a track and a one-shot ad
+ * body play through the same ExoPlayer session - the queue, the crossfade
+ * and the blends never see the difference.
  */
 internal class RoutedSources(private val context: Context) : DataSource.Factory {
 
@@ -194,14 +211,21 @@ internal class RoutedSources(private val context: Context) : DataSource.Factory 
         }
 
         override fun open(dataSpec: DataSpec): Long {
-            // The rendition key is the router's whole signal: an alternate
-            // item always carries one, a catalogue item never does.
-            val rendition = dataSpec.key?.takeIf { it.endsWith(YtStreamTable.SUFFIX) }
-            val stream = rendition?.let { YtStreamTable.of(it) }
-            val picked = if (rendition != null && stream != null) {
-                YtStreamSource(context, rendition, stream).also { source ->
-                    listeners.forEach(source::addTransferListener)
-                }
+            // The key is the router's whole signal: an alternate item always
+            // carries the rendition key, a direct url carries the ad marker,
+            // and a catalogue item carries neither.
+            val key = dataSpec.key.orEmpty()
+            val alternate = key.takeIf { it.endsWith(YtStreamTable.SUFFIX) }
+                ?.let { YtStreamTable.of(it) }
+            val routed = when {
+                alternate != null -> YtStreamSource(context, key, alternate)
+                key.endsWith(YtStreamTable.AD_SUFFIX) ->
+                    YtStreamSource(context, key, DirectBody(dataSpec.uri.toString(), AD_HEADERS))
+                else -> null
+            }
+            val picked: DataSource = if (routed != null) {
+                listeners.forEach(routed::addTransferListener)
+                routed
             } else {
                 catalogue
             }
