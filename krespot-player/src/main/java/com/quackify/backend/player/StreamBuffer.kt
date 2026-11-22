@@ -234,20 +234,53 @@ internal class StreamBuffer private constructor(
     }
 
     companion object {
-        private const val CHUNK = 64L * 1024
+        const val CHUNK = 64L * 1024
 
         /**
          * Opens the url for progressive playback: one range probe learns the
          * exact length and lands the first chunk, then reads pull on demand.
          * A server that answers the probe with a full 200 body gets that body
-         * served as a plain in-memory source instead.
+         * served as a plain in-memory source instead. Callers that already
+         * hold the head of the body hand it in as [seed] with its [seedTotal],
+         * skipping the probe entirely.
          */
         suspend fun open(
             url: String,
             headers: Map<String, String>,
             cacheDir: File?,
             tag: String,
+            seed: ByteArray? = null,
+            seedTotal: Long = 0L,
         ): MediaDataSource? {
+            if (seed != null && seedTotal in 1..seed.size.toLong()) {
+                log.i("$tag open: the ${seed.size}B seed covers the whole body")
+                return BytesSource(seed)
+            }
+            if (seed != null && seedTotal > 0L) {
+                val spill = cacheDir
+                    ?: return null.also { log.w("$tag open: nowhere to spill the seeded stream") }
+                val seeded = runInterruptible(Dispatchers.IO) {
+                    runCatching {
+                        val scratch = File.createTempFile("quackify-", ".stream", spill)
+                        val body = RandomAccessFile(scratch, "rw")
+                        try {
+                            body.setLength(seedTotal)
+                            body.seek(0)
+                            body.write(seed)
+                        } catch (failure: Throwable) {
+                            runCatching { body.close() }
+                            runCatching { scratch.delete() }
+                            throw failure
+                        }
+                        log.i("$tag open: ${seedTotal}B streams in ${CHUNK}B pulls, ${seed.size}B seeded")
+                        StreamBuffer(url, headers, seedTotal, scratch, body, tag, seed.size)
+                    }.getOrElse {
+                        log.e("$tag open failed ${it.javaClass.simpleName}: ${it.message}")
+                        null
+                    }
+                }
+                if (seeded != null) return seeded
+            }
             val probe =
                 Net.blob(url, headers + mapOf("Range" to "bytes=0-${CHUNK - 1}"), "$tag-open")
                     ?: return null.also { log.w("$tag open: no response") }

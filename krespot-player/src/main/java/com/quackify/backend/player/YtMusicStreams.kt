@@ -4,6 +4,7 @@ import android.content.Context
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
+import com.quackify.backend.core.store.AppPrefs
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -27,13 +28,15 @@ private const val MUSIC_ORIGIN = "https://music.youtube.com"
 private const val NONCE_ALPHABET =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
-private const val PROBE_BYTES = 16 * 1024
-
 private const val DURATION_TOLERANCE_MS = 40_000L
 
 private const val CANDIDATES = 4
 
 private const val VIDEO_CACHE = 32
+
+private const val VIDEO_STORE = "quackify.ytm"
+
+private const val VIDEO_INDEX = "video.keys"
 
 private const val STREAM_CACHE = 8
 
@@ -45,6 +48,8 @@ data class YtStream(
     val bitrate: Int,
     val mime: String,
     val headers: Map<String, String>,
+    val head: ByteArray,
+    val total: Long,
 )
 
 private class YtClient(
@@ -190,6 +195,9 @@ private val CLIENTS = listOf(
 
 private class YtCandidate(val videoId: String, val title: String)
 
+/** A match that served before: the video it landed on and the visitor the search that found it rode. */
+private class VideoMatch(val videoId: String, val visitor: String)
+
 /** The search reply: its candidates plus the visitor the server handed out. */
 private class SearchMatch(val candidates: List<YtCandidate>, val visitorData: String)
 
@@ -201,6 +209,16 @@ internal object YtMusicStreams {
 
     suspend fun resolve(context: Context, track: CommandTrack): YtStream? {
         cached(track.uri)?.let { return it }
+        val remembered = recallVideo(context, track.uri)
+        if (remembered != null) {
+            val stream = streamOf(context, track, YtCandidate(remembered.videoId, track.name), remembered.visitor)
+            if (stream != null) {
+                remember(track.uri, stream)
+                return stream
+            }
+            log.w("the remembered video '${remembered.videoId}' stopped serving, searching fresh")
+            forgetVideo(context, track.uri)
+        }
         val found = search(track)
         if (found.candidates.isEmpty()) {
             log.w("no youtube music match for '${track.name.ifBlank { track.uri.takeLast(12) }}'")
@@ -210,6 +228,7 @@ internal object YtMusicStreams {
         for (candidate in ranked.take(CANDIDATES)) {
             val stream = streamOf(context, track, candidate, found.visitorData) ?: continue
             remember(track.uri, stream)
+            rememberVideo(context, track.uri, stream.videoId, found.visitorData)
             return stream
         }
         log.w("no stream for '${track.name.ifBlank { track.uri.takeLast(12) }}' after ${found.candidates.size} candidates")
@@ -231,6 +250,41 @@ internal object YtMusicStreams {
                 streamFor.remove(oldest)
                 expiresAt.remove(oldest)
             }
+        }
+    }
+
+    /** Persists the match so a later process start skips the search round trip. */
+    private fun rememberVideo(context: Context, uri: String, videoId: String, visitor: String) {
+        runCatching {
+            val prefs = AppPrefs.prefs(context, VIDEO_STORE)
+            val editor = prefs.edit()
+                .putString(uri, JSONObject().put("v", videoId).put("vis", visitor).toString())
+            val keys = prefs.getString(VIDEO_INDEX, "").orEmpty()
+                .split(',').filter { it.isNotBlank() }.toMutableList()
+            keys.remove(uri)
+            keys.add(uri)
+            while (keys.size > VIDEO_CACHE) editor.remove(keys.removeAt(0))
+            editor.putString(VIDEO_INDEX, keys.joinToString(","))
+            editor.apply()
+        }
+    }
+
+    private fun recallVideo(context: Context, uri: String): VideoMatch? {
+        val raw = runCatching {
+            AppPrefs.prefs(context, VIDEO_STORE).getString(uri, null)
+        }.getOrNull() ?: return null
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+        val videoId = json.optString("v").takeIf { it.isNotBlank() } ?: return null
+        return VideoMatch(videoId, json.optString("vis"))
+    }
+
+    private fun forgetVideo(context: Context, uri: String) {
+        runCatching {
+            val prefs = AppPrefs.prefs(context, VIDEO_STORE)
+            val keys = prefs.getString(VIDEO_INDEX, "").orEmpty()
+                .split(',').filter { it.isNotBlank() }.toMutableList()
+            if (!keys.remove(uri)) return
+            prefs.edit().remove(uri).putString(VIDEO_INDEX, keys.joinToString(",")).apply()
         }
     }
 
@@ -360,8 +414,15 @@ internal object YtMusicStreams {
                 urls.add(base)
                 if (sessionToken != null) urls.add(base.withPot(sessionToken))
                 if (contentToken != null && contentToken != sessionToken) urls.add(base.withPot(contentToken))
-                val url = urls.firstOrNull { probe(it, client.mediaHeaders()) }
-                if (url == null) {
+                var picked: String? = null
+                var seeded: Probe? = null
+                for (url in urls) {
+                    val probed = probe(url, client.mediaHeaders()) ?: continue
+                    picked = url
+                    seeded = probed
+                    break
+                }
+                if (picked == null || seeded == null) {
                     log.w("itag ${format.optInt("itag")} from ${client.clientName} refused the probe")
                     continue
                 }
@@ -370,7 +431,15 @@ internal object YtMusicStreams {
                 log.i("'${candidate.videoId}' via ${client.clientName} itag=${format.optInt("itag")} " +
                         "${format.text("mimeType")} ${bitrate}b serves"
                 )
-                return YtStream(candidate.videoId, url, bitrate, format.text("mimeType"), client.mediaHeaders())
+                return YtStream(
+                    candidate.videoId,
+                    picked,
+                    bitrate,
+                    format.text("mimeType"),
+                    client.mediaHeaders(),
+                    seeded.head,
+                    seeded.total,
+                )
             }
             if (!served) {
                 log.w("${client.clientName} offered no direct audio url for '${candidate.videoId}'")
@@ -458,9 +527,25 @@ internal object YtMusicStreams {
         )
         .toList()
 
-    private suspend fun probe(url: String, headers: Map<String, String>): Boolean {
-        val sample = Net.fetch(url, 0, PROBE_BYTES - 1, headers, tag = "ytm-probe")
-        return sample != null && sample.isNotEmpty()
+    private class Probe(val head: ByteArray, val total: Long)
+
+    /**
+     * The serving check doubles as the stream seed: it pulls the first buffer
+     * chunk and the total length out of the range reply, so playback starts
+     * off bytes already in hand instead of re-opening the url.
+     */
+    private suspend fun probe(url: String, headers: Map<String, String>): Probe? {
+        val sample = Net.blob(
+            url,
+            headers + mapOf("Range" to "bytes=0-${StreamBuffer.CHUNK - 1}"),
+            tag = "ytm-probe",
+        )?.takeIf { it.ok && it.bytes.isNotEmpty() } ?: return null
+        val total = if (sample.code == 206) {
+            sample.header("content-range").substringAfter('/').trim().toLongOrNull()
+        } else {
+            sample.bytes.size.toLong()
+        }
+        return Probe(sample.bytes, total ?: 0L)
     }
 }
 
