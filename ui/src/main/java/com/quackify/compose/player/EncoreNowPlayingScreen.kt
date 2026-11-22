@@ -951,6 +951,7 @@ fun EncoreNowPlayingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(artworkGestureModifier)
+                            .then(if (canvasImmersive) artworkSwipeModifier else Modifier)
                             .heightIn(min = viewportHeight - PEEK_HEIGHT),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
