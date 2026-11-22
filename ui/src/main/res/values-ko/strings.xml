@@ -242,6 +242,15 @@
     <string name="sleep_timer_custom_hint">3분에서 24시간 사이</string>
     <string name="sleep_timer_custom_unit">분</string>
     <string name="sleep_timer_end_of_track_info">현재 트랙이 끝나면 재생이 중지됩니다</string>
+    <string name="stream_sources">스트림 소스</string>
+    <string name="stream_sources_desc">재생은 이 순서대로 각 소스를 시도하고, 실패하면 다음 소스로 넘어갑니다</string>
+    <string name="stream_sources_row_desc">먼저 시도할 오디오 소스를 선택합니다</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">기본</string>
+    <string name="stream_source_fallback">대체</string>
+    <string name="stream_source_move_up">위로 이동</string>
+    <string name="stream_source_move_down">아래로 이동</string>
     <string name="sleep_timer_set">타이머 설정</string>
     <string name="sleep_timer_stops_at">%1$s에 중지됩니다</string>
     <string name="sleep_timer_with_duration">수면 타이머(%1$s)</string>
@@ -524,4 +533,5 @@
     <string name="artist_photo_cd">%1$s 사진</string>
     <string name="webview_missing_message">이 기기에서 Android System WebView 패키지가 없거나, 비활성화되었거나, 업데이트 중이라 로그인 페이지를 열 수 없습니다. 시스템 설정에서 Android System WebView를 활성화하거나 업데이트한 후 다시 시도하세요.</string>
     <string name="name_your_folder">폴더 이름을 지정하세요</string>
+    <string name="session_expired_toast">세션이 만료되었습니다. 계속 듣으려면 다시 로그인하세요.</string>
 </resources>

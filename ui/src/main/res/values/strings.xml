@@ -219,6 +219,7 @@
     <string name="lyrics_prioritize_word_synced_desc">Keep searching other sources for word-by-word timing when the top source only has line-synced lyrics</string>
     <string name="lyrics_source">Lyrics source</string>
     <string name="lyrics_source_desc">Tap a source to move it to the top. Sources are tried in this order.</string>
+    <string name="lyrics_source_stream_desc">Providers used while the audio streams from %1$s. Tap a source to move it to the top.</string>
     <string name="lyrics_provider_word_synced">Word-synced</string>
     <string name="lyrics_provider_line_synced">Line-synced</string>
     <string name="lyrics_translation">Translate lyrics</string>
@@ -229,6 +230,11 @@
     <string name="lyrics_menu">Lyrics options</string>
     <string name="lyrics_keep_screen_on">Keep screen on</string>
     <string name="lyrics_keep_screen_on_desc">Keep the screen awake while the fullscreen lyrics are open</string>
+    <string name="lyrics_deepfeel">DeepFeel lyrics</string>
+    <string name="lyrics_deepfeel_desc">A cinematic dark canvas where only the current line glows in the colors of the artwork</string>
+    <string name="lyrics_next_up">Next up</string>
+    <string name="lyrics_next_up_desc">Peek the opening lines of the next track at the end of the lyrics</string>
+    <string name="lyrics_next_track_name">%1$s (%2$s)</string>
     <string name="lyrics_offset">Lyrics offset</string>
     <string name="lyrics_offset_desc">Shift the lyric timing when it runs ahead of or behind the vocal</string>
     <string name="lyrics_offset_value">%1$.1f s</string>
@@ -347,14 +353,30 @@
     <string name="sign_in">Sign in</string>
     <string name="sign_in_with_sp_dc">Sign in with sp_dc</string>
     <string name="sign_in_with_sp_dc_subtitle">Paste a sp_dc cookie value to skip the web login</string>
+    <string name="sp_dc_installed_subtitle">Custom sp_dc installed (%1$d B)</string>
     <string name="sp_dc_rejected">That sp_dc did not sign in</string>
     <string name="sp_dc_signed_in">Signed in as %1$s</string>
+    <string name="sp_dc_check_failed_title">Couldn\'t check this sp_dc</string>
+    <string name="sp_dc_check_failed_body">Spotify could not be reached to verify the cookie, so it is untested. You can keep it and the profile will fill in later, or cancel and try again when the connection is back.</string>
+    <string name="sp_dc_keep_anyway">Keep it anyway</string>
+    <string name="sp_dc_signed_in_unchecked">Signed in — the profile will sync when the connection is back</string>
+    <string name="sp_dc_pending_name">Sp_dc account</string>
+    <string name="remove_custom_sp_dc">Remove custom sp_dc</string>
     <string name="singles_and_eps">Singles &amp; EPs</string>
     <string name="sleep_timer">Sleep timer</string>
     <string name="sleep_timer_custom">Custom</string>
     <string name="sleep_timer_custom_hint">Between 3 minutes and 24 hours</string>
     <string name="sleep_timer_custom_unit">minutes</string>
     <string name="sleep_timer_end_of_track_info">Playback stops at the end of the current track</string>
+    <string name="stream_sources">Stream sources</string>
+    <string name="stream_sources_desc">Playback tries each source in this order and falls through to the next one when a source fails</string>
+    <string name="stream_sources_row_desc">Choose which audio source is tried first</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">Primary</string>
+    <string name="stream_source_fallback">Fallback</string>
+    <string name="stream_source_move_up">Move up</string>
+    <string name="stream_source_move_down">Move down</string>
     <string name="sleep_timer_set">Set timer</string>
     <string name="sleep_timer_stops_at">Stops at %1$s</string>
     <string name="sleep_timer_with_duration">Sleep timer (%1$s)</string>
@@ -622,4 +644,5 @@
     <string name="enable_android_auto_desc">Expose custom player controls on the car display</string>
     <string name="app_icon_and_player_controls">App icon and player controls</string>
     <string name="player_controls_and_app_icon">Player controls and app icon</string>
+    <string name="session_expired_toast">Your session expired. Sign in again to keep listening.</string>
 </resources>

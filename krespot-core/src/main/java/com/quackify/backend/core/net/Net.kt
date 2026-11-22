@@ -289,7 +289,7 @@ object Net {
             val started = System.currentTimeMillis()
             val outcome = runCatching {
                 baseClient.newCall(buildRequest(method, url, headers, body)).await().use { raw ->
-                    val text = raw.body?.string().orEmpty()
+                    val text = raw.body.string()
                     val type = raw.header("Content-Type").orEmpty()
                     val millis = System.currentTimeMillis() - started
                     logResponse(label, raw.code, millis, text, type)
@@ -337,7 +337,7 @@ object Net {
         val started = System.currentTimeMillis()
         val outcome = runCatching {
             longClient.newCall(buildRequest("GET", url, headers, null)).await().use { raw ->
-                val bytes = raw.body?.bytes() ?: ByteArray(0)
+                val bytes = raw.body.bytes()
                 val type = raw.header("Content-Type").orEmpty()
                 val fromServer = received(raw.headers)
                 val millis = System.currentTimeMillis() - started
@@ -401,7 +401,7 @@ object Net {
             longClient.newCall(
                 buildRequest("POST", url, sent, body)
             ).await().use { raw ->
-                val bytes = raw.body?.bytes() ?: ByteArray(0)
+                val bytes = raw.body.bytes()
                 val type = raw.header("Content-Type").orEmpty()
                 val fromServer = received(raw.headers)
                 val millis = System.currentTimeMillis() - started

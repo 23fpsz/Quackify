@@ -242,6 +242,15 @@
     <string name="sleep_timer_custom_hint">Zwischen 3 Minuten und 24 Stunden</string>
     <string name="sleep_timer_custom_unit">Minuten</string>
     <string name="sleep_timer_end_of_track_info">Die Wiedergabe stoppt am Ende des aktuellen Titels</string>
+    <string name="stream_sources">Streamingquellen</string>
+    <string name="stream_sources_desc">Die Wiedergabe testet jede Quelle in dieser Reihenfolge und weicht bei einem Fehler auf die nächste aus</string>
+    <string name="stream_sources_row_desc">Legt fest, welche Audioquelle zuerst versucht wird</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">Primär</string>
+    <string name="stream_source_fallback">Ersatz</string>
+    <string name="stream_source_move_up">Nach oben</string>
+    <string name="stream_source_move_down">Nach unten</string>
     <string name="sleep_timer_set">Timer festlegen</string>
     <string name="sleep_timer_stops_at">Stoppt um %1$s</string>
     <string name="sleep_timer_with_duration">Einschlaf-Timer (%1$s)</string>
@@ -526,4 +535,5 @@
     <string name="artist_photo_cd">Foto von %1$s</string>
     <string name="webview_missing_message">Das Android-System-WebView-Paket fehlt, ist deaktiviert oder wird gerade aktualisiert, daher kann sich die Anmeldeseite nicht öffnen. Aktiviere oder aktualisiere Android System WebView in den Systemeinstellungen und versuche es erneut.</string>
     <string name="name_your_folder">Gib Deinem Ordner einen Namen</string>
+    <string name="session_expired_toast">Deine Sitzung ist abgelaufen. Melde dich erneut an, um weiter zu hören.</string>
 </resources>

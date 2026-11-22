@@ -24,12 +24,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.quackify.app.search.decorateSearchTracks
+import com.quackify.compose.R
 import com.quackify.backend.api.Browse
 import com.quackify.backend.api.ArtistBanStore
 import com.quackify.backend.api.Collection2
@@ -72,8 +80,11 @@ import com.quackify.backend.model.ShelfKind
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.backend.model.UserProfile
+import com.quackify.compose.R as ComposeR
+import com.quackify.compose.components.QuackifyToastHost
 import com.quackify.compose.components.UpdateDialog
 import com.quackify.compose.components.UpdateInstallPhase
+import com.quackify.compose.components.rememberQuackifyToastState
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.format.parseHexColor
 import com.quackify.app.widget.WidgetSync
@@ -144,6 +155,18 @@ class MainActivity : ComponentActivity() {
     internal var openPlayerSignal by mutableStateOf(0)
     private var pausedAt = 0L
     private var sawStop = false
+
+    /** Flips when the stored session is proven unable to mint tokens, so the
+     * composition swaps to the login screen with a toast instead of letting
+     * every call fail silently. */
+    private var sessionLapsed by mutableStateOf(false)
+
+    private fun markSessionLapsed() {
+        if (sessionLapsed) return
+        sessionLapsed = true
+        EncoreAuth.invalidateToken(applicationContext)
+        log.w("the stored session can no longer mint tokens, reopening the login screen")
+    }
 
     internal var homeGreeting by mutableStateOf("")
     internal var homeFacet by mutableStateOf("")
@@ -255,6 +278,8 @@ class MainActivity : ComponentActivity() {
     internal var nowPlayingArtist by mutableStateOf<ArtistDetail?>(null)
     internal var nowPlayingArtistFollowed by mutableStateOf<Boolean?>(null)
     internal var nowPlayingLyrics by mutableStateOf<TrackLyrics?>(null)
+    /** The opening lines of whatever plays next, for the reader's sneak peek. */
+    internal var nowPlayingNextLyrics by mutableStateOf<TrackLyrics?>(null)
     internal var nowPlayingTranscript by mutableStateOf<EpisodeTranscript?>(null)
     internal var canvasFile by mutableStateOf<String?>(null)
     internal var nowPlayingShow by mutableStateOf<ShowDetail?>(null)
@@ -283,6 +308,7 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         Pathfinder.silentRefresh = { context, reason -> SilentTokenRefresh.refresh(context, reason) }
+        SilentTokenRefresh.onSessionDead = { markSessionLapsed() }
         playHistory = PlayHistory.all(applicationContext)
         playStats = PlayStats.snapshot(applicationContext)
         RecentSearches.refresh(applicationContext)
@@ -326,9 +352,37 @@ class MainActivity : ComponentActivity() {
                 var loggedIn by remember { mutableStateOf(EncoreAuth.isLoggedIn(context)) }
                 val updates = rememberUpdateController()
                 UpdateEffects(updates)
+                val sessionToast = rememberQuackifyToastState()
+                val sessionExpiredText = context.getString(ComposeR.string.session_expired_toast)
+                val sessionLapsedNow = sessionLapsed
+                LaunchedEffect(sessionLapsedNow) {
+                    if (sessionLapsedNow) {
+                        loggedIn = false
+                        sessionToast.show(sessionExpiredText)
+                    }
+                }
+                LaunchedEffect(loggedIn) {
+                    if (loggedIn) this@MainActivity.sessionLapsed = false
+                }
 
-
+                Box(Modifier.fillMaxSize()) {
                 if (loggedIn) {
+                    // The debug door installs sessions the web login never
+                    // would; a quiet one-line reminder at startup — once per
+                    // process — keeps the tinkerer aware they are running on
+                    // a custom sp_dc, with its length, never its value.
+                    LaunchedEffect(Unit) {
+                        if (EncoreAuth.customSpDc(applicationContext)) {
+                            Toast.makeText(
+                                applicationContext,
+                                applicationContext.getString(
+                                    com.quackify.app.R.string.custom_spdc_startup_toast,
+                                    EncoreAuth.customSpDcLength(applicationContext)
+                                ),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
                     var capturing by remember {
                         val tokenUsable = EncoreAuth.token(context).isNotBlank() &&
                             !EncoreAuth.tokenExpired(context)
@@ -529,8 +583,8 @@ class MainActivity : ComponentActivity() {
                                 }
                                 profileDetail = profile
                                 if (isSelf && !profile?.colorHex.isNullOrBlank()) {
-                                    userProfileColorHex = profile!!.colorHex
-                                    EncoreAuth.saveProfileColor(context, profile!!.colorHex)
+                                    userProfileColorHex = profile.colorHex
+                                    EncoreAuth.saveProfileColor(context, profile.colorHex)
                                 }
                                 profileTop = top
                                 profileTopUnavailable = !isSelf && top == null
@@ -1064,6 +1118,15 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     )
+                }
+
+                QuackifyToastHost(
+                    state = sessionToast,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 32.dp),
+                )
                 }
             }
         }

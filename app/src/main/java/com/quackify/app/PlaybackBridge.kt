@@ -4,10 +4,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.quackify.backend.api.ArtistBanStore
+import androidx.compose.runtime.snapshotFlow
 import com.quackify.app.bridge.QueueNavigatorState
 import com.quackify.app.bridge.QueueTarget
 import com.quackify.app.bridge.UriSources
@@ -18,27 +24,12 @@ import com.quackify.app.bridge.asCommandTrack
 import com.quackify.app.bridge.asTrackItem
 import com.quackify.app.bridge.playingUri
 import com.quackify.app.bridge.targetFrom
-import com.quackify.compose.playlist.TrackItem
-import com.quackify.compose.components.RepeatMode
-import com.quackify.compose.components.ShuffleMode
-import com.quackify.compose.shell.ChapterMarker
-import com.quackify.compose.shell.ComposePlaybackState
-import com.quackify.compose.shell.ComposePlayerListener
-import com.quackify.compose.shell.PlaybackProgress
-import com.quackify.compose.shell.QueueEditKind
-import com.quackify.compose.shell.QueueEditResult
-import com.quackify.compose.sheets.SleepTimerOption
+import com.quackify.backend.api.ArtistBanStore
+import com.quackify.backend.api.Library
+import com.quackify.backend.api.Podcasts
 import com.quackify.backend.connect.KrespotConnect
 import com.quackify.backend.connect.cluster.ClusterState
 import com.quackify.backend.connect.cluster.ClusterTrack
-import com.quackify.backend.model.ConnectDevice
-import com.quackify.backend.model.DeviceKind
-import android.media.AudioDeviceCallback
-import android.os.Handler
-import android.os.Looper
-import android.media.AudioDeviceInfo
-import android.media.AudioManager
-import com.quackify.backend.connect.command.CommandClient
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.connect.command.ContentType
 import com.quackify.backend.connect.command.PlaybackCommand
@@ -46,33 +37,42 @@ import com.quackify.backend.connect.command.RemoteCommand
 import com.quackify.backend.connect.command.TrackUid
 import com.quackify.backend.connect.state.DebugSource
 import com.quackify.backend.connect.state.Snapshot
-import com.quackify.backend.player.KrespotPlayer
-import com.quackify.backend.player.PlayerEvent
-import com.quackify.backend.player.PlayerState
-import com.quackify.backend.player.VideoManifests
-import com.quackify.backend.api.Podcasts
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.flow.filter
-import androidx.compose.runtime.snapshotFlow
-import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.core.log.Logs
 import com.quackify.backend.library.Krespot
 import com.quackify.backend.library.SmartShuffleRow
 import com.quackify.backend.library.SmartShuffleSource
 import com.quackify.backend.library.TrackSource
-import com.quackify.backend.api.Library
-import android.os.SystemClock
+import com.quackify.backend.model.ConnectDevice
+import com.quackify.backend.model.DeviceKind
+import com.quackify.backend.player.KrespotPlayer
+import com.quackify.backend.player.PlayerEvent
+import com.quackify.backend.player.PlayerState
+import com.quackify.backend.player.VideoManifests
+import com.quackify.compose.components.RepeatMode
+import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.sheets.SleepTimerOption
+import com.quackify.compose.shell.ChapterMarker
+import com.quackify.compose.shell.ComposePlaybackState
+import com.quackify.compose.shell.ComposePlayerListener
+import com.quackify.compose.shell.PlaybackProgress
+import com.quackify.compose.shell.QueueEditKind
+import com.quackify.compose.shell.QueueEditResult
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Mirrors the seek bar's coarse view of the engine: position and duration only. */
 data class PlaybackProgressSnapshot(
@@ -228,7 +228,7 @@ class PlaybackBridge(private val context: Context) {
                 name = queued.title,
                 artists = queued.artist,
                 album = "",
-                albumUri = queued.albumUri.orEmpty(),
+                albumUri = queued.albumUri,
                 durationMs = queued.durationMs,
                 imageUrl = queued.imageUrl.orEmpty(),
                 explicit = queued.isExplicit,
@@ -267,7 +267,7 @@ class PlaybackBridge(private val context: Context) {
                 name = item.title,
                 artists = item.artist,
                 album = "",
-                albumUri = item.albumUri.orEmpty(),
+                albumUri = item.albumUri,
                 durationMs = item.durationMs,
                 imageUrl = item.imageUrl.orEmpty(),
                 explicit = item.isExplicit,
@@ -548,7 +548,7 @@ class PlaybackBridge(private val context: Context) {
                         "engine='${player.state.value.trackUri.takeLast(12)}'"
                 )
             } else if (waiting && sameContext && named != pendingTrack) {
-                log.i("command accepted: the server started '${track?.name}' from the context we " +
+                log.i("command accepted: the server started '${track.name}' from the context we " +
                         "asked for instead of the row we named"
                 )
             }
@@ -736,19 +736,19 @@ class PlaybackBridge(private val context: Context) {
             if (visible) scope.launch { connect.refreshCluster() }
         }
 
-        override fun onSelectDevice(targetId: String) {
+        override fun onSelectDevice(deviceId: String) {
             scope.launch {
-                val target = connect.cluster.value?.devices?.firstOrNull { it.id == targetId }
-                    ?: if (targetId == deviceId) localDeviceRow(active = false) else null
+                val target = connect.cluster.value?.devices?.firstOrNull { it.id == deviceId }
+                    ?: if (deviceId == this@PlaybackBridge.deviceId) localDeviceRow(active = false) else null
                 if (target == null) {
-                    log.w("device select: '" + targetId + "' is not in the cluster any more")
+                    log.w("device select: '$deviceId' is not in the cluster any more")
                     return@launch
                 }
                 if (!target.canTransfer) {
                     log.w("device select: '" + target.name + "' cannot take the stream")
                     return@launch
                 }
-                val backHome = target.id == deviceId
+                val backHome = target.id == this@PlaybackBridge.deviceId
                 log.i("device select '" + target.name + "' -> " +
                         if (backHome) "taking the stream back here" else "transfer"
                 )
@@ -756,9 +756,9 @@ class PlaybackBridge(private val context: Context) {
                     state = state.copy(
                         controllingRemote = false,
                         activeDeviceName = "Quackify",
-                        activeDeviceId = deviceId,
+                        activeDeviceId = this@PlaybackBridge.deviceId,
                         connectedDevice = localOutputLabel(),
-                        devices = state.devices.map { it.copy(active = it.id == deviceId) }
+                        devices = state.devices.map { it.copy(active = it.id == this@PlaybackBridge.deviceId) }
                     )
                     takeBackHere()
                     return@launch
@@ -911,9 +911,9 @@ class PlaybackBridge(private val context: Context) {
                 )
             }
             val currentDecorated = rows[state.trackUri]
-            if (currentDecorated != null && currentDecorated.imageUrl?.isNotBlank() == true && state.coverUrl.isBlank()) {
+            if (currentDecorated != null && currentDecorated.imageUrl.isNotBlank() && state.coverUrl.isBlank()) {
                 state = state.copy(
-                    coverUrl = currentDecorated.imageUrl.orEmpty(),
+                    coverUrl = currentDecorated.imageUrl,
                     title = state.title.ifBlank { currentDecorated.title },
                     artist = state.artist.ifBlank { currentDecorated.artists },
                 )
@@ -949,7 +949,7 @@ class PlaybackBridge(private val context: Context) {
     fun start() {
         if (dealer != null) return
         adoptLegacySessionPrefs()
-        log.i("start device=" + deviceId)
+        log.i("start device=$deviceId")
         (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
             ?.registerAudioDeviceCallback(localOutputWatcher, Handler(Looper.getMainLooper()))
         context.applicationContext.registerReceiver(
@@ -991,7 +991,7 @@ class PlaybackBridge(private val context: Context) {
         connect.holdsStream = false
         deviceWatch = scope.launch {
             while (true) {
-                delay(if (deviceSheetOpen || state.controllingRemote) DEVICE_WATCH_MS else DEVICE_POLL_MS)
+                delay((if (deviceSheetOpen || state.controllingRemote) DEVICE_WATCH_MS else DEVICE_POLL_MS).milliseconds)
                 when {
                     player.hasSource && remoteTarget().isNotBlank() -> {
                         connect.holdsStream = false
@@ -1017,7 +1017,7 @@ class PlaybackBridge(private val context: Context) {
         }
         remoteTick = scope.launch {
             while (true) {
-                delay(REMOTE_TICK_MS)
+                delay(REMOTE_TICK_MS.milliseconds)
                 advanceRemote()
             }
         }
@@ -1116,6 +1116,8 @@ class PlaybackBridge(private val context: Context) {
                             else -> state.coverUrl
                         },
                         trackUri = if (engineOwns) engineUri else state.trackUri,
+                        streamSource = if (engineOwns) playing.source.key else state.streamSource,
+                        videoId = if (engineOwns) playing.videoId else state.videoId,
                         artistUri = if (engineOwns && engineUri != state.trackUri) {
                             candidate?.artistUri?.takeIf { it.isNotBlank() } ?: artistUriOf(engineUri)
                         } else state.artistUri,
@@ -1128,6 +1130,8 @@ class PlaybackBridge(private val context: Context) {
                         isBuffering = if (engineOwns) playing.buffering else false,
                     )
                     val identityChanged = next.trackUri != state.trackUri ||
+                        next.streamSource != state.streamSource ||
+                        next.videoId != state.videoId ||
                         next.title != state.title || next.artist != state.artist ||
                         next.coverUrl != state.coverUrl || next.artistUri != state.artistUri ||
                         next.albumUri != state.albumUri || next.isPlaying != state.isPlaying ||
@@ -1165,7 +1169,7 @@ class PlaybackBridge(private val context: Context) {
     fun stop() {
         pauseRemoteOnExit()
         runCatching {
-            runBlocking { withTimeoutOrNull(2_000L) { playSession?.let { finishPlaySession(it, "logout") } } }
+            runBlocking { withTimeoutOrNull(2_000L.milliseconds) { playSession?.let { finishPlaySession(it, "logout") } } }
         }.onFailure { log.w("stream report on stop failed ${it.javaClass.simpleName}") }
         playSession = null
         sleepTimerJob?.cancel()
@@ -1180,7 +1184,7 @@ class PlaybackBridge(private val context: Context) {
                 ?.unregisterAudioDeviceCallback(localOutputWatcher)
         }
         runCatching {
-            runBlocking { withTimeoutOrNull(2_000L) { connect.unregister() } }
+            runBlocking { withTimeoutOrNull(2_000L.milliseconds) { connect.unregister() } }
         }.onFailure { log.w("unregister on stop failed ${it.javaClass.simpleName}") }
         dealer?.cancel()
         dealer = null
@@ -1240,7 +1244,7 @@ class PlaybackBridge(private val context: Context) {
         if (player.isPlaying) player.pause()
         runCatching {
             runBlocking {
-                withTimeoutOrNull(2_000L) {
+                withTimeoutOrNull(2_000L.milliseconds) {
                     if (connect.holdsStream && player.hasSource) {
                         publishLocalFromEngine(playing = false)
                     }
@@ -1595,7 +1599,7 @@ class PlaybackBridge(private val context: Context) {
         }
         val canShuffle = cluster?.canShuffle ?: true
         val canSmartShuffle = smartAvailable(cluster)
-        val canRepeat = (cluster?.canRepeatContext ?: true) || (cluster?.canRepeatTrack ?: true)
+        val canRepeat = (cluster?.canRepeatContext ?: true) || cluster.canRepeatTrack
         val currentEnhanced = if (cluster?.track?.uri == state.trackUri && state.trackUri.isNotBlank()) {
             state.isEnhanced
         } else {
@@ -1732,7 +1736,7 @@ class PlaybackBridge(private val context: Context) {
             publishLocalFromEngine()
         }
         if (nextSmart) enhanceReset(cluster)
-        delay(MODE_SETTLE_MS)
+        delay(MODE_SETTLE_MS.milliseconds)
         runCatching { connect.refreshCluster() }
         publishModes()
     }
@@ -1944,7 +1948,7 @@ class PlaybackBridge(private val context: Context) {
             return ahead.ifEmpty { rows.filter { it.uri != current } }
         }
         val after = rows.drop(at + 1).filter { it.uri !in consumed }
-        return if (after.isNotEmpty()) after else {
+        return after.ifEmpty {
             // The cursor sits on the last row: the tail rows the taps fed in
             // after it are still worth offering before starting over.
             val unpositioned = rows.filter {
@@ -1972,7 +1976,7 @@ class PlaybackBridge(private val context: Context) {
             try {
                 val lens = resolveLens(contextUri) ?: return@launch
                 val target = connect.cluster.value?.activeDevice?.id?.takeIf { it.isNotBlank() } ?: deviceId
-                val ok = connect.setShuffleOn(target, true, true)
+                val ok = connect.setShuffleOn(target, value = true, smart = true)
                 if (!ok) {
                     log.w("smart shuffle re-arm: the server refused the options")
                     return@launch
@@ -2020,7 +2024,7 @@ class PlaybackBridge(private val context: Context) {
         }
         rememberModes(shuffle = null, smart = null, repeatContext = nextContext, repeatTrack = nextTrack)
         publishModes()
-        delay(MODE_SETTLE_MS)
+        delay(MODE_SETTLE_MS.milliseconds)
         runCatching { connect.refreshCluster() }
         publishModes()
     }
@@ -2095,7 +2099,7 @@ class PlaybackBridge(private val context: Context) {
                 state = state.copy(sleepTimer = option, sleepTimerEndsAtMs = endsAtMs)
                 log.i("sleep timer armed for ${option.minutes} minutes")
                 sleepTimerJob = scope.launch {
-                    delay(option.minutes * 60_000L)
+                    delay((option.minutes * 60_000L).milliseconds)
                     log.i("sleep timer fired after ${option.minutes}m")
                     fireSleepTimer()
                     state = state.copy(sleepTimer = null, sleepTimerEndsAtMs = 0L)
@@ -2117,7 +2121,7 @@ class PlaybackBridge(private val context: Context) {
         }
     }
 
-    private suspend fun toggleRemote(cluster: ClusterState, active: com.quackify.backend.model.ConnectDevice) {
+    private suspend fun toggleRemote(cluster: ClusterState, active: ConnectDevice) {
         connect.refreshCluster()
         val fresh = connect.cluster.value ?: cluster
         val playing = fresh.isPlaying
@@ -2134,7 +2138,7 @@ class PlaybackBridge(private val context: Context) {
         val duration = fresh.durationMs.takeIf { it > 0L } ?: progress.durationMs
         state = state.copy(isPlaying = !playing)
         progress.set(at, duration)
-        delay(SKIP_SETTLE_MS)
+        delay(SKIP_SETTLE_MS.milliseconds)
         connect.refreshCluster()
     }
 
@@ -2162,7 +2166,7 @@ class PlaybackBridge(private val context: Context) {
                 var added = connect.addToQueue(uri)
                 if (!added) {
                     connect.refreshCluster()
-                    delay(QUEUE_RETRY_MS)
+                    delay(QUEUE_RETRY_MS.milliseconds)
                     added = connect.addToQueue(uri)
                 }
                 log.i("queue += '$uri' ok=$added")
@@ -2324,7 +2328,7 @@ class PlaybackBridge(private val context: Context) {
         if (!remotePlayer && player.hasSource) {
             publishLocalFromEngine()
         }
-        delay(MODE_SETTLE_MS)
+        delay(MODE_SETTLE_MS.milliseconds)
         runCatching { connect.refreshCluster() }
         publishModes()
     }
@@ -2517,7 +2521,7 @@ class PlaybackBridge(private val context: Context) {
             repeatContext = state.repeatMode == RepeatMode.REPEAT_ALL,
             repeatTrack = state.repeatMode == RepeatMode.REPEAT_ONE,
             enhancement = if (state.shuffleMode == ShuffleMode.SMART_SHUFFLE) ENHANCEMENT_SMART else "NONE",
-            queueRevision = cluster.queueRevision.orEmpty(),
+            queueRevision = cluster.queueRevision,
             contextDescription = state.queueContextLabel
                 .takeIf { it.isNotBlank() && state.queueContext == cluster.contextUri }
                 .orEmpty(),
@@ -2548,7 +2552,7 @@ class PlaybackBridge(private val context: Context) {
                     title = found.title,
                     artistName = found.artists,
                     artistUri = found.artistUri,
-                    imageUrl = found.imageUrl.orEmpty(),
+                    imageUrl = found.imageUrl,
                     albumUri = found.albumUri,
                     durationMs = if (found.durationMs > 0L) found.durationMs else row.durationMs,
                 )
@@ -2649,7 +2653,7 @@ class PlaybackBridge(private val context: Context) {
         adoptDuration = 0L
         val deadline = SystemClock.elapsedRealtime() + 3000L
         while (connect.playback?.currentTrack?.uri != uri && SystemClock.elapsedRealtime() < deadline) {
-            delay(100)
+            delay(100.milliseconds)
         }
         val command = connect.playback
         if (command?.currentTrack?.uri != uri) {
@@ -2823,7 +2827,7 @@ class PlaybackBridge(private val context: Context) {
     private fun queueTailRows(contextUri: String): List<ClusterTrack> {
         val at = connect.cluster.value
         val follows = at?.contextUri.orEmpty().isNotBlank() && at?.contextUri == contextUri
-        val serverRows = if (follows) at!!.fromContext else emptyList()
+        val serverRows = if (follows) at.fromContext else emptyList()
         val serverEnhanced = serverRows.any { it.isEnhanced }
         val enhanced = if (!serverEnhanced) enhancedQueue(contextUri) else emptyList()
         if (enhanced.isNotEmpty()) {
@@ -2876,9 +2880,9 @@ class PlaybackBridge(private val context: Context) {
         val remote = active != null && active.id != deviceId
         if (remote) {
             val what = if (next) "next" else "previous"
-            log.i("skip $what on the remote device '${active!!.name}'")
+            log.i("skip $what on the remote device '${active.name}'")
             if (connect.skipOn(active.id, next)) {
-                delay(SKIP_SETTLE_MS)
+                delay(SKIP_SETTLE_MS.milliseconds)
                 settleSkip(active.id)
                 return
             }
@@ -2910,7 +2914,7 @@ class PlaybackBridge(private val context: Context) {
                 listener.onSeek(currentChapter.startMs)
                 return true
             }
-            val prevChapter = chapters.filter { it.startMs < currentChapter.startMs }.lastOrNull()
+            val prevChapter = chapters.lastOrNull { it.startMs < currentChapter.startMs }
             if (prevChapter != null) {
                 log.i("skip: jumping to previous podcast chapter '${prevChapter.title}' at ${prevChapter.startMs}ms")
                 listener.onSeek(prevChapter.startMs)
@@ -3235,9 +3239,9 @@ class PlaybackBridge(private val context: Context) {
                 hydrateCurrent(at)
                 return
             }
-            delay(SKIP_RETRY_MS)
+            delay(SKIP_RETRY_MS.milliseconds)
         }
-        log.w("skip: the cluster still names '${state.trackUri.takeLast(12)}' after ${SKIP_TRIES} reads")
+        log.w("skip: the cluster still names '${state.trackUri.takeLast(12)}' after $SKIP_TRIES reads")
     }
 
     /**
@@ -3247,7 +3251,7 @@ class PlaybackBridge(private val context: Context) {
      */
     private suspend fun awaitRemoteTrack(uri: String, remoteId: String): Boolean {
         repeat(PLAY_LAND_TRIES) { attempt ->
-            delay(if (attempt == 0) SKIP_SETTLE_MS else SKIP_RETRY_MS)
+            delay((if (attempt == 0) SKIP_SETTLE_MS else SKIP_RETRY_MS).milliseconds)
             val at = connect.cluster.value
             if (at != null && at.track.uri == uri && at.activeDevice?.id == remoteId) {
                 log.i("play '$uri' landed on the remote at attempt ${attempt + 1}")
@@ -3579,7 +3583,7 @@ class PlaybackBridge(private val context: Context) {
         val until = System.currentTimeMillis() + millis
         while (System.currentTimeMillis() < until) {
             if (settled()) return true
-            delay(120L)
+            delay(120L.milliseconds)
         }
         return settled()
     }
@@ -3602,7 +3606,7 @@ class PlaybackBridge(private val context: Context) {
 
     private suspend fun settleCluster(uri: String, index: Int) {
         repeat(CLUSTER_TRIES) { attempt ->
-            if (attempt > 0) delay(CLUSTER_RETRY_MS)
+            if (attempt > 0) delay(CLUSTER_RETRY_MS.milliseconds)
             if (!connect.refreshCluster()) return
             val at = connect.cluster.value ?: return
             if (at.track.uri != uri) {
@@ -3630,7 +3634,7 @@ class PlaybackBridge(private val context: Context) {
             log.w("seek: '${active.name}' refused it")
             return
         }
-        delay(SKIP_SETTLE_MS)
+        delay(SKIP_SETTLE_MS.milliseconds)
         connect.refreshCluster()
     }
 
@@ -3646,7 +3650,7 @@ class PlaybackBridge(private val context: Context) {
         }
         log.i("leaving, pausing '${active.name}'")
         runCatching {
-            runBlocking { withTimeoutOrNull(2_000L) { connect.setPausedOn(active.id, playing = true) } }
+            runBlocking { withTimeoutOrNull(2_000L.milliseconds) { connect.setPausedOn(active.id, playing = true) } }
         }.onFailure { log.w("pause on exit failed ${it.javaClass.simpleName}") }
         state = state.copy(isPlaying = false, isBuffering = false)
     }
@@ -3658,7 +3662,7 @@ class PlaybackBridge(private val context: Context) {
         if (duration <= 0L) return
         val snapshot = cluster
         if (snapshot != null && !snapshot.isPlaying) return
-        val next = snapshot?.positionNow() ?: progress.positionMs + REMOTE_TICK_MS
+        val next = snapshot?.positionNow() ?: (progress.positionMs + REMOTE_TICK_MS)
         val clamped = next.coerceIn(0L, duration)
         if (clamped == progress.positionMs) return
         progress.set(clamped, duration)
@@ -4273,7 +4277,7 @@ class PlaybackBridge(private val context: Context) {
                 (clusterContext == context || (single && context.isBlank()))
         val smartActive = smartOn(cluster)
         val serverTracks = if (server && follows) {
-            if (smartActive) cluster!!.fromContext else cluster!!.fromContext
+            if (smartActive) cluster.fromContext else cluster.fromContext
                 .filterNot { it.isEnhanced }
                 .filterNot { bannedCachedUri(it.uri) }
         } else emptyList()
@@ -4291,9 +4295,9 @@ class PlaybackBridge(private val context: Context) {
             localRows.ifEmpty { serverRows }
         }
         val radio = server && follows &&
-                cluster!!.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
+                cluster.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
         val label = if (server && follows && !radio && !single) {
-            cluster!!.contextDescription.ifBlank {
+            cluster.contextDescription.ifBlank {
                 state.queueContextLabel.takeIf { state.queueContext == context }.orEmpty()
             }.ifBlank { playlistLabelOf(context) }
         } else ""
@@ -4303,7 +4307,7 @@ class PlaybackBridge(private val context: Context) {
                 .map { if (it.title.isBlank()) decorated[it.uri] ?: it else it }
                 .filterNot { bannedCachedUri(it.uri) }
         } else if (server) {
-            val onServer = cluster!!.queued
+            val onServer = cluster.queued
                 .map { it.asTrackItem() }
                 .filterNot { bannedCachedUri(it.uri) }
             val known = onServer.mapTo(HashSet()) { it.uri }
@@ -4316,7 +4320,7 @@ class PlaybackBridge(private val context: Context) {
                 .filterNot { bannedCachedUri(it.uri) }
         }
         val queuedUris = buildSet {
-            if (server) cluster!!.queued.forEach { add(it.uri) }
+            if (server) cluster.queued.forEach { add(it.uri) }
             queued.forEach { add(it.uri) }
         }
         val chainFits = chainContext.isNotBlank() && (context.isBlank() || chainContext == context)
@@ -4386,7 +4390,7 @@ class PlaybackBridge(private val context: Context) {
         )
         log.i("queue ${queued.size} queued + ${upcoming.size} next from " +
                 "'${label.ifBlank { context.ifBlank { "?" } }}' " +
-                "${if (server) "the server" else "the list on screen"}"
+                if (server) "the server" else "the list on screen"
         )
     }
 
@@ -4467,9 +4471,9 @@ class PlaybackBridge(private val context: Context) {
                 )
             }
             val currentDecorated = rows[state.trackUri]
-            if (currentDecorated != null && currentDecorated.imageUrl?.isNotBlank() == true && state.coverUrl.isBlank()) {
+            if (currentDecorated != null && currentDecorated.imageUrl.isNotBlank() && state.coverUrl.isBlank()) {
                 state = state.copy(
-                    coverUrl = currentDecorated.imageUrl.orEmpty(),
+                    coverUrl = currentDecorated.imageUrl,
                     title = state.title.ifBlank { currentDecorated.title },
                     artist = state.artist.ifBlank { currentDecorated.artists },
                 )
@@ -5182,10 +5186,11 @@ class PlaybackBridge(private val context: Context) {
             machine?.takeIf { it.currentTrack?.uri == session.uri }?.stateId.orEmpty()
         }
         val duration = session.durationMs.takeIf { it > 0L } ?: track.durationMs
-        val msPlayed = when {
-            reasonEnd == REASON_TRACKDONE && session.playedMs > 0L -> session.playedMs
-            reasonEnd == REASON_TRACKDONE && duration > 0L ->
+        val msPlayed = when (reasonEnd) {
+            REASON_TRACKDONE if session.playedMs > 0L -> session.playedMs
+            REASON_TRACKDONE if duration > 0L ->
                 (duration - session.startPositionMs).coerceIn(0L, duration)
+
             else -> session.playedMs
         }
         if (msPlayed <= 0L) return
@@ -5281,38 +5286,37 @@ class PlaybackBridge(private val context: Context) {
     }
 
     private suspend fun runAdvance(endedIn: String) {
-        val ended = endedIn
         if (sleepEndOfTrackArmed) {
             sleepEndOfTrackArmed = false
-            log.i("sleep timer: '${ended.takeLast(12)}' ended, stopping instead of advancing")
+            log.i("sleep timer: '${endedIn.takeLast(12)}' ended, stopping instead of advancing")
             player.pause()
             reportPaused()
             state = state.copy(sleepTimer = null, sleepTimerEndsAtMs = 0L)
             return
         }
         val rows = chainFor()
-        val at = rowOf(rows, ended)
+        val at = rowOf(rows, endedIn)
         if (at >= 0) resumeRow = at + 1
         val server = connect.cluster.value
         val serverQueued = server?.queued.orEmpty()
         val queued = queuedTail.firstOrNull()
         val next = when {
             connect.playback == null -> null
-            queued != null || serverQueued.isNotEmpty() -> awaitServerNext(ended)
-            else -> serverNext(ended)
+            queued != null || serverQueued.isNotEmpty() -> awaitServerNext(endedIn)
+            else -> serverNext(endedIn)
         }
         val moved = next?.currentTrack
         val engine = player.state.value.trackUri
-        val engineOnEnded = engine.isBlank() || engine == ended ||
-                (ended.startsWith(AD_PREFIX) && engine.startsWith(AD_PREFIX))
+        val engineOnEnded = engine.isBlank() || engine == endedIn ||
+                (endedIn.startsWith(AD_PREFIX) && engine.startsWith(AD_PREFIX))
         if (!engineOnEnded) {
             log.i("advance: the engine already moved to '${engine.takeLast(12)}', nothing to do")
             return
         }
-        if (repeatTrackOn(server) && ended.isNotBlank() && !ended.startsWith(AD_PREFIX)) {
-            log.i("advance -> repeating '${ended.takeLast(12)}' (repeat one)")
+        if (repeatTrackOn(server) && endedIn.isNotBlank() && !endedIn.startsWith(AD_PREFIX)) {
+            log.i("advance -> repeating '${endedIn.takeLast(12)}' (repeat one)")
             playTrack(
-                ended,
+                endedIn,
                 chainContext.ifBlank { server?.contextUri.orEmpty() },
                 if (at >= 0) at else -1,
             )
@@ -5330,16 +5334,16 @@ class PlaybackBridge(private val context: Context) {
         }
         val enhancedContext = chainContext.ifBlank { server?.contextUri.orEmpty() }
         if (enhancedQueue(enhancedContext).isNotEmpty()) {
-            val upcoming = enhancedUpcoming(enhancedContext, ended)
+            val upcoming = enhancedUpcoming(enhancedContext, endedIn)
             val pick = upcoming.firstOrNull()?.uri
-            if (!pick.isNullOrBlank() && pick != ended) {
+            if (!pick.isNullOrBlank() && pick != endedIn) {
                 log.i("advance -> '${pick.takeLast(12)}' from the enhanced queue, " +
                         "${upcoming.size} upcoming"
                 )
                 playTrack(pick, enhancedContext, -1)
                 return
             }
-            log.i("advance: the enhanced queue ran out after '${ended.takeLast(12)}'")
+            log.i("advance: the enhanced queue ran out after '${endedIn.takeLast(12)}'")
         }
         if (queued != null && serverQueued.isNotEmpty() && serverQueued.none { it.uri == queued.uri }) {
             queuedTail = queuedTail.drop(1)
@@ -5353,7 +5357,7 @@ class PlaybackBridge(private val context: Context) {
             return
         }
         if (sessionQueueContext == chainContext.ifBlank { server?.contextUri.orEmpty() } && sessionQueue.isNotEmpty()) {
-            if (sessionQueue.firstOrNull() == ended) sessionQueue = sessionQueue.drop(1)
+            if (sessionQueue.firstOrNull() == endedIn) sessionQueue = sessionQueue.drop(1)
             val pick = sessionQueue.firstOrNull()
             if (!pick.isNullOrBlank()) {
                 sessionQueue = sessionQueue.drop(1)
@@ -5362,13 +5366,13 @@ class PlaybackBridge(private val context: Context) {
                 return
             }
         }
-        if (shuffleOn(server) && !smartOn(server) && !ended.startsWith(AD_PREFIX)) {
+        if (shuffleOn(server) && !smartOn(server) && !endedIn.startsWith(AD_PREFIX)) {
             val shuffleRows = rows.ifEmpty {
                 server?.window()?.filter { it.isVisible }?.map { it.uri }.orEmpty()
             }
             val shuffleContext = chainContext.ifBlank { server?.contextUri.orEmpty() }
-            val tail = shuffleTail(shuffleContext, shuffleRows, ended)
-                .filter { it.isNotBlank() && it != ended && !bannedCachedUri(it) }
+            val tail = shuffleTail(shuffleContext, shuffleRows, endedIn)
+                .filter { it.isNotBlank() && it != endedIn && !bannedCachedUri(it) }
             val pick = tail.firstOrNull()
             if (!pick.isNullOrBlank()) {
                 sessionQueue = tail.drop(1)
@@ -5398,15 +5402,15 @@ class PlaybackBridge(private val context: Context) {
             )
         }
         val cluster = connect.cluster.value ?: return
-        if (cluster.window().none { it.uri == ended }) {
-            log.w("advance: '$ended' is not in the cluster window, not guessing")
+        if (cluster.window().none { it.uri == endedIn }) {
+            log.w("advance: '$endedIn' is not in the cluster window, not guessing")
             return
         }
         val target = targetFrom(cluster, 0)
-        if (target == null || target.track.uri == ended) {
-            if (repeatContextOn(cluster) && !ended.startsWith(AD_PREFIX)) {
-                val firstRow = rows.firstOrNull { it.isNotBlank() && it != ended }
-                    ?: cluster.window().firstOrNull { it.isVisible && it.uri != ended }?.uri
+        if (target == null || target.track.uri == endedIn) {
+            if (repeatContextOn(cluster) && !endedIn.startsWith(AD_PREFIX)) {
+                val firstRow = rows.firstOrNull { it.isNotBlank() && it != endedIn }
+                    ?: cluster.window().firstOrNull { it.isVisible && it.uri != endedIn }?.uri
                 if (firstRow != null) {
                     log.i("advance -> wrapping to '${firstRow.takeLast(12)}' (repeat all)")
                     playTrack(
@@ -5417,8 +5421,8 @@ class PlaybackBridge(private val context: Context) {
                     return
                 }
             }
-            log.w("advance: end of the context at '${command?.currentTrack?.name ?: ended.takeLast(12)}'")
-            autoplayFrom(ended)
+            log.w("advance: end of the context at '${command?.currentTrack?.name ?: endedIn.takeLast(12)}'")
+            autoplayFrom(endedIn)
             return
         }
         log.i("advance -> '${target.track.title}' from the cluster row")
@@ -5475,7 +5479,7 @@ class PlaybackBridge(private val context: Context) {
         serverNext(ended)?.let { return it }
         val until = System.currentTimeMillis() + ADVANCE_WAIT_MS
         while (System.currentTimeMillis() < until) {
-            delay(120L)
+            delay(120L.milliseconds)
             val engine = player.state.value.trackUri
             if (engine.isNotBlank() && engine != ended) return null
             serverNext(ended)?.let { return it }

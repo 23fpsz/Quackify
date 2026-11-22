@@ -30,9 +30,16 @@ internal class TransitionSpec(
     val cueMs: Long,
     val incomingRate: Double,
     val phaseLock: Boolean,
+    val outSilenceMs: Long,
     val outGrid: TrackGrid?,
     val inGrid: TrackGrid?,
 )
+
+/**
+ * The most trailing silence a plan may skip over, matching the analyzer's own
+ * cap: a longer dead tail is not trusted to be real content loss.
+ */
+private const val MAX_OUT_SILENCE_MS = 12_000L
 
 /**
  * Sizes a DJ-style transition from one track's beat grid into the next. The
@@ -41,7 +48,9 @@ internal class TransitionSpec(
  * (whole bars, tempo stretch, phase lock); a trusted grid on the outgoing
  * side alone gets the fade still cut on its bar lines without stretching;
  * anything less - no grid, weak confidence, or tempi too far apart - falls
- * back to a plain crossfade of the manually configured length.
+ * back to a plain crossfade of the manually configured length. [outSilenceMs]
+ * moves the whole plan earlier by the track's silent tail, so the blend
+ * crosses audible music instead of decaying into dead air.
  */
 internal object AutomixPlanner {
 
@@ -85,15 +94,27 @@ internal object AutomixPlanner {
         outDurationMs: Long,
         inDurationMs: Long,
         fallbackFadeMs: Long,
+        outSilenceMs: Long = 0L,
     ): TransitionSpec {
-        val outDuration = outDurationMs / 1000.0
         val inDuration = inDurationMs / 1000.0
+        val nominal = outDurationMs / 1000.0
+        val silenceMs = outSilenceMs.coerceIn(0L, MAX_OUT_SILENCE_MS)
+        val trimmed = nominal - silenceMs / 1000.0
+        val planSilenceMs: Long
+        val outDuration: Double
+        if (trimmed > MIN_FADE_SECONDS + 1.0) {
+            outDuration = trimmed
+            planSilenceMs = silenceMs
+        } else {
+            outDuration = nominal
+            planSilenceMs = 0L
+        }
         if (outDuration <= 0.0 || inDuration <= 0.0) {
-            return plain(out, into, fallbackFadeMs, outDuration, inDuration)
+            return plain(out, into, fallbackFadeMs, outDuration, inDuration, planSilenceMs)
         }
         val outBpm = localBpm(out, outDuration - LOCAL_WINDOW_SECONDS)
         if (out == null || outBpm <= 0.0 || out.beatStarts.size < 2 || out.confidence < MIN_DJ_CONFIDENCE) {
-            return plain(out, into, fallbackFadeMs, outDuration, inDuration)
+            return plain(out, into, fallbackFadeMs, outDuration, inDuration, planSilenceMs)
         }
         val inBpm = localBpm(into, 0.0)
         val rate = if (inBpm > 0.0) 1.0 / foldedRatio(outBpm, inBpm) else 1.0
@@ -113,6 +134,7 @@ internal object AutomixPlanner {
             cueMs = 0L,
             incomingRate = if (beatmatched) roundRate(rate) else 1.0,
             phaseLock = beatmatched,
+            outSilenceMs = planSilenceMs,
             outGrid = out,
             inGrid = into,
         )
@@ -124,6 +146,7 @@ internal object AutomixPlanner {
         fallbackFadeMs: Long,
         outDuration: Double,
         inDuration: Double,
+        outSilenceMs: Long,
     ): TransitionSpec {
         val fallback = (if (fallbackFadeMs > 0L) fallbackFadeMs else DEFAULT_FALLBACK_MS) / 1000.0
         val span = if (outDuration > 0.0 && inDuration > 0.0) {
@@ -136,6 +159,7 @@ internal object AutomixPlanner {
             cueMs = 0L,
             incomingRate = 1.0,
             phaseLock = false,
+            outSilenceMs = outSilenceMs,
             outGrid = out,
             inGrid = into,
         )

@@ -1,12 +1,3 @@
-/*
- * SpotiDuck-Compose — playlist contributors state holder.
- *
- * Owns the member list of the open playlist: loads it on demand when the
- * contributors sheet opens and applies add/remove mutations, refreshing the
- * list after every successful change. Kept outside MainActivity so the shell
- * composable stays small enough for the compiler's method size limit.
- */
-
 package com.quackify.app
 
 import android.content.Context

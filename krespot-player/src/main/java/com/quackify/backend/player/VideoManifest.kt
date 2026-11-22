@@ -240,7 +240,7 @@ object VideoManifests {
             log.w("video manifest has no segment templates")
             return null
         }
-        val profiles = content.optJSONArray("profiles").orEmpty().mapNotNull { node ->
+        val profiles = content.optJSONArray("profiles").objects().mapNotNull { node ->
             val mime = node.text("mime_type")
             val codecs = when {
                 node.text("video_codec").isNotBlank() -> node.text("video_codec")
@@ -264,7 +264,7 @@ object VideoManifests {
             log.w("video manifest profiles audio=${audioProfile != null} video=${videoProfiles.size}")
             return null
         }
-        val encryption = content.optJSONArray("encryption_infos").orEmpty()
+        val encryption = content.optJSONArray("encryption_infos").objects()
             .firstOrNull { it.text("key_system") == "widevine" }
             ?.let { node ->
                 VideoEncryption(
@@ -302,8 +302,9 @@ object VideoManifests {
     private fun JSONArray.toStringList(): List<String> =
         (0 until length()).mapNotNull { optString(it).takeIf(String::isNotBlank) }
 
-    private fun JSONArray.orEmpty(): List<JSONObject> =
-        (0 until length()).mapNotNull { optJSONObject(it) }
+    /** The array's object entries; an absent array reads as no entries. */
+    private fun JSONArray?.objects(): List<JSONObject> =
+        this?.let { array -> (0 until array.length()).mapNotNull { array.optJSONObject(it) } } ?: emptyList()
 
     private val BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 

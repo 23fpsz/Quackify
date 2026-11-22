@@ -1,24 +1,27 @@
 package com.quackify.compose.player
 
+import android.app.Activity
+import android.content.res.Configuration
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,6 +32,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -43,35 +48,38 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.maxLengthTrim
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,36 +87,31 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
-import android.content.res.Configuration
-import android.app.Activity
-import android.view.WindowManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -116,7 +119,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -125,41 +127,38 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.quackify.backend.core.store.StreamSource
 import com.quackify.compose.R
-import com.quackify.compose.shell.ChapterMarker
-import com.quackify.compose.sheets.LyricsProviderSheet
-import com.quackify.compose.sheets.LyricsShortcutSheet
-import com.quackify.compose.sheets.TranslationLanguageSheet
 import com.quackify.compose.components.CanvasVideoPlayer
-import com.quackify.compose.components.MusicVideoSurface
-import com.quackify.compose.components.EncoreHeartButton
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.EncoreExplicitTag
+import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncoreMenu
 import com.quackify.compose.components.EncoreMenuItem
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreRepeatButton
 import com.quackify.compose.components.EncoreSmartShuffleButton
+import com.quackify.compose.components.MusicVideoSurface
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
-import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.sheets.DarkSystemBarsSheet
+import com.quackify.compose.sheets.LyricsProviderSheet
+import com.quackify.compose.sheets.LyricsShortcutSheet
+import com.quackify.compose.sheets.TranslationLanguageSheet
+import com.quackify.compose.shell.ChapterMarker
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
-import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
+import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
-import com.quackify.compose.theme.EncoreTheme
-import com.quackify.compose.playlist.TrackItem
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
-import com.quackify.compose.sheets.DarkSystemBarsSheet
-import com.quackify.compose.util.rememberDominantColor
-import androidx.compose.ui.res.stringResource
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
@@ -287,6 +286,7 @@ fun EncoreNowPlayingScreen(
     onCanvasToggle: (Boolean) -> Unit = {},
     musicVideoAvailable: Boolean = false,
     videoActive: Boolean = false,
+    streamSource: String = "",
     videoQualities: List<Int> = emptyList(),
     videoSwitching: Boolean = false,
     onSwitchVideo: (Boolean) -> Unit = {},
@@ -325,6 +325,7 @@ fun EncoreNowPlayingScreen(
     selfUserUri: String = "",
     onDeleteComment: suspend (String) -> Boolean = { false },
     lyrics: List<TimeSyncedLyric> = emptyList(),
+    nextTrackLyrics: List<TimeSyncedLyric> = emptyList(),
     transcript: List<TranscriptLine> = emptyList(),
     lyricsProviderName: String = "",
     showLyricsPreview: Boolean = true,
@@ -698,9 +699,8 @@ fun EncoreNowPlayingScreen(
             )
         }
 
-        @OptIn(ExperimentalFoundationApi::class)
         CompositionLocalProvider(
-            LocalOverscrollConfiguration provides null
+            LocalOverscrollFactory provides null
         ) {
             val resolvedContextTitle = contextHeaderTitle ?: when {
                 albumOrPlaylistContext.isBlank() || albumOrPlaylistContext.equals("Recommended for you", ignoreCase = true) -> stringResource(R.string.recommended_for_you)
@@ -1231,7 +1231,10 @@ fun EncoreNowPlayingScreen(
                 currentPositionMs = currentPositionMs,
                 isPlaying = isPlaying,
                 dominantColor = dominantColor,
+                artworkColor = dynamicArtworkColor,
                 lyrics = lyrics,
+                nextTrack = nextTrack,
+                nextTrackLyrics = nextTrackLyrics,
                 lyricsProviderName = lyricsProviderName,
                 onSeekMs = { targetMs -> if (durationMs > 0L) onSeek(targetMs.toFloat() / durationMs.toFloat()) },
                 onShareClick = { isLyricsShareOpen = true },
@@ -1305,10 +1308,18 @@ fun EncoreNowPlayingScreen(
         }
         if (isLyricsProviderSheetOpen) {
             val context = LocalContext.current
+            val stream = streamSource
+                .let { key -> StreamSource.entries.firstOrNull { it.key == key } }
+                ?: StreamSource.SPOTIFY
             LyricsProviderSheet(
-                orderedProviders = LyricsOptions.providerOrder,
+                orderedProviders = LyricsOptions.providerOrderFor(stream),
+                stream = stream,
                 onOrderSelected = { order ->
-                    LyricsOptions.setProviderOrder(context, order)
+                    if (stream == StreamSource.YT_MUSIC) {
+                        LyricsOptions.setYtmProviderOrder(context, order)
+                    } else {
+                        LyricsOptions.setProviderOrder(context, order)
+                    }
                 },
                 onDismiss = { isLyricsProviderSheetOpen = false }
             )
@@ -1584,7 +1595,7 @@ private fun NowPlayingArtworkCard(
                 if (videoOverlayVisible == null) {
                     LaunchedEffect(internalOverlay) {
                         if (internalOverlay) {
-                            delay(3000)
+                            delay(3000.milliseconds)
                             internalOverlay = false
                         }
                     }
@@ -1848,7 +1859,6 @@ private fun SwipableTrackArtwork(
             }
     ) {
         val pageWidth = maxWidth
-        val pageWidthPx = with(LocalDensity.current) { pageWidth.toPx() }
         Row(
             modifier = Modifier
                 .requiredWidth(pageWidth * 3)
@@ -1939,7 +1949,7 @@ private fun VideoFullscreenLayout(
     var overlayVisible by remember { mutableStateOf(true) }
     LaunchedEffect(overlayVisible) {
         if (overlayVisible) {
-            delay(3000)
+            delay(3000.milliseconds)
             overlayVisible = false
         }
     }
@@ -2695,50 +2705,54 @@ private fun NowPlayingLyricsCard(
                 ) {
                     itemsIndexed(lyrics) { i, lyric ->
                         val isActive = i == activeIndex
-                        if (isActive && lyric.isWordSynced) {
-                            WordSyncedLyricSweepText(
-                                lyric = lyric,
-                                positionMs = clockMs,
-                                sungColor = ink,
-                                unsungColor = ink.copy(alpha = 0.55f),
-                                style = EncoreTheme.typography.titleMedium.copy(
-                                    fontSize = lyricFontSize * 1.02f,
-                                    lineHeight = 31.sp,
-                                    fontWeight = FontWeight.Bold,
-                                ),
-                                maxLines = 2,
-                                modifier = Modifier.padding(bottom = 2.dp)
-                            )
-                        } else {
-                            Text(
-                                text = lyric.text,
-                                style = EncoreTheme.typography.titleMedium.copy(
-                                    fontSize = if (isActive) lyricFontSize * 1.02f else lyricFontSize,
-                                    lineHeight = 31.sp,
-                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
-                                    color = when {
-                                        isActive -> ink.copy(alpha = 0.95f)
-                                        i < activeIndex -> ink.copy(alpha = 0.45f)
-                                        else -> ink.copy(alpha = 0.55f)
-                                    }
-                                ),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(bottom = if (isActive && lyric.translation.isNotBlank()) 2.dp else 6.dp)
-                            )
-                        }
-                        if (isActive && lyric.translation.isNotBlank()) {
-                            Text(
-                                text = lyric.translation,
-                                style = EncoreTheme.typography.bodyMedium.copy(
-                                    fontSize = 14.sp,
-                                    lineHeight = 19.sp,
-                                    color = ink.copy(alpha = 0.65f)
-                                ),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(bottom = 6.dp)
-                            )
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isActive && lyric.isWordSynced) {
+                                WordSyncedLyricSweepText(
+                                    lyric = lyric,
+                                    positionMs = clockMs,
+                                    sungColor = ink,
+                                    unsungColor = ink.copy(alpha = 0.55f),
+                                    style = EncoreTheme.typography.titleMedium.copy(
+                                        fontSize = lyricFontSize * 1.02f,
+                                        lineHeight = 31.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    maxLines = 2,
+                                    modifier = Modifier.padding(bottom = 2.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = lyric.text,
+                                    style = EncoreTheme.typography.titleMedium.copy(
+                                        fontSize = if (isActive) lyricFontSize * 1.02f else lyricFontSize,
+                                        lineHeight = 31.sp,
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = when {
+                                            isActive -> ink.copy(alpha = 0.95f)
+                                            i < activeIndex -> ink.copy(alpha = 0.45f)
+                                            else -> ink.copy(alpha = 0.55f)
+                                        }
+                                    ),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(bottom = if (isActive && lyric.translation.isNotBlank()) 2.dp else 6.dp)
+                                )
+                            }
+                            if (isActive && lyric.translation.isNotBlank()) {
+                                Text(
+                                    text = lyric.translation,
+                                    style = EncoreTheme.typography.bodyMedium.copy(
+                                        fontSize = 14.sp,
+                                        lineHeight = 19.sp,
+                                        color = ink.copy(alpha = 0.65f)
+                                    ),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(bottom = 6.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -2913,7 +2927,10 @@ private fun FullscreenLyricsView(
     currentPositionMs: Long,
     isPlaying: Boolean,
     dominantColor: Color,
+    artworkColor: Color,
     lyrics: List<TimeSyncedLyric>,
+    nextTrack: TrackItem?,
+    nextTrackLyrics: List<TimeSyncedLyric>,
     lyricsProviderName: String,
     onSeekMs: (Long) -> Unit,
     onShareClick: () -> Unit,
@@ -2932,9 +2949,115 @@ private fun FullscreenLyricsView(
     )
     val activeIndex by rememberActiveLyricIndex(clockMs, lyrics)
     val listState = rememberLazyListState()
-    val ink = contrastInk(dominantColor)
-    LaunchedEffect(activeIndex) {
-        listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
+
+    // ---- The sneak peek hand-off ----------------------------------------
+    // When the song ends and the next one starts while the reader is open,
+    // the peek earns its keep: it is already showing the opening of what is
+    // now playing, so instead of the lyrics list snapping to a new song, the
+    // whole sheet — title bar, old lyrics and the peek at the bottom — is
+    // carried up and out by the peek itself, and the new song's lines slide
+    // in from below. The old sheet's data is held for the exit so it keeps
+    // rendering what the user was just reading while it leaves.
+    val deepFeel = LyricsOptions.deepFeelEnabled
+    val nextPeekEnabled = LyricsOptions.nextTrackPeek
+    val trackKey = remember(lyrics) { lyrics.firstOrNull()?.startTimeMs }
+    var handoffExit by remember { mutableStateOf(false) }
+    var heldTitle by remember { mutableStateOf(title) }
+    var heldArtist by remember { mutableStateOf(artist) }
+    var heldLyrics by remember { mutableStateOf(lyrics) }
+    var heldProvider by remember { mutableStateOf(lyricsProviderName) }
+    var heldPeekTrack by remember { mutableStateOf(nextTrack) }
+    var heldPeekLyrics by remember { mutableStateOf(nextTrackLyrics) }
+    var heldTrackKey by remember { mutableStateOf(trackKey) }
+    var hasShownPeekHandoff by remember { mutableStateOf(false) }
+    // Rides at the head of the exiting sheet: the peek pulls upward a touch
+    // faster than the sheet itself, so the hand-off reads as the next song
+    // dragging the old one away.
+    val peekLead by animateFloatAsState(
+        targetValue = if (handoffExit) 1f else 0f,
+        animationSpec = tween(durationMillis = 460, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "peekLead"
+    )
+    LaunchedEffect(trackKey) {
+        if (heldTrackKey != trackKey && hasShownPeekHandoff) {
+            handoffExit = true
+            // The exit runs 460ms; the entering sheet waits for it so the
+            // two never overlap on screen.
+            delay(460)
+            handoffExit = false
+        }
+        hasShownPeekHandoff = true
+        heldTrackKey = trackKey
+        heldTitle = title
+        heldArtist = artist
+        heldLyrics = lyrics
+        heldProvider = lyricsProviderName
+        heldPeekTrack = nextTrack
+        heldPeekLyrics = nextTrackLyrics
+    }
+    // When the old song's sheet is on its way out, the active index is
+    // meaningless for it — the clock has already jumped to the new song —
+    // so the held lines render as a static page while they leave.
+    val sheetActiveIndex = if (handoffExit) -1 else activeIndex
+    // Which data set the sheet renders: held (old song) while it exits,
+    // live (new song) once it has gone.
+    val sheetTitle = if (handoffExit) heldTitle else title
+    val sheetArtist = if (handoffExit) heldArtist else artist
+    val sheetLyrics = if (handoffExit) heldLyrics else lyrics
+    val sheetProvider = if (handoffExit) heldProvider else lyricsProviderName
+    val sheetPeekTrack = if (handoffExit) heldPeekTrack else nextTrack
+    val sheetPeekLyrics = if (handoffExit) heldPeekLyrics else nextTrackLyrics
+    val showNextPeek = nextPeekEnabled && (if (handoffExit) heldPeekTrack else nextTrack) != null &&
+        (if (handoffExit) heldPeekLyrics else nextTrackLyrics).isNotEmpty()
+
+    val deepFeelPalette = rememberDeepFeelPalette(artworkColor)
+    val glowPhases = if (deepFeel) rememberDeepFeelGlowPhases() else null
+    val flowPhases = if (deepFeel) rememberDeepFeelFlowPhases() else null
+    var heldLyricIndex by remember { mutableStateOf<Int?>(null) }
+    // While the reader holds a lyric down (and for a short grace window
+    // after they let go), the auto-scroll that chases the active line is
+    // suspended: they scrolled away on purpose to read ahead.
+    var suppressAutoScroll by remember { mutableStateOf(false) }
+    val flowReveal by animateFloatAsState(
+        targetValue = if (deepFeel) 1f else 0f,
+        animationSpec = tween(durationMillis = 900, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "deepFeelFlowReveal"
+    )
+    val ink by animateColorAsState(
+        targetValue = if (deepFeel) Color.White else contrastInk(dominantColor),
+        animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "deepFeelInk"
+    )
+    val backgroundTop by animateColorAsState(
+        targetValue = if (deepFeel) deepFeelPalette.deepTop else dominantColor,
+        animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "deepFeelBackgroundTop"
+    )
+    val backgroundBottom by animateColorAsState(
+        targetValue = if (deepFeel) deepFeelPalette.deepBottom else dominantColor,
+        animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "deepFeelBackgroundBottom"
+    )
+    LaunchedEffect(heldLyricIndex) {
+        if (heldLyricIndex != null) {
+            suppressAutoScroll = true
+        } else {
+            delay(2500.milliseconds)
+            suppressAutoScroll = false
+        }
+    }
+    LaunchedEffect(handoffExit, activeIndex) {
+        // While the hand-off runs, the list shows the old song's held
+        // sheet; jumping to the new active line mid-exit would fight the
+        // sweep, so the chase waits for the entering sheet to land.
+        if (handoffExit) return@LaunchedEffect
+        if (!suppressAutoScroll) {
+            // A fresh sheet enters scrolled to its top: snap, no animation,
+            // because the sheet itself is already gliding into place.
+            val entering = peekLead > 0f
+            val target = (activeIndex - 1).coerceAtLeast(0)
+            if (entering) listState.scrollToItem(target) else listState.animateScrollToItem(target)
+        }
     }
 
     // Keep the screen awake while the reader is open, if the user asked for
@@ -2952,125 +3075,376 @@ private fun FullscreenLyricsView(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(dominantColor)
+            .deepFeelBackdrop(
+                topColor = backgroundTop,
+                bottomColor = backgroundBottom,
+                palette = deepFeelPalette,
+                phases = flowPhases,
+                flowReveal = flowReveal
+            )
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(horizontal = EncoreSpacers.Looser2)
+        // No horizontal padding here: the DeepFeel highlight wash runs from
+        // screen edge to screen edge, so the list itself is full-bleed and
+        // each line pads its own text inward.
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = EncoreSpacers.Tighter2),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = EncoreSpacers.Looser2)
+                .padding(vertical = EncoreSpacers.Tighter2)
         ) {
-            EncoreIconButton(
-                iconRes = R.drawable.encore_icon_chevron_down_24,
-                contentDescription = stringResource(R.string.close_lyrics),
-                onClick = onClose,
-                tint = ink
-            )
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                EncoreIconButton(
+                    iconRes = R.drawable.encore_icon_chevron_down_24,
+                    contentDescription = stringResource(R.string.close_lyrics),
+                    onClick = onClose,
+                    tint = ink
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_deepfeel_24,
+                        contentDescription = stringResource(R.string.lyrics_deepfeel),
+                        onClick = { LyricsOptions.setDeepFeelEnabled(context, !deepFeel) },
+                        tint = ink,
+                        isActive = deepFeel,
+                        activeTint = deepFeelPalette.accent
+                    )
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_more_android_24,
+                        contentDescription = stringResource(R.string.lyrics_menu),
+                        onClick = onLyricsMenuClick,
+                        tint = ink
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 96.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
-                    text = title,
+                    text = sheetTitle,
                     style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = artist,
+                    text = sheetArtist,
                     style = EncoreTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-
-            EncoreIconButton(
-                iconRes = R.drawable.encore_icon_more_android_24,
-                contentDescription = stringResource(R.string.lyrics_menu),
-                onClick = onLyricsMenuClick,
-                tint = ink
-            )
         }
 
         Spacer(modifier = Modifier.height(EncoreSpacers.Looser2))
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            // The hand-off rides the list: while the old song's sheet exits
+            // upward it is translated by the exit fraction, and the new
+            // song's lines start one screen below and rise in as the exit
+            // finishes — one continuous upward sweep from old lyrics to new.
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    if (handoffExit) {
+                        // Exit: the old sheet rides a full screen up, so by
+                        // the time the content swaps it is already gone.
+                        translationY = -peekLead * size.height
+                        alpha = 1f - peekLead * 0.55f
+                    } else if (peekLead > 0f) {
+                        // Enter: the fraction decays back to 0 after the
+                        // exit, so the new sheet starts one screen below and
+                        // rises the last stretch into place.
+                        translationY = peekLead * size.height
+                        alpha = 1f - peekLead
+                    }
+                },
             contentPadding = PaddingValues(bottom = 96.dp)
         ) {
-            itemsIndexed(lyrics) { index, line ->
-                val isCurrentLine = index == activeIndex
-                if (isCurrentLine && line.isWordSynced) {
-                    WordSyncedLyricSweepText(
-                        lyric = line,
-                        positionMs = clockMs,
-                        sungColor = ink,
-                        unsungColor = ink.copy(alpha = 0.35f),
-                        style = EncoreTheme.typography.titleLarge.copy(
-                            fontSize = 24.sp,
-                            lineHeight = 34.sp,
-                            fontWeight = FontWeight.Bold,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSeekMs(line.startTimeMs) }
-                            .padding(
-                                top = EncoreSpacers.Tighter,
-                                bottom = if (isCurrentLine && line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
-                            )
-                    )
-                } else {
-                    Text(
-                        text = line.text,
-                        style = EncoreTheme.typography.titleLarge.copy(
-                            fontSize = 24.sp,
-                            lineHeight = 34.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isCurrentLine) ink else ink.copy(alpha = 0.35f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSeekMs(line.startTimeMs) }
-                            .padding(
-                                top = EncoreSpacers.Tighter,
-                                bottom = if (isCurrentLine && line.translation.isNotBlank()) 2.dp else EncoreSpacers.Tighter
-                            )
-                    )
+            itemsIndexed(sheetLyrics) { index, line ->
+                val isCurrentLine = index == sheetActiveIndex
+                val lineAlpha by animateFloatAsState(
+                    targetValue = when {
+                        !deepFeel -> if (isCurrentLine) 1f else 0.35f
+                        isCurrentLine -> 1f
+                        index < sheetActiveIndex -> 0.16f
+                        else -> 0.38f
+                    },
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineAlpha"
+                )
+                val lineScale by animateFloatAsState(
+                    targetValue = when {
+                        !deepFeel -> 1f
+                        isCurrentLine -> 1f
+                        index < sheetActiveIndex -> 0.82f
+                        else -> 0.87f
+                    },
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineScale"
+                )
+                val activation by animateFloatAsState(
+                    targetValue = if (deepFeel && isCurrentLine) 1f else 0f,
+                    animationSpec = tween(durationMillis = 520, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineActivation"
+                )
+                val distance = (index - sheetActiveIndex).absoluteValue
+                val lineBlur by animateDpAsState(
+                    targetValue = when {
+                        !deepFeel -> 0.dp
+                        heldLyricIndex == index -> 0.dp
+                        distance >= 5 -> 9.dp
+                        distance == 4 -> 6.75.dp
+                        distance == 3 -> 4.5.dp
+                        distance == 2 -> 2.25.dp
+                        else -> 0.dp
+                    },
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineBlur"
+                )
+                val lineBlurModifier = if (lineBlur > 0.dp) Modifier.blur(lineBlur) else Modifier
+                val lineFont by animateFloatAsState(
+                    targetValue = when {
+                        !deepFeel -> if (isCurrentLine) 28f else 23f
+                        isCurrentLine -> 30f
+                        else -> 23f
+                    },
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineFont"
+                )
+                val lineVerticalPadding by animateDpAsState(
+                    targetValue = when {
+                        isCurrentLine -> 12.dp
+                        deepFeel -> 2.dp
+                        else -> 3.dp
+                    },
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineVerticalPadding"
+                )
+                val lineInteraction = remember { MutableInteractionSource() }
+                val linePressed by lineInteraction.collectIsPressedAsState()
+                val holdConsumed = remember { mutableStateOf(false) }
+                // A ~360ms press means "let me read this", in DeepFeel and
+                // in the plain reader alike: it peels the blur off the line
+                // (if any), suspends the active-line auto-scroll and, on
+                // release, does not fire the tap-to-seek.
+                LaunchedEffect(linePressed) {
+                    if (linePressed) {
+                        delay(360.milliseconds)
+                        holdConsumed.value = true
+                        heldLyricIndex = index
+                    } else {
+                        heldLyricIndex = null
+                        holdConsumed.value = false
+                    }
                 }
-                if (isCurrentLine && line.translation.isNotBlank()) {
-                    Text(
-                        text = line.translation,
-                        style = EncoreTheme.typography.bodyMedium.copy(
-                            fontSize = 15.sp,
-                            lineHeight = 21.sp,
-                            color = ink.copy(alpha = 0.55f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSeekMs(line.startTimeMs) }
-                            .padding(bottom = EncoreSpacers.Tighter)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = lineVerticalPadding)
+                        .then(lineBlurModifier)
+                        .deepFeelLineGlow(
+                            palette = deepFeelPalette,
+                            phases = glowPhases,
+                            progress = activation
+                        )
+                        .graphicsLayer {
+                            scaleX = lineScale
+                            scaleY = lineScale
+                            alpha = lineAlpha
+                            transformOrigin = TransformOrigin(0f, 0.5f)
+                        }
+                        .clickable(
+                            interactionSource = lineInteraction,
+                            indication = null
+                        ) {
+                            if (!holdConsumed.value) onSeekMs(line.startTimeMs)
+                        }
+                        // The wash behind the active line is full-bleed, so
+                        // the horizontal inset lives on the text itself.
+                        .padding(horizontal = EncoreSpacers.Looser2)
+                ) {
+                    if (isCurrentLine && line.isWordSynced) {
+                        WordSyncedLyricSweepText(
+                            lyric = line,
+                            positionMs = clockMs,
+                            sungColor = ink,
+                            unsungColor = ink.copy(alpha = if (deepFeel) 0.42f else 0.35f),
+                            style = EncoreTheme.typography.titleLarge.copy(
+                                fontSize = lineFont.sp,
+                                lineHeight = (lineFont * 1.42f).sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Text(
+                            text = line.text,
+                            style = EncoreTheme.typography.titleLarge.copy(
+                                fontSize = lineFont.sp,
+                                lineHeight = (lineFont * 1.42f).sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ink
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    if (isCurrentLine && line.translation.isNotBlank()) {
+                        Text(
+                            text = line.translation,
+                            style = EncoreTheme.typography.bodyMedium.copy(
+                                fontSize = 15.sp,
+                                lineHeight = 21.sp,
+                                color = ink.copy(alpha = if (deepFeel) 0.5f else 0.55f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 3.dp)
+                        )
+                    }
+                }
+            }
+            // The sneak peek: once the last line of this song scrolls by,
+            // the opening lines of the next one surface beneath it — each
+            // line blurrier than the one above, like the song is coming
+            // into view through fog. Subtle on purpose: it is a whisper of
+            // what is next, not a second lyric sheet.
+            if (showNextPeek) {
+                item(key = "nextTrackPeek") {
+                    NextTrackPeek(
+                        nextTrack = sheetPeekTrack,
+                        nextLyrics = sheetPeekLyrics,
+                        ink = ink,
+                        // In the plain reader the backdrop IS the dominant
+                        // colour, so tinting the eyebrow with it made the
+                        // "next up" label vanish into the background; the
+                        // contrast ink keeps it legible in both modes.
+                        accent = if (deepFeel) deepFeelPalette.accent else ink,
+                        deepFeel = deepFeel,
+                        // During the hand-off the peek is the engine: it is
+                        // already the next song's opening, so it travels
+                        // further upward than the sheet carrying it and the
+                        // old lines appear to be dragged after it.
+                        leadFraction = if (handoffExit) peekLead else 0f
                     )
                 }
             }
-            if (lyricsProviderName.isNotBlank()) {
+            if (sheetProvider.isNotBlank()) {
                 item {
                     // Attribution for the source these lines came from, at
                     // the very end of the scroll — where Spotify itself
                     // puts it.
                     Text(
-                        text = stringResource(R.string.lyrics_provided_by, lyricsProviderName),
+                        text = stringResource(R.string.lyrics_provided_by, sheetProvider),
                         style = EncoreTheme.typography.marginal.copy(
                             color = ink.copy(alpha = 0.45f)
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(horizontal = EncoreSpacers.Looser2)
                             .padding(top = 28.dp)
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * The tail of the fullscreen reader: a whisper of the next track. Its name
+ * sits under a small "next up" eyebrow, and its opening lines fade out line
+ * by line — 0%, 25%, 50%, 75%, 100% blur — so the farther down you read,
+ * the more the song feels like it is still wrapped in fog. No seek, no
+ * glow, no translation: it is something to glance at, not to read along
+ * with, and it stays quieter than the real lyric sheet in both modes.
+ */
+@Composable
+private fun NextTrackPeek(
+    nextTrack: TrackItem?,
+    nextLyrics: List<TimeSyncedLyric>,
+    ink: Color,
+    accent: Color,
+    deepFeel: Boolean,
+    leadFraction: Float = 0f
+) {
+    if (nextTrack == null || nextLyrics.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                // The hand-off lead: the peek glides up by a sixth of the
+                // screen beyond the sheet's own travel, as if it pulled the
+                // finished song away behind it.
+                if (leadFraction > 0f) {
+                    translationY = -leadFraction * size.height * 0.16f
+                }
+            }
+            .padding(horizontal = EncoreSpacers.Looser2)
+            .padding(top = 44.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 20.dp, height = 2.dp)
+                    .background(accent.copy(alpha = if (deepFeel) 0.9f else 0.6f))
+            )
+            Text(
+                text = stringResource(R.string.lyrics_next_up),
+                style = EncoreTheme.typography.marginalBold.copy(
+                    color = accent.copy(alpha = if (deepFeel) 0.95f else 0.8f),
+                    fontSize = 11.sp,
+                    letterSpacing = 1.4.sp
+                )
+            )
+        }
+        Text(
+            text = stringResource(R.string.lyrics_next_track_name, nextTrack.title, nextTrack.artist),
+            style = EncoreTheme.typography.bodyMedium.copy(
+                color = ink.copy(alpha = if (deepFeel) 0.8f else 0.75f),
+                fontWeight = FontWeight.Bold
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp)
+        )
+        // Each line down the peek is blurrier than the one above it: a
+        // quarter step per row, all the way to fully unreadable.
+        nextLyrics.take(5).forEachIndexed { index, line ->
+            val blur by animateDpAsState(
+                targetValue = 1.6.dp * index,
+                animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                label = "nextPeekBlur"
+            )
+            val lineAlpha = if (deepFeel) 0.44f else 0.5f
+            Text(
+                text = line.text,
+                style = EncoreTheme.typography.bodyMedium.copy(
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ink.copy(alpha = lineAlpha - index * 0.04f)
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+                    .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)
+            )
         }
     }
 }
@@ -3084,8 +3458,8 @@ private fun spokenPrefixEnd(line: TranscriptLine, positionMs: Long): Int {
     val words = line.words
     if (words.isEmpty()) return if (positionMs >= line.startMs) line.text.length else 0
     var end = 0
-    for (word in words) {
-        if (positionMs >= word.startMs) end = word.endChar else break
+    for ((startMs, _, endChar) in words) {
+        if (positionMs >= startMs) end = endChar else break
     }
     return end
 }
@@ -3535,7 +3909,7 @@ private fun transcriptBoundary(line: TranscriptLine, positionMs: Long): Float {
     for (index in words.indices.reversed()) {
         val word = words[index]
         if (positionMs >= word.startMs) {
-            val span = (words.getOrNull(index + 1)?.startMs ?: line.startMs + 1)
+            val span = ((words.getOrNull(index + 1)?.startMs ?: (line.startMs + 1)))
                 .coerceAtLeast(word.startMs + 1L) - word.startMs
             val frac = ((positionMs - word.startMs).toFloat() / span).coerceIn(0f, 1f)
             return word.startChar + (word.endChar - word.startChar) * frac
@@ -3608,8 +3982,16 @@ private fun TranscriptShortcutSheet(onDismiss: () -> Unit) {
                 text = stringResource(R.string.transcript_offset_desc),
                 style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
-            Slider(
+            val offsetSliderState = rememberSliderState(
                 value = (offsetTenths + LYRICS_OFFSET_TENTHS_MAX).toFloat(),
+                steps = LYRICS_OFFSET_TENTHS_MAX * 2 - 1,
+                trackRange = 0f..(LYRICS_OFFSET_TENTHS_MAX * 2).toFloat(),
+            )
+            LaunchedEffect(offsetTenths) {
+                offsetSliderState.value = (offsetTenths + LYRICS_OFFSET_TENTHS_MAX).toFloat()
+            }
+            Slider(
+                state = offsetSliderState,
                 onValueChange = { raw ->
                     LyricsOptions.setTranscriptOffsetTenths(
                         context,
@@ -3619,8 +4001,6 @@ private fun TranscriptShortcutSheet(onDismiss: () -> Unit) {
                         )
                     )
                 },
-                valueRange = 0f..(LYRICS_OFFSET_TENTHS_MAX * 2).toFloat(),
-                steps = LYRICS_OFFSET_TENTHS_MAX * 2 - 1,
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -3672,7 +4052,7 @@ private fun NowPlayingEpisodeCommentsCard(
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
-    var draft by remember { mutableStateOf("") }
+    val draftState = rememberTextFieldState("")
     var posting by remember { mutableStateOf(false) }
     val replyStates = remember { mutableStateMapOf<String, CommentReplyState>() }
     val reactionViews = remember { mutableStateMapOf<String, ReactionViewState>() }
@@ -3895,9 +4275,8 @@ private fun NowPlayingEpisodeCommentsCard(
                     horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter4)
                 ) {
                     androidx.compose.foundation.text.BasicTextField(
-                        value = draft,
-                        onValueChange = { draft = it.take(280) },
-                        singleLine = false,
+                        state = draftState,
+                        inputTransformation = InputTransformation.maxLengthTrim(280),
                         textStyle = EncoreTheme.typography.bodyMedium.copy(color = Color.White),
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(EncoreColors.Green),
                         modifier = Modifier
@@ -3905,9 +4284,9 @@ private fun NowPlayingEpisodeCommentsCard(
                             .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
                             .background(EncoreColors.PureBlack.copy(alpha = 0.3f))
                             .padding(horizontal = 12.dp, vertical = 10.dp),
-                        decorationBox = { inner ->
+                        decorator = TextFieldDecorator { inner ->
                             Box(modifier = Modifier.heightIn(min = 20.dp)) {
-                                if (draft.isEmpty()) {
+                                if (draftState.text.isEmpty()) {
                                     androidx.compose.material3.Text(
                                         text = stringResource(R.string.write_a_comment),
                                         style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
@@ -3923,16 +4302,16 @@ private fun NowPlayingEpisodeCommentsCard(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(if (draft.isBlank() || posting) EncoreColors.PureBlack.copy(alpha = 0.3f) else EncoreColors.Green)
-                            .clickable(enabled = draft.isNotBlank() && !posting) {
-                                val text = draft.trim()
+                            .background(if (draftState.text.isBlank() || posting) EncoreColors.PureBlack.copy(alpha = 0.3f) else EncoreColors.Green)
+                            .clickable(enabled = draftState.text.isNotBlank() && !posting) {
+                                val text = draftState.text.toString().trim()
                                 if (text.isEmpty()) return@clickable
                                 posting = true
                                 scope.launch {
                                     val ok = onPostComment(text)
                                     posting = false
                                     if (ok) {
-                                        draft = ""
+                                        draftState.clearText()
                                         onRefresh()
                                     }
                                 }
@@ -3949,7 +4328,7 @@ private fun NowPlayingEpisodeCommentsCard(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_arrow_up_24),
                                 contentDescription = stringResource(R.string.post_comment),
-                                tint = if (draft.isBlank()) EncoreColors.TextSecondary else Color.White,
+                                tint = if (draftState.text.isBlank()) EncoreColors.TextSecondary else Color.White,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
