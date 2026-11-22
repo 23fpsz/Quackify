@@ -163,24 +163,48 @@ internal fun Modifier.deepFeelLineGlow(
         val breathe = phases.breathe.value
         val sweep = phases.sweep.value
         val pulse = sin(breathe * PI.toFloat())
-        // Full-bleed rectangle: no rounded corners, spanning the whole
-        // screen width and the entire active line plus its translation,
-        // with a 3dp cushion above and below the text block.
-        val pad = 3.dp.toPx()
+        // The wash bleeds past the text block so the highlight reads as a
+        // band of light rather than a box behind words: a cushion of air
+        // above and below, and vertical ramps that dissolve the band into
+        // the backdrop instead of cutting it off.
+        val pad = 6.dp.toPx()
+        val bandTop = -pad
+        val bandBottom = h + pad
+        val bandHeight = bandBottom - bandTop
+        // The top and bottom fades occupy this share of the band each; the
+        // middle stays at full strength so the active line itself never dims.
+        val fadeSpan = (bandHeight * 0.34f).coerceAtLeast(1f)
         val core = (0.5f + 0.07f * sin(DEEP_FEEL_TAU * sweep)).coerceIn(0.08f, 0.92f)
-        val wash = Brush.horizontalGradient(
-            0.0f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse),
-            (core * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
-            core to palette.base.copy(alpha = 0.38f + 0.11f * pulse),
-            (core + (1f - core) * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
-            1.0f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse)
-        )
-        drawRect(
-            brush = wash,
-            topLeft = Offset(0f, -pad),
-            size = Size(w, h + pad * 2f),
-            alpha = progress
-        )
+        // Painted in horizontal slices: every slice gets the horizontal
+        // colour wash, multiplied by a vertical ramp that eases out toward
+        // both edges of the band — that product is what blends the
+        // highlight into the background on all four sides.
+        val steps = 24
+        val slice = bandHeight / steps
+        for (step in 0 until steps) {
+            val top = bandTop + slice * step
+            val fromEdge = minOf(top - bandTop, bandBottom - (top + slice))
+            val fade = (fromEdge / fadeSpan).coerceIn(0f, 1f)
+            // Smoothstep: a straight linear ramp still shows a visible
+            // shoulder where it reaches full strength.
+            val eased = fade * fade * (3f - 2f * fade)
+            if (eased <= 0.01f) continue
+            val wash = Brush.horizontalGradient(
+                0.0f to palette.accent.copy(alpha = 0f),
+                0.06f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse),
+                (core * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
+                core to palette.base.copy(alpha = 0.38f + 0.11f * pulse),
+                (core + (1f - core) * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
+                0.94f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse),
+                1.0f to palette.accent.copy(alpha = 0f)
+            )
+            drawRect(
+                brush = wash,
+                topLeft = Offset(0f, top),
+                size = Size(w, slice + 0.5f),
+                alpha = progress * eased
+            )
+        }
     }
 }
 
