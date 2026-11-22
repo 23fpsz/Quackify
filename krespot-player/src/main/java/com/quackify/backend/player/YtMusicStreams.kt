@@ -1,8 +1,11 @@
 package com.quackify.backend.player
 
+import android.content.Context
 import com.quackify.backend.connect.command.CommandTrack
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -16,7 +19,9 @@ private const val SEARCH_SONGS = "EgWKAQIIAWoKEAkQChAFEAMQBA=="
 
 private const val WEB_REMIX_VERSION = "1.20250101.01.00"
 
-private const val EMBED_ORIGIN = "https://www.youtube.com/"
+private const val WWW_ORIGIN = "https://www.youtube.com"
+
+private const val MUSIC_ORIGIN = "https://music.youtube.com"
 
 private const val PROBE_BYTES = 16 * 1024
 
@@ -45,25 +50,30 @@ private class YtClient(
     val clientNumber: String = "",
     val host: String = VIDEO_HOST,
     val androidSdk: Int = 0,
-    val embed: Boolean = false,
-    val browserOrigin: Boolean = false,
+    /** The site this client runs on, for browser-shaped clients only. */
+    val origin: String = "",
+    /**
+     * Web-shaped clients: they need the visitor's session context, a signature
+     * timestamp and a proof-of-origin token before innertube serves them.
+     */
+    val webFamily: Boolean = false,
+    /** Cobalt-style TV clients announce their own user agent in the context. */
+    val uaInContext: Boolean = false,
 ) {
 
-    fun context(): JSONObject {
+    fun context(visitorData: String): JSONObject {
         val client = JSONObject()
             .put("clientName", clientName)
             .put("clientVersion", clientVersion)
             .put("hl", "en")
             .put("gl", "US")
         if (androidSdk > 0) client.put("androidSdkVersion", androidSdk)
-        val root = JSONObject().put("client", client)
-        if (embed) {
-            root.put("thirdParty", JSONObject().put("embedUrl", EMBED_ORIGIN))
-        }
-        return root
+        if (uaInContext) client.put("userAgent", userAgent)
+        if (visitorData.isNotBlank()) client.put("visitorData", visitorData)
+        return JSONObject().put("client", client)
     }
 
-    fun requestHeaders(): Map<String, String> {
+    fun requestHeaders(visitorData: String): Map<String, String> {
         val headers = linkedMapOf(
             "Content-Type" to "application/json",
             "User-Agent" to userAgent,
@@ -73,23 +83,58 @@ private class YtClient(
             headers["X-YouTube-Client-Name"] = clientNumber
             headers["X-YouTube-Client-Version"] = clientVersion
         }
-        if (browserOrigin) {
-            headers["Origin"] = EMBED_ORIGIN
-            headers["Referer"] = "$EMBED_ORIGIN/"
+        if (origin.isNotBlank()) {
+            headers["Origin"] = origin
+            headers["Referer"] = "$origin/"
+        }
+        if (webFamily) {
+            headers["X-Goog-Api-Format-Version"] = "1"
+            if (origin.isNotBlank()) headers["X-Origin"] = origin
+            if (visitorData.isNotBlank()) headers["X-Goog-Visitor-Id"] = visitorData
         }
         return headers
     }
 
     fun mediaHeaders(): Map<String, String> {
         val headers = linkedMapOf("User-Agent" to userAgent)
-        if (browserOrigin) {
-            headers["Referer"] = "$EMBED_ORIGIN/"
+        if (origin.isNotBlank()) {
+            headers["Origin"] = origin
+            headers["Referer"] = "$origin/"
         }
         return headers
     }
 }
 
 private val CLIENTS = listOf(
+    YtClient(
+        clientName = "TVHTML5",
+        clientVersion = "7.20260707.07.00",
+        userAgent = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/25.lts.30.1034943-gold " +
+                "(unlike Gecko), Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)",
+        clientNumber = "7",
+        origin = WWW_ORIGIN,
+        webFamily = true,
+        uaInContext = true,
+    ),
+    YtClient(
+        clientName = "WEB_REMIX",
+        clientVersion = "1.20260707.12.00",
+        userAgent = Net.DESKTOP_UA,
+        clientNumber = "67",
+        host = MUSIC_HOST,
+        origin = MUSIC_ORIGIN,
+        webFamily = true,
+    ),
+    YtClient(
+        clientName = "TVHTML5_SIMPLY",
+        clientVersion = "1.0",
+        userAgent = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/25.lts.30.1034943-gold " +
+                "(unlike Gecko), Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)",
+        clientNumber = "75",
+        host = MUSIC_HOST,
+        origin = MUSIC_ORIGIN,
+        webFamily = true,
+    ),
     YtClient(
         clientName = "ANDROID",
         clientVersion = "21.26.364",
@@ -113,7 +158,7 @@ internal object YtMusicStreams {
 
     private val expiresAt = HashMap<String, Long>()
 
-    suspend fun resolve(track: CommandTrack): YtStream? {
+    suspend fun resolve(context: Context, track: CommandTrack): YtStream? {
         cached(track.uri)?.let { return it }
         val candidates = search(track)
         if (candidates.isEmpty()) {
@@ -122,7 +167,7 @@ internal object YtMusicStreams {
         }
         val ranked = candidates.sortedByDescending { candidate -> titleScore(track.name, candidate.title) }
         for (candidate in ranked.take(CANDIDATES)) {
-            val stream = streamOf(track, candidate) ?: continue
+            val stream = streamOf(context, track, candidate) ?: continue
             remember(track.uri, stream)
             return stream
         }
@@ -232,9 +277,10 @@ internal object YtMusicStreams {
     private fun normalize(value: String): String =
         value.lowercase().replace(Regex("[^\\p{L}\\p{N}\\s]"), "").trim()
 
-    private suspend fun streamOf(track: CommandTrack, candidate: YtCandidate): YtStream? {
+    private suspend fun streamOf(context: Context, track: CommandTrack, candidate: YtCandidate): YtStream? {
         for (client in CLIENTS) {
-            val (lengthSeconds, formats) = playerFormats(client, candidate.videoId) ?: continue
+            val session = if (client.webFamily) PoTokenGate.session(context) else null
+            val (lengthSeconds, formats) = playerFormats(client, candidate.videoId, session) ?: continue
             if (lengthSeconds > 0L && track.durationMs > 0L &&
                 kotlin.math.abs(lengthSeconds * 1000L - track.durationMs) > DURATION_TOLERANCE_MS
             ) {
@@ -242,8 +288,13 @@ internal object YtMusicStreams {
                 return null
             }
             for (format in orderedFormats(formats)) {
-                val url = format.text("url")
+                var url = format.text("url")
                 if (url.isBlank()) continue
+                if (client.webFamily && session != null) {
+                    PoTokenGate.videoToken(context, candidate.videoId)?.let { token ->
+                        url += (if (url.contains('?')) "&" else "?") + "pot=$token"
+                    }
+                }
                 if (!probe(url, client.mediaHeaders())) {
                     log.w("itag ${format.optInt("itag")} from ${client.clientName} refused the probe")
                     continue
@@ -258,13 +309,31 @@ internal object YtMusicStreams {
         return null
     }
 
-    private suspend fun playerFormats(client: YtClient, videoId: String): Pair<Long, List<JSONObject>>? {
+    private suspend fun playerFormats(
+        client: YtClient,
+        videoId: String,
+        session: PoTokenGate.Session?,
+    ): Pair<Long, List<JSONObject>>? {
+        val visitorData = session?.visitorData.orEmpty()
         val body = JSONObject()
-            .put("context", client.context())
+            .put("context", client.context(visitorData))
             .put("videoId", videoId)
             .put("contentCheckOk", true)
             .put("racyCheckOk", true)
-        val response = Net.postJson("${client.host}/player?prettyPrint=false", body.toString(), client.requestHeaders(), tag = "ytm-player")
+        if (client.webFamily) {
+            body.put("playbackContext", JSONObject().put("contentPlaybackContext",
+                JSONObject().put("signatureTimestamp", SignatureStamp.current())))
+            if (client.host == VIDEO_HOST) body.put("videoCheckOk", true)
+            if (session != null) {
+                body.put("serviceIntegrityDimensions", JSONObject().put("poToken", session.requestToken))
+            }
+        }
+        val response = Net.postJson(
+            "${client.host}/player?prettyPrint=false",
+            body.toString(),
+            client.requestHeaders(visitorData),
+            tag = "ytm-player",
+        )
         val json = response?.takeIf { it.ok }?.json()
         if (json == null) {
             log.w("${client.clientName} player ${response?.code ?: "no response"}")
@@ -303,5 +372,53 @@ internal object YtMusicStreams {
     private suspend fun probe(url: String, headers: Map<String, String>): Boolean {
         val sample = Net.fetch(url, 0, PROBE_BYTES - 1, headers, tag = "ytm-probe")
         return sample != null && sample.isNotEmpty()
+    }
+}
+
+/**
+ * The signature timestamp the web clients borrow from the web player build;
+ * fetched rarely and cached hard because it only moves with player releases.
+ */
+private object SignatureStamp {
+
+    private const val FRESH_MS = 12 * 60 * 60_000L
+
+    @Volatile
+    private var stamp: Int = 0
+
+    @Volatile
+    private var fetchedAt: Long = 0L
+
+    private val lock = Mutex()
+
+    suspend fun current(): Int {
+        stamp.takeIf { it > 0 && System.currentTimeMillis() - fetchedAt < FRESH_MS }?.let { return it }
+        return lock.withLock {
+            stamp.takeIf { it > 0 && System.currentTimeMillis() - fetchedAt < FRESH_MS }?.let { return it }
+            val found = fetch() ?: stamp
+            if (found > 0) {
+                stamp = found
+                fetchedAt = System.currentTimeMillis()
+            }
+            found
+        }
+    }
+
+    private suspend fun fetch(): Int? {
+        val api = Net.get(
+            "https://www.youtube.com/iframe_api",
+            mapOf("User-Agent" to Net.DESKTOP_UA),
+            tag = "ytm-sts",
+        )?.takeIf { it.ok }?.body ?: return null
+        val hash = Regex("""/s/player/([a-f0-9]{8})/""").find(api)?.groupValues?.getOrNull(1) ?: return null
+        val base = Net.get(
+            "https://www.youtube.com/s/player/$hash/player_ias.vflset/en_US/base.js",
+            mapOf("User-Agent" to Net.DESKTOP_UA),
+            tag = "ytm-sts",
+        )?.takeIf { it.ok }?.body ?: return null
+        val value = Regex("""signatureTimestamp[=:]"?(\d{4,6})"?""").find(base)?.groupValues?.getOrNull(1)
+        val parsed = value?.toIntOrNull() ?: 0
+        if (parsed > 0) log.i("signature timestamp $parsed from player $hash")
+        return parsed.takeIf { it > 0 }
     }
 }
