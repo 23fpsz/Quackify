@@ -59,6 +59,7 @@ import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.resetHomeSplash
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.store.StreamSource
 import java.util.Calendar
 
 private val log = Logs.of(Logs.Module.MAIN)
@@ -244,10 +245,13 @@ internal fun MainActivity.rememberNowPlayingData(
     }
     LaunchedEffect(
         playback?.trackUri,
+        playback?.streamSource,
+        playback?.videoId,
         LyricsOptions.translationEnabled,
         LyricsOptions.translationLanguage,
         LyricsOptions.prioritizeWordSynced,
         LyricsOptions.providerOrder,
+        LyricsOptions.ytmProviderOrder,
     ) {
         val uri = playback?.trackUri.orEmpty()
         if (!uri.startsWith("spotify:track:")) {
@@ -256,6 +260,10 @@ internal fun MainActivity.rememberNowPlayingData(
         }
         val bridge = PlaybackHost.bridge
         val duration = bridge?.progressSnapshot?.durationMs ?: 0L
+        val stream = playback?.streamSource
+            ?.let { key -> StreamSource.entries.firstOrNull { it.key == key } }
+            ?: StreamSource.SPOTIFY
+        val order = LyricsOptions.providerOrderFor(stream)
         val repository = Krespot.lyricsRepository
         val result = repository.lyrics(
             context = this@rememberNowPlayingData,
@@ -263,14 +271,18 @@ internal fun MainActivity.rememberNowPlayingData(
             title = playback?.title.orEmpty(),
             artist = playback?.artist.orEmpty(),
             durationMs = duration,
-            sources = LyricsOptions.providerOrder.toSet(),
-            order = LyricsOptions.providerOrder,
+            sources = order.toSet(),
+            order = order,
             prioritizeWordSynced = LyricsOptions.prioritizeWordSynced,
+            stream = stream,
+            videoId = playback?.videoId.orEmpty(),
         )
         var trackLyrics = if (result != null) {
             repository.asTrackLyrics(result)
-        } else {
+        } else if (stream == StreamSource.SPOTIFY) {
             Krespot.lyrics.lyrics(this@rememberNowPlayingData, uri)
+        } else {
+            null
         }
         if (trackLyrics != null && LyricsOptions.translationEnabled && LyricsOptions.enabled) {
             val target = LyricsOptions.translationTargetTag(this@rememberNowPlayingData)

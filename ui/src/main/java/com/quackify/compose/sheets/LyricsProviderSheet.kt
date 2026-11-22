@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quackify.backend.core.store.StreamSource
 import com.quackify.backend.library.lyrics.LyricsProvider
 import com.quackify.compose.R
 import com.quackify.compose.theme.EncoreColors
@@ -44,6 +45,7 @@ import com.quackify.compose.theme.EncoreTheme
 @Composable
 fun LyricsProviderSheet(
     orderedProviders: List<LyricsProvider>,
+    stream: StreamSource = StreamSource.SPOTIFY,
     onOrderSelected: (List<LyricsProvider>) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -82,7 +84,10 @@ fun LyricsProviderSheet(
                 modifier = Modifier.padding(bottom = 4.dp)
             )
             Text(
-                text = stringResource(R.string.lyrics_source_desc),
+                text = stringResource(
+                    R.string.lyrics_source_stream_desc,
+                    streamLabel(stream)
+                ),
                 style = EncoreTheme.typography.bodySmall.copy(
                     color = EncoreColors.TextSecondary
                 ),
@@ -144,4 +149,9 @@ fun LyricsProviderSheet(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+private fun streamLabel(stream: StreamSource): String = when (stream) {
+    StreamSource.SPOTIFY -> "Spotify"
+    StreamSource.YT_MUSIC -> "YouTube Music"
 }

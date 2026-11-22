@@ -127,6 +127,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.quackify.backend.core.store.StreamSource
 import com.quackify.compose.R
 import com.quackify.compose.components.CanvasVideoPlayer
 import com.quackify.compose.components.EncoreArtworkImage
@@ -285,6 +286,7 @@ fun EncoreNowPlayingScreen(
     onCanvasToggle: (Boolean) -> Unit = {},
     musicVideoAvailable: Boolean = false,
     videoActive: Boolean = false,
+    streamSource: String = "",
     videoQualities: List<Int> = emptyList(),
     videoSwitching: Boolean = false,
     onSwitchVideo: (Boolean) -> Unit = {},
@@ -1303,10 +1305,18 @@ fun EncoreNowPlayingScreen(
         }
         if (isLyricsProviderSheetOpen) {
             val context = LocalContext.current
+            val stream = streamSource
+                .let { key -> StreamSource.entries.firstOrNull { it.key == key } }
+                ?: StreamSource.SPOTIFY
             LyricsProviderSheet(
-                orderedProviders = LyricsOptions.providerOrder,
+                orderedProviders = LyricsOptions.providerOrderFor(stream),
+                stream = stream,
                 onOrderSelected = { order ->
-                    LyricsOptions.setProviderOrder(context, order)
+                    if (stream == StreamSource.YT_MUSIC) {
+                        LyricsOptions.setYtmProviderOrder(context, order)
+                    } else {
+                        LyricsOptions.setProviderOrder(context, order)
+                    }
                 },
                 onDismiss = { isLyricsProviderSheetOpen = false }
             )

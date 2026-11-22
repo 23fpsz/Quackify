@@ -320,6 +320,7 @@ private fun NowPlayingScreenLayer(
         onCanvasToggle = { on -> env.onCanvasToggle?.invoke(on) },
         musicVideoAvailable = playbackState?.musicVideoAvailable ?: false,
         videoActive = playbackState?.videoActive ?: false,
+        streamSource = playbackState?.streamSource.orEmpty(),
         videoQualities = playbackState?.videoQualities.orEmpty(),
         videoSwitching = playbackState?.videoSwitching ?: false,
         onSwitchVideo = { to -> env.playerListener?.onSwitchVideo(to) },

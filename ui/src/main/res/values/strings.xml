@@ -219,6 +219,7 @@
     <string name="lyrics_prioritize_word_synced_desc">Keep searching other sources for word-by-word timing when the top source only has line-synced lyrics</string>
     <string name="lyrics_source">Lyrics source</string>
     <string name="lyrics_source_desc">Tap a source to move it to the top. Sources are tried in this order.</string>
+    <string name="lyrics_source_stream_desc">Providers used while the audio streams from %1$s. Tap a source to move it to the top.</string>
     <string name="lyrics_provider_word_synced">Word-synced</string>
     <string name="lyrics_provider_line_synced">Line-synced</string>
     <string name="lyrics_translation">Translate lyrics</string>
