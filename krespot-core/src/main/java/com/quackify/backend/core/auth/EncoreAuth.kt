@@ -46,6 +46,7 @@ object EncoreAuth {
     )
 
     private const val KEY_SESSION = "session"
+    private const val KEY_CUSTOM_SPDC = "custom_spdc"
     private const val KEY_NAME = "account_name"
     private const val KEY_ID = "account_id"
     private const val KEY_EMAIL = "account_email"
@@ -171,6 +172,7 @@ object EncoreAuth {
             .putString(KEY_COLOR, p.getString("multi.$id.color", "").orEmpty())
             .putLong(KEY_SAVED_AT, System.currentTimeMillis())
             .putString(KEY_MULTI_ACTIVE, id)
+            .remove(KEY_CUSTOM_SPDC)
             .remove(KEY_TOKEN)
             .remove(KEY_TOKEN_AT)
             .remove(KEY_TOKEN_EXP)
@@ -426,6 +428,19 @@ object EncoreAuth {
         return spDcOf(session)
     }
 
+    /**
+     * Whether the active session was installed through the Debug sp_dc
+     * door rather than the web login, and how long the cookie is. The length
+     * — never the value — is exposed: it is enough to tell "a real cookie is
+     * in here" from "an experiment pasted something short" without leaking
+     * the credential into logs or the UI.
+     */
+    fun customSpDc(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_CUSTOM_SPDC, false)
+
+    fun customSpDcLength(context: Context): Int =
+        if (customSpDc(context)) spDc(context).length else 0
+
     fun spDcOf(cookies: String): String {
         val map = runCatching { JSONObject(cookies) }.getOrNull() ?: return ""
         COOKIE_DOMAINS.forEach { domain ->
@@ -576,10 +591,12 @@ object EncoreAuth {
         return map.toString()
     }
 
-    fun saveLogin(context: Context, cookies: String, account: Account) {
-        log.i("saveLogin name=${account.name} id=${account.id} product=${account.product} avatar=${account.imageUrl.isNotBlank()}")
+    fun saveLogin(context: Context, cookies: String, account: Account, customSpDc: Boolean = false) {
+        log.i("saveLogin name=${account.name} id=${account.id} product=${account.product} " +
+                "avatar=${account.imageUrl.isNotBlank()} customSpDc=$customSpDc")
         prefs(context).edit()
             .putString(KEY_SESSION, cookies)
+            .putBoolean(KEY_CUSTOM_SPDC, customSpDc)
             .putString(KEY_NAME, account.name)
             .putString(KEY_ID, account.id)
             .putString(KEY_EMAIL, account.email)
@@ -663,6 +680,7 @@ object EncoreAuth {
         }
         prefs(context).edit()
             .remove(KEY_SESSION)
+            .remove(KEY_CUSTOM_SPDC)
             .remove(KEY_NAME)
             .remove(KEY_ID)
             .remove(KEY_EMAIL)
