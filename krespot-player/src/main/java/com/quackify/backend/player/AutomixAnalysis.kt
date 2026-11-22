@@ -21,6 +21,7 @@
 package com.quackify.backend.player
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -44,6 +45,7 @@ import com.quackify.backend.core.store.AppPrefs
 import java.nio.ByteBuffer
 import java.util.Locale
 import kotlin.math.min
+import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -110,6 +112,8 @@ internal class AutomixAnalysis(private val context: Context) {
         return windowGrid(source, uri, 0.0, "$uri#head", budgetMs, stillWanted)
     }
 
+    fun tailSilenceSec(uri: String): Double = GridCache.getSilence(context, uri)
+
     fun interrupt() {
         generation.incrementAndGet()
         main.post { runCatching { player?.stop() } }
@@ -151,6 +155,7 @@ internal class AutomixAnalysis(private val context: Context) {
         val pcm = mutex.withLock {
             decodeWindow(source, uri, start, windowSec, budgetMs, token, stillWanted)
         } ?: return null
+        rememberTailSilence(uri, pcm, start, durationSec)
         val grid = withContext(Dispatchers.Default) {
             runCatching { TrackAnalyzer.analyze(pcm.samples, pcm.rate, start) }.getOrNull()
         }
@@ -168,6 +173,66 @@ internal class AutomixAnalysis(private val context: Context) {
                 "in ${SystemClock.elapsedRealtime() - startedAt}ms"
         )
         return grid
+    }
+
+    /**
+     * Measures the trailing silence off a decoded window that reaches the end
+     * of the track, so blends can be anchored where the music actually stops
+     * instead of the file's nominal length. RMS windows are judged against the
+     * window's own percentile levels, the same envelope pass Orchard and
+     * BitChord run over the whole file: a quiet fade-out still counts as
+     * music, only a genuinely dead tail is trimmed.
+     */
+    private fun rememberTailSilence(uri: String, pcm: Pcm, windowStartSec: Double, durationSec: Double) {
+        if (pcm.rate <= 0) return
+        val windowSec = pcm.samples.size.toDouble() / pcm.rate
+        if (durationSec - (windowStartSec + windowSec) > END_COVER_TOLERANCE_SECONDS) return
+        val silence = trailingSilenceSec(pcm.samples, pcm.rate, windowStartSec, durationSec)
+        GridCache.putSilence(context, uri, silence)
+        if (silence >= MIN_TAIL_SILENCE_SECONDS) {
+            log.i(
+                "automix: '${uri.takeLast(12)}' runs silent for the last ${"%.1f".format(silence)}s, " +
+                    "blends will stop at the audible end"
+            )
+        }
+    }
+
+    private fun trailingSilenceSec(samples: FloatArray, rate: Int, windowStartSec: Double, durationSec: Double): Double {
+        val windowSec = samples.size.toDouble() / rate
+        if (windowSec < MIN_MEASURED_TAIL_SECONDS) return 0.0
+        val windowSamples = (MEASURE_WINDOW_SECONDS * rate).toInt()
+        if (windowSamples <= 0) return 0.0
+        val windows = minOf((windowSec / MEASURE_WINDOW_SECONDS).toInt(), samples.size / windowSamples)
+        if (windows < 4) return 0.0
+        val levels = DoubleArray(windows)
+        for (index in 0 until windows) {
+            val from = index * windowSamples
+            var sum = 0.0
+            for (cursor in from until from + windowSamples) {
+                val sample = samples[cursor].toDouble()
+                sum += sample * sample
+            }
+            levels[index] = sqrt(sum / windowSamples)
+        }
+        val noiseFloor = percentile(levels, 0.05)
+        val reference = percentile(levels, 0.85)
+        if (reference <= 0.0) return 0.0
+        val activeThreshold = maxOf(0.0025, minOf(noiseFloor * 2.6, reference * 0.28), reference * 0.1)
+        val silenceThreshold = maxOf(0.0015, minOf(activeThreshold * 0.25, reference * 0.04))
+        var quietStart = windows
+        while (quietStart > 0 && levels[quietStart - 1] < silenceThreshold) {
+            quietStart--
+        }
+        if (quietStart == 0) return 0.0
+        val silence = durationSec - (windowStartSec + quietStart * MEASURE_WINDOW_SECONDS)
+        if (silence < MIN_TAIL_SILENCE_SECONDS) return 0.0
+        return minOf(silence, MAX_TAIL_SILENCE_SECONDS)
+    }
+
+    private fun percentile(values: DoubleArray, fraction: Double): Double {
+        if (values.isEmpty()) return 0.0
+        val sorted = values.copyOf().also { it.sort() }
+        return sorted[((sorted.size - 1) * fraction).toInt().coerceIn(0, sorted.size - 1)]
     }
 
     private class Pcm(val samples: FloatArray, val rate: Int)
@@ -315,6 +380,16 @@ internal class AutomixAnalysis(private val context: Context) {
         const val ANALYSIS_SPEED = 2f
 
         const val MAX_TAP_RATE = 12_500
+
+        const val MEASURE_WINDOW_SECONDS = 0.25
+
+        const val MIN_MEASURED_TAIL_SECONDS = 2.0
+
+        const val MIN_TAIL_SILENCE_SECONDS = 0.5
+
+        const val MAX_TAIL_SILENCE_SECONDS = 12.0
+
+        const val END_COVER_TOLERANCE_SECONDS = 2.0
     }
 }
 
@@ -418,11 +493,15 @@ private object GridCache {
 
     private const val KEY_INDEX = "grid.keys"
 
+    private const val SILENCE_SUFFIX = "#silence"
+
     private const val LIMIT = 48
 
     private val lock = Any()
 
     private val memory = LinkedHashMap<String, TrackGrid>()
+
+    private val memorySilence = LinkedHashMap<String, Double>()
 
     fun get(context: Context, key: String): TrackGrid? {
         synchronized(lock) { memory[key]?.let { return it } }
@@ -459,15 +538,42 @@ private object GridCache {
                 .put("beats", doublesToCsv(grid.beatStarts))
                 .put("bars", doublesToCsv(grid.barStarts))
             val editor = prefs.edit().putString(key, json.toString())
-            val keys = prefs.getString(KEY_INDEX, "").orEmpty()
-                .split(',').filter { it.isNotBlank() }.toMutableList()
-            keys.remove(key)
-            keys.add(key)
-            while (keys.size > LIMIT) {
-                editor.remove(keys.removeAt(0))
-            }
-            editor.putString(KEY_INDEX, keys.joinToString(",")).apply()
+            touchIndex(prefs, editor, key)
+            editor.apply()
         }
+    }
+
+    fun getSilence(context: Context, uri: String): Double {
+        synchronized(lock) { memorySilence[uri]?.let { return it } }
+        val raw = runCatching {
+            AppPrefs.prefs(context, STORE).getString(uri + SILENCE_SUFFIX, null)
+        }.getOrNull() ?: return 0.0
+        val value = raw.toDoubleOrNull() ?: return 0.0
+        if (!value.isFinite() || value < 0.0) return 0.0
+        synchronized(lock) { memorySilence[uri] = value }
+        return value
+    }
+
+    fun putSilence(context: Context, uri: String, seconds: Double) {
+        synchronized(lock) { memorySilence[uri] = seconds }
+        runCatching {
+            val key = uri + SILENCE_SUFFIX
+            val prefs = AppPrefs.prefs(context, STORE)
+            val editor = prefs.edit().putString(key, seconds.toString())
+            touchIndex(prefs, editor, key)
+            editor.apply()
+        }
+    }
+
+    private fun touchIndex(prefs: SharedPreferences, editor: SharedPreferences.Editor, key: String) {
+        val keys = prefs.getString(KEY_INDEX, "").orEmpty()
+            .split(',').filter { it.isNotBlank() }.toMutableList()
+        keys.remove(key)
+        keys.add(key)
+        while (keys.size > LIMIT) {
+            editor.remove(keys.removeAt(0))
+        }
+        editor.putString(KEY_INDEX, keys.joinToString(","))
     }
 
     private fun doublesToCsv(values: DoubleArray): String = buildString {
