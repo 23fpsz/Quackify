@@ -111,6 +111,8 @@ data class YtStream(
     val headers: Map<String, String>,
     val head: ByteArray,
     val total: Long,
+    /** The video's own length in ms, so callers never have to fall back on the track metadata. */
+    val lengthMs: Long,
 )
 
 private class YtClient(
@@ -609,6 +611,7 @@ internal object YtMusicStreams {
                     client.mediaHeaders(),
                     seeded.head,
                     seeded.total,
+                    reply.lengthSeconds * 1000L,
                 )
             }
             if (!served) {

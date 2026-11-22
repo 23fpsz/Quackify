@@ -85,6 +85,9 @@ private const val SPEC_MARGIN_MS = 24_000L
 
 private const val MAX_SPEC_BUDGET_MS = 120_000L
 
+/** Length disagreement below this is the same cut; a resume crosses it untouched. */
+private const val SAME_CUT_MS = 2_000L
+
 sealed interface PlayerEvent {
     data class Started(val uri: String = "") : PlayerEvent
     data class Ended(val uri: String = "") : PlayerEvent
@@ -111,6 +114,23 @@ data class PlayerState(
 
 private fun resumeStoreFor(account: String): String =
     if (account.isBlank()) PLAYER_PREFS else "$PLAYER_PREFS.$account"
+
+/**
+ * A resume point measured on one source's timeline, replanted on another's.
+ * The alternate is rarely the same cut: a breath of lead-in here, a padded
+ * tail there. The resolve gate keeps grossly wrong takes out; what reaches
+ * here is the near miss, and folding the point across the two lengths holds
+ * the handover near the same musical moment instead of letting it drift
+ * with the longer edit. A point at the very start, or two lengths that
+ * agree, needs no fold.
+ */
+private fun replant(positionMs: Long, fromLengthMs: Long, intoLengthMs: Long): Long {
+    if (positionMs <= 0L) return positionMs
+    if (fromLengthMs <= 0L || intoLengthMs <= 0L) return positionMs
+    if (kotlin.math.abs(fromLengthMs - intoLengthMs) < SAME_CUT_MS) return positionMs
+    val folded = positionMs * intoLengthMs / fromLengthMs
+    return folded.coerceAtMost((intoLengthMs - SAME_CUT_MS).coerceAtLeast(0L))
+}
 
 class KrespotPlayer(private val context: Context) {
 
@@ -998,7 +1018,13 @@ class KrespotPlayer(private val context: Context) {
                 }
                 playYtMusic(track, alternate, positionMs, divert = true)
             } else {
-                play(track, spclient, positionMs, divert = true)
+                // The death spot rides the stream's timeline; the next source
+                // plays the track's own cut, so fold it back across first.
+                val folded = replant(positionMs, _state.value.durationMs, track.durationMs)
+                if (folded != positionMs) {
+                    log.i("the handover spot ${positionMs}ms folds to ${folded}ms on the track's cut")
+                }
+                play(track, spclient, folded, divert = true)
             }
         }
         return true
@@ -1039,6 +1065,17 @@ class KrespotPlayer(private val context: Context) {
         job = scope.launch {
             var player: Mp3Engine? = null
             try {
+                // The resume point rides the track's timeline; the stream is
+                // the alternate cut's, so fold it across before the extractor
+                // seeks — a handover at 2:00 of a 3:00 track must not land at
+                // 2:00 of a 3:20 edit.
+                val requestedMs = if (parked >= 0L) parked else fromMs
+                val startAtMs = replant(requestedMs, track.durationMs, stream.lengthMs)
+                if (startAtMs != requestedMs) {
+                    log.i("resume ${requestedMs}ms folds to ${startAtMs}ms: the stream runs " +
+                            "${stream.lengthMs}ms against the track's ${track.durationMs}ms"
+                    )
+                }
                 player = Mp3Engine(stream.url, { event ->
                     if (id == generation) {
                         if (event is PlayerEvent.Failed && transportDivertUri == null &&
@@ -1052,7 +1089,7 @@ class KrespotPlayer(private val context: Context) {
                             if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                         }
                     }
-                }, stream.headers, if (parked >= 0L) parked else fromMs, context.cacheDir, stream.head, stream.total)
+                }, stream.headers, startAtMs, context.cacheDir, stream.head, stream.total)
                 mp3 = player
                 player.run()
             } catch (cancellation: CancellationException) {
