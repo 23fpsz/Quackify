@@ -232,6 +232,9 @@
     <string name="lyrics_keep_screen_on_desc">Keep the screen awake while the fullscreen lyrics are open</string>
     <string name="lyrics_deepfeel">DeepFeel lyrics</string>
     <string name="lyrics_deepfeel_desc">A cinematic dark canvas where only the current line glows in the colors of the artwork</string>
+    <string name="lyrics_next_up">Next up</string>
+    <string name="lyrics_next_up_desc">Peek the opening lines of the next track at the end of the lyrics</string>
+    <string name="lyrics_next_track_name">%1$s (%2$s)</string>
     <string name="lyrics_offset">Lyrics offset</string>
     <string name="lyrics_offset_desc">Shift the lyric timing when it runs ahead of or behind the vocal</string>
     <string name="lyrics_offset_value">%1$.1f s</string>

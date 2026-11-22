@@ -73,6 +73,7 @@ internal class ShellPlayerEnv(
     val selfUserUri: String = "",
     val onDeleteComment: (suspend (String) -> Boolean)? = null,
     val nowPlayingLyrics: List<TimeSyncedLyric>,
+    val nextTrackLyrics: List<TimeSyncedLyric> = emptyList(),
     val nowPlayingTranscript: List<TranscriptLine>,
     val lyricsProviderName: String = "",
     val canvasFilePath: String?,
@@ -309,6 +310,7 @@ private fun NowPlayingScreenLayer(
         // toggle only hides the preview line, and both read live state so a
         // Settings change applies to the open player without a reopen.
         lyrics = if (LyricsOptions.enabled) env.nowPlayingLyrics else emptyList(),
+        nextTrackLyrics = if (LyricsOptions.enabled) env.nextTrackLyrics else emptyList(),
         transcript = env.nowPlayingTranscript,
         lyricsProviderName = if (LyricsOptions.enabled) env.lyricsProviderName else "",
         lyricsPreview = LyricsOptions.preview,

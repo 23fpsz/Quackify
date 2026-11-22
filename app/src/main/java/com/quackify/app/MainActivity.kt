@@ -278,6 +278,8 @@ class MainActivity : ComponentActivity() {
     internal var nowPlayingArtist by mutableStateOf<ArtistDetail?>(null)
     internal var nowPlayingArtistFollowed by mutableStateOf<Boolean?>(null)
     internal var nowPlayingLyrics by mutableStateOf<TrackLyrics?>(null)
+    /** The opening lines of whatever plays next, for the reader's sneak peek. */
+    internal var nowPlayingNextLyrics by mutableStateOf<TrackLyrics?>(null)
     internal var nowPlayingTranscript by mutableStateOf<EpisodeTranscript?>(null)
     internal var canvasFile by mutableStateOf<String?>(null)
     internal var nowPlayingShow by mutableStateOf<ShowDetail?>(null)

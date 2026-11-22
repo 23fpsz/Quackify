@@ -76,6 +76,7 @@ fun LyricsShortcutSheet(
     val providerOrder = LyricsOptions.providerOrder
     val keepScreenOn = LyricsOptions.keepScreenOn
     val deepFeelEnabled = LyricsOptions.deepFeelEnabled
+    val nextTrackPeek = LyricsOptions.nextTrackPeek
     val offsetTenths = LyricsOptions.offsetTenths
     val offsetLabel = remember(offsetTenths) {
         String.format(Locale.US, "%+.1f s", offsetTenths / 10f)
@@ -142,6 +143,16 @@ fun LyricsShortcutSheet(
                 onCheckedChange = { on ->
                     onDismiss()
                     LyricsOptions.setDeepFeelEnabled(context, on)
+                }
+            )
+
+            ShortcutToggleRow(
+                title = stringResource(R.string.lyrics_next_up),
+                subtitle = stringResource(R.string.lyrics_next_up_desc),
+                isChecked = nextTrackPeek,
+                onCheckedChange = { on ->
+                    onDismiss()
+                    LyricsOptions.setNextTrackPeek(context, on)
                 }
             )
 

@@ -42,6 +42,9 @@ object LyricsOptions {
 
     private const val KEY_DEEP_FEEL = "lyricsDeepFeel"
 
+    /** The fullscreen reader ends with a blurred sneak peek of the next track's opening lines. */
+    private const val KEY_NEXT_TRACK_PEEK = "lyricsNextTrackPeek"
+
     private const val KEY_TRANSCRIPT_SMOOTH_SWEEP = "transcriptSmoothSweepEnabled"
 
     private const val KEY_TRANSCRIPT_OFFSET_TENTHS = "transcriptOffsetTenths"
@@ -84,6 +87,9 @@ object LyricsOptions {
     var deepFeelEnabled by mutableStateOf(false)
         private set
 
+    var nextTrackPeek by mutableStateOf(true)
+        private set
+
     var transcriptSmoothSweep by mutableStateOf(true)
         private set
 
@@ -107,6 +113,7 @@ object LyricsOptions {
         offsetTenths = prefs.getInt(KEY_OFFSET_TENTHS, 0).coerceIn(LYRICS_OFFSET_TENTHS_MIN, LYRICS_OFFSET_TENTHS_MAX)
         keepScreenOn = prefs.getBoolean(KEY_KEEP_SCREEN_ON, false)
         deepFeelEnabled = prefs.getBoolean(KEY_DEEP_FEEL, false)
+        nextTrackPeek = prefs.getBoolean(KEY_NEXT_TRACK_PEEK, true)
         transcriptSmoothSweep = prefs.getBoolean(KEY_TRANSCRIPT_SMOOTH_SWEEP, true)
         transcriptOffsetTenths = prefs.getInt(KEY_TRANSCRIPT_OFFSET_TENTHS, 0)
             .coerceIn(LYRICS_OFFSET_TENTHS_MIN, LYRICS_OFFSET_TENTHS_MAX)
@@ -182,6 +189,11 @@ object LyricsOptions {
     fun setDeepFeelEnabled(context: Context, value: Boolean) {
         deepFeelEnabled = value
         AppPrefs.edit(context, PREFS).putBoolean(KEY_DEEP_FEEL, value).apply()
+    }
+
+    fun setNextTrackPeek(context: Context, value: Boolean) {
+        nextTrackPeek = value
+        AppPrefs.edit(context, PREFS).putBoolean(KEY_NEXT_TRACK_PEEK, value).apply()
     }
 
     fun setTranscriptSmoothSweep(context: Context, value: Boolean) {

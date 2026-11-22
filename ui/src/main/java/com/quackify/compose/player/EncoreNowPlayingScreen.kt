@@ -325,6 +325,7 @@ fun EncoreNowPlayingScreen(
     selfUserUri: String = "",
     onDeleteComment: suspend (String) -> Boolean = { false },
     lyrics: List<TimeSyncedLyric> = emptyList(),
+    nextTrackLyrics: List<TimeSyncedLyric> = emptyList(),
     transcript: List<TranscriptLine> = emptyList(),
     lyricsProviderName: String = "",
     showLyricsPreview: Boolean = true,
@@ -1232,6 +1233,8 @@ fun EncoreNowPlayingScreen(
                 dominantColor = dominantColor,
                 artworkColor = dynamicArtworkColor,
                 lyrics = lyrics,
+                nextTrack = nextTrack,
+                nextTrackLyrics = nextTrackLyrics,
                 lyricsProviderName = lyricsProviderName,
                 onSeekMs = { targetMs -> if (durationMs > 0L) onSeek(targetMs.toFloat() / durationMs.toFloat()) },
                 onShareClick = { isLyricsShareOpen = true },
@@ -2926,6 +2929,8 @@ private fun FullscreenLyricsView(
     dominantColor: Color,
     artworkColor: Color,
     lyrics: List<TimeSyncedLyric>,
+    nextTrack: TrackItem?,
+    nextTrackLyrics: List<TimeSyncedLyric>,
     lyricsProviderName: String,
     onSeekMs: (Long) -> Unit,
     onShareClick: () -> Unit,
@@ -2945,6 +2950,8 @@ private fun FullscreenLyricsView(
     val activeIndex by rememberActiveLyricIndex(clockMs, lyrics)
     val listState = rememberLazyListState()
     val deepFeel = LyricsOptions.deepFeelEnabled
+    val nextPeekEnabled = LyricsOptions.nextTrackPeek
+    val showNextPeek = nextPeekEnabled && nextTrack != null && nextTrackLyrics.isNotEmpty()
     val deepFeelPalette = rememberDeepFeelPalette(artworkColor)
     val glowPhases = if (deepFeel) rememberDeepFeelGlowPhases() else null
     val flowPhases = if (deepFeel) rememberDeepFeelFlowPhases() else null
@@ -3221,6 +3228,22 @@ private fun FullscreenLyricsView(
                     }
                 }
             }
+            // The sneak peek: once the last line of this song scrolls by,
+            // the opening lines of the next one surface beneath it — each
+            // line blurrier than the one above, like the song is coming
+            // into view through fog. Subtle on purpose: it is a whisper of
+            // what is next, not a second lyric sheet.
+            if (showNextPeek) {
+                item(key = "nextTrackPeek") {
+                    NextTrackPeek(
+                        nextTrack = nextTrack,
+                        nextLyrics = nextTrackLyrics,
+                        ink = ink,
+                        accent = if (deepFeel) deepFeelPalette.accent else dominantColor,
+                        deepFeel = deepFeel
+                    )
+                }
+            }
             if (lyricsProviderName.isNotBlank()) {
                 item {
                     // Attribution for the source these lines came from, at
@@ -3238,6 +3261,87 @@ private fun FullscreenLyricsView(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * The tail of the fullscreen reader: a whisper of the next track. Its name
+ * sits under a small "next up" eyebrow, and its opening lines fade out line
+ * by line — 0%, 25%, 50%, 75%, 100% blur — so the farther down you read,
+ * the more the song feels like it is still wrapped in fog. No seek, no
+ * glow, no translation: it is something to glance at, not to read along
+ * with, and it stays quieter than the real lyric sheet in both modes.
+ */
+@Composable
+private fun NextTrackPeek(
+    nextTrack: TrackItem?,
+    nextLyrics: List<TimeSyncedLyric>,
+    ink: Color,
+    accent: Color,
+    deepFeel: Boolean
+) {
+    if (nextTrack == null || nextLyrics.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = EncoreSpacers.Looser2)
+            .padding(top = 44.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 20.dp, height = 2.dp)
+                    .background(accent.copy(alpha = if (deepFeel) 0.9f else 0.6f))
+            )
+            Text(
+                text = stringResource(R.string.lyrics_next_up),
+                style = EncoreTheme.typography.marginalBold.copy(
+                    color = accent.copy(alpha = if (deepFeel) 0.95f else 0.8f),
+                    fontSize = 11.sp,
+                    letterSpacing = 1.4.sp
+                )
+            )
+        }
+        Text(
+            text = stringResource(R.string.lyrics_next_track_name, nextTrack.title, nextTrack.artist),
+            style = EncoreTheme.typography.bodyMedium.copy(
+                color = ink.copy(alpha = if (deepFeel) 0.8f else 0.75f),
+                fontWeight = FontWeight.Bold
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp)
+        )
+        // Each line down the peek is blurrier than the one above it: a
+        // quarter step per row, all the way to fully unreadable.
+        nextLyrics.take(5).forEachIndexed { index, line ->
+            val blur by animateDpAsState(
+                targetValue = 1.6.dp * index,
+                animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                label = "nextPeekBlur"
+            )
+            val lineAlpha = if (deepFeel) 0.44f else 0.5f
+            Text(
+                text = line.text,
+                style = EncoreTheme.typography.bodyMedium.copy(
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ink.copy(alpha = lineAlpha - index * 0.04f)
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+                    .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)
+            )
         }
     }
 }
