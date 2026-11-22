@@ -681,7 +681,7 @@ class KrespotPlayer(private val context: Context) {
         licenceSettling = lastPlayAt > 0L && sinceLast < LICENCE_SKIP_WINDOW_MS
         lastPlayAt = System.currentTimeMillis()
         if (track.isDirect) {
-            playDirect(track)
+            playDirect(track, fromMs)
             return
         }
         val file = track.best() ?: track.files.firstOrNull()
@@ -712,7 +712,7 @@ class KrespotPlayer(private val context: Context) {
                 if (stack.firstOrNull() == StreamSource.YT_MUSIC) {
                     val alternate = YtMusicStreams.resolve(track)
                     if (alternate != null) {
-                        playYtMusic(track, alternate)
+                        playYtMusic(track, alternate, fromMs)
                         return@launch
                     }
                     log.w("youtube music leads the stack but the track did not resolve, trying spotify")
@@ -722,7 +722,7 @@ class KrespotPlayer(private val context: Context) {
                     if (stack.firstOrNull() != StreamSource.YT_MUSIC) {
                         val alternate = YtMusicStreams.resolve(track)
                         if (alternate != null) {
-                            playYtMusic(track, alternate)
+                            playYtMusic(track, alternate, fromMs)
                             return@launch
                         }
                     }
@@ -873,12 +873,13 @@ class KrespotPlayer(private val context: Context) {
             licencePending = null
             refused = null
             log.i("the licence is rate limited, diverting '${track.name.ifBlank { track.uri }}' to youtube music")
-            playYtMusic(track, alternate)
+            playYtMusic(track, alternate, fromMs)
         }
         return true
     }
 
-    private fun playYtMusic(track: CommandTrack, stream: YtStream) {
+    private fun playYtMusic(track: CommandTrack, stream: YtStream, fromMs: Long = 0L) {
+        val parked = pendingSeekMs.takeIf { it >= 0L }?.also { pendingSeekMs = -1L } ?: -1L
         stop()
         if (!focus.acquire()) {
             log.w("play youtube music refused, another app holds the audio focus")
@@ -887,7 +888,6 @@ class KrespotPlayer(private val context: Context) {
         }
         val id = ++generation
         pendingPause = false
-        pendingSeekMs = -1L
         _state.value = PlayerState(
             playing = true,
             buffering = true,
@@ -906,7 +906,7 @@ class KrespotPlayer(private val context: Context) {
                         mirror(event, _state.value.durationMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                     }
-                }, stream.headers)
+                }, stream.headers, if (parked >= 0L) parked else fromMs)
                 mp3 = player
                 player.run()
             } catch (cancellation: CancellationException) {
@@ -920,7 +920,7 @@ class KrespotPlayer(private val context: Context) {
         }
     }
 
-    private fun playDirect(track: CommandTrack) {
+    private fun playDirect(track: CommandTrack, fromMs: Long = 0L) {
         val file = track.bestDirect()
         val url = file?.url.orEmpty()
         if (url.isBlank()) {
@@ -928,6 +928,7 @@ class KrespotPlayer(private val context: Context) {
             _events.tryEmit(PlayerEvent.Failed("no direct url"))
             return
         }
+        val parked = pendingSeekMs.takeIf { it >= 0L }?.also { pendingSeekMs = -1L } ?: -1L
         stop()
         if (!focus.acquire()) {
             log.w("play direct refused, another app holds the audio focus")
@@ -936,7 +937,6 @@ class KrespotPlayer(private val context: Context) {
         }
         val id = ++generation
         pendingPause = false
-        pendingSeekMs = -1L
         _state.value = PlayerState(playing = true, buffering = true, trackUri = track.uri)
         log.i("play direct '${track.name.ifBlank { track.uri }}' ${file?.bitrate ?: 0}b ${url.take(72)}")
         job = scope.launch {
@@ -947,7 +947,7 @@ class KrespotPlayer(private val context: Context) {
                         mirror(event, _state.value.durationMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                     }
-                })
+                }, startAtMs = if (parked >= 0L) parked else fromMs)
                 mp3 = player
                 _state.value = PlayerState(playing = true, buffering = true, trackUri = track.uri)
                 player.run()
@@ -1010,6 +1010,13 @@ class KrespotPlayer(private val context: Context) {
         if (videoActive) {
             log.i("video seek -> ${ms}ms")
             video.seekTo(ms)
+            _state.update { it.copy(positionMs = ms) }
+            return
+        }
+        val direct = mp3
+        if (direct != null) {
+            log.i("seek -> ${ms}ms on the direct engine")
+            direct.seekTo(ms)
             _state.update { it.copy(positionMs = ms) }
             return
         }
