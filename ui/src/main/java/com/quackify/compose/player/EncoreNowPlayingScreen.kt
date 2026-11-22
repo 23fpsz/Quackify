@@ -18,7 +18,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +31,11 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.maxLengthTrim
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -67,6 +72,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -702,9 +708,8 @@ fun EncoreNowPlayingScreen(
             )
         }
 
-        @OptIn(ExperimentalFoundationApi::class)
         CompositionLocalProvider(
-            LocalOverscrollConfiguration provides null
+            LocalOverscrollFactory provides null
         ) {
             val resolvedContextTitle = contextHeaderTitle ?: when {
                 albumOrPlaylistContext.isBlank() || albumOrPlaylistContext.equals("Recommended for you", ignoreCase = true) -> stringResource(R.string.recommended_for_you)
@@ -2947,6 +2952,10 @@ private fun FullscreenLyricsView(
     val glowPhases = if (deepFeel) rememberDeepFeelGlowPhases() else null
     val flowPhases = if (deepFeel) rememberDeepFeelFlowPhases() else null
     var heldLyricIndex by remember { mutableStateOf<Int?>(null) }
+    // While the reader holds a lyric down (and for a short grace window
+    // after they let go), the auto-scroll that chases the active line is
+    // suspended: they scrolled away on purpose to read ahead.
+    var suppressAutoScroll by remember { mutableStateOf(false) }
     val flowReveal by animateFloatAsState(
         targetValue = if (deepFeel) 1f else 0f,
         animationSpec = tween(durationMillis = 900, easing = EncoreAnimation.DecelerateInterpolator),
@@ -2967,8 +2976,18 @@ private fun FullscreenLyricsView(
         animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
         label = "deepFeelBackgroundBottom"
     )
+    LaunchedEffect(heldLyricIndex) {
+        if (heldLyricIndex != null) {
+            suppressAutoScroll = true
+        } else {
+            delay(2500)
+            suppressAutoScroll = false
+        }
+    }
     LaunchedEffect(activeIndex) {
-        listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
+        if (!suppressAutoScroll) {
+            listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
+        }
     }
 
     // Keep the screen awake while the reader is open, if the user asked for
@@ -3091,8 +3110,10 @@ private fun FullscreenLyricsView(
                     targetValue = when {
                         !deepFeel -> 0.dp
                         heldLyricIndex == index -> 0.dp
-                        distance > 4 -> 9.dp
-                        distance > 2 -> 5.dp
+                        distance >= 5 -> 9.dp
+                        distance == 4 -> 6.75.dp
+                        distance == 3 -> 4.5.dp
+                        distance == 2 -> 2.25.dp
                         else -> 0.dp
                     },
                     animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
@@ -3105,20 +3126,26 @@ private fun FullscreenLyricsView(
                     label = "deepFeelLineFont"
                 )
                 val lineVerticalPadding by animateDpAsState(
-                    targetValue = if (isCurrentLine) 12.dp else 2.dp,
+                    targetValue = when {
+                        isCurrentLine -> 12.dp
+                        deepFeel -> 2.dp
+                        else -> 3.dp
+                    },
                     animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
                     label = "deepFeelLineVerticalPadding"
                 )
                 val lineInteraction = remember { MutableInteractionSource() }
                 val linePressed by lineInteraction.collectIsPressedAsState()
                 val holdConsumed = remember { mutableStateOf(false) }
+                // A ~360ms press means "let me read this", in DeepFeel and
+                // in the plain reader alike: it peels the blur off the line
+                // (if any), suspends the active-line auto-scroll and, on
+                // release, does not fire the tap-to-seek.
                 LaunchedEffect(linePressed) {
                     if (linePressed) {
                         delay(360)
-                        if (deepFeel) {
-                            holdConsumed.value = true
-                            heldLyricIndex = index
-                        }
+                        holdConsumed.value = true
+                        heldLyricIndex = index
                     } else {
                         heldLyricIndex = null
                         holdConsumed.value = false
@@ -3740,8 +3767,16 @@ private fun TranscriptShortcutSheet(onDismiss: () -> Unit) {
                 text = stringResource(R.string.transcript_offset_desc),
                 style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
-            Slider(
+            val offsetSliderState = rememberSliderState(
                 value = (offsetTenths + LYRICS_OFFSET_TENTHS_MAX).toFloat(),
+                steps = LYRICS_OFFSET_TENTHS_MAX * 2 - 1,
+                trackRange = 0f..(LYRICS_OFFSET_TENTHS_MAX * 2).toFloat(),
+            )
+            LaunchedEffect(offsetTenths) {
+                offsetSliderState.value = (offsetTenths + LYRICS_OFFSET_TENTHS_MAX).toFloat()
+            }
+            Slider(
+                state = offsetSliderState,
                 onValueChange = { raw ->
                     LyricsOptions.setTranscriptOffsetTenths(
                         context,
@@ -3751,8 +3786,6 @@ private fun TranscriptShortcutSheet(onDismiss: () -> Unit) {
                         )
                     )
                 },
-                valueRange = 0f..(LYRICS_OFFSET_TENTHS_MAX * 2).toFloat(),
-                steps = LYRICS_OFFSET_TENTHS_MAX * 2 - 1,
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -3804,7 +3837,7 @@ private fun NowPlayingEpisodeCommentsCard(
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
-    var draft by remember { mutableStateOf("") }
+    val draftState = rememberTextFieldState("")
     var posting by remember { mutableStateOf(false) }
     val replyStates = remember { mutableStateMapOf<String, CommentReplyState>() }
     val reactionViews = remember { mutableStateMapOf<String, ReactionViewState>() }
@@ -4027,9 +4060,8 @@ private fun NowPlayingEpisodeCommentsCard(
                     horizontalArrangement = Arrangement.spacedBy(EncoreSpacers.Tighter4)
                 ) {
                     androidx.compose.foundation.text.BasicTextField(
-                        value = draft,
-                        onValueChange = { draft = it.take(280) },
-                        singleLine = false,
+                        state = draftState,
+                        inputTransformation = InputTransformation.maxLengthTrim(280),
                         textStyle = EncoreTheme.typography.bodyMedium.copy(color = Color.White),
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(EncoreColors.Green),
                         modifier = Modifier
@@ -4037,9 +4069,9 @@ private fun NowPlayingEpisodeCommentsCard(
                             .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
                             .background(EncoreColors.PureBlack.copy(alpha = 0.3f))
                             .padding(horizontal = 12.dp, vertical = 10.dp),
-                        decorationBox = { inner ->
+                        decorator = TextFieldDecorator { inner ->
                             Box(modifier = Modifier.heightIn(min = 20.dp)) {
-                                if (draft.isEmpty()) {
+                                if (draftState.text.isEmpty()) {
                                     androidx.compose.material3.Text(
                                         text = stringResource(R.string.write_a_comment),
                                         style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary)
@@ -4055,16 +4087,16 @@ private fun NowPlayingEpisodeCommentsCard(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(if (draft.isBlank() || posting) EncoreColors.PureBlack.copy(alpha = 0.3f) else EncoreColors.Green)
-                            .clickable(enabled = draft.isNotBlank() && !posting) {
-                                val text = draft.trim()
+                            .background(if (draftState.text.isBlank() || posting) EncoreColors.PureBlack.copy(alpha = 0.3f) else EncoreColors.Green)
+                            .clickable(enabled = draftState.text.isNotBlank() && !posting) {
+                                val text = draftState.text.toString().trim()
                                 if (text.isEmpty()) return@clickable
                                 posting = true
                                 scope.launch {
                                     val ok = onPostComment(text)
                                     posting = false
                                     if (ok) {
-                                        draft = ""
+                                        draftState.clearText()
                                         onRefresh()
                                     }
                                 }
@@ -4081,7 +4113,7 @@ private fun NowPlayingEpisodeCommentsCard(
                             Icon(
                                 painter = painterResource(id = R.drawable.encore_icon_arrow_up_24),
                                 contentDescription = stringResource(R.string.post_comment),
-                                tint = if (draft.isBlank()) EncoreColors.TextSecondary else Color.White,
+                                tint = if (draftState.text.isBlank()) EncoreColors.TextSecondary else Color.White,
                                 modifier = Modifier.size(18.dp)
                             )
                         }

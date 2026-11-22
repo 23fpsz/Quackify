@@ -11,7 +11,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -19,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.dp
 import java.util.Random
 import kotlin.math.PI
 import kotlin.math.sin
@@ -163,32 +163,22 @@ internal fun Modifier.deepFeelLineGlow(
         val breathe = phases.breathe.value
         val sweep = phases.sweep.value
         val pulse = sin(breathe * PI.toFloat())
-        val core = Offset(
-            w * 0.5f + w * 0.07f * sin(DEEP_FEEL_TAU * sweep),
-            h * 0.5f + h * 0.16f * sin(DEEP_FEEL_TAU * sweep * 2f + 1.7f)
+        // Full-bleed rectangle: no rounded corners, spanning the whole
+        // screen width and the entire active line plus its translation,
+        // with a 3dp cushion above and below the text block.
+        val pad = 3.dp.toPx()
+        val core = (0.5f + 0.07f * sin(DEEP_FEEL_TAU * sweep)).coerceIn(0.08f, 0.92f)
+        val wash = Brush.horizontalGradient(
+            0.0f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse),
+            (core * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
+            core to palette.base.copy(alpha = 0.38f + 0.11f * pulse),
+            (core + (1f - core) * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
+            1.0f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse)
         )
-        val halo = w * 0.46f
-        drawCircle(
-            brush = Brush.radialGradient(
-                0.0f to palette.accent.copy(alpha = 0.13f + 0.07f * pulse),
-                1.0f to palette.accent.copy(alpha = 0f),
-                center = core,
-                radius = halo
-            ),
-            center = core,
-            radius = halo,
-            alpha = progress
-        )
-        drawRoundRect(
-            brush = Brush.radialGradient(
-                0.0f to palette.base.copy(alpha = 0.34f + 0.10f * pulse),
-                0.5f to palette.accent.copy(alpha = 0.19f + 0.05f * pulse),
-                1.0f to palette.accent.copy(alpha = 0f),
-                center = core,
-                radius = w * 0.60f
-            ),
-            size = Size(w, h),
-            cornerRadius = CornerRadius(h * 0.5f),
+        drawRect(
+            brush = wash,
+            topLeft = Offset(0f, -pad),
+            size = Size(w, h + pad * 2f),
             alpha = progress
         )
     }
