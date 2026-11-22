@@ -51,7 +51,6 @@
     <string name="remove_account_message_suffix">" akan dihapus dan dikeluarkan dari perangkat ini. Kamu bisa masuk kembali kapan saja untuk menambahkannya lagi."</string>
     <string name="accounts">Akun</string>
     <string name="active_device">Perangkat aktif</string>
-</resources>
 <string name="add">Tambah</string>
 <string name="add_account">Tambah akun</string>
 <string name="add_contributor">Tambah kontributor</string>
