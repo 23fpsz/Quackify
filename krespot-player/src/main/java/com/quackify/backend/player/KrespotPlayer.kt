@@ -924,9 +924,12 @@ class KrespotPlayer(private val context: Context) {
                                     if (id == generation) play(waiting, spclient)
                                 }
                             } else if (refusedSource != null) {
-                                log.w("the licence is rate limited, keeping format ${refusedSource.format}")
-                                licencePending = waiting
-                                licenceFrom = if (movedTo) 0L else fromMs
+                                val from = if (movedTo) 0L else player?.currentPositionMs ?: 0L
+                                if (!divertToAlternate(waiting, from)) {
+                                    log.w("the licence is rate limited, keeping format ${refusedSource.format}")
+                                    licencePending = waiting
+                                    licenceFrom = if (movedTo) 0L else fromMs
+                                }
                             } else if (LicenseGate.remainingMs() > 0L) {
                                 val from = if (movedTo) 0L else player?.currentPositionMs ?: 0L
                                 if (!divertToAlternate(waiting, from)) {
