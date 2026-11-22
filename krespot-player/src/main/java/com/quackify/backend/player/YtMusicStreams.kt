@@ -15,13 +15,17 @@ private const val MUSIC_HOST = "https://music.youtube.com/youtubei/v1"
 
 private const val VIDEO_HOST = "https://www.youtube.com/youtubei/v1"
 
+private const val GAPIS_HOST = "https://youtubei.googleapis.com/youtubei/v1"
+
 private const val SEARCH_SONGS = "EgWKAQIIAWoKEAkQChAFEAMQBA=="
 
 private const val WEB_REMIX_VERSION = "1.20250101.01.00"
 
-private const val WWW_ORIGIN = "https://www.youtube.com"
-
 private const val MUSIC_ORIGIN = "https://music.youtube.com"
+
+/** The content playback nonce alphabet the device clients mint nonces from. */
+private const val NONCE_ALPHABET =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
 private const val PROBE_BYTES = 16 * 1024
 
@@ -59,6 +63,23 @@ private class YtClient(
     val webFamily: Boolean = false,
     /** Cobalt-style TV clients announce their own user agent in the context. */
     val uaInContext: Boolean = false,
+    /**
+     * Device clients that ride the googleapis gateway: their player endpoint
+     * takes the video id and a content playback nonce as query params.
+     */
+    val gapis: Boolean = false,
+    /**
+     * Whether the client can carry a po token. The googleapis gateway serves
+     * the visionos player without any attestation at all.
+     */
+    val usesAtt: Boolean = true,
+    val apiFormat: String = "",
+    val clientScreen: String = "",
+    val platform: String = "",
+    val deviceMake: String = "",
+    val deviceModel: String = "",
+    val osName: String = "",
+    val osVersion: String = "",
 ) {
 
     fun context(visitorData: String): JSONObject {
@@ -69,6 +90,12 @@ private class YtClient(
             .put("gl", "US")
         if (androidSdk > 0) client.put("androidSdkVersion", androidSdk)
         if (uaInContext) client.put("userAgent", userAgent)
+        if (clientScreen.isNotBlank()) client.put("clientScreen", clientScreen)
+        if (platform.isNotBlank()) client.put("platform", platform)
+        if (deviceMake.isNotBlank()) client.put("deviceMake", deviceMake)
+        if (deviceModel.isNotBlank()) client.put("deviceModel", deviceModel)
+        if (osName.isNotBlank()) client.put("osName", osName)
+        if (osVersion.isNotBlank()) client.put("osVersion", osVersion)
         if (visitorData.isNotBlank()) client.put("visitorData", visitorData)
         return JSONObject().put("client", client)
     }
@@ -87,6 +114,7 @@ private class YtClient(
             headers["Origin"] = origin
             headers["Referer"] = "$origin/"
         }
+        if (apiFormat.isNotBlank()) headers["X-Goog-Api-Format-Version"] = apiFormat
         if (webFamily) {
             headers["X-Goog-Api-Format-Version"] = "1"
             if (origin.isNotBlank()) headers["X-Origin"] = origin
@@ -106,15 +134,38 @@ private class YtClient(
 }
 
 private val CLIENTS = listOf(
+    // The googleapis gateway the visionos app rides: no attestation, no
+    // signature timestamp, and the audio urls come out direct. It leads the
+    // chain so a cold resolve never has to prime the webview attestation.
     YtClient(
-        clientName = "TVHTML5",
-        clientVersion = "7.20260707.07.00",
-        userAgent = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/25.lts.30.1034943-gold " +
-                "(unlike Gecko), Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)",
-        clientNumber = "7",
-        origin = WWW_ORIGIN,
-        webFamily = true,
-        uaInContext = true,
+        clientName = "VISIONOS",
+        clientVersion = "1.04",
+        userAgent = "com.google.visionos.youtube/1.04(RealityDevice17,1; U; CPU visionOS 26_6_0 like Mac OS X; US)",
+        host = GAPIS_HOST,
+        gapis = true,
+        usesAtt = false,
+        apiFormat = "2",
+        clientScreen = "WATCH",
+        platform = "MOBILE",
+        deviceMake = "Apple",
+        deviceModel = "RealityDevice17,1",
+        osName = "visionOS",
+        osVersion = "26.6.0.23O770",
+    ),
+    // The device clients take the content-bound po token in the player request
+    // body; with it they hand out direct urls and want no token on the urls.
+    YtClient(
+        clientName = "ANDROID",
+        clientVersion = "21.26.364",
+        userAgent = "com.google.android.youtube/21.26.364 (Linux; U; Android 13) gzip",
+        clientNumber = "3",
+        androidSdk = 34,
+    ),
+    YtClient(
+        clientName = "IOS",
+        clientVersion = "21.29.1",
+        userAgent = "com.google.ios.youtube/21.29.1 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X)",
+        clientNumber = "5",
     ),
     YtClient(
         clientName = "WEB_REMIX",
@@ -135,22 +186,12 @@ private val CLIENTS = listOf(
         origin = MUSIC_ORIGIN,
         webFamily = true,
     ),
-    YtClient(
-        clientName = "ANDROID",
-        clientVersion = "21.26.364",
-        userAgent = "com.google.android.youtube/21.26.364 (Linux; U; Android 13) gzip",
-        clientNumber = "3",
-        androidSdk = 34,
-    ),
-    YtClient(
-        clientName = "IOS",
-        clientVersion = "21.29.1",
-        userAgent = "com.google.ios.youtube/21.29.1 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X)",
-        clientNumber = "5",
-    ),
 )
 
 private class YtCandidate(val videoId: String, val title: String)
+
+/** The search reply: its candidates plus the visitor the server handed out. */
+private class SearchMatch(val candidates: List<YtCandidate>, val visitorData: String)
 
 internal object YtMusicStreams {
 
@@ -160,18 +201,18 @@ internal object YtMusicStreams {
 
     suspend fun resolve(context: Context, track: CommandTrack): YtStream? {
         cached(track.uri)?.let { return it }
-        val candidates = search(track)
-        if (candidates.isEmpty()) {
+        val found = search(track)
+        if (found.candidates.isEmpty()) {
             log.w("no youtube music match for '${track.name.ifBlank { track.uri.takeLast(12) }}'")
             return null
         }
-        val ranked = candidates.sortedByDescending { candidate -> titleScore(track.name, candidate.title) }
+        val ranked = found.candidates.sortedByDescending { candidate -> titleScore(track.name, candidate.title) }
         for (candidate in ranked.take(CANDIDATES)) {
-            val stream = streamOf(context, track, candidate) ?: continue
+            val stream = streamOf(context, track, candidate, found.visitorData) ?: continue
             remember(track.uri, stream)
             return stream
         }
-        log.w("no stream for '${track.name.ifBlank { track.uri.takeLast(12) }}' after ${candidates.size} candidates")
+        log.w("no stream for '${track.name.ifBlank { track.uri.takeLast(12) }}' after ${found.candidates.size} candidates")
         return null
     }
 
@@ -193,14 +234,14 @@ internal object YtMusicStreams {
         }
     }
 
-    private suspend fun search(track: CommandTrack): List<YtCandidate> {
+    private suspend fun search(track: CommandTrack): SearchMatch {
         val query = buildString {
             append(track.name)
             if (track.artists.isNotBlank() && !track.artists.contains(track.name)) {
                 append(' ').append(track.artists)
             }
         }.trim()
-        if (query.isBlank()) return emptyList()
+        if (query.isBlank()) return SearchMatch(emptyList(), "")
         val body = JSONObject()
             .put(
                 "context",
@@ -227,13 +268,18 @@ internal object YtMusicStreams {
         val json = response?.takeIf { it.ok }?.json()
         if (json == null) {
             log.w("search failed ${response?.code ?: "no response"}")
-            return emptyList()
+            return SearchMatch(emptyList(), "")
         }
         val parsed = ArrayList<YtCandidate>()
         val seen = HashSet<String>()
         scanResults(json.opt("contents"), parsed, seen)
+        // the reply's visitor rides along: the device clients borrow it when no
+        // attestation session is around to provide one of its own
+        val visitor = json.optJSONObject("responseContext")?.text("visitorData")
+            ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
+            .orEmpty()
         log.i("search '${query.take(48)}' -> ${parsed.size} songs")
-        return parsed
+        return SearchMatch(parsed, visitor)
     }
 
     private fun scanResults(node: Any?, out: MutableList<YtCandidate>, seen: MutableSet<String>) {
@@ -277,18 +323,25 @@ internal object YtMusicStreams {
     private fun normalize(value: String): String =
         value.lowercase().replace(Regex("[^\\p{L}\\p{N}\\s]"), "").trim()
 
-    private suspend fun streamOf(context: Context, track: CommandTrack, candidate: YtCandidate): YtStream? {
+    private suspend fun streamOf(
+        context: Context,
+        track: CommandTrack,
+        candidate: YtCandidate,
+        visitor: String,
+    ): YtStream? {
         for (client in CLIENTS) {
-            val session = if (client.webFamily) PoTokenGate.session(context) else null
+            val session = if (client.usesAtt) PoTokenGate.session(context) else null
             if (client.webFamily && session == null) continue
             // The player request body carries the content-bound token (minted
             // per video); the stream urls carry the session-bound one instead.
             val contentToken = session?.let { PoTokenGate.videoToken(context, candidate.videoId) }
             val sessionToken = session?.requestToken
-            var reply = playerFormats(client, candidate.videoId, session, contentToken)
-            if (reply == null && contentToken != null && contentToken != sessionToken) {
+            val visitorData = session?.visitorData ?: visitor
+            val poToken = contentToken ?: sessionToken?.takeIf { client.webFamily }
+            var reply = playerFormats(client, candidate.videoId, visitorData, poToken)
+            if (reply == null && client.webFamily && contentToken != null && contentToken != sessionToken) {
                 // the surfaces disagree across sources; give the other binding a shot
-                reply = playerFormats(client, candidate.videoId, session, sessionToken)
+                reply = playerFormats(client, candidate.videoId, visitorData, sessionToken)
             }
             if (reply == null) continue
             if (reply.lengthSeconds > 0L && track.durationMs > 0L &&
@@ -297,24 +350,30 @@ internal object YtMusicStreams {
                 log.w("'${candidate.videoId}' is ${reply.lengthSeconds}s, the track is ${track.durationMs / 1000}s, wrong take")
                 return null
             }
+            var served = false
             for (format in orderedFormats(reply.formats)) {
                 val base = format.text("url")
                 if (base.isBlank()) continue
-                val urls = when {
-                    sessionToken == null -> listOf(base)
-                    contentToken == null -> listOf(base.withPot(sessionToken))
-                    else -> listOf(base.withPot(sessionToken), base.withPot(contentToken))
-                }
+                // the device clients want their urls bare; the web family wants
+                // the session-bound token riding the query string
+                val urls = ArrayList<String>()
+                urls.add(base)
+                if (sessionToken != null) urls.add(base.withPot(sessionToken))
+                if (contentToken != null && contentToken != sessionToken) urls.add(base.withPot(contentToken))
                 val url = urls.firstOrNull { probe(it, client.mediaHeaders()) }
                 if (url == null) {
                     log.w("itag ${format.optInt("itag")} from ${client.clientName} refused the probe")
                     continue
                 }
+                served = true
                 val bitrate = format.optInt("averageBitrate", format.optInt("bitrate", 0))
                 log.i("'${candidate.videoId}' via ${client.clientName} itag=${format.optInt("itag")} " +
                         "${format.text("mimeType")} ${bitrate}b serves"
                 )
                 return YtStream(candidate.videoId, url, bitrate, format.text("mimeType"), client.mediaHeaders())
+            }
+            if (!served) {
+                log.w("${client.clientName} offered no direct audio url for '${candidate.videoId}'")
             }
         }
         return null
@@ -323,15 +382,19 @@ internal object YtMusicStreams {
     private fun String.withPot(token: String): String =
         this + (if (contains('?')) "&" else "?") + "pot=$token"
 
+    /** A fresh content playback nonce, the device gateway's request salt. */
+    private fun nonce(): String = buildString {
+        repeat(12) { append(NONCE_ALPHABET[(0 until NONCE_ALPHABET.length).random()]) }
+    }
+
     private class PlayerReply(val lengthSeconds: Long, val formats: List<JSONObject>)
 
     private suspend fun playerFormats(
         client: YtClient,
         videoId: String,
-        session: PoTokenGate.Session?,
+        visitorData: String,
         poToken: String?,
     ): PlayerReply? {
-        val visitorData = session?.visitorData.orEmpty()
         val body = JSONObject()
             .put("context", client.context(visitorData))
             .put("videoId", videoId)
@@ -340,14 +403,22 @@ internal object YtMusicStreams {
         if (client.webFamily) {
             body.put("playbackContext", JSONObject().put("contentPlaybackContext",
                 JSONObject().put("signatureTimestamp", SignatureStamp.current())))
-            if (client.host == VIDEO_HOST) body.put("videoCheckOk", true)
-            if (session != null) {
-                body.put("serviceIntegrityDimensions",
-                    JSONObject().put("poToken", poToken ?: session.requestToken))
-            }
+        }
+        if (poToken != null) {
+            body.put("serviceIntegrityDimensions",
+                JSONObject().put("poToken", poToken))
+        }
+        val endpoint = if (client.gapis) {
+            // the googleapis gateway wants the video id and a fresh playback
+            // nonce up front, both as query params and in the body
+            val nonce = nonce()
+            body.put("cpn", nonce)
+            "${client.host}/player?prettyPrint=false&t=$nonce&id=$videoId"
+        } else {
+            "${client.host}/player?prettyPrint=false"
         }
         val response = Net.postJson(
-            "${client.host}/player?prettyPrint=false",
+            endpoint,
             body.toString(),
             client.requestHeaders(visitorData),
             tag = "ytm-player",
