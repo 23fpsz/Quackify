@@ -295,7 +295,11 @@ internal class VideoEngine(
             } catch (failure: Throwable) {
                 log.w("video drm prewarm failed ${failure.javaClass.simpleName}: ${failure.message}")
             } finally {
-                runCatching { drm.release() }
+                // close() only exists from API 28; release() is its pre-P spelling.
+                @Suppress("DEPRECATION")
+                runCatching {
+                    if (android.os.Build.VERSION.SDK_INT >= 28) drm.close() else drm.release()
+                }
             }
         }
     }
