@@ -986,7 +986,7 @@ class KrespotPlayer(private val context: Context) {
                             if (parkedAt > 0L) divertTransport(track, StreamSource.YT_MUSIC, id, parkedAt)
                         }
                     }
-                }, stream.headers, if (parked >= 0L) parked else fromMs, context.cacheDir)
+                }, stream.headers, if (parked >= 0L) parked else fromMs, context.cacheDir, stream.head, stream.total)
                 mp3 = player
                 player.run()
             } catch (cancellation: CancellationException) {

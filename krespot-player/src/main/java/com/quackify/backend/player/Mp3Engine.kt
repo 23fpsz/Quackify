@@ -44,6 +44,8 @@ internal class Mp3Engine(
     private val headers: Map<String, String> = mapOf("referer" to "https://open.spotify.com/"),
     private val startAtMs: Long = 0L,
     private val cacheDir: File? = null,
+    private val seed: ByteArray? = null,
+    private val seedTotal: Long = 0L,
 ) {
 
     @Volatile
@@ -112,7 +114,7 @@ internal class Mp3Engine(
      */
     private suspend fun openSource(): MediaDataSource? {
         val streamed = cacheDir?.let { dir ->
-            runCatching { StreamBuffer.open(url, headers, dir, "ad") }.getOrNull()
+            runCatching { StreamBuffer.open(url, headers, dir, "ad", seed, seedTotal) }.getOrNull()
         }
         if (streamed != null) return streamed
         val whole = Net.blob(url, headers, tag = "ad").also {
