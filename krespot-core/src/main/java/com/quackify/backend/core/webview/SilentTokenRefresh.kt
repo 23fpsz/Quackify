@@ -218,7 +218,6 @@ object SilentTokenRefresh {
         web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            databaseEnabled = true
             userAgentString = Net.DESKTOP_UA
         }
         web.webViewClient = object : WebViewClient() {
