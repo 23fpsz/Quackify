@@ -13,6 +13,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -66,6 +67,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.style.TextAlign
 import androidx.core.content.pm.PackageInfoCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -231,6 +236,9 @@ fun SettingsScreen(
     var playerButtonsSheetOpen by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf<Int?>(null) }
     var spDcDialogOpen by remember { mutableStateOf(false) }
+    // Holds the sp_dc that could not be checked while the user decides
+    // whether to keep it anyway; blank when no decision is pending.
+    var spDcUnchecked by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val disableDebug = {
         debugUnlocked = false
@@ -1004,27 +1012,173 @@ fun SettingsScreen(
             val spDc = value.trim().removePrefix("sp_dc=").substringBefore(";").trim()
             if (spDc.isNotBlank()) {
                 scope.launch {
-                    val token = EncoreAuth.fetchToken(context, spDc)
-                    val account = token?.let { EncoreAuth.fetchAccount(it) }
-                    if (account != null) {
-                        val cookies = JSONObject()
-                            .put("https://open.spotify.com", "sp_dc=$spDc")
-                            .toString()
-                        EncoreAuth.saveLogin(context, cookies, account)
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.sp_dc_signed_in, account.name),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        onSpDcSignedIn()
-                    } else {
-                        Toast.makeText(context, R.string.sp_dc_rejected, Toast.LENGTH_SHORT).show()
+                    when (val outcome = EncoreAuth.fetchSpDcOutcome(context, spDc)) {
+                        is EncoreAuth.SpDcOutcome.Ok -> {
+                            val cookies = JSONObject()
+                                .put("https://open.spotify.com", "sp_dc=$spDc")
+                                .toString()
+                            EncoreAuth.saveLogin(context, cookies, outcome.account)
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.sp_dc_signed_in, outcome.account.name),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            onSpDcSignedIn()
+                        }
+                        // The server could not be reached to vouch for the
+                        // cookie, so the user decides: keep it and let the
+                        // profile fill in later, or drop it and try again
+                        // once the network is back.
+                        EncoreAuth.SpDcOutcome.FetchFailed -> spDcUnchecked = spDc
+                        EncoreAuth.SpDcOutcome.Rejected ->
+                            Toast.makeText(context, R.string.sp_dc_rejected, Toast.LENGTH_SHORT).show()
                     }
                 }
             }
         },
         onDismiss = { spDcDialogOpen = false }
     )
+
+    SpDcUncheckedConfirmDialog(
+        spDc = spDcUnchecked,
+        onConfirm = {
+            val spDc = spDcUnchecked
+            spDcUnchecked = null
+            if (spDc.isNullOrBlank()) return@SpDcUncheckedConfirmDialog
+            scope.launch {
+                val cookies = JSONObject()
+                    .put("https://open.spotify.com", "sp_dc=$spDc")
+                    .toString()
+                // The profile endpoints never answered, so there is nothing
+                // to show yet; the account resolves and persists itself the
+                // first time the app talks to Spotify with this session.
+                EncoreAuth.saveLogin(
+                    context,
+                    cookies,
+                    EncoreAuth.Account(name = context.getString(R.string.sp_dc_pending_name))
+                )
+                Toast.makeText(context, R.string.sp_dc_signed_in_unchecked, Toast.LENGTH_SHORT).show()
+                onSpDcSignedIn()
+            }
+        },
+        onDismiss = { spDcUnchecked = null }
+    )
+}
+
+/**
+ * The sp_dc could not be verified because the check itself failed — offline,
+ * timeout, server hiccup. Presented in the same cinematic language as the
+ * sp_dc entry dialog it follows: the gradient canvas, the centered message,
+ * and two pill buttons — "keep it anyway" in the signature green, cancel
+ * quiet in white. The cookie is only as good as the user's confidence, so
+ * the choice belongs to them, not to a silent failure toast.
+ */
+@Composable
+private fun SpDcUncheckedConfirmDialog(
+    spDc: String?,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (spDc.isNullOrBlank()) return
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF5A5A5A),
+                            Color(0xFF242424),
+                            Color(0xFF121212)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {} // block outside clicks
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.sp_dc_check_failed_title),
+                    style = EncoreTheme.typography.titleLarge.copy(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = stringResource(R.string.sp_dc_check_failed_body),
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        color = Color.White.copy(alpha = 0.75f),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .clickable(onClick = onDismiss)
+                            .padding(horizontal = 28.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.cancel),
+                            style = EncoreTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(EncoreColors.Green)
+                            .clickable(onClick = onConfirm)
+                            .padding(horizontal = 32.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.sp_dc_keep_anyway),
+                            style = EncoreTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black,
+                                fontSize = 14.sp
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 private const val GITHUB_URL = "https://github.com/23fpsz/Quackify"

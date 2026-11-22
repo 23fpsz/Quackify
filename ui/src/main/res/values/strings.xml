@@ -352,6 +352,11 @@
     <string name="sign_in_with_sp_dc_subtitle">Paste a sp_dc cookie value to skip the web login</string>
     <string name="sp_dc_rejected">That sp_dc did not sign in</string>
     <string name="sp_dc_signed_in">Signed in as %1$s</string>
+    <string name="sp_dc_check_failed_title">Couldn\'t check this sp_dc</string>
+    <string name="sp_dc_check_failed_body">Spotify could not be reached to verify the cookie, so it is untested. You can keep it and the profile will fill in later, or cancel and try again when the connection is back.</string>
+    <string name="sp_dc_keep_anyway">Keep it anyway</string>
+    <string name="sp_dc_signed_in_unchecked">Signed in — the profile will sync when the connection is back</string>
+    <string name="sp_dc_pending_name">Sp_dc account</string>
     <string name="singles_and_eps">Singles &amp; EPs</string>
     <string name="sleep_timer">Sleep timer</string>
     <string name="sleep_timer_custom">Custom</string>
