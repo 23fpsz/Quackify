@@ -12,9 +12,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
@@ -175,35 +179,58 @@ internal fun Modifier.deepFeelLineGlow(
         // middle stays at full strength so the active line itself never dims.
         val fadeSpan = (bandHeight * 0.34f).coerceAtLeast(1f)
         val core = (0.5f + 0.07f * sin(DEEP_FEEL_TAU * sweep)).coerceIn(0.08f, 0.92f)
-        // Painted in horizontal slices: every slice gets the horizontal
-        // colour wash, multiplied by a vertical ramp that eases out toward
-        // both edges of the band — that product is what blends the
-        // highlight into the background on all four sides.
-        val steps = 24
-        val slice = bandHeight / steps
-        for (step in 0 until steps) {
-            val top = bandTop + slice * step
-            val fromEdge = minOf(top - bandTop, bandBottom - (top + slice))
-            val fade = (fromEdge / fadeSpan).coerceIn(0f, 1f)
-            // Smoothstep: a straight linear ramp still shows a visible
-            // shoulder where it reaches full strength.
-            val eased = fade * fade * (3f - 2f * fade)
-            if (eased <= 0.01f) continue
-            val wash = Brush.horizontalGradient(
-                0.0f to palette.accent.copy(alpha = 0f),
-                0.06f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse),
-                (core * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
-                core to palette.base.copy(alpha = 0.38f + 0.11f * pulse),
-                (core + (1f - core) * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
-                0.94f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse),
-                1.0f to palette.accent.copy(alpha = 0f)
-            )
+        // Painted as ONE rect, then faded at the edges by masking the same
+        // layer with a vertical alpha ramp. The band was once sliced into
+        // stacked rects and the seams between slices — each painted twice
+        // where they overlapped — showed up as faint white hairlines
+        // cutting the highlight into little boxes; one surface, one mask,
+        // and the band is seamless.
+        val wash = Brush.horizontalGradient(
+            0.0f to palette.accent.copy(alpha = 0f),
+            0.06f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse),
+            (core * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
+            core to palette.base.copy(alpha = 0.38f + 0.11f * pulse),
+            (core + (1f - core) * 0.5f) to palette.base.copy(alpha = 0.30f + 0.09f * pulse),
+            0.94f to palette.accent.copy(alpha = 0.10f + 0.04f * pulse),
+            1.0f to palette.accent.copy(alpha = 0f)
+        )
+        val bandRect = Rect(0f, bandTop, w, bandBottom)
+        // The vertical fade as a piecewise-linear smoothstep: full strength
+        // through the middle, easing out over the fade span at both edges —
+        // the same eased shape the sliced version had, minus the seams.
+        val fadeFraction = (fadeSpan / bandHeight).coerceIn(0.02f, 0.49f)
+        val maskBrush = Brush.verticalGradient(
+            0.0f to Color.Transparent,
+            (fadeFraction * 0.25f) to Color.White.copy(alpha = 0.16f),
+            (fadeFraction * 0.5f) to Color.White.copy(alpha = 0.5f),
+            (fadeFraction * 0.75f) to Color.White.copy(alpha = 0.84f),
+            fadeFraction to Color.White,
+            (1f - fadeFraction) to Color.White,
+            (1f - fadeFraction * 0.75f) to Color.White.copy(alpha = 0.84f),
+            (1f - fadeFraction * 0.5f) to Color.White.copy(alpha = 0.5f),
+            (1f - fadeFraction * 0.25f) to Color.White.copy(alpha = 0.16f),
+            1.0f to Color.Transparent,
+            startY = bandTop,
+            endY = bandBottom
+        )
+        drawIntoCanvas { canvas ->
+            canvas.saveLayer(bandRect, Paint())
             drawRect(
                 brush = wash,
-                topLeft = Offset(0f, top),
-                size = Size(w, slice + 0.5f),
-                alpha = progress * eased
+                topLeft = Offset(0f, bandTop),
+                size = Size(w, bandHeight),
+                alpha = progress
             )
+            // DstIn multiplies the layer's alpha by the mask, dissolving
+            // the band's top and bottom edges into the backdrop in one
+            // continuous surface.
+            drawRect(
+                brush = maskBrush,
+                topLeft = Offset(0f, bandTop),
+                size = Size(w, bandHeight),
+                blendMode = BlendMode.DstIn
+            )
+            canvas.restore()
         }
     }
 }
