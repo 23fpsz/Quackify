@@ -126,6 +126,10 @@ data class ComposePlaybackState(
     val isEnhanced: Boolean = false,
     val connectedDevice: String = "",
     val trackUri: String = "",
+    /** Which catalogue is serving the audio right now, as a [com.quackify.backend.core.store.StreamSource] key. */
+    val streamSource: String = "",
+    /** The YouTube video the audio streams from, when the source is YouTube Music. */
+    val videoId: String = "",
     val artistUri: String = "",
     /** Every credited artist's uri on the playing track, in display order. */
     val artistUris: List<String> = emptyList(),

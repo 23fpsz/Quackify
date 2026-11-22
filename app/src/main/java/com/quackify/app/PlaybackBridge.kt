@@ -1116,6 +1116,8 @@ class PlaybackBridge(private val context: Context) {
                             else -> state.coverUrl
                         },
                         trackUri = if (engineOwns) engineUri else state.trackUri,
+                        streamSource = if (engineOwns) playing.source.key else state.streamSource,
+                        videoId = if (engineOwns) playing.videoId else state.videoId,
                         artistUri = if (engineOwns && engineUri != state.trackUri) {
                             candidate?.artistUri?.takeIf { it.isNotBlank() } ?: artistUriOf(engineUri)
                         } else state.artistUri,
@@ -1128,6 +1130,8 @@ class PlaybackBridge(private val context: Context) {
                         isBuffering = if (engineOwns) playing.buffering else false,
                     )
                     val identityChanged = next.trackUri != state.trackUri ||
+                        next.streamSource != state.streamSource ||
+                        next.videoId != state.videoId ||
                         next.title != state.title || next.artist != state.artist ||
                         next.coverUrl != state.coverUrl || next.artistUri != state.artistUri ||
                         next.albumUri != state.albumUri || next.isPlaying != state.isPlaying ||
