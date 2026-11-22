@@ -261,7 +261,7 @@ object MusixmatchSource {
             .apply { if (cookie != null) header("Cookie", cookie) }
             .build()
         client.newCall(request).execute().use { response: okhttp3.Response ->
-            if (response.isSuccessful) response.body?.string() else null
+            if (response.isSuccessful) response.body.string() else null
         }
     }.getOrNull()
 
