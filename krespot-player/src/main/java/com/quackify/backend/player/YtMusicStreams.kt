@@ -42,6 +42,67 @@ private const val STREAM_CACHE = 8
 
 private const val URL_TTL_MS = 15 * 60_000L
 
+private const val CREDIT_EXACT = 40
+
+private const val CREDIT_SHARED = 15
+
+private const val LENGTH_TIGHT = 30
+
+private const val LENGTH_CLOSE = 10
+
+/** Past this many seconds of drift the candidate is a different take. */
+private const val LENGTH_LIMIT_SECONDS = 30L
+
+private const val LENGTH_VETO = -1_000
+
+private val ARTIST_SEPARATORS = Regex(
+    """\s*(?:,|&|;|/|\s+and\s+|\s+x\s+|\s+with\s+|\s+feat\.?\s+|\s+ft\.?\s+)\s*""",
+    RegexOption.IGNORE_CASE,
+)
+
+private val TYPE_LABELS = setOf("song", "video", "album", "single", "ep", "artist")
+
+private val DURATION = Regex("""(\d+):(\d{2})""")
+
+private val BRACKETED = Regex("""[(\[]([^()\[\]]*)[)\]]""")
+
+private val FEATURING = Regex("""\b(feat|ft|featuring|with)\b.*""")
+
+private val NON_ALNUM = Regex("""[^\p{L}\p{N}]""")
+
+private val WHITESPACE = Regex("""\s+""")
+
+private val VERSION_WORDS = setOf(
+    "remix", "rmx", "refix", "flip", "bootleg", "mashup", "medley", "live",
+    "concert", "unplugged", "acoustic", "instrumental", "karaoke", "vocals",
+    "vocal", "acapella", "acappella", "backing", "stems", "stem", "cover",
+    "demo", "reprise", "remake", "rework", "extended", "edit", "version",
+    "mix", "dub", "vip", "session", "sessions", "sped", "slowed", "reverb",
+    "nightcore", "lofi", "orchestral", "symphonic", "part", "pt", "chapter",
+)
+
+private val NEUTRAL_SEGMENTS = setOf(
+    "albumversion", "originalversion", "originalmix", "singleversion",
+    "radioversion", "radioedit", "stereoversion", "monoversion",
+    "studioversion", "fullversion", "standardversion", "explicitversion",
+    "deluxeversion", "originaltrack",
+)
+
+private val TRAILING_TAKES = setOf(
+    "instrumental", "karaoke", "acapella", "acappella", "remix", "rmx", "nightcore",
+)
+
+private val TRAILING_NOISE = setOf(
+    "song", "songs", "video", "audio", "lyrics", "lyric", "official", "full",
+    "hd", "hq", "4k", "mp3", "ost", "soundtrack",
+)
+
+private fun artistNames(credit: String): List<String> =
+    credit.split(ARTIST_SEPARATORS)
+        .map { it.trim().lowercase().replace(NON_ALNUM, "") }
+        .filter { it.length > 1 }
+        .distinct()
+
 data class YtStream(
     val videoId: String,
     val url: String,
@@ -193,7 +254,25 @@ private val CLIENTS = listOf(
     ),
 )
 
-private class YtCandidate(val videoId: String, val title: String)
+private class YtCandidate(
+    val videoId: String,
+    val title: String,
+    val subtitle: String = "",
+    val squareArt: Boolean = true,
+) {
+    val artists: List<String> by lazy { subtitleArtists() }
+
+    val durationSeconds: Long by lazy {
+        subtitle.split('•').lastOrNull()?.trim()?.let(DURATION::matchEntire)?.groupValues
+            ?.getOrNull(1)?.toLongOrNull() ?: 0L
+    }
+
+    private fun subtitleArtists(): List<String> =
+        subtitle.split('•').firstOrNull()?.trim().orEmpty()
+            .split(ARTIST_SEPARATORS)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it !in TYPE_LABELS }
+}
 
 /** A match that served before: the video it landed on and the visitor the search that found it rode. */
 private class VideoMatch(val videoId: String, val visitor: String)
@@ -224,7 +303,10 @@ internal object YtMusicStreams {
             log.w("no youtube music match for '${track.name.ifBlank { track.uri.takeLast(12) }}'")
             return null
         }
-        val ranked = found.candidates.sortedByDescending { candidate -> titleScore(track.name, candidate.title) }
+        val ranked = officialRank(track, found.candidates).ifEmpty {
+            log.w("no official audio candidate for '${track.name.ifBlank { track.uri.takeLast(12) }}'")
+            return null
+        }
         for (candidate in ranked.take(CANDIDATES)) {
             val stream = streamOf(context, track, candidate, found.visitorData) ?: continue
             remember(track.uri, stream)
@@ -233,6 +315,88 @@ internal object YtMusicStreams {
         }
         log.w("no stream for '${track.name.ifBlank { track.uri.takeLast(12) }}' after ${found.candidates.size} candidates")
         return null
+    }
+
+    /**
+     * The catalogue's own audio for the track: a song row, the same take, the
+     * same credit. A music video, a cover by another artist or a sped-up edit
+     * is dropped rather than streamed, so the audio lines up with the Spotify
+     * master the queue asked for.
+     */
+    private fun officialRank(track: CommandTrack, candidates: List<YtCandidate>): List<YtCandidate> {
+        val wanted = TitleParts.of(track.name)
+        val wantedArtists = artistNames(track.artists)
+        return candidates.mapNotNull { candidate ->
+            if (!candidate.squareArt) return@mapNotNull null
+            val have = TitleParts.of(candidate.title)
+            if (have.core.isBlank() || wanted.core.isBlank()) return@mapNotNull null
+            if (!titlesMatch(wanted, have)) return@mapNotNull null
+            if (wanted.versions != have.versions) return@mapNotNull null
+            val credit = creditScore(wantedArtists, candidate.artists) ?: return@mapNotNull null
+            val length = lengthScore(track.durationMs / 1000, candidate.durationSeconds)
+            candidate to (credit + length)
+        }.sortedByDescending { it.second }.map { it.first }
+    }
+
+    private fun titlesMatch(wanted: TitleParts, have: TitleParts): Boolean {
+        if (wanted.core == have.core) return true
+        if (wanted.core.length <= 3 || have.core.length <= 3) return false
+        return wanted.core.contains(have.core) || have.core.contains(wanted.core)
+    }
+
+    private fun creditScore(wanted: List<String>, have: List<String>): Int? {
+        if (wanted.isEmpty() || have.isEmpty()) return 0
+        val shared = wanted.any { w -> have.any { h -> w == h || w.contains(h) || h.contains(w) } }
+        if (!shared) return null
+        return if (wanted == have) CREDIT_EXACT else CREDIT_SHARED
+    }
+
+    private fun lengthScore(wantedSec: Long, haveSec: Long): Int = when {
+        wantedSec <= 0L || haveSec <= 0L -> 0
+        else -> when (val drift = kotlin.math.abs(wantedSec - haveSec)) {
+            in 0..3 -> LENGTH_TIGHT
+            in 4..10 -> LENGTH_CLOSE
+            else -> if (drift > LENGTH_LIMIT_SECONDS) LENGTH_VETO else 0
+        }
+    }
+
+    private class TitleParts private constructor(val core: String, val versions: Set<String>) {
+
+        companion object {
+            fun of(raw: String): TitleParts {
+                var text = raw.lowercase().replace(Regex("[\"“”‘’]"), " ")
+                val versions = sortedSetOf<String>()
+                repeat(3) {
+                    text = text.replace(BRACKETED) { match ->
+                        classify(match.groupValues[1], versions)
+                        " "
+                    }
+                }
+                text = text.replace(FEATURING, " ")
+                var words = text.split(WHITESPACE)
+                    .map { it.replace(NON_ALNUM, "") }
+                    .filter { it.isNotEmpty() }
+                while (words.size > 1) {
+                    val last = words.last()
+                    if (last in TRAILING_TAKES) {
+                        versions += last
+                        words = words.dropLast(1)
+                    } else if (last in TRAILING_NOISE) {
+                        words = words.dropLast(1)
+                    } else break
+                }
+                return TitleParts(words.joinToString(""), versions)
+            }
+
+            private fun classify(segment: String, versions: MutableSet<String>) {
+                val words = segment.split(WHITESPACE)
+                    .map { it.replace(NON_ALNUM, "") }
+                    .filter { it.isNotEmpty() }
+                if (words.isEmpty() || words.joinToString("") in NEUTRAL_SEGMENTS) return
+                val marks = words.filter { it in VERSION_WORDS }
+                if (marks.isNotEmpty()) versions += marks
+            }
+        }
     }
 
     private fun cached(trackUri: String): YtStream? = synchronized(streamFor) {
@@ -344,13 +508,31 @@ internal object YtMusicStreams {
                     val videoId = item.optJSONObject("playlistItemData")?.text("videoId").orEmpty()
                     if (videoId.isNotBlank() && seen.add(videoId)) {
                         val title = columnText(item.optJSONArray("flexColumns"), 0)
-                        out.add(YtCandidate(videoId, title))
+                        val subtitle = columnText(item.optJSONArray("flexColumns"), 1)
+                        out.add(YtCandidate(videoId, title, subtitle, squareArt(item)))
                     }
                 }
                 for (key in node.keys()) scanResults(node.opt(key), out, seen)
             }
             is JSONArray -> for (index in 0 until node.length()) scanResults(node.opt(index), out, seen)
         }
+    }
+
+    /**
+     * Catalogue songs ship square album art; a music-video upload ships a
+     * widescreen still. Missing dimensions count as square so a row is never
+     * dropped over a field YouTube left out.
+     */
+    private fun squareArt(item: JSONObject): Boolean {
+        val thumbs = item.optJSONObject("thumbnail")
+            ?.optJSONObject("musicThumbnailRenderer")
+            ?.optJSONObject("thumbnail")
+            ?.optJSONArray("thumbnails")
+        val last = thumbs?.optJSONObject(thumbs.length() - 1) ?: return true
+        val width = last.text("width").toDoubleOrNull() ?: return true
+        val height = last.text("height").toDoubleOrNull() ?: return true
+        if (width <= 0.0 || height <= 0.0) return true
+        return width / height in 0.85..1.15
     }
 
     private fun columnText(columns: JSONArray?, index: Int): String {
@@ -362,20 +544,8 @@ internal object YtMusicStreams {
         val parts = (0 until column.length()).mapNotNull { index ->
             column.optJSONObject(index)?.text("text").orEmpty().takeIf { it.isNotBlank() }
         }
-        return parts.joinToString(" ").replace(Regex("\\s*•\\s*"), " ").trim()
+        return parts.joinToString(" ").replace(Regex("\\s*•\\s*"), " • ").trim()
     }
-
-    private fun titleScore(trackName: String, candidateTitle: String): Int {
-        val wanted = normalize(trackName)
-        val have = normalize(candidateTitle)
-        if (wanted.isBlank() || have.isBlank()) return 0
-        if (wanted == have) return 3
-        if (have.contains(wanted) || wanted.contains(have)) return 2
-        return 0
-    }
-
-    private fun normalize(value: String): String =
-        value.lowercase().replace(Regex("[^\\p{L}\\p{N}\\s]"), "").trim()
 
     private suspend fun streamOf(
         context: Context,
