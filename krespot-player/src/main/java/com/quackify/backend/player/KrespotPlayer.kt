@@ -301,6 +301,9 @@ class KrespotPlayer(private val context: Context) {
     @Volatile
     private var queuedGainDb = 0.0
 
+    @Volatile
+    private var playingTrack: CommandTrack? = null
+
     private val queueTicket = java.util.concurrent.atomic.AtomicLong(0L)
 
     /**
@@ -852,6 +855,7 @@ class KrespotPlayer(private val context: Context) {
         }
         val id = ++generation
         pendingPause = false
+        playingTrack = track
         queuedNextUri = ""
         queuedNextTrack = null
         _state.value = PlayerState(
@@ -905,7 +909,8 @@ class KrespotPlayer(private val context: Context) {
                 val totalMs = source.seektable.totalDuration * 1000L / source.seektable.timescale
                 val sink: (PlayerEvent) -> Unit = { event ->
                     if (id == generation) {
-                        val failed = (event as? PlayerEvent.Failed)?.message
+                        val failedEvent = event as? PlayerEvent.Failed
+                        val failed = failedEvent?.message
                             ?.takeIf { it.contains("DRM_LICENSE_ACQUISITION_FAILED") }
                         if (failed != null) {
                             // A queued track may already have taken the slot by
@@ -913,25 +918,31 @@ class KrespotPlayer(private val context: Context) {
                             // back refused; retrying the stale track would loop
                             // the same two rows, so whatever is waiting is the
                             // one to keep.
-                            val movedTo = _state.value.trackUri == queuedNextUri
-                            val waiting = if (movedTo) queuedNextTrack ?: track else track
+                            val queued = queuedNextTrack
+                            val liveUri = player?.currentUri.orEmpty().ifBlank { _state.value.trackUri }
+                            val waiting = when {
+                                queued != null && liveUri == queuedNextUri -> queued
+                                liveUri.isNotBlank() && liveUri != track.uri ->
+                                    playingTrack?.takeIf { it.uri == liveUri } ?: track
+                                else -> track
+                            }
+                            val movedOn = waiting.uri != track.uri
+                            val from = player?.currentPositionMs ?: 0L
                             val refusedSource = sourceFor(waiting.uri)
                             if (refusedSource != null && !LicenseGate.rateLimited) {
                                 SourceResolver.blockFormat(refusedSource.format)
                                 forgetSource(waiting.uri)
                                 log.w("the licence refused format ${refusedSource.format}, trying the next one")
                                 scope.launch {
-                                    if (id == generation) play(waiting, spclient)
+                                    if (id == generation) play(waiting, spclient, from)
                                 }
                             } else if (refusedSource != null) {
-                                val from = if (movedTo) 0L else player?.currentPositionMs ?: 0L
                                 if (!divertToAlternate(waiting, from)) {
                                     log.w("the licence is rate limited, keeping format ${refusedSource.format}")
                                     licencePending = waiting
-                                    licenceFrom = if (movedTo) 0L else fromMs
+                                    licenceFrom = if (movedOn) 0L else fromMs
                                 }
                             } else if (LicenseGate.remainingMs() > 0L) {
-                                val from = if (movedTo) 0L else player?.currentPositionMs ?: 0L
                                 if (!divertToAlternate(waiting, from)) {
                                     refused = waiting
                                     refusedFrom = from
@@ -939,7 +950,10 @@ class KrespotPlayer(private val context: Context) {
                                             "keeping '${waiting.name.ifBlank { waiting.uri }}' for a retry"
                                     )
                                 }
-                            } else {
+                            } else if (!divertToAlternate(waiting, from, failedEvent)) {
+                                log.w("the licence failed on '${waiting.name.ifBlank { waiting.uri }}', " +
+                                        "no alternate could take the track"
+                                )
                                 mirror(event, player?.durationMs ?: totalMs)
                                 _events.tryEmit(event)
                             }
@@ -1008,7 +1022,7 @@ class KrespotPlayer(private val context: Context) {
                     SourceResolver.blockFormat(refusedSource.format)
                     forgetSource(track.uri)
                     log.w("the licence refused format ${refusedSource.format}, trying the next one")
-                    play(track, spclient)
+                    play(track, spclient, fromMs)
                     return@launch
                 }
                 if (LicenseGate.remainingMs() > 0L) {
@@ -1023,27 +1037,41 @@ class KrespotPlayer(private val context: Context) {
                     }
                     return@launch
                 }
-                _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
+                val message = failure.message.orEmpty()
+                if (message.contains("DRM_LICENSE_ACQUISITION_FAILED") &&
+                    divertToAlternate(track, fromMs, PlayerEvent.Failed(message))
+                ) {
+                    return@launch
+                }
+                _events.emit(PlayerEvent.Failed(message))
             }
         }
     }
 
-    private fun divertToAlternate(track: CommandTrack, fromMs: Long): Boolean {
-        if (!LicenseGate.rateLimited) return false
+    private fun divertToAlternate(
+        track: CommandTrack,
+        fromMs: Long,
+        failure: PlayerEvent.Failed? = null,
+    ): Boolean {
         if (StreamSources.after(context, StreamSource.SPOTIFY).isEmpty()) return false
         refused = track
         refusedFrom = fromMs
         licencePending = track
         licenceFrom = fromMs
+        val id = generation
         scope.launch {
             val alternate = YtMusicStreams.resolve(context, track)
             if (alternate == null) {
-                log.w("the licence is rate limited and youtube music did not resolve, the track stays parked")
+                log.w("the licence is refused and youtube music did not resolve, the track stays parked")
+                if (failure != null && id == generation) {
+                    mirror(failure, _state.value.durationMs)
+                    _events.emit(failure)
+                }
                 return@launch
             }
             licencePending = null
             refused = null
-            log.i("the licence is rate limited, diverting '${track.name.ifBlank { track.uri }}' to youtube music")
+            log.i("the licence is refused, diverting '${track.name.ifBlank { track.uri }}' to youtube music")
             playYtMusic(track, alternate, fromMs)
         }
         return true
@@ -1121,6 +1149,7 @@ class KrespotPlayer(private val context: Context) {
         }
         val id = ++generation
         pendingPause = false
+        playingTrack = track
         _state.value = PlayerState(
             playing = true,
             buffering = true,
@@ -1208,6 +1237,7 @@ class KrespotPlayer(private val context: Context) {
         }
         val id = ++generation
         pendingPause = false
+        playingTrack = track
         _state.value = PlayerState(playing = true, buffering = true, trackUri = track.uri)
         log.i("play direct '${track.name.ifBlank { track.uri }}' ${file?.bitrate ?: 0}b ${url.take(72)}")
         job = scope.launch {
@@ -1335,6 +1365,7 @@ class KrespotPlayer(private val context: Context) {
         pendingSeekMs = -1L
         queuedNextUri = ""
         queuedNextTrack = null
+        playingTrack = null
         refused = null
         automixAnalysis.interrupt()
         YtStreamPool.unpinAll()
@@ -1479,6 +1510,7 @@ class KrespotPlayer(private val context: Context) {
                         current.copy(durationMs = settled)
                     }
                     if (event.uri == queuedNextUri) {
+                        queuedNextTrack?.let { playingTrack = it }
                         engine?.retune(queuedGainDb)
                     }
                     if (current.paused) {
