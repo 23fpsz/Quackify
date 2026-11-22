@@ -361,6 +361,7 @@
     <string name="sp_dc_keep_anyway">Keep it anyway</string>
     <string name="sp_dc_signed_in_unchecked">Signed in — the profile will sync when the connection is back</string>
     <string name="sp_dc_pending_name">Sp_dc account</string>
+    <string name="remove_custom_sp_dc">Remove custom sp_dc</string>
     <string name="singles_and_eps">Singles &amp; EPs</string>
     <string name="sleep_timer">Sleep timer</string>
     <string name="sleep_timer_custom">Custom</string>

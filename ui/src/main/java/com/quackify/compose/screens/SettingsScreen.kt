@@ -25,12 +25,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -56,6 +60,8 @@ import android.content.Intent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
@@ -63,6 +69,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
@@ -70,6 +79,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextAlign
 import androidx.core.content.pm.PackageInfoCompat
 import coil.compose.AsyncImage
@@ -94,7 +104,6 @@ import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MAX
 import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MIN
 import com.quackify.compose.player.TRANSLATION_DEVICE_LANGUAGE
 import com.quackify.compose.sheets.AppLanguageSheet
-import com.quackify.compose.sheets.EncoreCreateNameDialog
 import com.quackify.compose.sheets.LyricsProviderSheet
 import com.quackify.compose.sheets.PlayerButtonsConfigSheet
 import com.quackify.compose.sheets.StreamSourcesSheet
@@ -1033,11 +1042,17 @@ fun SettingsScreen(
         }
     }
 
-    EncoreCreateNameDialog(
+    val activeSpDc = remember(spDcRevision) {
+        if (EncoreAuth.customSpDc(context)) EncoreAuth.spDc(context) else ""
+    }
+    SpDcSignInDialog(
         isOpen = spDcDialogOpen,
-        title = stringResource(R.string.sign_in_with_sp_dc),
-        initialName = "",
-        confirmLabel = stringResource(R.string.sign_in),
+        initialSpDc = activeSpDc,
+        onRemove = {
+            spDcDialogOpen = false
+            spDcRevision++
+            onLogout()
+        },
         onConfirm = { value ->
             spDcDialogOpen = false
             val spDc = value.trim().removePrefix("sp_dc=").substringBefore(";").trim()
@@ -1212,6 +1227,203 @@ private fun SpDcUncheckedConfirmDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SpDcSignInDialog(
+    isOpen: Boolean,
+    initialSpDc: String,
+    onRemove: () -> Unit,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!isOpen) return
+
+    var textFieldValue by remember(initialSpDc) {
+        mutableStateOf(
+            TextFieldValue(
+                text = initialSpDc,
+                selection = TextRange(0, initialSpDc.length)
+            )
+        )
+    }
+
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(150)
+        focusRequester.requestFocus()
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF5A5A5A),
+                            Color(0xFF242424),
+                            Color(0xFF121212)
+                        )
+                    )
+                )
+                .imePadding(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.sign_in_with_sp_dc),
+                    style = EncoreTheme.typography.titleLarge.copy(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(40.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    BasicTextField(
+                        value = textFieldValue,
+                        onValueChange = { textFieldValue = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                        textStyle = EncoreTheme.typography.bodyMedium.copy(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        ),
+                        singleLine = true,
+                        cursorBrush = SolidColor(Color.White),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                val trimmed = textFieldValue.text.trim()
+                                if (trimmed.isNotBlank()) {
+                                    onConfirm(trimmed)
+                                }
+                            }
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color.White.copy(alpha = 0.45f))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                val canConfirm = textFieldValue.text.trim().isNotBlank()
+
+                if (initialSpDc.isNotBlank()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SpDcDialogPill(
+                                label = stringResource(R.string.cancel),
+                                background = Color.Transparent,
+                                contentColor = Color.White,
+                                onClick = onDismiss
+                            )
+                            SpDcDialogPill(
+                                label = stringResource(R.string.remove_custom_sp_dc),
+                                background = EncoreColors.Error,
+                                contentColor = Color.White,
+                                onClick = onRemove
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        SpDcDialogPill(
+                            label = stringResource(R.string.sign_in),
+                            background = if (canConfirm) EncoreColors.Green else EncoreColors.Green.copy(alpha = 0.4f),
+                            contentColor = Color.Black,
+                            enabled = canConfirm,
+                            onClick = { onConfirm(textFieldValue.text.trim()) }
+                        )
+                    }
+                } else {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SpDcDialogPill(
+                            label = stringResource(R.string.cancel),
+                            background = Color.Transparent,
+                            contentColor = Color.White,
+                            onClick = onDismiss
+                        )
+                        SpDcDialogPill(
+                            label = stringResource(R.string.sign_in),
+                            background = if (canConfirm) EncoreColors.Green else EncoreColors.Green.copy(alpha = 0.4f),
+                            contentColor = Color.Black,
+                            enabled = canConfirm,
+                            onClick = { onConfirm(textFieldValue.text.trim()) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpDcDialogPill(
+    label: String,
+    background: Color,
+    contentColor: Color,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(background)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 28.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = EncoreTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = if (enabled) contentColor else contentColor.copy(alpha = 0.6f),
+                fontSize = 14.sp
+            )
+        )
     }
 }
 
