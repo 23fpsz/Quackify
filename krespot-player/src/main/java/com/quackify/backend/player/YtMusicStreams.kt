@@ -66,7 +66,7 @@ private val DURATION = Regex("""(\d+):(\d{2})""")
 
 private val BRACKETED = Regex("""[(\[]([^()\[\]]*)[)\]]""")
 
-private val FEATURING = Regex("""\b(feat|ft|featuring|with)\b.*""")
+private val FEATURING = Regex("""\b(feat|ft|featuring)\b.*""")
 
 private val NON_ALNUM = Regex("""[^\p{L}\p{N}]""")
 
@@ -272,8 +272,9 @@ private class YtCandidate(
     private fun subtitleArtists(): List<String> =
         subtitle.split('•').firstOrNull()?.trim().orEmpty()
             .split(ARTIST_SEPARATORS)
-            .map { it.trim() }
-            .filter { it.isNotEmpty() && it !in TYPE_LABELS }
+            .map { it.trim().lowercase().replace(NON_ALNUM, "") }
+            .filter { it.length > 1 && it !in TYPE_LABELS }
+            .distinct()
 }
 
 /** A match that served before: the video it landed on and the visitor the search that found it rode. */
