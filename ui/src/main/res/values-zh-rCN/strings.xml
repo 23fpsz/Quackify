@@ -533,4 +533,5 @@
     <string name="artist_photo_cd">%1$s 的照片</string>
     <string name="webview_missing_message">此设备上的 Android System WebView 软件包缺失、已停用或正在更新，因此登录页面无法打开。请在系统设置中启用或更新 Android System WebView，然后重试。</string>
     <string name="name_your_folder">给你的文件夹起个名字</string>
+    <string name="session_expired_toast">你的会话已过期。请重新登录以继续收听。</string>
 </resources>

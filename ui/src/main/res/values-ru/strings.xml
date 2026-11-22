@@ -545,4 +545,5 @@
     <string name="artist_photo_cd">Фото %1$s</string>
     <string name="webview_missing_message">Пакет Android System WebView на этом устройстве отсутствует, отключён или обновляется, поэтому страница входа не открывается. Включите или обновите Android System WebView в настройках системы и повторите попытку.</string>
     <string name="name_your_folder">Дайте папке название</string>
+    <string name="session_expired_toast">Ваш сеанс истёк. Войдите снова, чтобы продолжить прослушивание.</string>
 </resources>

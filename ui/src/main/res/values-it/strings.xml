@@ -535,4 +535,5 @@
     <string name="sorted_ascending">Ordinamento crescente</string>
     <string name="sorted_descending">Ordinamento decrescente</string>
     <string name="name_your_folder">Dai un nome alla tua cartella</string>
+    <string name="session_expired_toast">La tua sessione è scaduta. Accedi di nuovo per continuare ad ascoltare.</string>
 </resources>

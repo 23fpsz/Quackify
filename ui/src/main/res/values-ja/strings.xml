@@ -533,4 +533,5 @@
     <string name="artist_photo_cd">%1$s の写真</string>
     <string name="webview_missing_message">この端末で Android System WebView パッケージが見つからないか、無効になっているか、更新中です。そのためログインページを開けません。システム設定で Android System WebView を有効化または更新してから、もう一度お試しください。</string>
     <string name="name_your_folder">フォルダに名前を付けてください</string>
+    <string name="session_expired_toast">セッションの有効期限が切れました。再生を続けるには再度ログインしてください。</string>
 </resources>

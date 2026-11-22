@@ -537,4 +537,5 @@
     <string name="sorted_ascending">Orden ascendente</string>
     <string name="sorted_descending">Orden descendente</string>
     <string name="name_your_folder">Dale un nombre a tu carpeta</string>
+    <string name="session_expired_toast">Tu sesión ha caducado. Inicia sesión de nuevo para seguir escuchando.</string>
 </resources>
