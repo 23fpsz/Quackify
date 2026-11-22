@@ -24,6 +24,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
@@ -72,8 +78,10 @@ import com.quackify.backend.model.ShelfKind
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.backend.model.UserProfile
+import com.quackify.compose.components.QuackifyToastHost
 import com.quackify.compose.components.UpdateDialog
 import com.quackify.compose.components.UpdateInstallPhase
+import com.quackify.compose.components.rememberQuackifyToastState
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.format.parseHexColor
 import com.quackify.app.widget.WidgetSync
@@ -144,6 +152,18 @@ class MainActivity : ComponentActivity() {
     internal var openPlayerSignal by mutableStateOf(0)
     private var pausedAt = 0L
     private var sawStop = false
+
+    /** Flips when the stored session is proven unable to mint tokens, so the
+     * composition swaps to the login screen with a toast instead of letting
+     * every call fail silently. */
+    private var sessionLapsed by mutableStateOf(false)
+
+    private fun markSessionLapsed() {
+        if (sessionLapsed) return
+        sessionLapsed = true
+        EncoreAuth.invalidateToken(applicationContext)
+        log.w("the stored session can no longer mint tokens, reopening the login screen")
+    }
 
     internal var homeGreeting by mutableStateOf("")
     internal var homeFacet by mutableStateOf("")
@@ -283,6 +303,7 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         Pathfinder.silentRefresh = { context, reason -> SilentTokenRefresh.refresh(context, reason) }
+        SilentTokenRefresh.onSessionDead = { markSessionLapsed() }
         playHistory = PlayHistory.all(applicationContext)
         playStats = PlayStats.snapshot(applicationContext)
         RecentSearches.refresh(applicationContext)
@@ -326,8 +347,20 @@ class MainActivity : ComponentActivity() {
                 var loggedIn by remember { mutableStateOf(EncoreAuth.isLoggedIn(context)) }
                 val updates = rememberUpdateController()
                 UpdateEffects(updates)
+                val sessionToast = rememberQuackifyToastState()
+                val sessionExpiredText = context.getString(R.string.session_expired_toast)
+                val sessionLapsedNow = sessionLapsed
+                LaunchedEffect(sessionLapsedNow) {
+                    if (sessionLapsedNow) {
+                        loggedIn = false
+                        sessionToast.show(sessionExpiredText)
+                    }
+                }
+                LaunchedEffect(loggedIn) {
+                    if (loggedIn) this@MainActivity.sessionLapsed = false
+                }
 
-
+                Box(Modifier.fillMaxSize()) {
                 if (loggedIn) {
                     var capturing by remember {
                         val tokenUsable = EncoreAuth.token(context).isNotBlank() &&
@@ -1064,6 +1097,15 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     )
+                }
+
+                QuackifyToastHost(
+                    state = sessionToast,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 32.dp),
+                )
                 }
             }
         }

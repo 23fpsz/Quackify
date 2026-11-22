@@ -24,6 +24,7 @@ import android.app.Activity
 import android.content.Context
 import android.view.ViewGroup
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.auth.WebToken
@@ -46,9 +47,24 @@ private const val PROACTIVE_AFTER_MS = 50 * 60 * 1000L
 
 private const val RENEW_BEFORE_MS = 5 * 60 * 1000L
 
+/** How long the site may stay loaded without minting a token before the stored login is called dead. */
+private const val DEAD_SESSION_GRACE_MS = 10_000L
+
 object SilentTokenRefresh {
 
     private val lock = Mutex()
+
+    /**
+     * Fires when the refresh webview conclusively proved the stored session
+     * can no longer mint tokens: the site loaded but stayed signed out. The
+     * app uses it to reopen the login screen with a toast instead of failing
+     * every call silently.
+     */
+    @Volatile
+    var onSessionDead: (() -> Unit)? = null
+
+    @Volatile
+    private var pageFinishedAt = 0L
 
     suspend fun maybeRefresh(context: Context): Boolean {
         if (!EncoreAuth.isLoggedIn(context)) return false
@@ -104,6 +120,7 @@ object SilentTokenRefresh {
         val host = (context as? Activity)?.takeIf { !it.isDestroyed }
         var web: WebView? = null
         var holder: FrameLayout? = null
+        pageFinishedAt = 0L
         try {
             val cookies = waitForCookies(context)
             if (cookies == null) {
@@ -122,9 +139,15 @@ object SilentTokenRefresh {
                     log.i("fresh token in ${System.currentTimeMillis() - started}ms ($reason)")
                     return true
                 }
-                if (!reloaded && System.currentTimeMillis() - started > RELOAD_AFTER_MS) {
+                val finishedAt = pageFinishedAt
+                if (finishedAt != 0L && System.currentTimeMillis() - finishedAt >= DEAD_SESSION_GRACE_MS) {
+                    log.w("the site is up but its session minted no token, the stored login is no longer valid ($reason)")
+                    onSessionDead?.invoke()
+                    return false
+                }
+                if (!reloaded && finishedAt == 0L && System.currentTimeMillis() - started > RELOAD_AFTER_MS) {
                     reloaded = true
-                    log.i("no credentials yet, reloading once ($reason)")
+                    log.i("no credentials and the page never finished, reloading once ($reason)")
                     web.reload()
                 }
                 delay(POLL_MS)
@@ -197,6 +220,11 @@ object SilentTokenRefresh {
             domStorageEnabled = true
             databaseEnabled = true
             userAgentString = Net.DESKTOP_UA
+        }
+        web.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                pageFinishedAt = System.currentTimeMillis()
+            }
         }
         NetworkTap.install(web, context)
         return web

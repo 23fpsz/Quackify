@@ -533,4 +533,5 @@
     <string name="artist_photo_cd">%1$s 사진</string>
     <string name="webview_missing_message">이 기기에서 Android System WebView 패키지가 없거나, 비활성화되었거나, 업데이트 중이라 로그인 페이지를 열 수 없습니다. 시스템 설정에서 Android System WebView를 활성화하거나 업데이트한 후 다시 시도하세요.</string>
     <string name="name_your_folder">폴더 이름을 지정하세요</string>
+    <string name="session_expired_toast">세션이 만료되었습니다. 계속 듣으려면 다시 로그인하세요.</string>
 </resources>

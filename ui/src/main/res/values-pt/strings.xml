@@ -535,4 +535,5 @@
     <string name="artist_photo_cd">Foto de %1$s</string>
     <string name="webview_missing_message">O pacote Android System WebView está ausente, desativado ou sendo atualizado neste dispositivo, então a página de login não abre. Ative ou atualize o Android System WebView nas configurações do sistema e tente novamente.</string>
     <string name="name_your_folder">Dê um nome à sua pasta</string>
+    <string name="session_expired_toast">A sua sessão expirou. Entre novamente para continuar a ouvir.</string>
 </resources>

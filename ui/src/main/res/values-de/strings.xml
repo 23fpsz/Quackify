@@ -535,4 +535,5 @@
     <string name="artist_photo_cd">Foto von %1$s</string>
     <string name="webview_missing_message">Das Android-System-WebView-Paket fehlt, ist deaktiviert oder wird gerade aktualisiert, daher kann sich die Anmeldeseite nicht öffnen. Aktiviere oder aktualisiere Android System WebView in den Systemeinstellungen und versuche es erneut.</string>
     <string name="name_your_folder">Gib Deinem Ordner einen Namen</string>
+    <string name="session_expired_toast">Deine Sitzung ist abgelaufen. Melde dich erneut an, um weiter zu hören.</string>
 </resources>
