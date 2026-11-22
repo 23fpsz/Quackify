@@ -19,6 +19,7 @@ import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.YTM)
 
@@ -244,7 +245,7 @@ internal class PoTokenPage private constructor(context: Context) {
             }
             webView.loadDataWithBaseURL("https://www.youtube.com", HARNESS, "text/html", "utf-8", null)
         }
-        withTimeout(LOAD_TIMEOUT_MS) { loaded.await() }
+        withTimeout(LOAD_TIMEOUT_MS.milliseconds) { loaded.await() }
     }
 
     private val loaded = CompletableDeferred<Unit>()
@@ -315,7 +316,7 @@ internal class PoTokenPage private constructor(context: Context) {
             )
         }
         return try {
-            withTimeout(OP_TIMEOUT_MS) { answer.await() }
+            withTimeout(OP_TIMEOUT_MS.milliseconds) { answer.await() }
         } catch (failure: Throwable) {
             answers.remove(key)
             dead = true
@@ -433,9 +434,9 @@ function bgMint(identifierBytes) {
         suspend fun open(context: Context): PoTokenPage? {
             var created: PoTokenPage? = null
             try {
-                return withTimeout(LOAD_TIMEOUT_MS) {
+                return withTimeout(LOAD_TIMEOUT_MS.milliseconds) {
                     created = withContext(Dispatchers.Main) { PoTokenPage(context) }
-                    created!!.load()
+                    created.load()
                     created
                 }
             } catch (failure: Throwable) {

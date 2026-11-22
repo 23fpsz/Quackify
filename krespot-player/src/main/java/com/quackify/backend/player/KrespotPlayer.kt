@@ -23,28 +23,28 @@ package com.quackify.backend.player
 import android.content.Context
 import android.os.SystemClock
 import android.view.Surface
-import java.io.File
+import com.quackify.backend.connect.command.AudioFile
+import com.quackify.backend.connect.command.CommandTrack
+import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.store.AppPrefs
+import com.quackify.backend.core.store.StreamSource
+import com.quackify.backend.core.store.StreamSources
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import com.quackify.backend.connect.command.AudioFile
-import com.quackify.backend.connect.command.CommandTrack
-import com.quackify.backend.core.log.Logs
-import com.quackify.backend.core.auth.EncoreAuth
-import com.quackify.backend.core.store.AppPrefs
-import com.quackify.backend.core.store.StreamSource
-import com.quackify.backend.core.store.StreamSources
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
@@ -466,7 +466,7 @@ class KrespotPlayer(private val context: Context) {
         val playing = _state.value.trackUri
         val stale = synchronized(deepWarmed) {
             val drop = deepWarmed.filter { it != playing && it != nowPlaying && it !in keep }
-            deepWarmed.removeAll(drop)
+            deepWarmed.removeAll(drop.toSet())
             drop
         }
         if (stale.isEmpty()) return
@@ -734,7 +734,7 @@ class KrespotPlayer(private val context: Context) {
                 SongCache.touch(track.uri, context)
                 if (licenceSettling) {
                     log.i("licence deferred, the user is still skipping")
-                    delay(LICENCE_SETTLE_MS)
+                    delay(LICENCE_SETTLE_MS.milliseconds)
                     if (id != generation) {
                         log.i("licence skipped, playback moved on before settling")
                         return@launch
@@ -780,7 +780,7 @@ class KrespotPlayer(private val context: Context) {
                                 }
                             } else {
                                 mirror(event, player?.durationMs ?: totalMs)
-                                if (event !is PlayerEvent.Progress) _events.tryEmit(event)
+                                _events.tryEmit(event)
                             }
                         } else {
                             mirror(event, player?.durationMs ?: totalMs)

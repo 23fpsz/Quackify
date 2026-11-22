@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.Net
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.MP3)
 
@@ -172,7 +173,7 @@ internal class Mp3Engine(
         var reported = 0L
         try {
             while (!stopped && !outputDone) {
-                while (paused && !stopped) delay(50)
+                while (paused && !stopped) delay(50.milliseconds)
                 val wanted = seekAtMs
                 if (wanted >= 0L) {
                     seekAtMs = -1L

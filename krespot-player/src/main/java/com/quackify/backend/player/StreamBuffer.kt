@@ -36,6 +36,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.MP3)
 
@@ -192,15 +195,18 @@ internal class StreamBuffer private constructor(
                 if (closed) return
                 var scan = 0
                 while (scan < chunks && (present[scan] || busy[scan])) scan++
-                if (scan >= chunks) {
-                    progressed.await(1_000)
-                    -1
-                } else {
+                if (scan >= chunks) -1
+                else {
                     busy[scan] = true
                     scan
                 }
             }
-            if (index < 0) continue
+
+            if (index < 0) {
+                withTimeoutOrNull(1_000.milliseconds) { progressed.await() }
+                continue
+            }
+
             try {
                 pull(index)
                 failures = 0
@@ -213,7 +219,7 @@ internal class StreamBuffer private constructor(
                     log.w("$tag prefetch gave up, reads will pull on their own")
                     return
                 }
-                delay(250L * failures)
+                delay((250L * failures).milliseconds)
             }
         }
     }
@@ -239,8 +245,9 @@ internal class StreamBuffer private constructor(
             cacheDir: File?,
             tag: String,
         ): MediaDataSource? {
-            val probe = Net.blob(url, headers + mapOf("Range" to "bytes=0-${CHUNK - 1}"), "$tag-open")
-                ?: return null.also { log.w("$tag open: no response") }
+            val probe =
+                Net.blob(url, headers + mapOf("Range" to "bytes=0-${CHUNK - 1}"), "$tag-open")
+                    ?: return null.also { log.w("$tag open: no response") }
             if (!probe.ok) return null.also { log.w("$tag open: refused ${probe.code}") }
             if (probe.code == 200) {
                 log.i("$tag open: ranges ignored, ${probe.size}B in hand")
@@ -252,26 +259,28 @@ internal class StreamBuffer private constructor(
             if (total <= 0) return null.also { log.w("$tag open: empty stream") }
             val spill = cacheDir
                 ?: return null.also { log.w("$tag open: nowhere to spill the stream") }
-            return try {
-                val scratch = File.createTempFile("quackify-", ".stream", spill)
-                val body = RandomAccessFile(scratch, "rw")
-                val seeded = minOf(probe.size.toLong(), CHUNK).toInt()
+            return runInterruptible(Dispatchers.IO) {
                 try {
-                    body.setLength(total)
-                    if (seeded > 0) {
-                        body.seek(0)
-                        body.write(probe.bytes, 0, seeded)
+                    val scratch = File.createTempFile("quackify-", ".stream", spill)
+                    val body = RandomAccessFile(scratch, "rw")
+                    val seeded = minOf(probe.size.toLong(), CHUNK).toInt()
+                    try {
+                        body.setLength(total)
+                        if (seeded > 0) {
+                            body.seek(0)
+                            body.write(probe.bytes, 0, seeded)
+                        }
+                    } catch (failure: Throwable) {
+                        runCatching { body.close() }
+                        runCatching { scratch.delete() }
+                        throw failure
                     }
+                    log.i("$tag open: ${total}B streams in ${CHUNK}B pulls")
+                    StreamBuffer(url, headers, total, scratch, body, tag, seeded)
                 } catch (failure: Throwable) {
-                    runCatching { body.close() }
-                    runCatching { scratch.delete() }
-                    throw failure
+                    log.e("$tag open failed ${failure.javaClass.simpleName}: ${failure.message}")
+                    null
                 }
-                log.i("$tag open: ${total}B streams in ${CHUNK}B pulls")
-                StreamBuffer(url, headers, total, scratch, body, tag, seeded)
-            } catch (failure: Throwable) {
-                log.e("$tag open failed ${failure.javaClass.simpleName}: ${failure.message}")
-                null
             }
         }
     }

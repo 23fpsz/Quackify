@@ -384,7 +384,7 @@ internal object YtMusicStreams {
 
     /** A fresh content playback nonce, the device gateway's request salt. */
     private fun nonce(): String = buildString {
-        repeat(12) { append(NONCE_ALPHABET[(0 until NONCE_ALPHABET.length).random()]) }
+        repeat(12) { append(NONCE_ALPHABET[NONCE_ALPHABET.indices.random()]) }
     }
 
     private class PlayerReply(val lengthSeconds: Long, val formats: List<JSONObject>)
