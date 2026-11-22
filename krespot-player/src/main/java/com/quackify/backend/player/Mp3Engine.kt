@@ -53,6 +53,7 @@ internal class Mp3Engine(
     private val url: String,
     private val emit: (PlayerEvent) -> Unit,
     private val headers: Map<String, String> = mapOf("referer" to "https://open.spotify.com/"),
+    private val startAtMs: Long = 0L,
 ) {
 
     @Volatile
@@ -66,6 +67,9 @@ internal class Mp3Engine(
 
     @Volatile
     private var durationMs = 0L
+
+    @Volatile
+    private var seekAtMs = -1L
 
     private var sink: AudioSink? = null
 
@@ -95,7 +99,7 @@ internal class Mp3Engine(
     }
 
     fun seekTo(ms: Long) {
-        log.i("seek ignored on a direct url, ${ms}ms requested")
+        seekAtMs = ms.coerceAtLeast(0L)
     }
 
     suspend fun run() {
@@ -132,6 +136,10 @@ internal class Mp3Engine(
         } else {
             0L
         }
+        if (startAtMs > 0L) {
+            extractor.seekTo(startAtMs * 1000L, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+            positionMs = extractor.sampleTime / 1000L
+        }
         log.i("ad $mime ${sampleRate}Hz ${channels}ch ${durationMs}ms ${bytes.size}B")
 
         val codec = runCatching {
@@ -157,6 +165,24 @@ internal class Mp3Engine(
         try {
             while (!stopped && !outputDone) {
                 while (paused && !stopped) delay(50)
+                val wanted = seekAtMs
+                if (wanted >= 0L) {
+                    seekAtMs = -1L
+                    val bounded = if (durationMs > 0L) {
+                        wanted.coerceAtMost((durationMs - 1000L).coerceAtLeast(0L))
+                    } else {
+                        wanted
+                    }
+                    extractor.seekTo(bounded * 1000L, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+                    codec.flush()
+                    sink?.flush()
+                    positionMs = extractor.sampleTime / 1000L
+                    reported = positionMs
+                    inputDone = false
+                    outputDone = false
+                    emit(PlayerEvent.Seeked(positionMs))
+                    log.i("seek landed at ${positionMs}ms of ${durationMs}ms")
+                }
                 if (!inputDone) {
                     val index = codec.dequeueInputBuffer(10_000)
                     if (index >= 0) {
