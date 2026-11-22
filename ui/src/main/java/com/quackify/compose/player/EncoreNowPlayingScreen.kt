@@ -3324,7 +3324,11 @@ private fun FullscreenLyricsView(
                         nextTrack = sheetPeekTrack,
                         nextLyrics = sheetPeekLyrics,
                         ink = ink,
-                        accent = if (deepFeel) deepFeelPalette.accent else dominantColor,
+                        // In the plain reader the backdrop IS the dominant
+                        // colour, so tinting the eyebrow with it made the
+                        // "next up" label vanish into the background; the
+                        // contrast ink keeps it legible in both modes.
+                        accent = if (deepFeel) deepFeelPalette.accent else ink,
                         deepFeel = deepFeel,
                         // During the hand-off the peek is the engine: it is
                         // already the next song's opening, so it travels
