@@ -79,6 +79,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
@@ -3078,9 +3079,21 @@ private fun FullscreenLyricsView(
                     animationSpec = tween(durationMillis = 520, easing = EncoreAnimation.DecelerateInterpolator),
                     label = "deepFeelLineActivation"
                 )
+                val distance = (index - activeIndex).absoluteValue
+                val lineBlur by animateDpAsState(
+                    targetValue = when {
+                        distance > 4 -> 9.dp
+                        distance > 2 -> 5.dp
+                        else -> 0.dp
+                    },
+                    animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
+                    label = "deepFeelLineBlur"
+                )
+                val lineBlurModifier = if (lineBlur > 0.dp) Modifier.blur(lineBlur) else Modifier
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(lineBlurModifier)
                         .deepFeelLineGlow(
                             palette = deepFeelPalette,
                             phases = glowPhases,

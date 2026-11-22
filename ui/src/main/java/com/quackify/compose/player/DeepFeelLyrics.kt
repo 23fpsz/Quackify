@@ -16,10 +16,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
+import java.util.Random
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -76,30 +77,43 @@ internal fun rememberDeepFeelGlowPhases(): DeepFeelGlowPhases {
     return DeepFeelGlowPhases(breathe, sweep)
 }
 
+private const val DEEP_FEEL_TAU = 6.2831855f
+
+internal class DeepFeelBlob(
+    val anchorX: Float,
+    val anchorY: Float,
+    val radius: Float,
+    val stretchX: Float,
+    val stretchY: Float,
+    val tiltDeg: Float,
+    val driftAmpX: Float,
+    val driftAmpY: Float,
+    val cyclesX: Int,
+    val cyclesY: Int,
+    val cyclesPulse: Int,
+    val phaseX: Float,
+    val phaseY: Float,
+    val phasePulse: Float,
+    val colorIndex: Int,
+    val maxAlpha: Float
+)
+
 internal class DeepFeelFlowPhases(
-    val forward: State<Float>,
-    val backward: State<Float>,
-    val breathe: State<Float>
+    val clock: State<Float>,
+    val breathe: State<Float>,
+    val blobs: List<DeepFeelBlob>
 )
 
 @Composable
 internal fun rememberDeepFeelFlowPhases(): DeepFeelFlowPhases {
     val transition = rememberInfiniteTransition(label = "deepFeelFlow")
-    val forward = transition.animateFloat(
+    val clock = transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 18000, easing = LinearEasing)
+            animation = tween(durationMillis = 30000, easing = LinearEasing)
         ),
-        label = "deepFeelFlowForward"
-    )
-    val backward = transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 26000, easing = LinearEasing)
-        ),
-        label = "deepFeelFlowBackward"
+        label = "deepFeelFlowClock"
     )
     val breathe = transition.animateFloat(
         initialValue = 0f,
@@ -110,7 +124,30 @@ internal fun rememberDeepFeelFlowPhases(): DeepFeelFlowPhases {
         ),
         label = "deepFeelFlowBreathe"
     )
-    return DeepFeelFlowPhases(forward, backward, breathe)
+    val blobs = remember {
+        val random = Random()
+        List(5 + random.nextInt(4)) {
+            DeepFeelBlob(
+                anchorX = 0.08f + random.nextFloat() * 0.84f,
+                anchorY = 0.60f + random.nextFloat() * 0.46f,
+                radius = 0.26f + random.nextFloat() * 0.40f,
+                stretchX = 1.1f + random.nextFloat() * 1.7f,
+                stretchY = 0.55f + random.nextFloat() * 0.55f,
+                tiltDeg = -38f + random.nextFloat() * 76f,
+                driftAmpX = 0.05f + random.nextFloat() * 0.17f,
+                driftAmpY = 0.02f + random.nextFloat() * 0.08f,
+                cyclesX = 1 + random.nextInt(3),
+                cyclesY = 1 + random.nextInt(3),
+                cyclesPulse = 1 + random.nextInt(2),
+                phaseX = random.nextFloat() * DEEP_FEEL_TAU,
+                phaseY = random.nextFloat() * DEEP_FEEL_TAU,
+                phasePulse = random.nextFloat() * DEEP_FEEL_TAU,
+                colorIndex = random.nextInt(3),
+                maxAlpha = 0.10f + random.nextFloat() * 0.12f
+            )
+        }
+    }
+    return DeepFeelFlowPhases(clock, breathe, blobs)
 }
 
 internal fun Modifier.deepFeelLineGlow(
@@ -184,61 +221,44 @@ internal fun Modifier.deepFeelBackdrop(
     if (phases == null || flowReveal <= 0.01f) return@drawBehind
     val w = size.width
     val h = size.height
-    val bandHeight = h * 0.34f
-    val bandTop = h - bandHeight
-    val period = w * 1.35f
-    val forward = phases.forward.value * period
-    drawRect(
-        brush = Brush.horizontalGradient(
-            0.0f to palette.base.copy(alpha = 0f),
-            0.22f to palette.base.copy(alpha = 0.30f),
-            0.5f to palette.accent.copy(alpha = 0.42f),
-            0.78f to palette.base.copy(alpha = 0.30f),
-            1.0f to palette.base.copy(alpha = 0f),
-            startX = -period + forward,
-            endX = forward,
-            tileMode = TileMode.Repeated
-        ),
-        topLeft = Offset(0f, bandTop),
-        size = Size(w, bandHeight),
-        alpha = flowReveal
-    )
-    val period2 = w * 0.9f
-    val backward = phases.backward.value * period2
-    drawRect(
-        brush = Brush.horizontalGradient(
-            0.0f to palette.glow.copy(alpha = 0f),
-            0.5f to palette.glow.copy(alpha = 0.20f),
-            1.0f to palette.glow.copy(alpha = 0f),
-            startX = -period2 + backward,
-            endX = backward,
-            tileMode = TileMode.Repeated
-        ),
-        topLeft = Offset(0f, bandTop),
-        size = Size(w, bandHeight),
-        alpha = flowReveal
-    )
+    val clock = phases.clock.value
+    for (blob in phases.blobs) {
+        val center = Offset(
+            blob.anchorX * w + blob.driftAmpX * w * sin(DEEP_FEEL_TAU * clock * blob.cyclesX + blob.phaseX),
+            blob.anchorY * h + blob.driftAmpY * h * sin(DEEP_FEEL_TAU * clock * blob.cyclesY + blob.phaseY)
+        )
+        val pulse = 0.72f + 0.28f * sin(DEEP_FEEL_TAU * clock * blob.cyclesPulse + blob.phasePulse)
+        val radius = blob.radius * w * (0.92f + 0.08f * pulse)
+        val color = when (blob.colorIndex) {
+            0 -> palette.base
+            1 -> palette.accent
+            else -> palette.glow
+        }
+        val alpha = blob.maxAlpha * pulse
+        val brush = Brush.radialGradient(
+            0.0f to color.copy(alpha = alpha),
+            0.42f to color.copy(alpha = alpha * 0.5f),
+            1.0f to color.copy(alpha = 0f),
+            center = center,
+            radius = radius
+        )
+        withTransform({
+            rotate(degrees = blob.tiltDeg, pivot = center)
+            scale(scaleX = blob.stretchX, scaleY = blob.stretchY, pivot = center)
+        }) {
+            drawCircle(brush = brush, radius = radius, center = center, alpha = flowReveal)
+        }
+    }
     val breath = sin(phases.breathe.value * PI.toFloat())
     drawRect(
         brush = Brush.radialGradient(
             colors = listOf(
-                palette.accent.copy(alpha = 0.14f + 0.10f * breath),
+                palette.accent.copy(alpha = 0.12f + 0.08f * breath),
                 palette.accent.copy(alpha = 0f)
             ),
-            center = Offset(w * 0.5f, h * 1.08f),
-            radius = w * (0.55f + 0.14f * breath)
+            center = Offset(w * 0.5f, h * 1.10f),
+            radius = w * (0.60f + 0.16f * breath)
         ),
-        topLeft = Offset(0f, bandTop),
-        size = Size(w, bandHeight),
         alpha = flowReveal
-    )
-    drawRect(
-        brush = Brush.verticalGradient(
-            0.0f to bottomColor,
-            0.6f to bottomColor.copy(alpha = 0f),
-            1.0f to bottomColor.copy(alpha = 0f)
-        ),
-        topLeft = Offset(0f, bandTop),
-        size = Size(w, bandHeight)
     )
 }
