@@ -28,7 +28,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
@@ -310,12 +309,13 @@ internal class AudioEngine(
         }
 
     private fun newKit(role: String): Kit {
-        // The song cache sits between ExoPlayer and the CDN: online reads
-        // seed it while streaming, offline reads come back from it, and
-        // the custom key (the track uri) survives CDN url rotation.
-        val factory = DefaultMediaSourceFactory(
-            SongCache.factory(context).setUpstreamDataSourceFactory(DefaultDataSource.Factory(context))
-        )
+        // The routed stack sits between ExoPlayer and the wire: catalogue
+        // reads pass through the song cache (online reads seed it while
+        // streaming, offline reads come back from it, and the custom key -
+        // the track uri - survives CDN url rotation), alternate-rendition
+        // reads open the stream buffer instead, so one session player serves
+        // both cuts of a track.
+        val factory = DefaultMediaSourceFactory(RoutedSources(context))
         val manager = DefaultDrmSessionManager.Builder()
             .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
             .setMultiSession(true)
@@ -439,6 +439,101 @@ internal class AudioEngine(
             }
             .build()
     }
+
+    /**
+     * Plays the alternate stream for a track on the same session player as
+     * the catalogue files: the item carries no licence and a rendition-keyed
+     * cache key, so its loads route to the stream buffer while the queue,
+     * the crossfade and the blend logic keep working off the track uri.
+     */
+    suspend fun prepareAlternate(
+        uri: String,
+        stream: YtStream,
+        fromMs: Long,
+        autoplay: Boolean,
+    ): Boolean =
+        withContext(Dispatchers.Main) {
+            crossfade?.stop()
+            spareGainFactor = 1f
+            gainFactor = 1f
+            YtStreamTable.serve(uri, stream)
+            val totalMs = stream.lengthMs
+            durationMs = totalMs
+            announced = false
+            lastItemUri = uri
+            if (uri.isNotBlank()) itemDurations[uri] = totalMs
+            // The player instance survives track changes: swapping the media
+            // source keeps the renderers, the codec and the audio sink warm, so
+            // only the first play pays the ExoPlayer build cost.
+            val live = player ?: ExoPlayer.Builder(context)
+                .setMediaSourceFactory(ensureSessionKit().factory)
+                .build()
+                .also {
+                    it.addListener(listener)
+                    player = it
+                }
+            live.setMediaSource(ensureSessionKit().factory.createMediaSource(itemForAlternate(uri, stream)))
+            live.prepare()
+            live.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
+            live.playWhenReady = autoplay
+            started = autoplay
+            loaded = true
+            applyVolume()
+            log.i("audio engine ready on the alternate '${stream.videoId}' ${totalMs}ms at ${fromMs}ms " +
+                    "autoplay=$autoplay reused=${player !== live}"
+            )
+            true
+        }
+
+    /**
+     * The alternate-rendition queue hand: [queueNext] for a stream instead
+     * of a catalogue file. The item joins the same playlist (or the same
+     * crossfade hold) its Spotify sibling would, so a handover between the
+     * two sources carries no engine teardown.
+     */
+    suspend fun queueNextAlternate(
+        uri: String,
+        stream: YtStream,
+        whileOn: String,
+        spec: TransitionSpec?,
+    ): Boolean {
+        YtStreamTable.serve(uri, stream)
+        val totalMs = stream.lengthMs
+        val item = itemForAlternate(uri, stream)
+        val heldForFade = spec != null || configuredCrossfadeMs() > 0L
+        val added = runOnMain {
+            val p = player ?: return@runOnMain false
+            if (p.currentMediaItem?.mediaId != whileOn) return@runOnMain false
+            if (heldForFade) {
+                true
+            } else {
+                val current = p.currentMediaItemIndex
+                if (p.mediaItemCount > current + 1) p.removeMediaItems(current + 1, p.mediaItemCount)
+                p.addMediaItem(item)
+                true
+            }
+        } ?: false
+        if (!added) return false
+        if (uri.isNotBlank()) itemDurations[uri] = totalMs
+        if (heldForFade) {
+            spareGainFactor = 1f
+            crossfadeEngine()?.hold(item, totalMs, spec)
+            log.i("audio held next '$uri' on the alternate stream for a crossfade")
+        } else {
+            log.i("audio queued next '$uri' on the alternate stream")
+        }
+        return true
+    }
+
+    private fun itemForAlternate(uri: String, stream: YtStream): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(uri)
+            .setUri(Uri.parse(stream.url))
+            // The rendition key doubles as the router's signal: the loading
+            // side opens the stream buffer instead of the song cache, and no
+            // licence session is ever asked for this item.
+            .setCustomCacheKey(YtStreamTable.keyFor(uri))
+            .build()
 
     fun play() {
         started = true

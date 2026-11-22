@@ -31,7 +31,6 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
-import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -78,40 +77,38 @@ internal class AutomixAnalysis(private val context: Context) {
     private val tap = PcmTap()
 
     suspend fun tailGrid(
-        source: AudioSource,
-        uri: String,
+        cut: Cut,
         durationMs: Long,
         budgetMs: Long,
         stillWanted: () -> Boolean,
     ): TrackGrid? {
         val durationSec = durationMs / 1000.0
         if (durationSec < MIN_TRACK_SECONDS) {
-            log.i("automix: '${uri.takeLast(12)}' is too short to grid")
+            log.i("automix: '${cut.uri.takeLast(12)}' is too short to grid")
             return null
         }
-        val head = GridCache.get(context, "$uri#head")
+        val head = GridCache.get(context, "${cut.cacheKey}#head")
         if (head != null && durationSec <= FULL_WINDOW_SECONDS) return head
-        return windowGrid(source, uri, durationSec - FULL_WINDOW_SECONDS, "$uri#tail", budgetMs, stillWanted)
+        return windowGrid(cut, durationSec - FULL_WINDOW_SECONDS, "tail", budgetMs, stillWanted)
     }
 
     suspend fun headGrid(
-        source: AudioSource,
-        uri: String,
+        cut: Cut,
         durationMs: Long,
         budgetMs: Long,
         stillWanted: () -> Boolean,
     ): TrackGrid? {
         val durationSec = durationMs / 1000.0
         if (durationSec < MIN_TRACK_SECONDS) {
-            log.i("automix: '${uri.takeLast(12)}' is too short to grid")
+            log.i("automix: '${cut.uri.takeLast(12)}' is too short to grid")
             return null
         }
-        val tail = GridCache.get(context, "$uri#tail")
+        val tail = GridCache.get(context, "${cut.cacheKey}#tail")
         if (tail != null && durationSec <= FULL_WINDOW_SECONDS) return tail
-        return windowGrid(source, uri, 0.0, "$uri#head", budgetMs, stillWanted)
+        return windowGrid(cut, 0.0, "head", budgetMs, stillWanted)
     }
 
-    fun tailSilenceSec(uri: String): Double = GridCache.getSilence(context, uri)
+    fun tailSilenceSec(cut: Cut): Double = GridCache.getSilence(context, cut.cacheKey)
 
     fun interrupt() {
         generation.incrementAndGet()
@@ -128,22 +125,22 @@ internal class AutomixAnalysis(private val context: Context) {
     }
 
     private suspend fun windowGrid(
-        source: AudioSource,
-        uri: String,
+        cut: Cut,
         fromSec: Double,
-        cacheKey: String,
+        side: String,
         budgetMs: Long,
         stillWanted: () -> Boolean,
     ): TrackGrid? {
+        val cacheKey = "${cut.cacheKey}#$side"
         GridCache.get(context, cacheKey)?.let { return it }
         if (budgetMs < MIN_DECODE_BUDGET_MS) {
-            log.i("automix: only ${budgetMs}ms left to decode '${uri.takeLast(12)}', skipped")
+            log.i("automix: only ${budgetMs}ms left to decode '${cut.uri.takeLast(12)}', skipped")
             return null
         }
         if (!stillWanted()) return null
         val token = generation.get()
         val startedAt = SystemClock.elapsedRealtime()
-        val durationSec = source.seektable.totalDuration.toDouble() / source.seektable.timescale
+        val durationSec = cut.lengthMs / 1000.0
         val start = fromSec.coerceIn(0.0, (durationSec - 2.0).coerceAtLeast(0.0))
         val windowSec = if (start <= 0.0) {
             min(FULL_WINDOW_SECONDS, durationSec - 1.0)
@@ -152,22 +149,22 @@ internal class AutomixAnalysis(private val context: Context) {
         }
         if (windowSec < MIN_WINDOW_SECONDS) return null
         val pcm = mutex.withLock {
-            decodeWindow(source, uri, start, windowSec, budgetMs, token, stillWanted)
+            decodeWindow(cut, start, windowSec, budgetMs, token, stillWanted)
         } ?: return null
-        rememberTailSilence(uri, pcm, start, durationSec)
+        rememberTailSilence(cut, pcm, start, durationSec)
         val grid = withContext(Dispatchers.Default) {
             runCatching { TrackAnalyzer.analyze(pcm.samples, pcm.rate, start) }.getOrNull()
         }
         if (grid == null) {
             log.w(
-                "no grid for '${uri.takeLast(12)}' at ${"%.0f".format(start)}s " +
+                "no grid for '${cut.uri.takeLast(12)}' at ${"%.0f".format(start)}s " +
                     "after ${SystemClock.elapsedRealtime() - startedAt}ms"
             )
             return null
         }
         GridCache.put(context, cacheKey, grid)
         log.i(
-            "grid '${uri.takeLast(12)}' ${"%.1f".format(grid.bpm)}bpm conf=${"%.2f".format(grid.confidence)} " +
+            "grid '${cut.uri.takeLast(12)}' ${"%.1f".format(grid.bpm)}bpm conf=${"%.2f".format(grid.confidence)} " +
                 "beats=${grid.beatStarts.size} bars=${grid.barStarts.size} " +
                 "in ${SystemClock.elapsedRealtime() - startedAt}ms"
         )
@@ -182,15 +179,15 @@ internal class AutomixAnalysis(private val context: Context) {
      * BitChord run over the whole file: a quiet fade-out still counts as
      * music, only a genuinely dead tail is trimmed.
      */
-    private fun rememberTailSilence(uri: String, pcm: Pcm, windowStartSec: Double, durationSec: Double) {
+    private fun rememberTailSilence(cut: Cut, pcm: Pcm, windowStartSec: Double, durationSec: Double) {
         if (pcm.rate <= 0) return
         val windowSec = pcm.samples.size.toDouble() / pcm.rate
         if (durationSec - (windowStartSec + windowSec) > END_COVER_TOLERANCE_SECONDS) return
         val silence = trailingSilenceSec(pcm.samples, pcm.rate, windowStartSec, durationSec)
-        GridCache.putSilence(context, uri, silence)
+        GridCache.putSilence(context, cut.cacheKey, silence)
         if (silence >= MIN_TAIL_SILENCE_SECONDS) {
             log.i(
-                "automix: '${uri.takeLast(12)}' runs silent for the last ${"%.1f".format(silence)}s, " +
+                "automix: '${cut.uri.takeLast(12)}' runs silent for the last ${"%.1f".format(silence)}s, " +
                     "blends will stop at the audible end"
             )
         }
@@ -237,8 +234,7 @@ internal class AutomixAnalysis(private val context: Context) {
     private class Pcm(val samples: FloatArray, val rate: Int)
 
     private suspend fun decodeWindow(
-        source: AudioSource,
-        uri: String,
+        cut: Cut,
         fromSec: Double,
         windowSec: Double,
         budgetMs: Long,
@@ -247,10 +243,29 @@ internal class AutomixAnalysis(private val context: Context) {
     ): Pcm? = withContext(Dispatchers.Main) {
         if (token != generation.get() || !stillWanted()) return@withContext null
         val p = ensurePlayer()
-        val keySetId = runCatching { offlineKeySetFor(source) }.getOrNull()
+        val item = when (cut) {
+            is Cut.Catalogue -> {
+                val keySetId = runCatching { offlineKeySetFor(cut.source) }.getOrNull()
+                itemFor(cut.uri, cut.source, keySetId)
+            }
+            is Cut.Alternate -> {
+                // The table holds the stream the queue committed to; the
+                // routed factory reads it back for the muted decode window.
+                val stream = YtStreamTable.of(cut.cacheKey)
+                if (stream == null) {
+                    log.w("analysis: the alternate for '${cut.uri.takeLast(12)}' left the table, no window")
+                    return@withContext null
+                }
+                MediaItem.Builder()
+                    .setMediaId(cut.uri)
+                    .setUri(Uri.parse(stream.url))
+                    .setCustomCacheKey(cut.cacheKey)
+                    .build()
+            }
+        }
         tap.start((windowSec * MAX_TAP_RATE).toInt() + 64)
         try {
-            p.setMediaSource(ensureFactory().createMediaSource(itemFor(uri, source, keySetId)))
+            p.setMediaSource(ensureFactory().createMediaSource(item))
             p.prepare()
             p.seekTo((fromSec * 1000.0).toLong())
             p.volume = 0f
@@ -266,7 +281,7 @@ internal class AutomixAnalysis(private val context: Context) {
                 val error = p.playerError
                 when {
                     error != null -> {
-                        log.w("analysis decode failed for '${uri.takeLast(12)}': ${error.errorCodeName}")
+                        log.w("analysis decode failed for '${cut.uri.takeLast(12)}': ${error.errorCodeName}")
                         return@withContext null
                     }
                     collected >= needed -> return@withContext Pcm(tap.snapshot(), rate)
@@ -274,11 +289,11 @@ internal class AutomixAnalysis(private val context: Context) {
                         if (rate > 0 && collected >= MIN_COLLECTED_SECONDS * rate) {
                             return@withContext Pcm(tap.snapshot(), rate)
                         }
-                        log.w("analysis decode ended early for '${uri.takeLast(12)}' with $collected samples")
+                        log.w("analysis decode ended early for '${cut.uri.takeLast(12)}' with $collected samples")
                         return@withContext null
                     }
                     p.playbackState == Player.STATE_IDLE && collected == 0 && ++idlePolls > 10 -> {
-                        log.w("analysis decode never started for '${uri.takeLast(12)}'")
+                        log.w("analysis decode never started for '${cut.uri.takeLast(12)}'")
                         return@withContext null
                     }
                 }
@@ -289,7 +304,7 @@ internal class AutomixAnalysis(private val context: Context) {
             if (rate > 0 && collected >= MIN_COLLECTED_SECONDS * rate) {
                 Pcm(tap.snapshot(), rate)
             } else {
-                log.w("analysis decode timed out for '${uri.takeLast(12)}' with $collected samples")
+                log.w("analysis decode timed out for '${cut.uri.takeLast(12)}' with $collected samples")
                 null
             }
         } finally {
@@ -325,9 +340,11 @@ internal class AutomixAnalysis(private val context: Context) {
 
     private fun ensureFactory(): DefaultMediaSourceFactory {
         sourceFactory?.let { return it }
-        val factory = DefaultMediaSourceFactory(
-            SongCache.factory(context).setUpstreamDataSourceFactory(DefaultDataSource.Factory(context))
-        )
+        // The same routed stack the engines play through: a catalogue window
+        // decodes out of the song cache, an alternate window out of the
+        // stream buffer, and the licence manager only ever engages for an
+        // item that carries a drm configuration.
+        val factory = DefaultMediaSourceFactory(RoutedSources(context))
         val manager = DefaultDrmSessionManager.Builder()
             .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
             .setMultiSession(true)

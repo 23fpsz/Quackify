@@ -305,14 +305,18 @@ class KrespotPlayer(private val context: Context) {
 
     /**
      * Hands the engine the next track of the queue so ExoPlayer prebuffers it
-     * while the current one plays and the transition carries no silence. A
-     * warm source queues right away; a cold one resolves here and only queues
-     * if the engine is still on the track that asked for it. The licence
-     * (restored, or freshly acquired offline) is settled before the item
-     * joins the playlist, so the prebuffered track never asks the endpoint
-     * again at transition time. The bridge checks hasQueuedNext at the end of
-     * the track, so a late resolve can never leave the transition hanging -
-     * the normal advance simply takes over.
+     * while the current one plays and the transition carries no silence. The
+     * item that joins is the cut the transition will really land on: the
+     * alternate stream when it leads the stack, the catalogue file with the
+     * alternate as the fallback otherwise - so a licence that closes mid-
+     * queue still leaves a seamless handover in place. A warm source queues
+     * right away; a cold one resolves here and only queues if the engine is
+     * still on the track that asked for it. The licence (restored, or freshly
+     * acquired offline) is settled before the item joins the playlist, so the
+     * prebuffered track never asks the endpoint again at transition time. The
+     * bridge checks hasQueuedNext at the end of the track, so a late resolve
+     * can never leave the transition hanging - the normal advance simply
+     * takes over.
      */
     fun queueNext(track: CommandTrack, spclient: String) {
         if (track.isDirect) return
@@ -326,36 +330,59 @@ class KrespotPlayer(private val context: Context) {
         if (queuedNextUri == track.uri) return
         val file = track.best() ?: track.files.firstOrNull()
         val cached = sourceFor(track.uri)
+        val alternateLeads = StreamSources.order(context).firstOrNull() == StreamSource.YT_MUSIC
         val ticket = queueTicket.incrementAndGet()
         scope.launch {
-            val source = cached ?: warmSource(track.uri, spclient) ?: run {
-                log.w("seamless: '${track.name}' could not be resolved, the pre-queue was dropped")
+            val cut: Cut? = if (alternateLeads) {
+                YtMusicStreams.resolve(context, track)?.let { Cut.Alternate(it, track.uri) }
+            } else {
+                val source = cached ?: warmSource(track.uri, spclient)
+                if (source != null) {
+                    Cut.Catalogue(source, track.uri)
+                } else {
+                    YtMusicStreams.resolve(context, track)?.let { Cut.Alternate(it, track.uri) }
+                }
+            }
+            if (cut == null) {
+                log.w("seamless: '${track.name}' could not be resolved on any source, the pre-queue was dropped")
                 return@launch
             }
+            // The analysis reads the alternate back out of the table before
+            // the item itself lands on the engine, so the stream has to sit
+            // in it from the moment the cut is chosen.
+            if (cut is Cut.Alternate) YtStreamTable.serve(track.uri, cut.stream)
             if (ticket != queueTicket.get()) return@launch
             val still = engine
             if (still !== live || still.currentUri != askedFor || _state.value.trackUri != askedFor) {
                 return@launch
             }
-            val spec = automixSpecFor(track, source)
-            if (!still.queueNext(track.uri, source, askedFor, file?.gainDb ?: 0.0, spec)) {
+            val spec = automixSpecFor(track, cut)
+            val queued = when (cut) {
+                is Cut.Catalogue -> still.queueNext(track.uri, cut.source, askedFor, file?.gainDb ?: 0.0, spec)
+                is Cut.Alternate -> still.queueNextAlternate(track.uri, cut.stream, askedFor, spec)
+            }
+            if (!queued) {
                 log.i("seamless: the engine left '${askedFor.takeLast(12)}' before '${track.name}' landed")
                 return@launch
             }
-            SongCache.touch(track.uri, context)
+            if (cut is Cut.Catalogue) SongCache.touch(track.uri, context)
             queuedNextUri = track.uri
             queuedNextTrack = track
-            queuedGainDb = file?.gainDb ?: 0.0
-            log.i("queued next '${track.name}' ${if (cached != null) "from the warm source" else "after resolving"}")
+            queuedGainDb = if (cut is Cut.Catalogue) file?.gainDb ?: 0.0 else 0.0
+            log.i("queued next '${track.name}' " + when {
+                cut is Cut.Alternate -> "on the alternate stream"
+                cached != null -> "from the warm source"
+                else -> "after resolving"
+            })
         }
     }
 
     private val alternateWarming = HashSet<String>()
 
     /**
-     * The mp3 engine cannot hold a queue, so when youtube music leads the
-     * stack the next stream resolves ahead of time instead; the handoff then
-     * walks straight out of the resolve cache.
+     * Nothing is on the engine yet, so there is no playlist to join: the
+     * next stream still resolves ahead of time instead, and the eventual
+     * handoff walks straight out of the resolve cache.
      */
     private fun warmAlternateNext(track: CommandTrack) {
         if (StreamSources.order(context).firstOrNull() != StreamSource.YT_MUSIC) return
@@ -379,16 +406,19 @@ class KrespotPlayer(private val context: Context) {
      * Plans the DJ transition into [next] when automix is on and a beat grid
      * was measured on the device for the sides of the transition, so the fade
      * the engine holds is already sized in whole bars with the incoming
-     * track's tempo stretch decided. The analysis runs inside the time the
-     * current track has left; a window that does not finish in it simply
-     * leaves the planner without grids and the plan falls back to the plain
-     * fade, so the settings warning's promised crossfade happens even with
-     * the crossfade slider at zero. Both paths anchor on the outgoing track's
-     * measured audible end, so a silent tail no longer swallows the blend; a
-     * plain fade with automix off reuses an already measured tail without
-     * decoding anything new.
+     * track's tempo stretch decided. The grids are decoded from the cuts that
+     * will really meet - the playing rendition's tail against the queued
+     * rendition's head - and filed under each cut's own cache key, so a grid
+     * measured on the catalogue file is never reused for the alternate edit
+     * of the same track. The analysis runs inside the time the current track
+     * has left; a window that does not finish in it simply leaves the planner
+     * without grids and the plan falls back to the plain fade, so the settings
+     * warning's promised crossfade happens even with the crossfade slider at
+     * zero. Both paths anchor on the outgoing track's measured audible end, so
+     * a silent tail no longer swallows the blend; a plain fade with automix
+     * off reuses an already measured tail without decoding anything new.
      */
-    private suspend fun automixSpecFor(next: CommandTrack, nextSource: AudioSource): TransitionSpec? {
+    private suspend fun automixSpecFor(next: CommandTrack, nextCut: Cut): TransitionSpec? {
         val crossfadeMs = AppPrefs.getInt(context, CLIENT_STORE, CROSSFADE_MS_PREF, 0).toLong()
         if (!automixEnabled()) {
             if (crossfadeMs <= 0L) {
@@ -396,15 +426,16 @@ class KrespotPlayer(private val context: Context) {
                 return null
             }
             val currentUri = _state.value.trackUri
+            val currentCut = currentCutFor(currentUri) ?: return null
             val outDurationMs = _state.value.durationMs
-            val silenceMs = tailSilenceMsFor(currentUri)
+            val silenceMs = tailSilenceMsFor(currentCut)
             if (silenceMs <= 0L || outDurationMs <= 0L) return null
             log.i("automix is off, pulling the plain fade ${silenceMs}ms earlier over the measured tail silence")
             return AutomixPlanner.plan(
                 null,
                 null,
                 outDurationMs,
-                nextSource.seektable.totalDuration * 1000L / nextSource.seektable.timescale,
+                nextCut.lengthMs,
                 crossfadeMs,
                 silenceMs,
             )
@@ -422,8 +453,8 @@ class KrespotPlayer(private val context: Context) {
             log.i("automix declined: '${next.name}' is not a track")
             return null
         }
-        val currentSource = sourceFor(currentUri) ?: run {
-            log.i("automix declined: no resolved source for the playing track")
+        val currentCut = currentCutFor(currentUri) ?: run {
+            log.i("automix declined: no resolved rendition for the playing track")
             return null
         }
         val outDurationMs = _state.value.durationMs
@@ -431,7 +462,7 @@ class KrespotPlayer(private val context: Context) {
             log.i("automix declined: the playing duration is unknown")
             return null
         }
-        val nextDurationMs = nextSource.seektable.totalDuration * 1000L / nextSource.seektable.timescale
+        val nextDurationMs = nextCut.lengthMs
         val ticket = queueTicket.get()
         val stillWanted = {
             queueTicket.get() == ticket && _state.value.trackUri == currentUri
@@ -439,11 +470,11 @@ class KrespotPlayer(private val context: Context) {
         val remaining = outDurationMs - _state.value.positionMs
         val budget = (remaining - SPEC_MARGIN_MS).coerceIn(0L, MAX_SPEC_BUDGET_MS)
         val startedAt = SystemClock.elapsedRealtime()
-        val outGrid = automixAnalysis.tailGrid(currentSource, currentUri, outDurationMs, budget, stillWanted)
-        val outSilenceMs = tailSilenceMsFor(currentUri)
+        val outGrid = automixAnalysis.tailGrid(currentCut, outDurationMs, budget, stillWanted)
+        val outSilenceMs = tailSilenceMsFor(currentCut)
         val inGrid = if (outGrid != null) {
             val left = (budget - (SystemClock.elapsedRealtime() - startedAt)).coerceAtLeast(0L)
-            automixAnalysis.headGrid(nextSource, next.uri, nextDurationMs, left, stillWanted)
+            automixAnalysis.headGrid(nextCut, nextDurationMs, left, stillWanted)
         } else {
             null
         }
@@ -465,9 +496,25 @@ class KrespotPlayer(private val context: Context) {
         return spec
     }
 
-    private fun tailSilenceMsFor(uri: String): Long =
-        if (uri.startsWith("spotify:track:")) {
-            (automixAnalysis.tailSilenceSec(uri) * 1000.0).roundToLong().coerceAtLeast(0L)
+    /**
+     * The cut the playing track is actually on: the alternate stream when the
+     * engine is playing one, the catalogue file otherwise. Automix plans the
+     * transition over the cuts that will really meet, so the blend's timing
+     * survives a mid-queue handover between the two sources.
+     */
+    private fun currentCutFor(uri: String): Cut? {
+        if (!uri.startsWith("spotify:track:")) return null
+        if (_state.value.source == StreamSource.YT_MUSIC) {
+            val stream = YtStreamTable.of(YtStreamTable.keyFor(uri)) ?: return null
+            return Cut.Alternate(stream, uri)
+        }
+        val source = sourceFor(uri) ?: return null
+        return Cut.Catalogue(source, uri)
+    }
+
+    private fun tailSilenceMsFor(cut: Cut): Long =
+        if (cut.uri.startsWith("spotify:track:")) {
+            (automixAnalysis.tailSilenceSec(cut) * 1000.0).roundToLong().coerceAtLeast(0L)
         } else {
             0L
         }
@@ -1053,7 +1100,7 @@ class KrespotPlayer(private val context: Context) {
         _state.value = PlayerState(
             playing = true,
             buffering = true,
-            durationMs = track.durationMs,
+            durationMs = stream.lengthMs,
             bitrate = stream.bitrate,
             trackUri = track.uri,
             source = StreamSource.YT_MUSIC,
@@ -1063,10 +1110,10 @@ class KrespotPlayer(private val context: Context) {
                 "${stream.bitrate}b video=${stream.videoId}"
         )
         job = scope.launch {
-            var player: Mp3Engine? = null
+            var player: AudioEngine? = null
             try {
                 // The resume point rides the track's timeline; the stream is
-                // the alternate cut's, so fold it across before the extractor
+                // the alternate cut's, so fold it across before the engine
                 // seeks — a handover at 2:00 of a 3:00 track must not land at
                 // 2:00 of a 3:20 edit.
                 val requestedMs = if (parked >= 0L) parked else fromMs
@@ -1076,7 +1123,11 @@ class KrespotPlayer(private val context: Context) {
                             "${stream.lengthMs}ms against the track's ${track.durationMs}ms"
                     )
                 }
-                player = Mp3Engine(stream.url, { event ->
+                // The alternate rides the same session player as the catalogue
+                // files, so the queue, the crossfade and the blends keep
+                // working across a handover instead of restarting between two
+                // engines.
+                val sink: (PlayerEvent) -> Unit = { event ->
                     if (id == generation) {
                         if (event is PlayerEvent.Failed && transportDivertUri == null &&
                             _state.value.positionMs > 0L &&
@@ -1085,20 +1136,33 @@ class KrespotPlayer(private val context: Context) {
                             // Same guard as the spotify sink: the failure stays
                             // hidden while the handover back is still possible.
                         } else {
-                            mirror(event, _state.value.durationMs)
+                            mirror(event, player?.durationMs ?: stream.lengthMs)
                             if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                         }
                     }
-                }, stream.headers, startAtMs, context.cacheDir, stream.head, stream.total)
-                mp3 = player
-                player.run()
+                }
+                player = engine?.also { it.onEvent = sink }
+                    ?: AudioEngine(context, scope, sink).also { engine = it }
+                val ready = player.prepareAlternate(track.uri, stream, startAtMs, autoplay = !pendingPause)
+                if (!ready || id != generation) {
+                    player.stop()
+                    if (id == generation) {
+                        settleStopped()
+                        _events.emit(PlayerEvent.Failed("prepare"))
+                    } else {
+                        log.i("play was superseded before the engine came up")
+                    }
+                    return@launch
+                }
+                engineIdle = false
+                if (pendingPause) {
+                    log.i("play was asked to stay paused, holding it at ${startAtMs}ms")
+                }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Throwable) {
                 log.e("play youtube music failed ${failure.javaClass.simpleName}: ${failure.message}")
                 _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
-            } finally {
-                if (player != null && mp3 === player) mp3 = null
             }
         }
     }
