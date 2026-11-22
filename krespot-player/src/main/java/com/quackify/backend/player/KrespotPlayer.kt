@@ -153,9 +153,6 @@ class KrespotPlayer(private val context: Context) {
     @Volatile
     private var engine: AudioEngine? = null
 
-    @Volatile
-    private var mp3: Mp3Engine? = null
-
     private var job: Job? = null
 
     @Volatile
@@ -802,7 +799,7 @@ class KrespotPlayer(private val context: Context) {
 
     val positionMs: Long
         get() = if (videoActive) video.positionMs else engine?.takeIf { it.hasMedia }?.currentPositionMs
-            ?: mp3?.currentPositionMs ?: _state.value.positionMs
+            ?: _state.value.positionMs
 
     val durationMs: Long get() = _state.value.durationMs
 
@@ -817,9 +814,9 @@ class KrespotPlayer(private val context: Context) {
     val quality: String get() = _state.value.quality
 
     val hasSource: Boolean
-        get() = videoActive || (engine?.hasMedia == true && !engineIdle) || mp3 != null || job?.isActive == true
+        get() = videoActive || (engine?.hasMedia == true && !engineIdle) || job?.isActive == true
 
-    val hasQueuedNext: Boolean get() = !videoActive && mp3 == null && (engine?.takeIf { it.hasMedia }?.hasQueuedNext ?: false)
+    val hasQueuedNext: Boolean get() = !videoActive && (engine?.takeIf { it.hasMedia }?.hasQueuedNext ?: false)
 
     val currentUri: String
         get() = engine?.takeIf { it.hasMedia }?.currentUri ?: _state.value.trackUri
@@ -1205,24 +1202,52 @@ class KrespotPlayer(private val context: Context) {
         _state.value = PlayerState(playing = true, buffering = true, trackUri = track.uri)
         log.i("play direct '${track.name.ifBlank { track.uri }}' ${file?.bitrate ?: 0}b ${url.take(72)}")
         job = scope.launch {
-            var player: Mp3Engine? = null
+            var player: AudioEngine? = null
             try {
-                player = Mp3Engine(url, { event ->
+                // The ad body rides the same session player as the catalogue
+                // files and the alternates - one engine, one focus path, one
+                // set of transport semantics - streamed out of the pool
+                // instead of the song cache, so a one-shot impression url
+                // never sits on disk.
+                val sink: (PlayerEvent) -> Unit = { event ->
                     if (id == generation) {
-                        mirror(event, _state.value.durationMs)
+                        mirror(event, player?.durationMs ?: track.durationMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                     }
-                }, startAtMs = if (parked >= 0L) parked else fromMs, cacheDir = context.cacheDir)
-                mp3 = player
-                _state.value = PlayerState(playing = true, buffering = true, trackUri = track.uri)
-                player.run()
+                }
+                player = engine?.also { it.onEvent = sink }
+                    ?: AudioEngine(context, scope, sink).also { engine = it }
+                val startAtMs = if (parked >= 0L) parked else fromMs
+                val ready = player.prepareDirect(
+                    track.uri, url, startAtMs,
+                    autoplay = !pendingPause, trackDurationMs = track.durationMs,
+                )
+                if (!ready || id != generation) {
+                    player.stop()
+                    if (id == generation) {
+                        settleStopped()
+                        _events.emit(PlayerEvent.Failed("prepare"))
+                    } else {
+                        log.i("play was superseded before the engine came up")
+                    }
+                    return@launch
+                }
+                engineIdle = false
+                if (pendingPause) {
+                    log.i("play was asked to stay paused, holding it at ${startAtMs}ms")
+                }
+                if (pendingSeekMs >= 0L) {
+                    val seek = pendingSeekMs.also { pendingSeekMs = -1L }
+                    log.i("a seek parked while the engine was loading, applying at ${seek}ms")
+                    player.seekTo(seek)
+                }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Throwable) {
                 log.e("play direct failed ${failure.javaClass.simpleName}: ${failure.message}")
+                player?.stop()
+                if (player != null && engine === player) engineIdle = true
                 _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
-            } finally {
-                if (player != null && mp3 === player) mp3 = null
             }
         }
     }
@@ -1237,7 +1262,6 @@ class KrespotPlayer(private val context: Context) {
         pendingPause = true
         if (videoActive) video.pause()
         engine?.pause()
-        mp3?.pause()
         _state.update { it.copy(playing = false, paused = true, buffering = false) }
     }
 
@@ -1254,34 +1278,24 @@ class KrespotPlayer(private val context: Context) {
         pendingPause = false
         if (videoActive) video.play()
         engine?.resume()
-        mp3?.resume()
         _state.update { it.copy(playing = true, paused = false, buffering = false) }
     }
 
     fun duck(level: Float) {
         if (videoActive) video.duck(level)
         engine?.duck(level)
-        mp3?.duck(level)
     }
 
     /** User volume on the local sink, kept separate from audio-focus ducking. */
     fun setVolume(level: Float) {
         if (videoActive) video.duck(level)
         engine?.volume(level)
-        mp3?.volume(level)
     }
 
     fun seekTo(ms: Long) {
         if (videoActive) {
             log.i("video seek -> ${ms}ms")
             video.seekTo(ms)
-            _state.update { it.copy(positionMs = ms) }
-            return
-        }
-        val direct = mp3
-        if (direct != null) {
-            log.i("seek -> ${ms}ms on the direct engine")
-            direct.seekTo(ms)
             _state.update { it.copy(positionMs = ms) }
             return
         }
@@ -1320,8 +1334,6 @@ class KrespotPlayer(private val context: Context) {
         deepTarget = ""
         engine?.stop()
         engineIdle = true
-        mp3?.stop()
-        mp3 = null
         job?.cancel()
         job = null
         focus.abandon()
@@ -1430,8 +1442,6 @@ class KrespotPlayer(private val context: Context) {
     private fun stopAudio() {
         generation++
         engine?.stop()
-        mp3?.stop()
-        mp3 = null
         job?.cancel()
         job = null
     }
