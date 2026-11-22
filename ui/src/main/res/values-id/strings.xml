@@ -574,3 +574,54 @@
 <string name="more_options_for">Opsi lainnya untuk %1$s</string>
 <string name="no_kind_found_for_query">Tidak ditemukan %1$s untuk "%2$s"</string>
 <string name="playlist_by_creator">Playlist • Oleh %1$s</string>
+<string name="show_rating">%1$s ★ • %2$s penilaian</string>
+<string name="follower_count">%1$s pengikut</string>
+<string name="listener_count">%1$s pendengar</string>
+<string name="plays_count">%1$s kali diputar</string>
+<string name="radio_title">Radio %1$s</string>
+<string name="playlist_by">Playlist • %1$s</string>
+<string name="popular_in_cities">Populer di %1$s</string>
+<string name="webview_missing_message">Paket Android System WebView tidak tersedia, dinonaktifkan, atau sedang diperbarui di perangkat ini sehingga halaman login tidak dapat dibuka. Aktifkan atau perbarui Android System WebView melalui pengaturan sistem, lalu coba lagi.</string>
+
+<plurals name="song_count">
+    <item quantity="one">1 lagu</item>
+    <item quantity="other">%1$d lagu</item>
+</plurals>
+<plurals name="day_count">
+    <item quantity="one">1 hari</item>
+    <item quantity="other">%1$d hari</item>
+</plurals>
+<plurals name="play_count">
+    <item quantity="one">%1$s kali diputar</item>
+    <item quantity="other">%1$s kali diputar</item>
+</plurals>
+<plurals name="sleep_timer_hours">
+    <item quantity="one">%1$d jam</item>
+    <item quantity="other">%1$d jam</item>
+</plurals>
+<plurals name="sleep_timer_minutes">
+    <item quantity="one">%1$d menit</item>
+    <item quantity="other">%1$d menit</item>
+</plurals>
+
+<string name="player_controls">Kontrol pemutar</string>
+<string name="notification_and_car_controls">Kontrol notifikasi &amp; Android Auto</string>
+<string name="notification_and_car_controls_desc">Sesuaikan urutan tombol dan tindakannya untuk notifikasi media, layar kunci, dan Android Auto</string>
+<string name="configure_player_buttons">Atur tombol pemutar</string>
+<string name="configure_player_buttons_subtitle">Kontrol layar mobil &amp; notifikasi ponsel</string>
+<string name="tap_button_to_customize">👉 Ketuk ikon tombol mana pun pada pratinjau di atas untuk menyesuaikan tindakan dan posisinya!</string>
+<string name="reset_default">Pulihkan pengaturan default</string>
+<string name="save_and_apply">Simpan &amp; Terapkan</string>
+<string name="select_action_for_slot">Pilih tindakan untuk tombol %1$d</string>
+<string name="previous_track">Trek sebelumnya</string>
+<string name="play_pause">Putar / Jeda</string>
+<string name="next_track">Trek berikutnya</string>
+<string name="favorite_like">Favorit / Suka</string>
+<string name="repeat_mode">Mode pengulangan</string>
+<string name="shuffle_mode">Mode acak</string>
+<string name="none_empty_slot">Tidak ada (Slot kosong)</string>
+<string name="enable_android_auto">Integrasi Android Auto</string>
+<string name="enable_android_auto_desc">Tampilkan kontrol pemutar khusus pada layar mobil</string>
+<string name="app_icon_and_player_controls">Ikon aplikasi dan kontrol pemutar</string>
+<string name="player_controls_and_app_icon">Kontrol pemutar dan ikon aplikasi</string>
+</resources>
