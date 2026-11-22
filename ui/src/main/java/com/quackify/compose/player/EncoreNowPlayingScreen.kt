@@ -1,22 +1,25 @@
 package com.quackify.compose.player
 
+import android.app.Activity
+import android.content.res.Configuration
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.ScrollState
@@ -31,11 +34,6 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.text.input.InputTransformation
-import androidx.compose.foundation.text.input.TextFieldDecorator
-import androidx.compose.foundation.text.input.clearText
-import androidx.compose.foundation.text.input.maxLengthTrim
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -50,36 +48,38 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.maxLengthTrim
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.rememberSliderState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -92,33 +92,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalConfiguration
-import android.content.res.Configuration
-import android.app.Activity
-import android.view.WindowManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -126,7 +119,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -136,40 +128,36 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.quackify.compose.R
-import com.quackify.compose.shell.ChapterMarker
-import com.quackify.compose.sheets.LyricsProviderSheet
-import com.quackify.compose.sheets.LyricsShortcutSheet
-import com.quackify.compose.sheets.TranslationLanguageSheet
 import com.quackify.compose.components.CanvasVideoPlayer
-import com.quackify.compose.components.MusicVideoSurface
-import com.quackify.compose.components.EncoreHeartButton
+import com.quackify.compose.components.EncoreArtworkImage
 import com.quackify.compose.components.EncoreExplicitTag
+import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncoreMenu
 import com.quackify.compose.components.EncoreMenuItem
 import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreRepeatButton
 import com.quackify.compose.components.EncoreSmartShuffleButton
+import com.quackify.compose.components.MusicVideoSurface
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
-import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.playlist.TrackItem
+import com.quackify.compose.sheets.DarkSystemBarsSheet
+import com.quackify.compose.sheets.LyricsProviderSheet
+import com.quackify.compose.sheets.LyricsShortcutSheet
+import com.quackify.compose.sheets.TranslationLanguageSheet
+import com.quackify.compose.shell.ChapterMarker
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreCornerRadii
 import com.quackify.compose.theme.EncoreSpacers
-import com.quackify.compose.theme.EncoreAppTheme
+import com.quackify.compose.theme.EncoreTheme
+import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
-import com.quackify.compose.theme.EncoreTheme
-import com.quackify.compose.playlist.TrackItem
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
-import com.quackify.compose.sheets.DarkSystemBarsSheet
-import com.quackify.compose.util.rememberDominantColor
-import androidx.compose.ui.res.stringResource
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val LANDSCAPE_ARTWORK_PANE_WEIGHT = 0.40f
 private const val LANDSCAPE_CONTROLS_PANE_WEIGHT = 0.60f
@@ -1594,7 +1582,7 @@ private fun NowPlayingArtworkCard(
                 if (videoOverlayVisible == null) {
                     LaunchedEffect(internalOverlay) {
                         if (internalOverlay) {
-                            delay(3000)
+                            delay(3000.milliseconds)
                             internalOverlay = false
                         }
                     }
@@ -1858,7 +1846,6 @@ private fun SwipableTrackArtwork(
             }
     ) {
         val pageWidth = maxWidth
-        val pageWidthPx = with(LocalDensity.current) { pageWidth.toPx() }
         Row(
             modifier = Modifier
                 .requiredWidth(pageWidth * 3)
@@ -1949,7 +1936,7 @@ private fun VideoFullscreenLayout(
     var overlayVisible by remember { mutableStateOf(true) }
     LaunchedEffect(overlayVisible) {
         if (overlayVisible) {
-            delay(3000)
+            delay(3000.milliseconds)
             overlayVisible = false
         }
     }
@@ -2980,7 +2967,7 @@ private fun FullscreenLyricsView(
         if (heldLyricIndex != null) {
             suppressAutoScroll = true
         } else {
-            delay(2500)
+            delay(2500.milliseconds)
             suppressAutoScroll = false
         }
     }
@@ -3143,7 +3130,7 @@ private fun FullscreenLyricsView(
                 // release, does not fire the tap-to-seek.
                 LaunchedEffect(linePressed) {
                     if (linePressed) {
-                        delay(360)
+                        delay(360.milliseconds)
                         holdConsumed.value = true
                         heldLyricIndex = index
                     } else {
@@ -3243,8 +3230,8 @@ private fun spokenPrefixEnd(line: TranscriptLine, positionMs: Long): Int {
     val words = line.words
     if (words.isEmpty()) return if (positionMs >= line.startMs) line.text.length else 0
     var end = 0
-    for (word in words) {
-        if (positionMs >= word.startMs) end = word.endChar else break
+    for ((startMs, _, endChar) in words) {
+        if (positionMs >= startMs) end = endChar else break
     }
     return end
 }
@@ -3694,7 +3681,7 @@ private fun transcriptBoundary(line: TranscriptLine, positionMs: Long): Float {
     for (index in words.indices.reversed()) {
         val word = words[index]
         if (positionMs >= word.startMs) {
-            val span = (words.getOrNull(index + 1)?.startMs ?: line.startMs + 1)
+            val span = ((words.getOrNull(index + 1)?.startMs ?: (line.startMs + 1)))
                 .coerceAtLeast(word.startMs + 1L) - word.startMs
             val frac = ((positionMs - word.startMs).toFloat() / span).coerceIn(0f, 1f)
             return word.startChar + (word.endChar - word.startChar) * frac
