@@ -444,6 +444,9 @@ class KrespotPlayer(private val context: Context) {
             val currentCut = currentCutFor(currentUri) ?: return null
             val outDurationMs = _state.value.durationMs
             val silenceMs = tailSilenceMsFor(currentCut)
+            // The trim rides on the measurement alone, so it holds even when
+            // the plain fade never arms.
+            engine?.noteTailSilence(currentUri, silenceMs)
             if (silenceMs <= 0L || outDurationMs <= 0L) return null
             log.i("automix is off, pulling the plain fade ${silenceMs}ms earlier over the measured tail silence")
             return AutomixPlanner.plan(
@@ -487,6 +490,9 @@ class KrespotPlayer(private val context: Context) {
         val startedAt = SystemClock.elapsedRealtime()
         val outGrid = automixAnalysis.tailGrid(currentCut, outDurationMs, budget, stillWanted)
         val outSilenceMs = tailSilenceMsFor(currentCut)
+        // Noted the moment it is measured, not when the hold lands: a late or
+        // failed queue must not cost the track its audible end.
+        engine?.noteTailSilence(currentUri, outSilenceMs)
         val inGrid = if (outGrid != null) {
             val left = (budget - (SystemClock.elapsedRealtime() - startedAt)).coerceAtLeast(0L)
             automixAnalysis.headGrid(nextCut, nextDurationMs, left, stillWanted)

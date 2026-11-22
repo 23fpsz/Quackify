@@ -164,6 +164,17 @@ internal class CrossfadeEngine(
 
     fun hasHold(): Boolean = held != null
 
+    /**
+     * True when the blend is already running, or armed with the spare
+     * playable and so about to start: the ending of the outgoing track is
+     * spoken for here, and the engine's tail trim must leave it alone.
+     */
+    fun ownsTheEnding(): Boolean = when (phase) {
+        Phase.FADING -> true
+        Phase.ARMING -> incoming?.playbackState == Player.STATE_READY
+        else -> false
+    }
+
     fun onUserSeek() {
         scope.launch {
             if (phase == Phase.IDLE) return@launch
