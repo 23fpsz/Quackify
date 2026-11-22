@@ -454,6 +454,22 @@ object EncoreAuth {
     fun customSpDcLength(context: Context): Int =
         if (customSpDc(context)) spDc(context).length else 0
 
+    /**
+     * Drops a custom sp_dc session without touching anything the web login
+     * saved: the account that was active before the door installed the custom
+     * cookie is restored from its snapshot when one exists, so a remove is a
+     * switch-back instead of a logout. Returns true when a stored account was
+     * restored, false when the removal ended in a full logout.
+     */
+    fun removeCustomSpDc(context: Context): Boolean {
+        val saved = savedAccounts(context)
+        val previous = activeAccountId(context)
+        val target = saved.firstOrNull { it.id == previous } ?: saved.firstOrNull()
+        if (target != null && switchAccount(context, target.id)) return true
+        logout(context)
+        return false
+    }
+
     fun spDcOf(cookies: String): String {
         val map = runCatching { JSONObject(cookies) }.getOrNull() ?: return ""
         COOKIE_DOMAINS.forEach { domain ->
