@@ -21,7 +21,6 @@
 package com.quackify.backend.player
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -565,7 +564,7 @@ private object GridCache {
         }
     }
 
-    private fun touchIndex(prefs: SharedPreferences, editor: SharedPreferences.Editor, key: String) {
+    private fun touchIndex(prefs: AppPrefs.Prefs, editor: AppPrefs.Editor, key: String) {
         val keys = prefs.getString(KEY_INDEX, "").orEmpty()
             .split(',').filter { it.isNotBlank() }.toMutableList()
         keys.remove(key)
