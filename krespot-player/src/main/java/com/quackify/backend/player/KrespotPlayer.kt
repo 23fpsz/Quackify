@@ -88,6 +88,9 @@ private const val MAX_SPEC_BUDGET_MS = 120_000L
 /** Length disagreement below this is the same cut; a resume crosses it untouched. */
 private const val SAME_CUT_MS = 2_000L
 
+/** Head window the queue pre-pulls for the next alternate handover. */
+private const val WARM_HEAD_SECONDS = 30L
+
 sealed interface PlayerEvent {
     data class Started(val uri: String = "") : PlayerEvent
     data class Ended(val uri: String = "") : PlayerEvent
@@ -328,6 +331,8 @@ class KrespotPlayer(private val context: Context) {
         val askedFor = _state.value.trackUri
         if (askedFor.isBlank() || live.currentUri != askedFor) return
         if (queuedNextUri == track.uri) return
+        // A new next replaces whatever the previous queue held warm.
+        YtStreamPool.unpinAll()
         val file = track.best() ?: track.files.firstOrNull()
         val cached = sourceFor(track.uri)
         val alternateLeads = StreamSources.order(context).firstOrNull() == StreamSource.YT_MUSIC
@@ -355,6 +360,19 @@ class KrespotPlayer(private val context: Context) {
             val still = engine
             if (still !== live || still.currentUri != askedFor || _state.value.trackUri != askedFor) {
                 return@launch
+            }
+            if (cut is Cut.Alternate) {
+                // The plain queue opens the item's loads only once the current
+                // period is done buffering, which on a slow wire is the
+                // handover itself: pin the rendition's buffer now with its
+                // head window pulled and parked, so the handover's open
+                // finds the transition window already on disk.
+                YtStreamPool.warmHead(
+                    YtStreamTable.keyFor(track.uri),
+                    cut.stream,
+                    context,
+                    (cut.stream.bitrate.coerceIn(64_000, 512_000) / 8L) * WARM_HEAD_SECONDS,
+                )
             }
             val spec = automixSpecFor(track, cut)
             val queued = when (cut) {
@@ -1296,6 +1314,7 @@ class KrespotPlayer(private val context: Context) {
         queuedNextTrack = null
         refused = null
         automixAnalysis.interrupt()
+        YtStreamPool.unpinAll()
         stopVideo()
         deepJob?.cancel()
         deepTarget = ""
