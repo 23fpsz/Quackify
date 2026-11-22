@@ -37,7 +37,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.runInterruptible
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.MP3)
@@ -203,7 +202,11 @@ internal class StreamBuffer private constructor(
             }
 
             if (index < 0) {
-                withTimeoutOrNull(1_000.milliseconds) { progressed.await() }
+                // The condition cannot be awaited from a coroutine: it needs
+                // the monitor held, and a pooled worker parked on it would sit
+                // un-cancellable. A short poll is all a prefetcher needs to
+                // notice fresh holes or closure.
+                delay(250.milliseconds)
                 continue
             }
 
