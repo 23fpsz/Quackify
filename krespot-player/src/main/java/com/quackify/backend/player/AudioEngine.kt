@@ -56,6 +56,9 @@ private val log = Logs.of(Logs.Module.PLAYER)
 
 private const val PROGRESS_MS = 500L
 
+/** Shorter measured tails are treated as measurement noise, not a trim. */
+private const val MIN_TAIL_TRIM_MS = 500L
+
 private const val CLIENT_STORE = "quackify.client"
 
 private const val CROSSFADE_MS_PREF = "crossfadeMs"
@@ -212,6 +215,16 @@ internal class AudioEngine(
     @Volatile
     private var lastItemUri = ""
 
+    /**
+     * The measured silent tail of the item the session is on, as uri to ms of
+     * quiet. The trim only ever acts past the measured audible end and only
+     * when no blend owns the ending, so a measurement that arrives too late
+     * for the crossfade still ends the track at its audible end instead of
+     * decaying into dead air.
+     */
+    @Volatile
+    private var tailSilence: Pair<String, Long>? = null
+
     private val itemDurations = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     @Volatile
@@ -285,6 +298,7 @@ internal class AudioEngine(
             durationMs = totalMs
             announced = false
             lastItemUri = uri
+            tailSilence = null
             if (uri.isNotBlank()) itemDurations[uri] = totalMs
             // The player instance survives track changes: swapping the media
             // source keeps the renderers, the codec and the audio sink warm, so
@@ -461,6 +475,7 @@ internal class AudioEngine(
             durationMs = totalMs
             announced = false
             lastItemUri = uri
+            tailSilence = null
             if (uri.isNotBlank()) itemDurations[uri] = totalMs
             // The player instance survives track changes: swapping the media
             // source keeps the renderers, the codec and the audio sink warm, so
@@ -557,6 +572,7 @@ internal class AudioEngine(
             durationMs = trackDurationMs
             announced = false
             lastItemUri = uri
+            tailSilence = null
             if (uri.isNotBlank() && trackDurationMs > 0L) itemDurations[uri] = trackDurationMs
             // The player instance survives track changes: swapping the media
             // source keeps the renderers, the codec and the audio sink warm, so
@@ -661,6 +677,7 @@ internal class AudioEngine(
         loaded = false
         durationMs = 0L
         lastItemUri = ""
+        tailSilence = null
         progressJob?.cancel()
         progressJob = null
         runOnMain {
@@ -675,6 +692,7 @@ internal class AudioEngine(
         loaded = false
         durationMs = 0L
         lastItemUri = ""
+        tailSilence = null
         progressJob?.cancel()
         progressJob = null
         runOnMain {
@@ -750,6 +768,7 @@ internal class AudioEngine(
         sessionKit = spareKit
         spareKit = handedKit
         lastItemUri = uri
+        tailSilence = null
         announced = true
         if (durationMs > 0L) {
             this.durationMs = durationMs
@@ -769,9 +788,44 @@ internal class AudioEngine(
                     lastPositionMs = position
                     onEvent(PlayerEvent.Progress(position, durationMs))
                 }
+                trimSilentTail(position)
                 delay(PROGRESS_MS.milliseconds)
             }
         }
+    }
+
+    /**
+     * Files the measured silent tail of the item the session is currently
+     * on. Noted the moment a measurement exists - even if the crossfade
+     * never arms - so every path past the measurable point can act on it.
+     * A silence below the floor clears any earlier note.
+     */
+    fun noteTailSilence(uri: String, silenceMs: Long) {
+        tailSilence = if (silenceMs >= MIN_TAIL_TRIM_MS) uri to silenceMs else null
+    }
+
+    /**
+     * The audible end stands in for the real one when no blend owns the
+     * ending: past it the session would only render silence, so the ended
+     * event fires there - exactly the sequence a natural end runs - and the
+     * normal advance lands the next track on top of the quiet tail instead
+     * of after it. The blend paths are left alone: an armed-and-ready spare
+     * is a beat from starting, and a running blend hands the session over at
+     * this very point on its own.
+     */
+    private fun trimSilentTail(position: Long) {
+        val (uri, silence) = tailSilence ?: return
+        if (silence <= 0L || durationMs <= silence) return
+        if (uri != lastItemUri || position < durationMs - silence) return
+        if (crossfade?.ownsTheEnding() == true) return
+        val playing = runOnMain { player?.isPlaying } ?: return
+        if (!playing) return
+        tailSilence = null
+        log.i("trimming '${uri.takeLast(12)}' at the audible end, ${silence}ms of tail silence skipped")
+        if (crossfade?.onSessionEnded() == true) return
+        lastPositionMs = durationMs
+        onEvent(PlayerEvent.Ended(uri))
+        lastItemUri = ""
     }
 
     private val listener = object : Player.Listener {
@@ -819,7 +873,9 @@ internal class AudioEngine(
                 Player.STATE_ENDED -> {
                     if (crossfade?.onSessionEnded() == true) return
                     lastPositionMs = durationMs
-                    onEvent(PlayerEvent.Ended(lastItemUri))
+                    // A trim already ended this item; the natural end that
+                    // follows must not advance the queue a second time.
+                    if (lastItemUri.isNotBlank()) onEvent(PlayerEvent.Ended(lastItemUri))
                     lastItemUri = ""
                 }
                 else -> Unit
