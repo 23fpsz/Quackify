@@ -3011,11 +3011,14 @@ private fun FullscreenLyricsView(
             )
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(horizontal = EncoreSpacers.Looser2)
+        // No horizontal padding here: the DeepFeel highlight wash runs from
+        // screen edge to screen edge, so the list itself is full-bleed and
+        // each line pads its own text inward.
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = EncoreSpacers.Looser2)
                 .padding(vertical = EncoreSpacers.Tighter2)
         ) {
             Row(
@@ -3118,7 +3121,11 @@ private fun FullscreenLyricsView(
                 )
                 val lineBlurModifier = if (lineBlur > 0.dp) Modifier.blur(lineBlur) else Modifier
                 val lineFont by animateFloatAsState(
-                    targetValue = if (isCurrentLine) 28f else 23f,
+                    targetValue = when {
+                        !deepFeel -> if (isCurrentLine) 28f else 23f
+                        isCurrentLine -> 30f
+                        else -> 23f
+                    },
                     animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
                     label = "deepFeelLineFont"
                 )
@@ -3170,6 +3177,9 @@ private fun FullscreenLyricsView(
                         ) {
                             if (!holdConsumed.value) onSeekMs(line.startTimeMs)
                         }
+                        // The wash behind the active line is full-bleed, so
+                        // the horizontal inset lives on the text itself.
+                        .padding(horizontal = EncoreSpacers.Looser2)
                 ) {
                     if (isCurrentLine && line.isWordSynced) {
                         WordSyncedLyricSweepText(
@@ -3223,6 +3233,7 @@ private fun FullscreenLyricsView(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(horizontal = EncoreSpacers.Looser2)
                             .padding(top = 28.dp)
                     )
                 }
