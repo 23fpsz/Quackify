@@ -435,8 +435,21 @@ object EncoreAuth {
      * in here" from "an experiment pasted something short" without leaking
      * the credential into logs or the UI.
      */
-    fun customSpDc(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_CUSTOM_SPDC, false)
+    fun customSpDc(context: Context): Boolean {
+        if (prefs(context).getBoolean(KEY_CUSTOM_SPDC, false)) return true
+        // The flag is written at save time only, so a session installed before
+        // the flag existed is recognised by its shape: the door stores exactly
+        // one domain with nothing but sp_dc cookies, the web login always
+        // captures more domains and more cookies than that.
+        val session = prefs(context).getString(KEY_SESSION, null) ?: return false
+        val map = runCatching { JSONObject(session) }.getOrNull() ?: return false
+        if (map.length() != 1) return false
+        val cookies = map.optString("https://open.spotify.com", "")
+            .split(";")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        return cookies.isNotEmpty() && cookies.all { it.startsWith("sp_dc=") }
+    }
 
     fun customSpDcLength(context: Context): Int =
         if (customSpDc(context)) spDc(context).length else 0
