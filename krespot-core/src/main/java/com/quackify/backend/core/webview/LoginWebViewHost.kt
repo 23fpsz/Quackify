@@ -652,7 +652,6 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
             view.settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                databaseEnabled = true
                 useWideViewPort = true
                 loadWithOverviewMode = true
                 setSupportZoom(true)
