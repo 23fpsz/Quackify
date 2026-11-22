@@ -240,6 +240,9 @@ fun SettingsScreen(
     // Holds the sp_dc that could not be checked while the user decides
     // whether to keep it anyway; blank when no decision is pending.
     var spDcUnchecked by remember { mutableStateOf<String?>(null) }
+    // Bumped after a sp_dc is installed so the row's subtitle — which reads
+    // prefs, not snapshot state — recomposes and picks the new length up.
+    var spDcRevision by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
     val disableDebug = {
         debugUnlocked = false
@@ -990,13 +993,31 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
+                                // When a custom sp_dc is installed the subtitle
+                                // says so — with the cookie's length in bytes,
+                                // never its value — so the debug door keeps
+                                // reminding the tinkerer what session they are
+                                // actually running on.
+                                val customSpDcLength = remember(spDcRevision) {
+                                    EncoreAuth.customSpDcLength(context)
+                                }
                                 Text(
                                     text = stringResource(R.string.sign_in_with_sp_dc),
                                     style = EncoreTheme.typography.bodyMediumBold
                                 )
                                 Text(
-                                    text = stringResource(R.string.sign_in_with_sp_dc_subtitle),
-                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                    text = if (customSpDcLength > 0) {
+                                        stringResource(R.string.sp_dc_installed_subtitle, customSpDcLength)
+                                    } else {
+                                        stringResource(R.string.sign_in_with_sp_dc_subtitle)
+                                    },
+                                    style = EncoreTheme.typography.bodySmall.copy(
+                                        color = if (customSpDcLength > 0) {
+                                            EncoreColors.Green
+                                        } else {
+                                            EncoreColors.TextSecondary
+                                        }
+                                    )
                                 )
                             }
                             Icon(
@@ -1027,13 +1048,14 @@ fun SettingsScreen(
                             val cookies = JSONObject()
                                 .put("https://open.spotify.com", "sp_dc=$spDc")
                                 .toString()
-                            EncoreAuth.saveLogin(context, cookies, outcome.account)
+                            EncoreAuth.saveLogin(context, cookies, outcome.account, customSpDc = true)
                             Toast.makeText(
                                 context,
                                 context.getString(R.string.sp_dc_signed_in, outcome.account.name),
                                 Toast.LENGTH_SHORT
                             ).show()
                             onSpDcSignedIn()
+                            spDcRevision++
                         }
                         // The server could not be reached to vouch for the
                         // cookie, so the user decides: keep it and let the
@@ -1065,10 +1087,12 @@ fun SettingsScreen(
                 EncoreAuth.saveLogin(
                     context,
                     cookies,
-                    EncoreAuth.Account(name = context.getString(R.string.sp_dc_pending_name))
+                    EncoreAuth.Account(name = context.getString(R.string.sp_dc_pending_name)),
+                    customSpDc = true
                 )
                 Toast.makeText(context, R.string.sp_dc_signed_in_unchecked, Toast.LENGTH_SHORT).show()
                 onSpDcSignedIn()
+                spDcRevision++
             }
         },
         onDismiss = { spDcUnchecked = null }

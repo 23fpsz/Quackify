@@ -2949,9 +2949,67 @@ private fun FullscreenLyricsView(
     )
     val activeIndex by rememberActiveLyricIndex(clockMs, lyrics)
     val listState = rememberLazyListState()
+
+    // ---- The sneak peek hand-off ----------------------------------------
+    // When the song ends and the next one starts while the reader is open,
+    // the peek earns its keep: it is already showing the opening of what is
+    // now playing, so instead of the lyrics list snapping to a new song, the
+    // whole sheet — title bar, old lyrics and the peek at the bottom — is
+    // carried up and out by the peek itself, and the new song's lines slide
+    // in from below. The old sheet's data is held for the exit so it keeps
+    // rendering what the user was just reading while it leaves.
     val deepFeel = LyricsOptions.deepFeelEnabled
     val nextPeekEnabled = LyricsOptions.nextTrackPeek
-    val showNextPeek = nextPeekEnabled && nextTrack != null && nextTrackLyrics.isNotEmpty()
+    val trackKey = remember(lyrics) { lyrics.firstOrNull()?.startTimeMs }
+    var handoffExit by remember { mutableStateOf(false) }
+    var heldTitle by remember { mutableStateOf(title) }
+    var heldArtist by remember { mutableStateOf(artist) }
+    var heldLyrics by remember { mutableStateOf(lyrics) }
+    var heldProvider by remember { mutableStateOf(lyricsProviderName) }
+    var heldPeekTrack by remember { mutableStateOf(nextTrack) }
+    var heldPeekLyrics by remember { mutableStateOf(nextTrackLyrics) }
+    var heldTrackKey by remember { mutableStateOf(trackKey) }
+    var hasShownPeekHandoff by remember { mutableStateOf(false) }
+    // Rides at the head of the exiting sheet: the peek pulls upward a touch
+    // faster than the sheet itself, so the hand-off reads as the next song
+    // dragging the old one away.
+    val peekLead by animateFloatAsState(
+        targetValue = if (handoffExit) 1f else 0f,
+        animationSpec = tween(durationMillis = 460, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "peekLead"
+    )
+    LaunchedEffect(trackKey) {
+        if (heldTrackKey != trackKey && hasShownPeekHandoff) {
+            handoffExit = true
+            // The exit runs 460ms; the entering sheet waits for it so the
+            // two never overlap on screen.
+            delay(460)
+            handoffExit = false
+        }
+        hasShownPeekHandoff = true
+        heldTrackKey = trackKey
+        heldTitle = title
+        heldArtist = artist
+        heldLyrics = lyrics
+        heldProvider = lyricsProviderName
+        heldPeekTrack = nextTrack
+        heldPeekLyrics = nextTrackLyrics
+    }
+    // When the old song's sheet is on its way out, the active index is
+    // meaningless for it — the clock has already jumped to the new song —
+    // so the held lines render as a static page while they leave.
+    val sheetActiveIndex = if (handoffExit) -1 else activeIndex
+    // Which data set the sheet renders: held (old song) while it exits,
+    // live (new song) once it has gone.
+    val sheetTitle = if (handoffExit) heldTitle else title
+    val sheetArtist = if (handoffExit) heldArtist else artist
+    val sheetLyrics = if (handoffExit) heldLyrics else lyrics
+    val sheetProvider = if (handoffExit) heldProvider else lyricsProviderName
+    val sheetPeekTrack = if (handoffExit) heldPeekTrack else nextTrack
+    val sheetPeekLyrics = if (handoffExit) heldPeekLyrics else nextTrackLyrics
+    val showNextPeek = nextPeekEnabled && (if (handoffExit) heldPeekTrack else nextTrack) != null &&
+        (if (handoffExit) heldPeekLyrics else nextTrackLyrics).isNotEmpty()
+
     val deepFeelPalette = rememberDeepFeelPalette(artworkColor)
     val glowPhases = if (deepFeel) rememberDeepFeelGlowPhases() else null
     val flowPhases = if (deepFeel) rememberDeepFeelFlowPhases() else null
@@ -2988,9 +3046,17 @@ private fun FullscreenLyricsView(
             suppressAutoScroll = false
         }
     }
-    LaunchedEffect(activeIndex) {
+    LaunchedEffect(handoffExit, activeIndex) {
+        // While the hand-off runs, the list shows the old song's held
+        // sheet; jumping to the new active line mid-exit would fight the
+        // sweep, so the chase waits for the entering sheet to land.
+        if (handoffExit) return@LaunchedEffect
         if (!suppressAutoScroll) {
-            listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
+            // A fresh sheet enters scrolled to its top: snap, no animation,
+            // because the sheet itself is already gliding into place.
+            val entering = peekLead > 0f
+            val target = (activeIndex - 1).coerceAtLeast(0)
+            if (entering) listState.scrollToItem(target) else listState.animateScrollToItem(target)
         }
     }
 
@@ -3064,13 +3130,13 @@ private fun FullscreenLyricsView(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = title,
+                    text = sheetTitle,
                     style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = artist,
+                    text = sheetArtist,
                     style = EncoreTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -3082,16 +3148,35 @@ private fun FullscreenLyricsView(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            // The hand-off rides the list: while the old song's sheet exits
+            // upward it is translated by the exit fraction, and the new
+            // song's lines start one screen below and rise in as the exit
+            // finishes — one continuous upward sweep from old lyrics to new.
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    if (handoffExit) {
+                        // Exit: the old sheet rides a full screen up, so by
+                        // the time the content swaps it is already gone.
+                        translationY = -peekLead * size.height
+                        alpha = 1f - peekLead * 0.55f
+                    } else if (peekLead > 0f) {
+                        // Enter: the fraction decays back to 0 after the
+                        // exit, so the new sheet starts one screen below and
+                        // rises the last stretch into place.
+                        translationY = peekLead * size.height
+                        alpha = 1f - peekLead
+                    }
+                },
             contentPadding = PaddingValues(bottom = 96.dp)
         ) {
-            itemsIndexed(lyrics) { index, line ->
-                val isCurrentLine = index == activeIndex
+            itemsIndexed(sheetLyrics) { index, line ->
+                val isCurrentLine = index == sheetActiveIndex
                 val lineAlpha by animateFloatAsState(
                     targetValue = when {
                         !deepFeel -> if (isCurrentLine) 1f else 0.35f
                         isCurrentLine -> 1f
-                        index < activeIndex -> 0.16f
+                        index < sheetActiveIndex -> 0.16f
                         else -> 0.38f
                     },
                     animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
@@ -3101,7 +3186,7 @@ private fun FullscreenLyricsView(
                     targetValue = when {
                         !deepFeel -> 1f
                         isCurrentLine -> 1f
-                        index < activeIndex -> 0.82f
+                        index < sheetActiveIndex -> 0.82f
                         else -> 0.87f
                     },
                     animationSpec = tween(durationMillis = 420, easing = EncoreAnimation.DecelerateInterpolator),
@@ -3112,7 +3197,7 @@ private fun FullscreenLyricsView(
                     animationSpec = tween(durationMillis = 520, easing = EncoreAnimation.DecelerateInterpolator),
                     label = "deepFeelLineActivation"
                 )
-                val distance = (index - activeIndex).absoluteValue
+                val distance = (index - sheetActiveIndex).absoluteValue
                 val lineBlur by animateDpAsState(
                     targetValue = when {
                         !deepFeel -> 0.dp
@@ -3236,21 +3321,26 @@ private fun FullscreenLyricsView(
             if (showNextPeek) {
                 item(key = "nextTrackPeek") {
                     NextTrackPeek(
-                        nextTrack = nextTrack,
-                        nextLyrics = nextTrackLyrics,
+                        nextTrack = sheetPeekTrack,
+                        nextLyrics = sheetPeekLyrics,
                         ink = ink,
                         accent = if (deepFeel) deepFeelPalette.accent else dominantColor,
-                        deepFeel = deepFeel
+                        deepFeel = deepFeel,
+                        // During the hand-off the peek is the engine: it is
+                        // already the next song's opening, so it travels
+                        // further upward than the sheet carrying it and the
+                        // old lines appear to be dragged after it.
+                        leadFraction = if (handoffExit) peekLead else 0f
                     )
                 }
             }
-            if (lyricsProviderName.isNotBlank()) {
+            if (sheetProvider.isNotBlank()) {
                 item {
                     // Attribution for the source these lines came from, at
                     // the very end of the scroll — where Spotify itself
                     // puts it.
                     Text(
-                        text = stringResource(R.string.lyrics_provided_by, lyricsProviderName),
+                        text = stringResource(R.string.lyrics_provided_by, sheetProvider),
                         style = EncoreTheme.typography.marginal.copy(
                             color = ink.copy(alpha = 0.45f)
                         ),
@@ -3279,12 +3369,21 @@ private fun NextTrackPeek(
     nextLyrics: List<TimeSyncedLyric>,
     ink: Color,
     accent: Color,
-    deepFeel: Boolean
+    deepFeel: Boolean,
+    leadFraction: Float = 0f
 ) {
     if (nextTrack == null || nextLyrics.isEmpty()) return
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                // The hand-off lead: the peek glides up by a sixth of the
+                // screen beyond the sheet's own travel, as if it pulled the
+                // finished song away behind it.
+                if (leadFraction > 0f) {
+                    translationY = -leadFraction * size.height * 0.16f
+                }
+            }
             .padding(horizontal = EncoreSpacers.Looser2)
             .padding(top = 44.dp)
     ) {

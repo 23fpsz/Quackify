@@ -367,6 +367,22 @@ class MainActivity : ComponentActivity() {
 
                 Box(Modifier.fillMaxSize()) {
                 if (loggedIn) {
+                    // The debug door installs sessions the web login never
+                    // would; a quiet one-line reminder at startup — once per
+                    // process — keeps the tinkerer aware they are running on
+                    // a custom sp_dc, with its length, never its value.
+                    LaunchedEffect(Unit) {
+                        if (EncoreAuth.customSpDc(applicationContext)) {
+                            Toast.makeText(
+                                applicationContext,
+                                applicationContext.getString(
+                                    com.quackify.app.R.string.custom_spdc_startup_toast,
+                                    EncoreAuth.customSpDcLength(applicationContext)
+                                ),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
                     var capturing by remember {
                         val tokenUsable = EncoreAuth.token(context).isNotBlank() &&
                             !EncoreAuth.tokenExpired(context)
