@@ -295,7 +295,10 @@ class KrespotPlayer(private val context: Context) {
     fun queueNext(track: CommandTrack, spclient: String) {
         if (track.isDirect) return
         this.spclient = spclient
-        val live = engine?.takeIf { it.hasMedia } ?: return
+        val live = engine?.takeIf { it.hasMedia } ?: run {
+            warmAlternateNext(track)
+            return
+        }
         val askedFor = _state.value.trackUri
         if (askedFor.isBlank() || live.currentUri != askedFor) return
         if (queuedNextUri == track.uri) return
@@ -322,6 +325,28 @@ class KrespotPlayer(private val context: Context) {
             queuedNextTrack = track
             queuedGainDb = file?.gainDb ?: 0.0
             log.i("queued next '${track.name}' ${if (cached != null) "from the warm source" else "after resolving"}")
+        }
+    }
+
+    private val alternateWarming = HashSet<String>()
+
+    /**
+     * The mp3 engine cannot hold a queue, so when youtube music leads the
+     * stack the next stream resolves ahead of time instead; the handoff then
+     * walks straight out of the resolve cache.
+     */
+    private fun warmAlternateNext(track: CommandTrack) {
+        if (StreamSources.order(context).firstOrNull() != StreamSource.YT_MUSIC) return
+        if (!track.uri.startsWith("spotify:track:")) return
+        synchronized(alternateWarming) {
+            if (!alternateWarming.add(track.uri)) return
+        }
+        scope.launch {
+            try {
+                runCatching { YtMusicStreams.resolve(context, track) }
+            } finally {
+                synchronized(alternateWarming) { alternateWarming.remove(track.uri) }
+            }
         }
     }
 
