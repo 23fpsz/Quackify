@@ -84,6 +84,7 @@ internal class CrossfadeEngine(
         val cueMs: Long,
         val incomingRate: Double,
         val phaseLock: Boolean,
+        val outSilenceMs: Long,
         val outGrid: TrackGrid?,
         val inGrid: TrackGrid?,
         val smart: Boolean,
@@ -145,6 +146,7 @@ internal class CrossfadeEngine(
                 cueMs = spec?.cueMs ?: 0L,
                 incomingRate = spec?.incomingRate ?: 1.0,
                 phaseLock = spec?.phaseLock ?: false,
+                outSilenceMs = spec?.outSilenceMs ?: 0L,
                 outGrid = spec?.outGrid,
                 inGrid = spec?.inGrid,
                 smart = spec != null,
@@ -300,9 +302,8 @@ internal class CrossfadeEngine(
             held = null
             return
         }
-        val gateOn = if (hold.smart) automixOn() else fadeMs() > 0L
-        if (!gateOn) {
-            log.i("crossfade dropped: the transition's toggle was turned off")
+        if (!transitionOn()) {
+            log.i("crossfade dropped: both the automix toggle and the crossfade slider are off")
             held = null
             return
         }
@@ -311,7 +312,7 @@ internal class CrossfadeEngine(
             held = null
             return
         }
-        val outDuration = sessionDurationMs()
+        val outDuration = fadeAnchorMs(hold)
         if (outDuration <= 0L) return
         val configured = if (hold.smart) hold.fadeMs else fadeMs()
         val fade = fadeFor(configured, outDuration, hold.durationMs)
@@ -341,6 +342,7 @@ internal class CrossfadeEngine(
             cueMs = hold.cueMs,
             incomingRate = hold.incomingRate,
             phaseLock = hold.phaseLock,
+            outSilenceMs = hold.outSilenceMs,
             outGrid = hold.outGrid,
             inGrid = hold.inGrid,
             smart = hold.smart,
@@ -361,7 +363,8 @@ internal class CrossfadeEngine(
         log.i(
             "crossfade armed '${armedTrack.item.mediaId.takeLast(12)}' over ${fade}ms " +
                 "at ${out.currentPosition}ms of '${outgoingUri.takeLast(12)}' " +
-                "rate=${armedTrack.incomingRate} lock=${armedTrack.phaseLock}"
+                "rate=${armedTrack.incomingRate} lock=${armedTrack.phaseLock} " +
+                "shift=${armedTrack.outSilenceMs}ms"
         )
     }
 
@@ -381,7 +384,7 @@ internal class CrossfadeEngine(
             log.i("crossfade bailed: '${armed.item.mediaId.takeLast(12)}' never became playable in time")
             return bail()
         }
-        val atFadePoint = sessionDurationMs() - out.currentPosition <= armed.fadeMs
+        val atFadePoint = fadeAnchorMs(armed) - out.currentPosition <= armed.fadeMs
         if (atFadePoint && ready) startFade()
     }
 
@@ -423,7 +426,7 @@ internal class CrossfadeEngine(
         } else {
             0f
         }
-        val outRemaining = (sessionDurationMs() - out.currentPosition).coerceAtLeast(0L)
+        val outRemaining = (fadeAnchorMs(armed) - out.currentPosition).coerceAtLeast(0L)
         val endDriven = ((armed.fadeMs - outRemaining).toFloat() / armed.fadeMs).coerceIn(0f, 1f)
         return maxOf(incomingProgress, endDriven)
     }
@@ -448,12 +451,17 @@ internal class CrossfadeEngine(
     }
 
     private fun stillWorthFading(armed: HeldTrack): Boolean {
-        val gateOn = if (armed.smart) automixOn() else fadeMs() > 0L
-        if (!gateOn) return false
+        if (!transitionOn()) return false
         val player = session() ?: return false
         val expected = if (handedOff) armed.item.mediaId else outgoingUri
         return player.currentMediaItem?.mediaId == expected
     }
+
+    private fun transitionOn(): Boolean = automixOn() || fadeMs() > 0L
+
+    /** Where the blend should treat the outgoing track as over: the nominal end pulled back over its silent tail. */
+    private fun fadeAnchorMs(held: HeldTrack): Long =
+        (sessionDurationMs() - held.outSilenceMs).coerceAtLeast(0L)
 
     private fun handOff() {
         if (handedOff) return

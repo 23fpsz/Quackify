@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.PLAYER)
@@ -335,12 +336,31 @@ class KrespotPlayer(private val context: Context) {
      * current track has left; a window that does not finish in it simply
      * leaves the planner without grids and the plan falls back to the plain
      * fade, so the settings warning's promised crossfade happens even with
-     * the crossfade slider at zero.
+     * the crossfade slider at zero. Both paths anchor on the outgoing track's
+     * measured audible end, so a silent tail no longer swallows the blend; a
+     * plain fade with automix off reuses an already measured tail without
+     * decoding anything new.
      */
     private suspend fun automixSpecFor(next: CommandTrack, nextSource: AudioSource): TransitionSpec? {
+        val crossfadeMs = AppPrefs.getInt(context, CLIENT_STORE, CROSSFADE_MS_PREF, 0).toLong()
         if (!automixEnabled()) {
-            log.i("automix declined: the toggle is off")
-            return null
+            if (crossfadeMs <= 0L) {
+                log.i("automix declined: the toggle is off")
+                return null
+            }
+            val currentUri = _state.value.trackUri
+            val outDurationMs = _state.value.durationMs
+            val silenceMs = tailSilenceMsFor(currentUri)
+            if (silenceMs <= 0L || outDurationMs <= 0L) return null
+            log.i("automix is off, pulling the plain fade ${silenceMs}ms earlier over the measured tail silence")
+            return AutomixPlanner.plan(
+                null,
+                null,
+                outDurationMs,
+                nextSource.seektable.totalDuration * 1000L / nextSource.seektable.timescale,
+                crossfadeMs,
+                silenceMs,
+            )
         }
         if (AutomixPlanner.unmixable(next.name)) {
             log.i("automix declined: '${next.name}' is spoken word or live")
@@ -373,6 +393,7 @@ class KrespotPlayer(private val context: Context) {
         val budget = (remaining - SPEC_MARGIN_MS).coerceIn(0L, MAX_SPEC_BUDGET_MS)
         val startedAt = SystemClock.elapsedRealtime()
         val outGrid = automixAnalysis.tailGrid(currentSource, currentUri, outDurationMs, budget, stillWanted)
+        val outSilenceMs = tailSilenceMsFor(currentUri)
         val inGrid = if (outGrid != null) {
             val left = (budget - (SystemClock.elapsedRealtime() - startedAt)).coerceAtLeast(0L)
             automixAnalysis.headGrid(nextSource, next.uri, nextDurationMs, left, stillWanted)
@@ -387,14 +408,22 @@ class KrespotPlayer(private val context: Context) {
             inGrid,
             outDurationMs,
             nextDurationMs,
-            AppPrefs.getInt(context, CLIENT_STORE, CROSSFADE_MS_PREF, 0).toLong(),
+            crossfadeMs,
+            outSilenceMs,
         )
         log.i(
             "automix into '${next.name}' fade=${spec.fadeMs}ms rate=${spec.incomingRate} " +
-                "lock=${spec.phaseLock}"
+                "lock=${spec.phaseLock} shift=${spec.outSilenceMs}ms"
         )
         return spec
     }
+
+    private fun tailSilenceMsFor(uri: String): Long =
+        if (uri.startsWith("spotify:track:")) {
+            (automixAnalysis.tailSilenceSec(uri) * 1000.0).roundToLong().coerceAtLeast(0L)
+        } else {
+            0L
+        }
 
     fun clearQueuedNext() {
         queueTicket.incrementAndGet()
