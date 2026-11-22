@@ -280,22 +280,33 @@ internal object YtMusicStreams {
     private suspend fun streamOf(context: Context, track: CommandTrack, candidate: YtCandidate): YtStream? {
         for (client in CLIENTS) {
             val session = if (client.webFamily) PoTokenGate.session(context) else null
-            val (lengthSeconds, formats) = playerFormats(client, candidate.videoId, session) ?: continue
-            if (lengthSeconds > 0L && track.durationMs > 0L &&
-                kotlin.math.abs(lengthSeconds * 1000L - track.durationMs) > DURATION_TOLERANCE_MS
+            if (client.webFamily && session == null) continue
+            // The player request body carries the content-bound token (minted
+            // per video); the stream urls carry the session-bound one instead.
+            val contentToken = session?.let { PoTokenGate.videoToken(context, candidate.videoId) }
+            val sessionToken = session?.requestToken
+            var reply = playerFormats(client, candidate.videoId, session, contentToken)
+            if (reply == null && contentToken != null && contentToken != sessionToken) {
+                // the surfaces disagree across sources; give the other binding a shot
+                reply = playerFormats(client, candidate.videoId, session, sessionToken)
+            }
+            if (reply == null) continue
+            if (reply.lengthSeconds > 0L && track.durationMs > 0L &&
+                kotlin.math.abs(reply.lengthSeconds * 1000L - track.durationMs) > DURATION_TOLERANCE_MS
             ) {
-                log.w("'${candidate.videoId}' is ${lengthSeconds}s, the track is ${track.durationMs / 1000}s, wrong take")
+                log.w("'${candidate.videoId}' is ${reply.lengthSeconds}s, the track is ${track.durationMs / 1000}s, wrong take")
                 return null
             }
-            for (format in orderedFormats(formats)) {
-                var url = format.text("url")
-                if (url.isBlank()) continue
-                if (client.webFamily && session != null) {
-                    PoTokenGate.videoToken(context, candidate.videoId)?.let { token ->
-                        url += (if (url.contains('?')) "&" else "?") + "pot=$token"
-                    }
+            for (format in orderedFormats(reply.formats)) {
+                val base = format.text("url")
+                if (base.isBlank()) continue
+                val urls = when {
+                    sessionToken == null -> listOf(base)
+                    contentToken == null -> listOf(base.withPot(sessionToken))
+                    else -> listOf(base.withPot(sessionToken), base.withPot(contentToken))
                 }
-                if (!probe(url, client.mediaHeaders())) {
+                val url = urls.firstOrNull { probe(it, client.mediaHeaders()) }
+                if (url == null) {
                     log.w("itag ${format.optInt("itag")} from ${client.clientName} refused the probe")
                     continue
                 }
@@ -309,11 +320,17 @@ internal object YtMusicStreams {
         return null
     }
 
+    private fun String.withPot(token: String): String =
+        this + (if (contains('?')) "&" else "?") + "pot=$token"
+
+    private class PlayerReply(val lengthSeconds: Long, val formats: List<JSONObject>)
+
     private suspend fun playerFormats(
         client: YtClient,
         videoId: String,
         session: PoTokenGate.Session?,
-    ): Pair<Long, List<JSONObject>>? {
+        poToken: String?,
+    ): PlayerReply? {
         val visitorData = session?.visitorData.orEmpty()
         val body = JSONObject()
             .put("context", client.context(visitorData))
@@ -325,7 +342,8 @@ internal object YtMusicStreams {
                 JSONObject().put("signatureTimestamp", SignatureStamp.current())))
             if (client.host == VIDEO_HOST) body.put("videoCheckOk", true)
             if (session != null) {
-                body.put("serviceIntegrityDimensions", JSONObject().put("poToken", session.requestToken))
+                body.put("serviceIntegrityDimensions",
+                    JSONObject().put("poToken", poToken ?: session.requestToken))
             }
         }
         val response = Net.postJson(
@@ -355,7 +373,7 @@ internal object YtMusicStreams {
             return null
         }
         val length = json.optJSONObject("videoDetails")?.text("lengthSeconds")?.toLongOrNull() ?: 0L
-        return length to formats
+        return PlayerReply(length, formats)
     }
 
     private fun orderedFormats(formats: List<JSONObject>): List<JSONObject> = formats.asSequence()
@@ -409,16 +427,28 @@ private object SignatureStamp {
             "https://www.youtube.com/iframe_api",
             mapOf("User-Agent" to Net.DESKTOP_UA),
             tag = "ytm-sts",
-        )?.takeIf { it.ok }?.body ?: return null
-        val hash = Regex("""/s/player/([a-f0-9]{8})/""").find(api)?.groupValues?.getOrNull(1) ?: return null
+        )?.takeIf { it.ok }?.body ?: run {
+            log.w("iframe api refused, no signature timestamp")
+            return null
+        }
+        // the api body escapes forward slashes inside its javascript strings
+        val hash = Regex("""/s/player/([a-f0-9]{8})/""").find(api.replace("\\/", "/"))
+            ?.groupValues?.getOrNull(1) ?: run {
+            log.w("no player hash in the iframe api")
+            return null
+        }
         val base = Net.get(
             "https://www.youtube.com/s/player/$hash/player_ias.vflset/en_US/base.js",
             mapOf("User-Agent" to Net.DESKTOP_UA),
             tag = "ytm-sts",
-        )?.takeIf { it.ok }?.body ?: return null
+        )?.takeIf { it.ok }?.body ?: run {
+            log.w("player script $hash refused")
+            return null
+        }
         val value = Regex("""signatureTimestamp[=:]"?(\d{4,6})"?""").find(base)?.groupValues?.getOrNull(1)
         val parsed = value?.toIntOrNull() ?: 0
         if (parsed > 0) log.i("signature timestamp $parsed from player $hash")
+        else log.w("no signature timestamp in player $hash")
         return parsed.takeIf { it > 0 }
     }
 }
