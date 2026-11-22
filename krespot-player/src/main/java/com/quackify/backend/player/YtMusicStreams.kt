@@ -28,8 +28,6 @@ private const val MUSIC_ORIGIN = "https://music.youtube.com"
 private const val NONCE_ALPHABET =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
-private const val PROBE_BYTES = 16 * 1024
-
 private const val DURATION_TOLERANCE_MS = 40_000L
 
 private const val CANDIDATES = 4
@@ -50,6 +48,8 @@ data class YtStream(
     val bitrate: Int,
     val mime: String,
     val headers: Map<String, String>,
+    val head: ByteArray,
+    val total: Long,
 )
 
 private class YtClient(
@@ -414,8 +414,15 @@ internal object YtMusicStreams {
                 urls.add(base)
                 if (sessionToken != null) urls.add(base.withPot(sessionToken))
                 if (contentToken != null && contentToken != sessionToken) urls.add(base.withPot(contentToken))
-                val url = urls.firstOrNull { probe(it, client.mediaHeaders()) }
-                if (url == null) {
+                var picked: String? = null
+                var seeded: Probe? = null
+                for (url in urls) {
+                    val probed = probe(url, client.mediaHeaders()) ?: continue
+                    picked = url
+                    seeded = probed
+                    break
+                }
+                if (picked == null || seeded == null) {
                     log.w("itag ${format.optInt("itag")} from ${client.clientName} refused the probe")
                     continue
                 }
@@ -424,7 +431,15 @@ internal object YtMusicStreams {
                 log.i("'${candidate.videoId}' via ${client.clientName} itag=${format.optInt("itag")} " +
                         "${format.text("mimeType")} ${bitrate}b serves"
                 )
-                return YtStream(candidate.videoId, url, bitrate, format.text("mimeType"), client.mediaHeaders())
+                return YtStream(
+                    candidate.videoId,
+                    picked,
+                    bitrate,
+                    format.text("mimeType"),
+                    client.mediaHeaders(),
+                    seeded.head,
+                    seeded.total,
+                )
             }
             if (!served) {
                 log.w("${client.clientName} offered no direct audio url for '${candidate.videoId}'")
@@ -512,9 +527,25 @@ internal object YtMusicStreams {
         )
         .toList()
 
-    private suspend fun probe(url: String, headers: Map<String, String>): Boolean {
-        val sample = Net.fetch(url, 0, PROBE_BYTES - 1, headers, tag = "ytm-probe")
-        return sample != null && sample.isNotEmpty()
+    private class Probe(val head: ByteArray, val total: Long)
+
+    /**
+     * The serving check doubles as the stream seed: it pulls the first buffer
+     * chunk and the total length out of the range reply, so playback starts
+     * off bytes already in hand instead of re-opening the url.
+     */
+    private suspend fun probe(url: String, headers: Map<String, String>): Probe? {
+        val sample = Net.blob(
+            url,
+            headers + mapOf("Range" to "bytes=0-${StreamBuffer.CHUNK - 1}"),
+            tag = "ytm-probe",
+        )?.takeIf { it.ok && it.bytes.isNotEmpty() } ?: return null
+        val total = if (sample.code == 206) {
+            sample.header("content-range").substringAfter('/').trim().toLongOrNull()
+        } else {
+            sample.bytes.size.toLong()
+        }
+        return Probe(sample.bytes, total ?: 0L)
     }
 }
 
