@@ -43,6 +43,11 @@ private val log = Logs.of(Logs.Module.MP3)
  * seek's re-open or a held crossfade source from starting the download
  * over. While nobody holds it the background pull parks, so a skipped
  * track's tail is not fetched for a grace period nobody wanted.
+ *
+ * The queue's next transition gets a pin instead: the head window the
+ * handover will read is pulled ahead of time and the buffer is held across
+ * the whole track that plays before it, because the handover can be
+ * minutes out and no grace bridges that.
  */
 internal object YtStreamPool {
 
@@ -50,6 +55,9 @@ internal object YtStreamPool {
     private const val KEEP_ALIVE_MS = 15_000L
 
     private val pool = LinkedHashMap<String, Entry>()
+
+    /** The queue's one warm slot: the next handover's pinned buffer. */
+    private var pinned: Pin? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -67,7 +75,7 @@ internal object YtStreamPool {
     }
 
     /** A reader's handle: drops its reference on [close], nothing more. */
-    private class Ref(private val entry: Entry) : MediaDataSource() {
+    private class Ref(val entry: Entry) : MediaDataSource() {
 
         override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int =
             entry.body.readAt(position, buffer, offset, size)
@@ -78,6 +86,9 @@ internal object YtStreamPool {
             YtStreamPool.detach(entry)
         }
     }
+
+    /** One held reference the queue owns on behalf of a future handover. */
+    private class Pin(val key: String, val entry: Entry)
 
     /**
      * Hands out a reference to the rendition's shared buffer, opening the
@@ -110,6 +121,52 @@ internal object YtStreamPool {
             log.i("ytm buffer opened for '${key.takeLast(16)}', ${stream.total}B")
             return Ref(entry)
         }
+    }
+
+    /**
+     * Pins the rendition's buffer and pulls its first [bytes], so the
+     * queue's next handover lands on a warm head instead of a cold open.
+     * The pin holds the buffer (and any window an analysis decode already
+     * pulled into it) across the whole track that plays before the
+     * handover; the background pull parks while the pin is the only holder,
+     * so pinning costs exactly the one window. A reader that opens in the
+     * meantime - a held crossfade source, the analysis - un-parks the pull
+     * as usual and the window keeps filling.
+     */
+    fun warmHead(key: String, stream: YtStream, context: Context, bytes: Long) {
+        scope.launch(Dispatchers.IO) {
+            val opened = attach(key, stream, context) ?: return@launch
+            val entry = (opened as Ref).entry
+            val (previous, park) = synchronized(pool) {
+                val old = pinned
+                pinned = Pin(key, entry)
+                // Only a lone pin parks: anyone else reading wants the pull
+                // running, and the park would silently cap their fill.
+                old to (entry.refs <= 1)
+            }
+            if (park) (entry.body as? StreamBuffer)?.prefetch(false)
+            previous?.let { detach(it.entry) }
+            try {
+                val window = bytes.coerceIn(0L, entry.body.size)
+                val chunk = ByteArray(64 * 1024)
+                var pulled = 0L
+                while (pulled < window) {
+                    val got = entry.body.readAt(pulled, chunk, 0, minOf(chunk.size.toLong(), window - pulled).toInt())
+                    if (got <= 0) break
+                    pulled += got
+                }
+                log.i("ytm warm head for '${key.takeLast(16)}': $pulled of ${window}B parked for the handover")
+            } catch (failure: Throwable) {
+                log.w("ytm warm head for '${key.takeLast(16)}' failed " +
+                        "${failure.javaClass.simpleName}: ${failure.message}")
+            }
+        }
+    }
+
+    /** Drops the queue's pin, whichever rendition it holds. */
+    fun unpinAll() {
+        val pin = synchronized(pool) { pinned.also { pinned = null } } ?: return
+        detach(pin.entry)
     }
 
     /**
