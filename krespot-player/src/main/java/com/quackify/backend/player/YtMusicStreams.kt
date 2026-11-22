@@ -139,6 +139,7 @@ internal object YtMusicStreams {
             remember(track.uri, stream)
             return stream
         }
+        log.w("no stream for '${track.name.ifBlank { track.uri.takeLast(12) }}' after ${candidates.size} candidates")
         return null
     }
 
@@ -250,7 +251,7 @@ internal object YtMusicStreams {
             if (lengthSeconds > 0L && track.durationMs > 0L &&
                 kotlin.math.abs(lengthSeconds * 1000L - track.durationMs) > DURATION_TOLERANCE_MS
             ) {
-                log.w("'$candidate.videoId' is ${lengthSeconds}s, the track is ${track.durationMs / 1000}s, wrong take")
+                log.w("'${candidate.videoId}' is ${lengthSeconds}s, the track is ${track.durationMs / 1000}s, wrong take")
                 return null
             }
             for (format in orderedFormats(formats)) {
@@ -261,7 +262,7 @@ internal object YtMusicStreams {
                     continue
                 }
                 val bitrate = format.optInt("averageBitrate", format.optInt("bitrate", 0))
-                log.i("'$candidate.videoId' via ${client.clientName} itag=${format.optInt("itag")} " +
+                log.i("'${candidate.videoId}' via ${client.clientName} itag=${format.optInt("itag")} " +
                         "${format.text("mimeType")} ${bitrate}b serves"
                 )
                 return YtStream(candidate.videoId, url, bitrate, format.text("mimeType"), client.mediaHeaders())
@@ -288,9 +289,15 @@ internal object YtMusicStreams {
             return null
         }
         val adaptive = json.optJSONObject("streamingData")?.optJSONArray("adaptiveFormats")
-            ?: return null
+        if (adaptive == null) {
+            log.w("${client.clientName} playability ok but no streaming data")
+            return null
+        }
         val formats = (0 until adaptive.length()).mapNotNull { adaptive.optJSONObject(it) }
-        if (formats.isEmpty()) return null
+        if (formats.isEmpty()) {
+            log.w("${client.clientName} playability ok but no formats")
+            return null
+        }
         val length = json.optJSONObject("videoDetails")?.text("lengthSeconds")?.toLongOrNull() ?: 0L
         return length to formats
     }
