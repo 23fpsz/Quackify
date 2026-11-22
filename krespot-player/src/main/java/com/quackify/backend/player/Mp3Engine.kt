@@ -24,6 +24,7 @@ import android.media.MediaCodec
 import android.media.MediaDataSource
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -36,24 +37,12 @@ private val log = Logs.of(Logs.Module.MP3)
 private const val MIME_PREFIX = "audio/"
 private const val PROGRESS_STEP_MS = 250L
 
-private class BytesSource(private val data: ByteArray) : MediaDataSource() {
-    override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
-        if (position >= data.size) return -1
-        val count = minOf(size.toLong(), data.size - position).toInt()
-        System.arraycopy(data, position.toInt(), buffer, offset, count)
-        return count
-    }
-
-    override fun getSize(): Long = data.size.toLong()
-
-    override fun close() = Unit
-}
-
 internal class Mp3Engine(
     private val url: String,
     private val emit: (PlayerEvent) -> Unit,
     private val headers: Map<String, String> = mapOf("referer" to "https://open.spotify.com/"),
     private val startAtMs: Long = 0L,
+    private val cacheDir: File? = null,
 ) {
 
     @Volatile
@@ -104,18 +93,37 @@ internal class Mp3Engine(
 
     suspend fun run() {
         stopped = false
-        val bytes = withContext(Dispatchers.IO) {
-            Net.blob(url, headers, tag = "ad").also {
-                log.i("ad bytes ${it?.code ?: "no response"} ${it?.size ?: 0}B")
-            }
-        }?.takeIf { it.ok }?.bytes
-        if (bytes == null) {
+        val source = withContext(Dispatchers.IO) { openSource() }
+        if (source == null) {
             emit(PlayerEvent.Failed("ad download failed"))
             return
         }
+        try {
+            decode(source)
+        } finally {
+            runCatching { source.close() }
+        }
+    }
+
+    /**
+     * The data source the extractor reads: a streaming pull when the server
+     * honors ranges, the whole body in memory when it does not.
+     */
+    private suspend fun openSource(): MediaDataSource? {
+        val streamed = cacheDir?.let { dir ->
+            runCatching { StreamBuffer.open(url, headers, dir, "ad") }.getOrNull()
+        }
+        if (streamed != null) return streamed
+        val whole = Net.blob(url, headers, tag = "ad").also {
+            log.i("ad bytes ${it?.code ?: "no response"} ${it?.size ?: 0}B")
+        }?.takeIf { it.ok } ?: return null
+        return BytesSource(whole.bytes)
+    }
+
+    private suspend fun decode(source: MediaDataSource) {
         val extractor = MediaExtractor()
         val prepared = runCatching {
-            extractor.setDataSource(BytesSource(bytes))
+            extractor.setDataSource(source)
             val index = (0 until extractor.trackCount).firstOrNull { i ->
                 extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME).orEmpty().startsWith(MIME_PREFIX)
             } ?: error("no audio track")
@@ -140,7 +148,7 @@ internal class Mp3Engine(
             extractor.seekTo(startAtMs * 1000L, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
             positionMs = extractor.sampleTime / 1000L
         }
-        log.i("ad $mime ${sampleRate}Hz ${channels}ch ${durationMs}ms ${bytes.size}B")
+        log.i("ad $mime ${sampleRate}Hz ${channels}ch ${durationMs}ms")
 
         val codec = runCatching {
             MediaCodec.createDecoderByType(mime).also {
@@ -215,8 +223,14 @@ internal class Mp3Engine(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (failure: Throwable) {
-            log.e("ad run failed ${failure.javaClass.simpleName}: ${failure.message}")
-            emit(PlayerEvent.Failed(failure.message.orEmpty()))
+            // a stopped stream fails its pending read on the way out; that is
+            // the teardown, not a playback error
+            if (stopped) {
+                log.i("ad stopped mid-read ${failure.javaClass.simpleName}: ${failure.message}")
+            } else {
+                log.e("ad run failed ${failure.javaClass.simpleName}: ${failure.message}")
+                emit(PlayerEvent.Failed(failure.message.orEmpty()))
+            }
         } finally {
             audio.release()
             sink = null

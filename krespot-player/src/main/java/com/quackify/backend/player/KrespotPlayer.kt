@@ -906,7 +906,7 @@ class KrespotPlayer(private val context: Context) {
                         mirror(event, _state.value.durationMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                     }
-                }, stream.headers, if (parked >= 0L) parked else fromMs)
+                }, stream.headers, if (parked >= 0L) parked else fromMs, context.cacheDir)
                 mp3 = player
                 player.run()
             } catch (cancellation: CancellationException) {
@@ -947,7 +947,7 @@ class KrespotPlayer(private val context: Context) {
                         mirror(event, _state.value.durationMs)
                         if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                     }
-                }, startAtMs = if (parked >= 0L) parked else fromMs)
+                }, startAtMs = if (parked >= 0L) parked else fromMs, cacheDir = context.cacheDir)
                 mp3 = player
                 _state.value = PlayerState(playing = true, buffering = true, trackUri = track.uri)
                 player.run()
