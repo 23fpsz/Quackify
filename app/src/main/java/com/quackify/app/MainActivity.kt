@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +79,7 @@ import com.quackify.backend.model.ShelfKind
 import com.quackify.backend.model.ShowDetail
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.backend.model.UserProfile
+import com.quackify.compose.R as ComposeR
 import com.quackify.compose.components.QuackifyToastHost
 import com.quackify.compose.components.UpdateDialog
 import com.quackify.compose.components.UpdateInstallPhase
@@ -348,7 +350,7 @@ class MainActivity : ComponentActivity() {
                 val updates = rememberUpdateController()
                 UpdateEffects(updates)
                 val sessionToast = rememberQuackifyToastState()
-                val sessionExpiredText = context.getString(R.string.session_expired_toast)
+                val sessionExpiredText = context.getString(ComposeR.string.session_expired_toast)
                 val sessionLapsedNow = sessionLapsed
                 LaunchedEffect(sessionLapsedNow) {
                     if (sessionLapsedNow) {
