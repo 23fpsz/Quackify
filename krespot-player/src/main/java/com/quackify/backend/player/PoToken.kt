@@ -55,22 +55,33 @@ internal object PoTokenGate {
     @Volatile
     private var unusable: Boolean = false
 
-    /** The visitor-bound token the web clients send in the player request body. */
+    /** When the last bootstrap failed; a failed gate stays shut for a minute. */
+    @Volatile
+    private var failedAt: Long = 0L
+
+    /**
+     * The visitor-bound token minted from the visitor data. The web clients
+     * append it to the stream urls (`pot=`); the player request body carries
+     * the content-bound token minted per video instead.
+     */
     suspend fun session(context: Context): Session? {
         cached()?.let { return it }
-        if (unusable) return null
+        if (unusable || cooling()) return null
         return gate.withLock {
             cached()?.let { return it }
             try {
                 open(context)
             } catch (failure: Throwable) {
+                failedAt = System.currentTimeMillis()
                 log.w("att session failed: ${failure.message ?: failure.javaClass.simpleName}")
                 null
             }
         }
     }
 
-    /** The video-bound token the web clients append to the stream urls. */
+    private fun cooling(): Boolean = System.currentTimeMillis() - failedAt < COOLDOWN_MS
+
+    /** The content-bound token the web clients send in the player request body. */
     suspend fun videoToken(context: Context, videoId: String): String? {
         if (unusable) return null
         if (cached() == null && session(context) == null) return null
@@ -101,16 +112,14 @@ internal object PoTokenGate {
             return null
         }
         try {
-            val home = Net.get(
-                "https://www.youtube.com",
-                mapOf("User-Agent" to Net.DESKTOP_UA, "Accept-Language" to "en-US,en;q=0.9"),
-                tag = "ytm-att",
-            )?.takeIf { it.ok } ?: throw IllegalStateException("homepage refused")
-            val ytcfg = extract(home.body, """ytcfg\.set\(({.+?})\);""") ?: throw IllegalStateException("no ytcfg")
-            val attCall = extract(home.body, """window\.ytAtN\(\s*({[\s\S]*?})\s*\)""") ?: throw IllegalStateException("no attestation")
-            val visitorData = extract(home.body, """"VISITOR_DATA"\s*:\s*"([^"]+)"""")
+            val home = homepage() ?: throw IllegalStateException("homepage refused")
+            // braces must be escaped: android's regex engine treats a bare { as
+            // a malformed repetition and rejected the pattern at compile time
+            val attCall = extract(home.body, """window\.ytAtN\(\s*(\{[\s\S]*?\})\s*\)""") ?: throw IllegalStateException("no attestation")
+            val visitorData = (extract(home.body, """"VISITOR_DATA"\s*:\s*"([^"]+)"""")
+                ?: extract(home.body, """"visitorData"\s*:\s*"([^"]+)""""))
                 ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
-                ?: throw IllegalStateException("no visitor data in ytcfg")
+                ?: throw IllegalStateException("no visitor data on the homepage")
             val challenge = JSONObject(fresh.parseAttestation(attCall))
             val program = challenge.optString("program")
             val globalName = challenge.optString("globalName")
@@ -125,7 +134,6 @@ internal object PoTokenGate {
             )?.takeIf { it.ok }?.body ?: throw IllegalStateException("interpreter refused")
             log.i("att challenge program ${program.length}ch via $globalName")
 
-            fresh.prime(ytcfg)
             fresh.run(program, globalName, interpreter)
             val snapshot = fresh.snapshot()
             val integrity = Net.postJson(
@@ -140,7 +148,11 @@ internal object PoTokenGate {
                 ),
                 tag = "ytm-att",
             )?.takeIf { it.ok }?.jsonArray()
-            val token = integrity?.optString(0).orEmpty()
+            // the exchange answers [token, ttl, refresh, fallback]; since 2025
+            // the primary slot often comes back empty and the token rides last
+            val token = integrity?.let { reply ->
+                reply.optString(0).takeIf { it.isNotBlank() } ?: reply.optString(3)
+            }.orEmpty()
             val ttl = integrity?.optLong(1, 0L) ?: 0L
             if (token.isBlank() || ttl <= 0L) throw IllegalStateException("integrity exchange refused")
             log.i("att integrity token ${token.length}ch for ${ttl}s")
@@ -158,9 +170,20 @@ internal object PoTokenGate {
         }
     }
 
+    private const val COOLDOWN_MS = 60_000L
+
     private const val REQUEST_KEY = "O43z0dpjhgX20SCx4KAo"
 
     private const val API_KEY = "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw"
+
+    /** The homepage the attestation lives on; one retry, redirect loops happen. */
+    private suspend fun homepage() = fetchHomepage() ?: fetchHomepage()
+
+    private suspend fun fetchHomepage() = Net.get(
+        "https://www.youtube.com",
+        mapOf("User-Agent" to Net.DESKTOP_UA, "Accept-Language" to "en-US,en;q=0.9"),
+        tag = "ytm-att",
+    )?.takeIf { it.ok }
 
     private fun extract(html: String, pattern: String): String? =
         Regex(pattern, RegexOption.DOT_MATCHES_ALL).find(html)?.groupValues?.getOrNull(1)
@@ -225,9 +248,6 @@ internal class PoTokenPage private constructor(context: Context) {
     }
 
     private val loaded = CompletableDeferred<Unit>()
-
-    /** Give the page the session's ytcfg; BotGuard reads yt.config_ while snapshotting. */
-    suspend fun prime(ytcfg: String) = evaluate("bgPrime(($ytcfg))")
 
     /** Parse the attestation literal in the page; it is a JS object, not JSON. */
     suspend fun parseAttestation(attCall: String): String = evaluate("bgParseAtt(($attCall))")
@@ -317,8 +337,6 @@ internal class PoTokenPage private constructor(context: Context) {
          */
         private const val HARNESS = """<!DOCTYPE html><html lang="en"><head><title></title><script>
 var bg = { vm: null, snapshotFn: null, output: null, minter: null };
-
-function bgPrime(ytcfg) { window.yt = { config_: ytcfg }; return Promise.resolve(''); }
 
 function bgParseAtt(att) {
   return new Promise(function (resolve, reject) {
