@@ -689,8 +689,19 @@ object EncoreAuth {
         }
     }
 
-    suspend fun fetchToken(context: Context, spDc: String): String? {
-        WebToken.mint(context, spDc)?.let { return it }
+    /** How a sp_dc token check ended: the answer matters as much as the token. */
+    private enum class TokenOutcome { OK, REJECTED, FETCH_FAILED }
+
+    /**
+     * Outcome-aware version of the token check. The minting path cannot tell
+     * a refused cookie from an unreachable server — both come back null — so
+     * when it fails the plain HTTP endpoint is asked as the tiebreaker: a
+     * response that hands out an anonymous (or empty) token means the server
+     * refused the cookie, while no response at all means the check itself
+     * failed and the sp_dc is simply untested.
+     */
+    private suspend fun tokenOutcome(context: Context, spDc: String): Pair<TokenOutcome, String> {
+        WebToken.mint(context, spDc)?.let { return TokenOutcome.OK to it }
         val jar = cookieManagerOrNull()?.getCookie("https://open.spotify.com")
         val cookieHeader = jar?.takeIf { it.isNotBlank() } ?: "sp_dc=$spDc"
         log.i("fetchToken jar=${!jar.isNullOrBlank()} cookies=${cookieHeader.length}B")
@@ -708,16 +719,60 @@ object EncoreAuth {
                 "Cookie" to cookieHeader,
             ),
             tag = "get_access_token",
-        ) ?: return null
+        ) ?: return TokenOutcome.FETCH_FAILED to ""
         val json = response.json()
         if (json == null) {
             log.w("fetchToken http=${response.code} not-json")
-            return null
+            return TokenOutcome.FETCH_FAILED to ""
         }
         val anonymous = json.optBoolean("isAnonymous", false)
         val token = json.optString("accessToken")
         log.i("fetchToken http=${response.code} anonymous=$anonymous tokenLen=${token.length}")
-        return token.takeIf { it.isNotBlank() && !anonymous }
+        return when {
+            token.isNotBlank() && !anonymous -> TokenOutcome.OK to token
+            else -> TokenOutcome.REJECTED to ""
+        }
+    }
+
+    suspend fun fetchToken(context: Context, spDc: String): String? =
+        tokenOutcome(context, spDc).second.takeIf { it.isNotBlank() }
+
+    /**
+     * What happened when a sp_dc was tried against Spotify, split into the
+     * cases the caller has to treat differently: a cookie the server
+     * actually refused is gone for good, while a cookie that could not be
+     * checked at all may still be fine and deserve a "keep it anyway".
+     */
+    sealed interface SpDcOutcome {
+        /** Signed in: the token works and the account behind it is known. */
+        data class Ok(val account: Account) : SpDcOutcome
+
+        /** The server answered and said no: expired, revoked or malformed sp_dc. */
+        data object Rejected : SpDcOutcome
+
+        /**
+         * The check never produced an answer — offline, timeout, or the
+         * profile endpoint would not talk. The sp_dc itself is untested.
+         */
+        data object FetchFailed : SpDcOutcome
+    }
+
+    /**
+     * Runs the whole sign-in check for a raw sp_dc cookie and reports which
+     * of the three outcomes it was, so the debug signer-in can ask the user
+     * whether to keep an unchecked cookie instead of silently dropping it.
+     */
+    suspend fun fetchSpDcOutcome(context: Context, spDc: String): SpDcOutcome {
+        if (spDc.isBlank()) return SpDcOutcome.Rejected
+        val (outcome, token) = tokenOutcome(context, spDc)
+        return when (outcome) {
+            TokenOutcome.FETCH_FAILED -> SpDcOutcome.FetchFailed
+            TokenOutcome.REJECTED -> SpDcOutcome.Rejected
+            TokenOutcome.OK -> {
+                val account = fetchAccount(token)
+                if (account == null) SpDcOutcome.FetchFailed else SpDcOutcome.Ok(account)
+            }
+        }
     }
 
     suspend fun fetchAccount(token: String): Account? {
