@@ -853,11 +853,17 @@ class KrespotPlayer(private val context: Context) {
                                 _events.tryEmit(event)
                             }
                         } else {
-                            mirror(event, player?.durationMs ?: totalMs)
-                            if (event !is PlayerEvent.Progress) _events.tryEmit(event)
-                            if (event is PlayerEvent.Failed && transportDivertUri == null) {
-                                val parkedAt = _state.value.positionMs
-                                if (parkedAt > 0L) divertTransport(track, StreamSource.SPOTIFY, id, parkedAt)
+                            if (event is PlayerEvent.Failed && transportDivertUri == null &&
+                                _state.value.positionMs > 0L &&
+                                divertTransport(track, StreamSource.SPOTIFY, id, _state.value.positionMs, event)
+                            ) {
+                                // The divert owns this failure and re-emits it
+                                // only if the resume falls through, so the
+                                // bridge's gapless-failure advance cannot race
+                                // the mid-song handover.
+                            } else {
+                                mirror(event, player?.durationMs ?: totalMs)
+                                if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                             }
                         }
                     }
@@ -958,19 +964,36 @@ class KrespotPlayer(private val context: Context) {
      * carries on from where it stopped instead of surfacing a dead player.
      * One divert per playback: a source that dies on both ends reports its
      * failure rather than the two handing the track back and forth.
+     *
+     * The claim happens before the caller surfaces the failure: the bridge
+     * reacts to a visible Failed while a gapless next is queued by advancing
+     * the hard way, which races this resume and turns a mid-song handover
+     * into a skip. While the divert runs the failure is swallowed; it is
+     * emitted only when the resume falls through, so the hard advance is the
+     * fallback instead of the winner.
+     *
+     * Returns false when no divert is possible and the caller must surface
+     * the failure immediately.
      */
-    private fun divertTransport(track: CommandTrack, from: StreamSource, id: Int, positionMs: Long) {
-        val next = StreamSources.after(context, from).firstOrNull() ?: return
+    private fun divertTransport(
+        track: CommandTrack,
+        from: StreamSource,
+        id: Int,
+        positionMs: Long,
+        failure: PlayerEvent.Failed,
+    ): Boolean {
+        val next = StreamSources.after(context, from).firstOrNull() ?: return false
         transportDivertUri = track.uri
         log.w("the ${from.key} stream died at ${positionMs}ms, handing " +
                 "'${track.name.ifBlank { track.uri }}' to ${next.key}"
         )
+        _state.update { it.copy(buffering = true) }
         scope.launch {
             if (id != generation) return@launch
             if (next == StreamSource.YT_MUSIC) {
                 val alternate = YtMusicStreams.resolve(context, track)
                 if (alternate == null) {
-                    log.w("the alternate did not resolve, the failure stands")
+                    divertFailed(failure, id)
                     return@launch
                 }
                 playYtMusic(track, alternate, positionMs, divert = true)
@@ -978,6 +1001,16 @@ class KrespotPlayer(private val context: Context) {
                 play(track, spclient, positionMs, divert = true)
             }
         }
+        return true
+    }
+
+    /** The resume fell through: hand the original failure to the bridge so the normal advance takes over. */
+    private suspend fun divertFailed(event: PlayerEvent.Failed, id: Int) {
+        log.w("the alternate did not resolve, the failure stands")
+        if (id != generation) return
+        transportDivertUri = null
+        mirror(event, _state.value.durationMs)
+        _events.emit(event)
     }
 
     private fun playYtMusic(track: CommandTrack, stream: YtStream, fromMs: Long = 0L, divert: Boolean = false) {
@@ -1008,11 +1041,15 @@ class KrespotPlayer(private val context: Context) {
             try {
                 player = Mp3Engine(stream.url, { event ->
                     if (id == generation) {
-                        mirror(event, _state.value.durationMs)
-                        if (event !is PlayerEvent.Progress) _events.tryEmit(event)
-                        if (event is PlayerEvent.Failed && transportDivertUri == null) {
-                            val parkedAt = _state.value.positionMs
-                            if (parkedAt > 0L) divertTransport(track, StreamSource.YT_MUSIC, id, parkedAt)
+                        if (event is PlayerEvent.Failed && transportDivertUri == null &&
+                            _state.value.positionMs > 0L &&
+                            divertTransport(track, StreamSource.YT_MUSIC, id, _state.value.positionMs, event)
+                        ) {
+                            // Same guard as the spotify sink: the failure stays
+                            // hidden while the handover back is still possible.
+                        } else {
+                            mirror(event, _state.value.durationMs)
+                            if (event !is PlayerEvent.Progress) _events.tryEmit(event)
                         }
                     }
                 }, stream.headers, if (parked >= 0L) parked else fromMs, context.cacheDir, stream.head, stream.total)
