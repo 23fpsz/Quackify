@@ -84,6 +84,10 @@ internal class StreamBuffer private constructor(
     @Volatile
     private var closed = false
 
+    /** False parks the background pull; reads still pull their own ranges. */
+    @Volatile
+    private var prefetching = true
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val totalBytes: Long get() = total
@@ -116,6 +120,16 @@ internal class StreamBuffer private constructor(
     }
 
     override fun getSize(): Long = total
+
+    /**
+     * Parks or resumes the background pull. A shared buffer with no reader
+     * left keeps its downloaded ranges but stops fetching forward, so the
+     * grace a pool gives an unused buffer costs no bandwidth; on-demand
+     * reads keep working either way.
+     */
+    fun prefetch(on: Boolean) {
+        prefetching = on
+    }
 
     override fun close() {
         lock.withLock {
@@ -190,6 +204,12 @@ internal class StreamBuffer private constructor(
     private suspend fun pullLoop() {
         var failures = 0
         while (!closed) {
+            if (!prefetching) {
+                // A reader parks the pull when it is the last to leave; the
+                // short poll is all an idle buffer needs to notice a resume.
+                delay(250.milliseconds)
+                continue
+            }
             val index = lock.withLock {
                 if (closed) return
                 var scan = 0

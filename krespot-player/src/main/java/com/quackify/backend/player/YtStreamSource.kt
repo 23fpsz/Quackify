@@ -94,15 +94,19 @@ internal object YtStreamTable {
 
 /**
  * The loading side of an alternate stream: ExoPlayer's progressive reads
- * pull straight out of the stream buffer, so play-while-download carries
- * over to the unified pipeline unchanged - the probe at resolve time seeds
- * the head, reads fetch ranges on demand and a background pull runs ahead.
- * One instance per open: the buffer owns a scratch file and a pull loop
- * that [close] tears down, and ExoPlayer's loader re-opens with a fresh
- * position on every seek.
+ * pull straight out of the rendition's shared stream buffer, so
+ * play-while-download carries over to the unified pipeline unchanged - the
+ * probe at resolve time seeds the head, reads fetch ranges on demand and a
+ * background pull runs ahead while a reader holds the buffer. One instance
+ * per open, but every open of the same rendition - the session engine, the
+ * crossfade spare, the muted analysis player, the re-open a seek performs
+ * - attaches to the one buffer the pool holds for it, so each range
+ * crosses the wire once and a seek re-opens warm instead of from a fresh
+ * scratch file.
  */
 internal class YtStreamSource(
     private val context: Context,
+    private val key: String,
     private val stream: YtStream,
 ) : DataSource {
 
@@ -126,11 +130,11 @@ internal class YtStreamSource(
         } else {
             total
         }
-        // Blocking is the loader thread's job; the seed carries the probe's
-        // head and length, so no wire roundtrip happens here.
-        val opened = runBlocking {
-            StreamBuffer.open(stream.url, stream.headers, context.cacheDir, "ytm", stream.head, stream.total)
-        } ?: throw IOException("the alternate stream did not open")
+        // Blocking is the loader thread's job; the pool hands back the
+        // rendition's shared buffer - the seed the resolve probe carried is
+        // already in it, and every range a previous reader pulled is too.
+        val opened = runBlocking { YtStreamPool.attach(key, stream, context) }
+            ?: throw IOException("the alternate stream did not open")
         body = opened
         cursor = from
         limit = until
@@ -192,11 +196,10 @@ internal class RoutedSources(private val context: Context) : DataSource.Factory 
         override fun open(dataSpec: DataSpec): Long {
             // The rendition key is the router's whole signal: an alternate
             // item always carries one, a catalogue item never does.
-            val stream = dataSpec.key
-                ?.takeIf { it.endsWith(YtStreamTable.SUFFIX) }
-                ?.let { YtStreamTable.of(it) }
-            val picked = if (stream != null) {
-                YtStreamSource(context, stream).also { source ->
+            val rendition = dataSpec.key?.takeIf { it.endsWith(YtStreamTable.SUFFIX) }
+            val stream = rendition?.let { YtStreamTable.of(it) }
+            val picked = if (rendition != null && stream != null) {
+                YtStreamSource(context, rendition, stream).also { source ->
                     listeners.forEach(source::addTransferListener)
                 }
             } else {
