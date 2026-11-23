@@ -793,7 +793,7 @@ internal fun ShellPlaylistPane(
             onSortedOrderChange = { sortedOrder = it },
             title = playlistDetail?.title?.takeIf { it.isNotBlank() } ?: activePlaylistTitle,
             description = playlistDetail?.description.orEmpty(),
-            creator = playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: if (activePlaylistUri.startsWith("spotiduck:local:playlist:") || activePlaylistUri.isEmpty()) userDisplayName else "",
+            creator = playlistDetail?.creator?.takeIf { it.isNotBlank() } ?: if (activePlaylistUri.startsWith("quackify:local:playlist:") || activePlaylistUri.isEmpty()) userDisplayName else "",
             creatorAvatarUrl = playlistDetail?.creatorAvatarUrl.orEmpty(),
             saveCount = playlistDetail?.saveCount.orEmpty(),
             totalDurationMs = playlistDurationMs,

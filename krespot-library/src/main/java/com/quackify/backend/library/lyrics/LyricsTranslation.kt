@@ -1,15 +1,8 @@
 package com.quackify.backend.library.lyrics
 
 import android.content.Context
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.security.MessageDigest
-import java.util.Locale
-import java.util.concurrent.TimeUnit
-import java.util.zip.GZIPInputStream
-import java.util.zip.GZIPOutputStream
-import kotlinx.coroutines.CancellationException
+import com.quackify.backend.library.lyrics.LyricsTranslation.MAX_BATCH_CHARS
+import com.quackify.backend.library.lyrics.LyricsTranslation.MAX_CACHE_BYTES
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -22,6 +15,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.security.MessageDigest
+import java.util.Locale
+import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 
 /**
  * On-demand lyric translation, adapted from BitChord's approach.
@@ -206,20 +207,20 @@ object LyricsTranslation {
                     .build()
                 val request = Request.Builder()
                     .url(ENDPOINT)
-                    .header("User-Agent", "SpotiDuck/1.0")
+                    .header("User-Agent", "Quackify/1.0")
                     .header("Accept", "application/json")
                     .post(form)
                     .build()
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@runCatching null
-                    val body = response.body?.string() ?: return@runCatching null
+                    val body = response.body.string()
                     val root = JSONArray(body)
                     val translatedBody = buildString {
                         for (i in 0 until root.getJSONArray(0).length()) {
                             append(root.getJSONArray(0).getJSONArray(i).optString(0))
                         }
                     }
-                    val source = root.opt(2)?.let { if (it is String) it else "" } ?: ""
+                    val source = root.opt(2)?.let { it as? String ?: "" } ?: ""
                     val parts = translatedBody.split(markerRegex).map(String::trim)
                     if (source.isBlank() || parts.size != batch.slots.size || parts.any { it.isBlank() }) {
                         return@runCatching null

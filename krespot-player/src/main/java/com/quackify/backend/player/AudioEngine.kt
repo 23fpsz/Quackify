@@ -28,7 +28,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
@@ -56,6 +55,9 @@ import kotlin.time.Duration.Companion.milliseconds
 private val log = Logs.of(Logs.Module.PLAYER)
 
 private const val PROGRESS_MS = 500L
+
+/** Shorter measured tails are treated as measurement noise, not a trim. */
+private const val MIN_TAIL_TRIM_MS = 500L
 
 private const val CLIENT_STORE = "quackify.client"
 
@@ -213,6 +215,16 @@ internal class AudioEngine(
     @Volatile
     private var lastItemUri = ""
 
+    /**
+     * The measured silent tail of the item the session is on, as uri to ms of
+     * quiet. The trim only ever acts past the measured audible end and only
+     * when no blend owns the ending, so a measurement that arrives too late
+     * for the crossfade still ends the track at its audible end instead of
+     * decaying into dead air.
+     */
+    @Volatile
+    private var tailSilence: Pair<String, Long>? = null
+
     private val itemDurations = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     @Volatile
@@ -286,6 +298,7 @@ internal class AudioEngine(
             durationMs = totalMs
             announced = false
             lastItemUri = uri
+            tailSilence = null
             if (uri.isNotBlank()) itemDurations[uri] = totalMs
             // The player instance survives track changes: swapping the media
             // source keeps the renderers, the codec and the audio sink warm, so
@@ -310,12 +323,13 @@ internal class AudioEngine(
         }
 
     private fun newKit(role: String): Kit {
-        // The song cache sits between ExoPlayer and the CDN: online reads
-        // seed it while streaming, offline reads come back from it, and
-        // the custom key (the track uri) survives CDN url rotation.
-        val factory = DefaultMediaSourceFactory(
-            SongCache.factory(context).setUpstreamDataSourceFactory(DefaultDataSource.Factory(context))
-        )
+        // The routed stack sits between ExoPlayer and the wire: catalogue
+        // reads pass through the song cache (online reads seed it while
+        // streaming, offline reads come back from it, and the custom key -
+        // the track uri - survives CDN url rotation), alternate-rendition
+        // reads open the stream buffer instead, so one session player serves
+        // both cuts of a track.
+        val factory = DefaultMediaSourceFactory(RoutedSources(context))
         val manager = DefaultDrmSessionManager.Builder()
             .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, DrmLevel.provider())
             .setMultiSession(true)
@@ -440,6 +454,164 @@ internal class AudioEngine(
             .build()
     }
 
+    /**
+     * Plays the alternate stream for a track on the same session player as
+     * the catalogue files: the item carries no licence and a rendition-keyed
+     * cache key, so its loads route to the stream buffer while the queue,
+     * the crossfade and the blend logic keep working off the track uri.
+     */
+    suspend fun prepareAlternate(
+        uri: String,
+        stream: YtStream,
+        fromMs: Long,
+        autoplay: Boolean,
+    ): Boolean =
+        withContext(Dispatchers.Main) {
+            crossfade?.stop()
+            spareGainFactor = 1f
+            gainFactor = 1f
+            YtStreamTable.serve(uri, stream)
+            val totalMs = stream.lengthMs
+            durationMs = totalMs
+            announced = false
+            lastItemUri = uri
+            tailSilence = null
+            if (uri.isNotBlank()) itemDurations[uri] = totalMs
+            // The player instance survives track changes: swapping the media
+            // source keeps the renderers, the codec and the audio sink warm, so
+            // only the first play pays the ExoPlayer build cost.
+            val live = player ?: ExoPlayer.Builder(context)
+                .setMediaSourceFactory(ensureSessionKit().factory)
+                .build()
+                .also {
+                    it.addListener(listener)
+                    player = it
+                }
+            live.setMediaSource(ensureSessionKit().factory.createMediaSource(itemForAlternate(uri, stream)))
+            live.prepare()
+            live.seekTo(fromMs.coerceIn(0L, (totalMs - 1000L).coerceAtLeast(0L)))
+            live.playWhenReady = autoplay
+            started = autoplay
+            loaded = true
+            applyVolume()
+            log.i("audio engine ready on the alternate '${stream.videoId}' ${totalMs}ms at ${fromMs}ms " +
+                    "autoplay=$autoplay reused=${player !== live}"
+            )
+            true
+        }
+
+    /**
+     * The alternate-rendition queue hand: [queueNext] for a stream instead
+     * of a catalogue file. The item joins the same playlist (or the same
+     * crossfade hold) its Spotify sibling would, so a handover between the
+     * two sources carries no engine teardown.
+     */
+    suspend fun queueNextAlternate(
+        uri: String,
+        stream: YtStream,
+        whileOn: String,
+        spec: TransitionSpec?,
+    ): Boolean {
+        YtStreamTable.serve(uri, stream)
+        val totalMs = stream.lengthMs
+        val item = itemForAlternate(uri, stream)
+        val heldForFade = spec != null || configuredCrossfadeMs() > 0L
+        val added = runOnMain {
+            val p = player ?: return@runOnMain false
+            if (p.currentMediaItem?.mediaId != whileOn) return@runOnMain false
+            if (heldForFade) {
+                true
+            } else {
+                val current = p.currentMediaItemIndex
+                if (p.mediaItemCount > current + 1) p.removeMediaItems(current + 1, p.mediaItemCount)
+                p.addMediaItem(item)
+                true
+            }
+        } ?: false
+        if (!added) return false
+        if (uri.isNotBlank()) itemDurations[uri] = totalMs
+        if (heldForFade) {
+            spareGainFactor = 1f
+            crossfadeEngine()?.hold(item, totalMs, spec)
+            log.i("audio held next '$uri' on the alternate stream for a crossfade")
+        } else {
+            log.i("audio queued next '$uri' on the alternate stream")
+        }
+        return true
+    }
+
+    private fun itemForAlternate(uri: String, stream: YtStream): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(uri)
+            .setUri(Uri.parse(stream.url))
+            // The rendition key doubles as the router's signal: the loading
+            // side opens the stream buffer instead of the song cache, and no
+            // licence session is ever asked for this item.
+            .setCustomCacheKey(YtStreamTable.keyFor(uri))
+            .build()
+
+    /**
+     * Plays a direct url - an ad body - on the same session player as the
+     * catalogue files and the alternates: the item carries the ad marker as
+     * its cache key, so its loads route to the stream buffer instead of the
+     * song cache, and no licence session is ever asked for it. The length
+     * is only known when the manifest carried it; the player settles it
+     * once its own parse reports one.
+     */
+    suspend fun prepareDirect(
+        uri: String,
+        url: String,
+        fromMs: Long,
+        autoplay: Boolean,
+        trackDurationMs: Long,
+    ): Boolean =
+        withContext(Dispatchers.Main) {
+            crossfade?.stop()
+            spareGainFactor = 1f
+            gainFactor = 1f
+            durationMs = trackDurationMs
+            announced = false
+            lastItemUri = uri
+            tailSilence = null
+            if (uri.isNotBlank() && trackDurationMs > 0L) itemDurations[uri] = trackDurationMs
+            // The player instance survives track changes: swapping the media
+            // source keeps the renderers, the codec and the audio sink warm, so
+            // only the first play pays the ExoPlayer build cost.
+            val live = player ?: ExoPlayer.Builder(context)
+                .setMediaSourceFactory(ensureSessionKit().factory)
+                .build()
+                .also {
+                    it.addListener(listener)
+                    player = it
+                }
+            live.setMediaSource(ensureSessionKit().factory.createMediaSource(itemForDirect(uri, url)))
+            live.prepare()
+            val bounded = if (trackDurationMs > 1_000L) {
+                fromMs.coerceIn(0L, trackDurationMs - 1_000L)
+            } else {
+                fromMs.coerceAtLeast(0L)
+            }
+            live.seekTo(bounded)
+            live.playWhenReady = autoplay
+            started = autoplay
+            loaded = true
+            applyVolume()
+            log.i("audio engine ready on the direct url at ${bounded}ms " +
+                    "autoplay=$autoplay reused=${player !== live}"
+            )
+            true
+        }
+
+    private fun itemForDirect(uri: String, url: String): MediaItem =
+        MediaItem.Builder()
+            .setMediaId(uri)
+            .setUri(Uri.parse(url))
+            // The ad marker routes the loads to the stream buffer - the body
+            // is a one-shot impression url, it must not sit in the song
+            // cache - while the media id stays the ad's own track uri.
+            .setCustomCacheKey(uri + YtStreamTable.AD_SUFFIX)
+            .build()
+
     fun play() {
         started = true
         runOnMain { player?.play() }
@@ -463,7 +635,7 @@ internal class AudioEngine(
             crossfade?.onUserSeek()
             player?.seekTo(ms)
         }
-        onEvent?.invoke(PlayerEvent.Seeked(ms))
+        onEvent(PlayerEvent.Seeked(ms))
     }
 
     fun duck(level: Float) {
@@ -505,6 +677,7 @@ internal class AudioEngine(
         loaded = false
         durationMs = 0L
         lastItemUri = ""
+        tailSilence = null
         progressJob?.cancel()
         progressJob = null
         runOnMain {
@@ -519,6 +692,7 @@ internal class AudioEngine(
         loaded = false
         durationMs = 0L
         lastItemUri = ""
+        tailSilence = null
         progressJob?.cancel()
         progressJob = null
         runOnMain {
@@ -594,6 +768,7 @@ internal class AudioEngine(
         sessionKit = spareKit
         spareKit = handedKit
         lastItemUri = uri
+        tailSilence = null
         announced = true
         if (durationMs > 0L) {
             this.durationMs = durationMs
@@ -611,11 +786,46 @@ internal class AudioEngine(
                 val position = runOnMain { player?.currentPosition } ?: lastPositionMs
                 if (position >= 0L) {
                     lastPositionMs = position
-                    onEvent?.invoke(PlayerEvent.Progress(position, durationMs))
+                    onEvent(PlayerEvent.Progress(position, durationMs))
                 }
+                trimSilentTail(position)
                 delay(PROGRESS_MS.milliseconds)
             }
         }
+    }
+
+    /**
+     * Files the measured silent tail of the item the session is currently
+     * on. Noted the moment a measurement exists - even if the crossfade
+     * never arms - so every path past the measurable point can act on it.
+     * A silence below the floor clears any earlier note.
+     */
+    fun noteTailSilence(uri: String, silenceMs: Long) {
+        tailSilence = if (silenceMs >= MIN_TAIL_TRIM_MS) uri to silenceMs else null
+    }
+
+    /**
+     * The audible end stands in for the real one when no blend owns the
+     * ending: past it the session would only render silence, so the ended
+     * event fires there - exactly the sequence a natural end runs - and the
+     * normal advance lands the next track on top of the quiet tail instead
+     * of after it. The blend paths are left alone: an armed-and-ready spare
+     * is a beat from starting, and a running blend hands the session over at
+     * this very point on its own.
+     */
+    private fun trimSilentTail(position: Long) {
+        val (uri, silence) = tailSilence ?: return
+        if (silence <= 0L || durationMs <= silence) return
+        if (uri != lastItemUri || position < durationMs - silence) return
+        if (crossfade?.ownsTheEnding() == true) return
+        val playing = runOnMain { player?.isPlaying } ?: return
+        if (!playing) return
+        tailSilence = null
+        log.i("trimming '${uri.takeLast(12)}' at the audible end, ${silence}ms of tail silence skipped")
+        if (crossfade?.onSessionEnded() == true) return
+        lastPositionMs = durationMs
+        onEvent(PlayerEvent.Ended(uri))
+        lastItemUri = ""
     }
 
     private val listener = object : Player.Listener {
@@ -623,7 +833,7 @@ internal class AudioEngine(
             val newUri = item?.mediaId.orEmpty()
             val auto = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
             if (auto && lastItemUri.isNotBlank()) {
-                onEvent?.invoke(PlayerEvent.Ended(lastItemUri))
+                onEvent(PlayerEvent.Ended(lastItemUri))
             }
             if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
                 announced = false
@@ -635,7 +845,7 @@ internal class AudioEngine(
                 val ready = runOnMain { player?.playbackState == Player.STATE_READY } ?: false
                 if (ready && !announced) {
                     announced = true
-                    onEvent?.invoke(PlayerEvent.Started(newUri))
+                    onEvent(PlayerEvent.Started(newUri))
                     if (started) startProgress()
                 }
             }
@@ -643,15 +853,29 @@ internal class AudioEngine(
 
         override fun onPlaybackStateChanged(state: Int) {
             when (state) {
-                Player.STATE_READY -> if (!announced) {
-                    announced = true
-                    onEvent?.invoke(PlayerEvent.Started(lastItemUri))
-                    if (started) startProgress()
+                Player.STATE_READY -> {
+                    // An item whose length nobody knew upfront - a direct url
+                    // - settles its duration as soon as the player reports
+                    // one, so the transport and the bridge stop guessing.
+                    if (durationMs <= 0L) {
+                        val real = runOnMain { player?.duration } ?: C.TIME_UNSET
+                        if (real != C.TIME_UNSET && real > 0L) {
+                            durationMs = real
+                            if (lastItemUri.isNotBlank()) itemDurations[lastItemUri] = real
+                        }
+                    }
+                    if (!announced) {
+                        announced = true
+                        onEvent(PlayerEvent.Started(lastItemUri))
+                        if (started) startProgress()
+                    }
                 }
                 Player.STATE_ENDED -> {
                     if (crossfade?.onSessionEnded() == true) return
                     lastPositionMs = durationMs
-                    onEvent?.invoke(PlayerEvent.Ended(lastItemUri))
+                    // A trim already ended this item; the natural end that
+                    // follows must not advance the queue a second time.
+                    if (lastItemUri.isNotBlank()) onEvent(PlayerEvent.Ended(lastItemUri))
                     lastItemUri = ""
                 }
                 else -> Unit
@@ -671,7 +895,7 @@ internal class AudioEngine(
                     log.w("dropped the offline licence for '${lastItemUri.takeLast(12)}' after a drm error")
                 }
             }
-            onEvent?.invoke(PlayerEvent.Failed("${error.errorCodeName}: ${error.message ?: "audio error"}"))
+            onEvent(PlayerEvent.Failed("${error.errorCodeName}: ${error.message ?: "audio error"}"))
         }
     }
 

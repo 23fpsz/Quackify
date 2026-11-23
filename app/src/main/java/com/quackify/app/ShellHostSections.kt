@@ -59,6 +59,7 @@ import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.resetHomeSplash
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.store.StreamSource
 import java.util.Calendar
 
 private val log = Logs.of(Logs.Module.MAIN)
@@ -84,6 +85,7 @@ private class NowPlayingWriters(
     val setArtist: (ArtistDetail?) -> Unit,
     val setArtistFollowed: (Boolean?) -> Unit,
     val setLyrics: (TrackLyrics?) -> Unit,
+    val setNextLyrics: (TrackLyrics?) -> Unit,
     val setTranscript: (EpisodeTranscript?) -> Unit,
     val setCanvasFile: (String?) -> Unit,
     val setShowDetail: (ShowDetail?) -> Unit,
@@ -183,6 +185,7 @@ internal fun MainActivity.rememberNowPlayingData(
         setArtist = { nowPlayingArtist = it },
         setArtistFollowed = { nowPlayingArtistFollowed = it },
         setLyrics = { nowPlayingLyrics = it },
+        setNextLyrics = { nowPlayingNextLyrics = it },
         setTranscript = { nowPlayingTranscript = it },
         setCanvasFile = { canvasFile = it },
         setShowDetail = { nowPlayingShow = it },
@@ -244,10 +247,13 @@ internal fun MainActivity.rememberNowPlayingData(
     }
     LaunchedEffect(
         playback?.trackUri,
+        playback?.streamSource,
+        playback?.videoId,
         LyricsOptions.translationEnabled,
         LyricsOptions.translationLanguage,
         LyricsOptions.prioritizeWordSynced,
         LyricsOptions.providerOrder,
+        LyricsOptions.ytmProviderOrder,
     ) {
         val uri = playback?.trackUri.orEmpty()
         if (!uri.startsWith("spotify:track:")) {
@@ -256,6 +262,10 @@ internal fun MainActivity.rememberNowPlayingData(
         }
         val bridge = PlaybackHost.bridge
         val duration = bridge?.progressSnapshot?.durationMs ?: 0L
+        val stream = playback?.streamSource
+            ?.let { key -> StreamSource.entries.firstOrNull { it.key == key } }
+            ?: StreamSource.SPOTIFY
+        val order = LyricsOptions.providerOrderFor(stream)
         val repository = Krespot.lyricsRepository
         val result = repository.lyrics(
             context = this@rememberNowPlayingData,
@@ -263,14 +273,18 @@ internal fun MainActivity.rememberNowPlayingData(
             title = playback?.title.orEmpty(),
             artist = playback?.artist.orEmpty(),
             durationMs = duration,
-            sources = LyricsOptions.providerOrder.toSet(),
-            order = LyricsOptions.providerOrder,
+            sources = order.toSet(),
+            order = order,
             prioritizeWordSynced = LyricsOptions.prioritizeWordSynced,
+            stream = stream,
+            videoId = playback?.videoId.orEmpty(),
         )
         var trackLyrics = if (result != null) {
             repository.asTrackLyrics(result)
-        } else {
+        } else if (stream == StreamSource.SPOTIFY) {
             Krespot.lyrics.lyrics(this@rememberNowPlayingData, uri)
+        } else {
+            null
         }
         if (trackLyrics != null && LyricsOptions.translationEnabled && LyricsOptions.enabled) {
             val target = LyricsOptions.translationTargetTag(this@rememberNowPlayingData)
@@ -296,6 +310,54 @@ internal fun MainActivity.rememberNowPlayingData(
             }
         }
         writers.setLyrics(trackLyrics)
+    }
+    // The reader's sneak peek: the first lines of whatever comes next. The
+    // lookup re-runs only when the next track actually changes, and it is
+    // skipped entirely while the feature is off so the queue costs nothing.
+    LaunchedEffect(
+        playback?.nextTrack?.uri,
+        LyricsOptions.nextTrackPeek,
+        LyricsOptions.enabled,
+        LyricsOptions.prioritizeWordSynced,
+        LyricsOptions.providerOrder,
+        LyricsOptions.ytmProviderOrder,
+    ) {
+        val next = playback?.nextTrack
+        if (!LyricsOptions.enabled || !LyricsOptions.nextTrackPeek || next == null ||
+            !next.uri.startsWith("spotify:track:")
+        ) {
+            writers.setNextLyrics(null)
+            return@LaunchedEffect
+        }
+        val bridge = PlaybackHost.bridge
+        val repository = Krespot.lyricsRepository
+        val order = LyricsOptions.providerOrderFor(
+            StreamSource.entries.firstOrNull { it.key == playback?.streamSource } ?: StreamSource.SPOTIFY
+        )
+        val result = repository.lyrics(
+            context = this@rememberNowPlayingData,
+            trackUri = next.uri,
+            title = next.title,
+            artist = next.artist,
+            durationMs = next.durationMs,
+            sources = order.toSet(),
+            order = order,
+            prioritizeWordSynced = LyricsOptions.prioritizeWordSynced,
+            stream = StreamSource.entries.firstOrNull { it.key == playback?.streamSource } ?: StreamSource.SPOTIFY,
+            videoId = "",
+        )
+        val nextLyrics = if (result != null) {
+            repository.asTrackLyrics(result)
+        } else {
+            Krespot.lyrics.lyrics(this@rememberNowPlayingData, next.uri)
+        }
+        // Only the opening lines are ever shown; trimming here keeps the
+        // cached payload small instead of carrying a whole song for 5 lines.
+        writers.setNextLyrics(
+            nextLyrics?.let { lyrics ->
+                lyrics.copy(lines = lyrics.lines.take(5))
+            }
+        )
     }
     LaunchedEffect(playback?.trackUri) {
         val uri = playback?.trackUri.orEmpty()
@@ -487,6 +549,7 @@ onLoadCommentReactions = onLoadCommentReactionsBound,
 onDeleteComment = onDeleteCommentBound,
         nowPlayingArtistFollowed = nowPlayingArtistFollowed,
         nowPlayingLyrics = remember(nowPlayingLyrics) { mapNowPlayingLyrics(nowPlayingLyrics) },
+        nextTrackLyrics = remember(nowPlayingNextLyrics) { mapNowPlayingLyrics(nowPlayingNextLyrics) },
         lyricsProviderName = nowPlayingLyrics?.provider.orEmpty(),
         nowPlayingTranscript = remember(nowPlayingTranscript) { mapNowPlayingTranscript(nowPlayingTranscript) },
         canvasFilePath = canvasFile,

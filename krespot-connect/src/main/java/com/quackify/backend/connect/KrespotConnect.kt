@@ -464,7 +464,7 @@ class KrespotConnect(private val context: Context) {
         }
         log.i("publish '${track.title.ifBlank { track.uri.takeLast(12) }}' " +
                 "pos=${positionMs}ms playing=$playing idx=$contextIndex " +
-                "ctx='${contextUri.takeLast(24)}' -> ${response?.code}"
+                "ctx='${contextUri.takeLast(24)}' -> ${response.code}"
         )
         return true
     }

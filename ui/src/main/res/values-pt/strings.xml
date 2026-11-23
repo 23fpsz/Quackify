@@ -242,6 +242,15 @@
     <string name="sleep_timer_custom_hint">Entre 3 minutos e 24 horas</string>
     <string name="sleep_timer_custom_unit">minutos</string>
     <string name="sleep_timer_end_of_track_info">A reprodução para no fim da faixa atual</string>
+    <string name="stream_sources">Fontes de transmissão</string>
+    <string name="stream_sources_desc">A reprodução testa cada fonte nesta ordem e passa para a seguinte quando uma falha</string>
+    <string name="stream_sources_row_desc">Escolhe qual fonte de áudio é tentada primeiro</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">Principal</string>
+    <string name="stream_source_fallback">Substituta</string>
+    <string name="stream_source_move_up">Mover para cima</string>
+    <string name="stream_source_move_down">Mover para baixo</string>
     <string name="sleep_timer_set">Definir temporizador</string>
     <string name="sleep_timer_stops_at">Para às %1$s</string>
     <string name="sleep_timer_with_duration">Temporizador de sono (%1$s)</string>
@@ -526,4 +535,5 @@
     <string name="artist_photo_cd">Foto de %1$s</string>
     <string name="webview_missing_message">O pacote Android System WebView está ausente, desativado ou sendo atualizado neste dispositivo, então a página de login não abre. Ative ou atualize o Android System WebView nas configurações do sistema e tente novamente.</string>
     <string name="name_your_folder">Dê um nome à sua pasta</string>
+    <string name="session_expired_toast">A sua sessão expirou. Entre novamente para continuar a ouvir.</string>
 </resources>

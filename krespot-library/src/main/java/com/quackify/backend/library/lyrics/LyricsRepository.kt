@@ -5,6 +5,7 @@ import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.Net
+import com.quackify.backend.core.store.StreamSource
 import com.quackify.backend.model.TrackLyrics
 import com.quackify.backend.model.WordTiming
 import com.quackify.backend.model.WordTimings
@@ -36,9 +37,11 @@ object LyricsRepository {
         order: List<LyricsProvider> = LyricsProvider.offered,
         prioritizeWordSynced: Boolean = true,
         isrc: String? = null,
+        stream: StreamSource = StreamSource.SPOTIFY,
+        videoId: String = "",
     ): Result? = coroutineScope {
         if (!trackUri.startsWith("spotify:track:")) return@coroutineScope null
-        val sequence = LyricsProvider.ordered(order).filter { it in sources }
+        val sequence = LyricsProvider.orderedFor(order, stream).filter { it in sources }
         if (sequence.isEmpty()) return@coroutineScope null
 
         val searchTitle = title.forLyricsSearch()
@@ -47,7 +50,7 @@ object LyricsRepository {
         val racing = sequence.map { provider ->
             provider to async(Dispatchers.IO) {
                 runCatching {
-                    fetch(context, provider, trackUri, searchTitle, searchArtist, album, durationMs, isrc)
+                    fetch(context, provider, trackUri, searchTitle, searchArtist, album, durationMs, isrc, videoId)
                 }.getOrNull()
             }
         }
@@ -76,12 +79,18 @@ object LyricsRepository {
         album: String?,
         durationMs: Long,
         isrc: String?,
+        videoId: String,
     ): Result? {
         val lines = when (provider) {
             LyricsProvider.SPOTIFY -> spotifyLines(context, trackUri)
             LyricsProvider.LRCLIB -> LrcLibSource.lyrics(context, title, artist, durationMs)
             LyricsProvider.MUSIXMATCH -> MusixmatchSource.lyrics(title, artist, durationMs)
             LyricsProvider.LRC_RED -> LrcRedSource.lyrics(title, artist, durationMs, isrc)
+            LyricsProvider.YT_MUSIC -> YtMusicLyricsSource.lyrics(context, videoId)
+            LyricsProvider.SIMPMUSIC -> SimpMusicSource.lyrics(videoId, durationMs)
+            LyricsProvider.BETTER_LYRICS -> BetterLyricsSource.lyrics(title, artist, durationMs, album)
+            LyricsProvider.LYRICS_PLUS -> LyricsPlusSource.lyrics(title, artist, durationMs, album, isrc)
+            LyricsProvider.KUGOU -> KuGouSource.lyrics(title, artist, durationMs, album)
         } ?: return null
         return Result(provider, lines)
     }

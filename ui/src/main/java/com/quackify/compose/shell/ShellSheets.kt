@@ -2,6 +2,7 @@ package com.quackify.compose.shell
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import com.quackify.backend.model.ConnectDevice
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.backend.core.auth.EncoreAuth
@@ -327,6 +328,7 @@ private fun ShellProfileSheets(
         onNotificationsClick = onNotifications,
         notificationsUnread = notificationsUnread,
         onLogoutClick = onLogout,
+        accountsLocked = EncoreAuth.customSpDc(LocalContext.current),
         userDisplayName = userDisplayName,
         userAvatarUrl = userAvatarUrl,
         userColorHex = userColorHex

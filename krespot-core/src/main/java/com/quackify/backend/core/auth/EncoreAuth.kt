@@ -46,6 +46,7 @@ object EncoreAuth {
     )
 
     private const val KEY_SESSION = "session"
+    private const val KEY_CUSTOM_SPDC = "custom_spdc"
     private const val KEY_NAME = "account_name"
     private const val KEY_ID = "account_id"
     private const val KEY_EMAIL = "account_email"
@@ -171,6 +172,7 @@ object EncoreAuth {
             .putString(KEY_COLOR, p.getString("multi.$id.color", "").orEmpty())
             .putLong(KEY_SAVED_AT, System.currentTimeMillis())
             .putString(KEY_MULTI_ACTIVE, id)
+            .remove(KEY_CUSTOM_SPDC)
             .remove(KEY_TOKEN)
             .remove(KEY_TOKEN_AT)
             .remove(KEY_TOKEN_EXP)
@@ -426,6 +428,48 @@ object EncoreAuth {
         return spDcOf(session)
     }
 
+    /**
+     * Whether the active session was installed through the Debug sp_dc
+     * door rather than the web login, and how long the cookie is. The length
+     * — never the value — is exposed: it is enough to tell "a real cookie is
+     * in here" from "an experiment pasted something short" without leaking
+     * the credential into logs or the UI.
+     */
+    fun customSpDc(context: Context): Boolean {
+        if (prefs(context).getBoolean(KEY_CUSTOM_SPDC, false)) return true
+        // The flag is written at save time only, so a session installed before
+        // the flag existed is recognised by its shape: the door stores exactly
+        // one domain with nothing but sp_dc cookies, the web login always
+        // captures more domains and more cookies than that.
+        val session = prefs(context).getString(KEY_SESSION, null) ?: return false
+        val map = runCatching { JSONObject(session) }.getOrNull() ?: return false
+        if (map.length() != 1) return false
+        val cookies = map.optString("https://open.spotify.com", "")
+            .split(";")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        return cookies.isNotEmpty() && cookies.all { it.startsWith("sp_dc=") }
+    }
+
+    fun customSpDcLength(context: Context): Int =
+        if (customSpDc(context)) spDc(context).length else 0
+
+    /**
+     * Drops a custom sp_dc session without touching anything the web login
+     * saved: the account that was active before the door installed the custom
+     * cookie is restored from its snapshot when one exists, so a remove is a
+     * switch-back instead of a logout. Returns true when a stored account was
+     * restored, false when the removal ended in a full logout.
+     */
+    fun removeCustomSpDc(context: Context): Boolean {
+        val saved = savedAccounts(context)
+        val previous = activeAccountId(context)
+        val target = saved.firstOrNull { it.id == previous } ?: saved.firstOrNull()
+        if (target != null && switchAccount(context, target.id)) return true
+        logout(context)
+        return false
+    }
+
     fun spDcOf(cookies: String): String {
         val map = runCatching { JSONObject(cookies) }.getOrNull() ?: return ""
         COOKIE_DOMAINS.forEach { domain ->
@@ -576,10 +620,12 @@ object EncoreAuth {
         return map.toString()
     }
 
-    fun saveLogin(context: Context, cookies: String, account: Account) {
-        log.i("saveLogin name=${account.name} id=${account.id} product=${account.product} avatar=${account.imageUrl.isNotBlank()}")
+    fun saveLogin(context: Context, cookies: String, account: Account, customSpDc: Boolean = false) {
+        log.i("saveLogin name=${account.name} id=${account.id} product=${account.product} " +
+                "avatar=${account.imageUrl.isNotBlank()} customSpDc=$customSpDc")
         prefs(context).edit()
             .putString(KEY_SESSION, cookies)
+            .putBoolean(KEY_CUSTOM_SPDC, customSpDc)
             .putString(KEY_NAME, account.name)
             .putString(KEY_ID, account.id)
             .putString(KEY_EMAIL, account.email)
@@ -663,6 +709,7 @@ object EncoreAuth {
         }
         prefs(context).edit()
             .remove(KEY_SESSION)
+            .remove(KEY_CUSTOM_SPDC)
             .remove(KEY_NAME)
             .remove(KEY_ID)
             .remove(KEY_EMAIL)
@@ -689,8 +736,19 @@ object EncoreAuth {
         }
     }
 
-    suspend fun fetchToken(context: Context, spDc: String): String? {
-        WebToken.mint(context, spDc)?.let { return it }
+    /** How a sp_dc token check ended: the answer matters as much as the token. */
+    private enum class TokenOutcome { OK, REJECTED, FETCH_FAILED }
+
+    /**
+     * Outcome-aware version of the token check. The minting path cannot tell
+     * a refused cookie from an unreachable server — both come back null — so
+     * when it fails the plain HTTP endpoint is asked as the tiebreaker: a
+     * response that hands out an anonymous (or empty) token means the server
+     * refused the cookie, while no response at all means the check itself
+     * failed and the sp_dc is simply untested.
+     */
+    private suspend fun tokenOutcome(context: Context, spDc: String): Pair<TokenOutcome, String> {
+        WebToken.mint(context, spDc)?.let { return TokenOutcome.OK to it }
         val jar = cookieManagerOrNull()?.getCookie("https://open.spotify.com")
         val cookieHeader = jar?.takeIf { it.isNotBlank() } ?: "sp_dc=$spDc"
         log.i("fetchToken jar=${!jar.isNullOrBlank()} cookies=${cookieHeader.length}B")
@@ -708,16 +766,60 @@ object EncoreAuth {
                 "Cookie" to cookieHeader,
             ),
             tag = "get_access_token",
-        ) ?: return null
+        ) ?: return TokenOutcome.FETCH_FAILED to ""
         val json = response.json()
         if (json == null) {
             log.w("fetchToken http=${response.code} not-json")
-            return null
+            return TokenOutcome.FETCH_FAILED to ""
         }
         val anonymous = json.optBoolean("isAnonymous", false)
         val token = json.optString("accessToken")
         log.i("fetchToken http=${response.code} anonymous=$anonymous tokenLen=${token.length}")
-        return token.takeIf { it.isNotBlank() && !anonymous }
+        return when {
+            token.isNotBlank() && !anonymous -> TokenOutcome.OK to token
+            else -> TokenOutcome.REJECTED to ""
+        }
+    }
+
+    suspend fun fetchToken(context: Context, spDc: String): String? =
+        tokenOutcome(context, spDc).second.takeIf { it.isNotBlank() }
+
+    /**
+     * What happened when a sp_dc was tried against Spotify, split into the
+     * cases the caller has to treat differently: a cookie the server
+     * actually refused is gone for good, while a cookie that could not be
+     * checked at all may still be fine and deserve a "keep it anyway".
+     */
+    sealed interface SpDcOutcome {
+        /** Signed in: the token works and the account behind it is known. */
+        data class Ok(val account: Account) : SpDcOutcome
+
+        /** The server answered and said no: expired, revoked or malformed sp_dc. */
+        data object Rejected : SpDcOutcome
+
+        /**
+         * The check never produced an answer — offline, timeout, or the
+         * profile endpoint would not talk. The sp_dc itself is untested.
+         */
+        data object FetchFailed : SpDcOutcome
+    }
+
+    /**
+     * Runs the whole sign-in check for a raw sp_dc cookie and reports which
+     * of the three outcomes it was, so the debug signer-in can ask the user
+     * whether to keep an unchecked cookie instead of silently dropping it.
+     */
+    suspend fun fetchSpDcOutcome(context: Context, spDc: String): SpDcOutcome {
+        if (spDc.isBlank()) return SpDcOutcome.Rejected
+        val (outcome, token) = tokenOutcome(context, spDc)
+        return when (outcome) {
+            TokenOutcome.FETCH_FAILED -> SpDcOutcome.FetchFailed
+            TokenOutcome.REJECTED -> SpDcOutcome.Rejected
+            TokenOutcome.OK -> {
+                val account = fetchAccount(token)
+                if (account == null) SpDcOutcome.FetchFailed else SpDcOutcome.Ok(account)
+            }
+        }
     }
 
     suspend fun fetchAccount(token: String): Account? {

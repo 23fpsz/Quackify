@@ -13,6 +13,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,14 +25,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
@@ -39,6 +45,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,9 +59,13 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
@@ -62,10 +73,18 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.style.TextAlign
 import androidx.core.content.pm.PackageInfoCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -78,6 +97,8 @@ import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.locale.AppLocale
 import com.quackify.backend.core.log.DeviceInfo
 import com.quackify.backend.core.log.Logs
+import com.quackify.backend.core.store.StreamSource
+import com.quackify.backend.core.store.StreamSources
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
@@ -87,9 +108,9 @@ import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MAX
 import com.quackify.compose.player.LYRICS_OFFSET_TENTHS_MIN
 import com.quackify.compose.player.TRANSLATION_DEVICE_LANGUAGE
 import com.quackify.compose.sheets.AppLanguageSheet
-import com.quackify.compose.sheets.EncoreCreateNameDialog
 import com.quackify.compose.sheets.LyricsProviderSheet
 import com.quackify.compose.sheets.PlayerButtonsConfigSheet
+import com.quackify.compose.sheets.StreamSourcesSheet
 import com.quackify.compose.sheets.TranslationLanguageSheet
 import com.quackify.compose.settings.PlayerButtonsConfig
 import com.quackify.compose.settings.PlayerButtonsStore
@@ -155,6 +176,7 @@ fun SettingsScreen(
     val lyricsPrioritizeWordSynced = LyricsOptions.prioritizeWordSynced
     val lyricsProviderOrder = LyricsOptions.providerOrder
     val lyricsKeepScreenOn = LyricsOptions.keepScreenOn
+    val lyricsNextTrackPeek = LyricsOptions.nextTrackPeek
     val lyricsOffsetTenths = LyricsOptions.offsetTenths + LYRICS_OFFSET_TENTHS_MAX
     val lyricsOffsetLabel = remember(LyricsOptions.offsetTenths) {
         val seconds = LyricsOptions.offsetTenths / 10f
@@ -228,6 +250,17 @@ fun SettingsScreen(
     var playerButtonsSheetOpen by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf<Int?>(null) }
     var spDcDialogOpen by remember { mutableStateOf(false) }
+    // Holds the sp_dc that could not be checked while the user decides
+    // whether to keep it anyway; blank when no decision is pending.
+    var spDcUnchecked by remember { mutableStateOf<String?>(null) }
+    // Bumped after a sp_dc is installed so the row's subtitle — which reads
+    // prefs, not snapshot state — recomposes and picks the new length up.
+    var spDcRevision by remember { mutableStateOf(0) }
+    // The custom sp_dc the door installed, or blank on a web login; it gates
+    // the logout row and feeds the door's prefilled field.
+    val activeSpDc = remember(spDcRevision) {
+        if (EncoreAuth.customSpDc(context)) EncoreAuth.spDc(context) else ""
+    }
     val scope = rememberCoroutineScope()
     val disableDebug = {
         debugUnlocked = false
@@ -243,6 +276,18 @@ fun SettingsScreen(
     var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
     var translationLanguageSheetOpen by remember { mutableStateOf(false) }
     var appLanguageSheetOpen by remember { mutableStateOf(false) }
+    var streamSources by remember { mutableStateOf(StreamSources.order(context)) }
+    var streamSourcesSheetOpen by remember { mutableStateOf(false) }
+    val streamSourcesLabel = remember(streamSources) {
+        streamSources.joinToString(" → ") { source ->
+            context.getString(
+                when (source) {
+                    StreamSource.SPOTIFY -> R.string.stream_source_spotify
+                    StreamSource.YT_MUSIC -> R.string.stream_source_ytmusic
+                }
+            )
+        }
+    }
     val appLanguage = remember { AppLocale.current(context) }
 
     BackHandler(enabled = category != null) {
@@ -408,6 +453,15 @@ fun SettingsScreen(
                             enabled = lyricsEnabled,
                             onCheckedChange = { on ->
                                 LyricsOptions.setKeepScreenOn(context, on)
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = stringResource(R.string.lyrics_next_up),
+                            subtitle = stringResource(R.string.lyrics_next_up_desc),
+                            isChecked = lyricsNextTrackPeek,
+                            enabled = lyricsEnabled,
+                            onCheckedChange = { on ->
+                                LyricsOptions.setNextTrackPeek(context, on)
                             }
                         )
                         SettingsSliderRow(
@@ -679,11 +733,17 @@ fun SettingsScreen(
                         }
                         Text(
                             text = stringResource(R.string.log_out),
-                            style = EncoreTheme.typography.bodyMediumBold.copy(color = EncoreColors.Error),
+                            style = EncoreTheme.typography.bodyMediumBold.copy(
+                                color = if (activeSpDc.isNotBlank()) {
+                                    EncoreColors.TextSecondary
+                                } else {
+                                    EncoreColors.Error
+                                }
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable { onLogout() }
+                                .clickable(enabled = activeSpDc.isBlank()) { onLogout() }
                                 .padding(vertical = 12.dp)
                         )
                     }
@@ -692,6 +752,43 @@ fun SettingsScreen(
                 if (target == 2) {
                     item {
                         SettingsSectionHeader(title = stringResource(R.string.playback))
+                        if (streamSourcesSheetOpen) {
+                            StreamSourcesSheet(
+                                orderedSources = streamSources,
+                                onOrderSelected = { order ->
+                                    streamSources = order
+                                    StreamSources.save(context, order)
+                                },
+                                onDismiss = { streamSourcesSheetOpen = false }
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { streamSourcesSheetOpen = true }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                                Text(
+                                    text = stringResource(R.string.stream_sources),
+                                    style = EncoreTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        color = EncoreColors.TextPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = stringResource(R.string.stream_sources_row_desc),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
+                            Text(
+                                text = streamSourcesLabel,
+                                style = EncoreTheme.typography.bodySmallBold.copy(color = EncoreColors.Green)
+                            )
+                        }
                         SettingsToggleRow(
                             title = stringResource(R.string.autoplay_on_startup),
                             subtitle = stringResource(R.string.when_you_open_the_app_the_loaded_track_starts_pl),
@@ -920,13 +1017,31 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
+                                // When a custom sp_dc is installed the subtitle
+                                // says so — with the cookie's length in bytes,
+                                // never its value — so the debug door keeps
+                                // reminding the tinkerer what session they are
+                                // actually running on.
+                                val customSpDcLength = remember(spDcRevision) {
+                                    EncoreAuth.customSpDcLength(context)
+                                }
                                 Text(
                                     text = stringResource(R.string.sign_in_with_sp_dc),
                                     style = EncoreTheme.typography.bodyMediumBold
                                 )
                                 Text(
-                                    text = stringResource(R.string.sign_in_with_sp_dc_subtitle),
-                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                    text = if (customSpDcLength > 0) {
+                                        stringResource(R.string.sp_dc_installed_subtitle, customSpDcLength)
+                                    } else {
+                                        stringResource(R.string.sign_in_with_sp_dc_subtitle)
+                                    },
+                                    style = EncoreTheme.typography.bodySmall.copy(
+                                        color = if (customSpDcLength > 0) {
+                                            EncoreColors.Green
+                                        } else {
+                                            EncoreColors.TextSecondary
+                                        }
+                                    )
                                 )
                             }
                             Icon(
@@ -942,37 +1057,407 @@ fun SettingsScreen(
         }
     }
 
-    EncoreCreateNameDialog(
+    SpDcSignInDialog(
         isOpen = spDcDialogOpen,
-        title = stringResource(R.string.sign_in_with_sp_dc),
-        initialName = "",
-        confirmLabel = stringResource(R.string.sign_in),
+        initialSpDc = activeSpDc,
+        onRemove = {
+            spDcDialogOpen = false
+            EncoreAuth.removeCustomSpDc(context)
+            restartApp(context)
+        },
         onConfirm = { value ->
             spDcDialogOpen = false
             val spDc = value.trim().removePrefix("sp_dc=").substringBefore(";").trim()
             if (spDc.isNotBlank()) {
                 scope.launch {
-                    val token = EncoreAuth.fetchToken(context, spDc)
-                    val account = token?.let { EncoreAuth.fetchAccount(it) }
-                    if (account != null) {
-                        val cookies = JSONObject()
-                            .put("https://open.spotify.com", "sp_dc=$spDc")
-                            .toString()
-                        EncoreAuth.saveLogin(context, cookies, account)
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.sp_dc_signed_in, account.name),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        onSpDcSignedIn()
-                    } else {
-                        Toast.makeText(context, R.string.sp_dc_rejected, Toast.LENGTH_SHORT).show()
+                    when (val outcome = EncoreAuth.fetchSpDcOutcome(context, spDc)) {
+                        is EncoreAuth.SpDcOutcome.Ok -> {
+                            val cookies = JSONObject()
+                                .put("https://open.spotify.com", "sp_dc=$spDc")
+                                .toString()
+                            EncoreAuth.saveLogin(context, cookies, outcome.account, customSpDc = true)
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.sp_dc_signed_in, outcome.account.name),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            onSpDcSignedIn()
+                            spDcRevision++
+                            restartApp(context)
+                        }
+                        // The server could not be reached to vouch for the
+                        // cookie, so the user decides: keep it and let the
+                        // profile fill in later, or drop it and try again
+                        // once the network is back.
+                        EncoreAuth.SpDcOutcome.FetchFailed -> spDcUnchecked = spDc
+                        EncoreAuth.SpDcOutcome.Rejected ->
+                            Toast.makeText(context, R.string.sp_dc_rejected, Toast.LENGTH_SHORT).show()
                     }
                 }
             }
         },
         onDismiss = { spDcDialogOpen = false }
     )
+
+    SpDcUncheckedConfirmDialog(
+        spDc = spDcUnchecked,
+        onConfirm = {
+            val spDc = spDcUnchecked
+            spDcUnchecked = null
+            if (spDc.isNullOrBlank()) return@SpDcUncheckedConfirmDialog
+            scope.launch {
+                val cookies = JSONObject()
+                    .put("https://open.spotify.com", "sp_dc=$spDc")
+                    .toString()
+                // The profile endpoints never answered, so there is nothing
+                // to show yet; the account resolves and persists itself the
+                // first time the app talks to Spotify with this session.
+                EncoreAuth.saveLogin(
+                    context,
+                    cookies,
+                    EncoreAuth.Account(name = context.getString(R.string.sp_dc_pending_name)),
+                    customSpDc = true
+                )
+                Toast.makeText(context, R.string.sp_dc_signed_in_unchecked, Toast.LENGTH_SHORT).show()
+                onSpDcSignedIn()
+                spDcRevision++
+                restartApp(context)
+            }
+        },
+        onDismiss = { spDcUnchecked = null }
+    )
+}
+
+private const val APP_RESTART_DELAY_MS = 400L
+
+/** The debug door swaps the whole session, so only a cold process start
+ *  guarantees every in-memory hold (token memos, caches, the player) picks
+ *  the new one up. The launch intent is registered with the system before
+ *  the process dies, so the app comes straight back up on the new session. */
+private fun restartApp(context: Context) {
+    Handler(Looper.getMainLooper()).postDelayed({
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        if (intent == null) {
+            (context as? Activity)?.recreate()
+            return@postDelayed
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        Runtime.getRuntime().exit(0)
+    }, APP_RESTART_DELAY_MS)
+}
+
+/**
+ * The sp_dc could not be verified because the check itself failed — offline,
+ * timeout, server hiccup. Presented in the same cinematic language as the
+ * sp_dc entry dialog it follows: the gradient canvas, the centered message,
+ * and two pill buttons — "keep it anyway" in the signature green, cancel
+ * quiet in white. The cookie is only as good as the user's confidence, so
+ * the choice belongs to them, not to a silent failure toast.
+ */
+@Composable
+private fun SpDcUncheckedConfirmDialog(
+    spDc: String?,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (spDc.isNullOrBlank()) return
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF5A5A5A),
+                            Color(0xFF242424),
+                            Color(0xFF121212)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {} // block outside clicks
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.sp_dc_check_failed_title),
+                    style = EncoreTheme.typography.titleLarge.copy(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = stringResource(R.string.sp_dc_check_failed_body),
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        color = Color.White.copy(alpha = 0.75f),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .clickable(onClick = onDismiss)
+                            .padding(horizontal = 28.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.cancel),
+                            style = EncoreTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(EncoreColors.Green)
+                            .clickable(onClick = onConfirm)
+                            .padding(horizontal = 32.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.sp_dc_keep_anyway),
+                            style = EncoreTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black,
+                                fontSize = 14.sp
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpDcSignInDialog(
+    isOpen: Boolean,
+    initialSpDc: String,
+    onRemove: () -> Unit,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!isOpen) return
+
+    var textFieldValue by remember(initialSpDc) {
+        mutableStateOf(
+            TextFieldValue(
+                text = initialSpDc,
+                selection = TextRange(0, initialSpDc.length)
+            )
+        )
+    }
+
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(150)
+        focusRequester.requestFocus()
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF5A5A5A),
+                            Color(0xFF242424),
+                            Color(0xFF121212)
+                        )
+                    )
+                )
+                .imePadding(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.sign_in_with_sp_dc),
+                    style = EncoreTheme.typography.titleLarge.copy(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(40.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    BasicTextField(
+                        value = textFieldValue,
+                        onValueChange = { textFieldValue = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                        textStyle = EncoreTheme.typography.bodyMedium.copy(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        ),
+                        singleLine = true,
+                        cursorBrush = SolidColor(Color.White),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                val trimmed = textFieldValue.text.trim()
+                                if (trimmed.isNotBlank()) {
+                                    onConfirm(trimmed)
+                                }
+                            }
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color.White.copy(alpha = 0.45f))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                val canConfirm = textFieldValue.text.trim().isNotBlank()
+
+                if (initialSpDc.isNotBlank()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SpDcDialogPill(
+                                label = stringResource(R.string.cancel),
+                                background = Color.Transparent,
+                                contentColor = Color.White,
+                                onClick = onDismiss
+                            )
+                            SpDcDialogPill(
+                                label = stringResource(R.string.remove_custom_sp_dc),
+                                background = EncoreColors.Error,
+                                contentColor = Color.White,
+                                onClick = onRemove
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        SpDcDialogPill(
+                            label = stringResource(R.string.sign_in),
+                            background = if (canConfirm) EncoreColors.Green else EncoreColors.Green.copy(alpha = 0.4f),
+                            contentColor = Color.Black,
+                            enabled = canConfirm,
+                            onClick = { onConfirm(textFieldValue.text.trim()) }
+                        )
+                    }
+                } else {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SpDcDialogPill(
+                            label = stringResource(R.string.cancel),
+                            background = Color.Transparent,
+                            contentColor = Color.White,
+                            onClick = onDismiss
+                        )
+                        SpDcDialogPill(
+                            label = stringResource(R.string.sign_in),
+                            background = if (canConfirm) EncoreColors.Green else EncoreColors.Green.copy(alpha = 0.4f),
+                            contentColor = Color.Black,
+                            enabled = canConfirm,
+                            onClick = { onConfirm(textFieldValue.text.trim()) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpDcDialogPill(
+    label: String,
+    background: Color,
+    contentColor: Color,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(background)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 28.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = EncoreTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = if (enabled) contentColor else contentColor.copy(alpha = 0.6f),
+                fontSize = 14.sp
+            )
+        )
+    }
 }
 
 private const val GITHUB_URL = "https://github.com/23fpsz/Quackify"
@@ -1073,6 +1558,7 @@ private fun SettingsSectionHeader(title: String) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsSliderRow(
     title: String,
@@ -1111,11 +1597,20 @@ private fun SettingsSliderRow(
                 style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
             )
         }
-        Slider(
+        val sliderState = rememberSliderState(
             value = value.toFloat(),
-            onValueChange = { onValueChange(it.roundToInt().coerceIn(0, maxValue)) },
-            valueRange = 0f..maxValue.toFloat(),
             steps = maxValue - 1,
+            trackRange = 0f..maxValue.toFloat()
+        )
+        // The state owns the thumb position; when the value is rewritten
+        // from outside (prefs reset, another screen changing it) the state
+        // is nudged back in sync.
+        LaunchedEffect(value) {
+            sliderState.value = value.toFloat()
+        }
+        Slider(
+            state = sliderState,
+            onValueChange = { onValueChange(it.roundToInt().coerceIn(0, maxValue)) },
             colors = SliderDefaults.colors(
                 thumbColor = EncoreColors.Green,
                 activeTrackColor = EncoreColors.Green,

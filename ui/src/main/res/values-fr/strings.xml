@@ -242,6 +242,15 @@
     <string name="sleep_timer_custom_hint">Entre 3 minutes et 24 heures</string>
     <string name="sleep_timer_custom_unit">minutes</string>
     <string name="sleep_timer_end_of_track_info">La lecture s\'arrêtera à la fin du titre actuel</string>
+    <string name="stream_sources">Sources de flux</string>
+    <string name="stream_sources_desc">La lecture essaie chaque source dans cet ordre et bascule vers la suivante quand une source échoue</string>
+    <string name="stream_sources_row_desc">Choisit la source audio essayée en premier</string>
+    <string name="stream_source_spotify">Spotify</string>
+    <string name="stream_source_ytmusic">YouTube Music</string>
+    <string name="stream_source_primary">Principale</string>
+    <string name="stream_source_fallback">Repli</string>
+    <string name="stream_source_move_up">Monter</string>
+    <string name="stream_source_move_down">Descendre</string>
     <string name="sleep_timer_set">Définir la minuterie</string>
     <string name="sleep_timer_stops_at">S\'arrête à %1$s</string>
     <string name="sleep_timer_with_duration">Minuterie de sommeil (%1$s)</string>
@@ -527,4 +536,5 @@
     <string name="artist_photo_cd">Photo de %1$s</string>
     <string name="webview_missing_message">Le paquet Android System WebView est absent, désactivé ou en cours de mise à jour sur cet appareil, la page de connexion ne peut donc pas s\'ouvrir. Active ou mets à jour Android System WebView dans les paramètres système, puis réessaie.</string>
     <string name="name_your_folder">Donne un nom à ton dossier</string>
+    <string name="session_expired_toast">Votre session a expiré. Reconnectez-vous pour continuer à écouter.</string>
 </resources>

@@ -34,7 +34,7 @@ import android.os.StatFs
 import android.os.SystemClock
 import android.telephony.TelephonyManager
 import android.view.WindowManager
-import android.webkit.WebView
+import androidx.webkit.WebViewCompat
 import com.quackify.backend.core.auth.EncoreAuth
 import java.io.File
 import java.text.SimpleDateFormat
@@ -42,6 +42,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
+import kotlin.math.ln
+import kotlin.math.pow
 
 /**
  * Builds a plain-text report of everything worth knowing when debugging this
@@ -206,7 +208,11 @@ object DeviceInfo {
         section(out, "Network")
         runCatching {
             val connectivity = app.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            val network = connectivity?.activeNetwork
+            if (connectivity == null) {
+                line(out, "transport", "unavailable")
+                return@runCatching
+            }
+            val network = connectivity.activeNetwork
             val capabilities = network?.let { connectivity.getNetworkCapabilities(it) }
             if (capabilities == null) {
                 line(out, "transport", "none")
@@ -231,7 +237,7 @@ object DeviceInfo {
                 line(out, "validated",
                     capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED).toString()
                 )
-                line(out, "metered", (connectivity?.isActiveNetworkMetered ?: true).toString())
+                line(out, "metered", connectivity.isActiveNetworkMetered.toString())
                 line(out, "bandwidth",
                     "down=${capabilities.linkDownstreamBandwidthKbps}kbps " +
                         "up=${capabilities.linkUpstreamBandwidthKbps}kbps"
@@ -263,7 +269,7 @@ object DeviceInfo {
         }.onFailure { line(out, "level", "unavailable: ${it.message}") }
 
         section(out, "WebView")
-        line(out, "engine", runCatching { WebView.getCurrentWebViewPackage()?.versionName }.getOrNull() ?: "unknown (API < 26)")
+        line(out, "engine", runCatching { WebViewCompat.getCurrentWebViewPackage(app)?.versionName }.getOrNull() ?: "unknown")
 
         section(out, "DRM / Widevine")
         writeWidevine(out)
@@ -278,7 +284,7 @@ object DeviceInfo {
         var drm: MediaDrm? = null
         runCatching {
             drm = MediaDrm(WIDEVINE)
-            val instance = drm ?: return
+            val instance = drm
             for (name in listOf(
                 "vendor", "version", "description", "algorithms",
                 "securityLevel", "systemId", "oemCryptoApiVersion",
@@ -310,7 +316,14 @@ object DeviceInfo {
         }.onFailure {
             line(out, "mediaDrm", "failed: ${it.javaClass.simpleName}: ${it.message}")
         }
-        runCatching { drm?.release() }
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                drm?.close()
+            } else {
+                @Suppress("DEPRECATION")
+                drm?.release()
+            }
+        }
     }
 
     private fun statFs(out: StringBuilder, label: String, dir: File) {
@@ -366,9 +379,9 @@ object DeviceInfo {
         if (bytes < 0) return "unknown"
         val unit = 1024.0
         if (bytes < unit) return "$bytes B"
-        val exp = (Math.log(bytes.toDouble()) / Math.log(unit)).toInt().coerceAtMost(4)
+        val exp = (ln(bytes.toDouble()) / ln(unit)).toInt().coerceAtMost(4)
         val prefix = arrayOf("KB", "MB", "GB", "TB")[exp - 1]
-        return "%.1f %s".format(Locale.US, bytes / Math.pow(unit, exp.toDouble()), prefix)
+        return "%.1f %s".format(Locale.US, bytes / unit.pow(exp.toDouble()), prefix)
     }
 
     private fun formatDuration(ms: Long): String {
