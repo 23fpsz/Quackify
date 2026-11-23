@@ -1478,17 +1478,36 @@ private fun NowPlayingHeaderRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        if (showCollapse) {
-            EncoreIconButton(
-                iconRes = R.drawable.encore_icon_chevron_down_24,
-                contentDescription = stringResource(R.string.collapse_player),
-                onClick = onCollapseClick,
-                tint = ink,
-                size = 48.dp,
-                iconSize = 24.dp
-            )
-        } else {
-            Spacer(modifier = Modifier.size(48.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (showCollapse) {
+                EncoreIconButton(
+                    iconRes = R.drawable.encore_icon_chevron_down_24,
+                    contentDescription = stringResource(R.string.collapse_player),
+                    onClick = onCollapseClick,
+                    tint = ink,
+                    size = 48.dp,
+                    iconSize = 24.dp
+                )
+            }
+
+            if (onToggleViewLayout != null) {
+                EncoreIconButton(
+                    iconRes = if (PlayerViewOptions.landscapeDualView) R.drawable.encore_icon_list_view_24
+                    else R.drawable.encore_icon_grid_view_24,
+                    contentDescription = stringResource(
+                        if (PlayerViewOptions.landscapeDualView) R.string.switch_to_full_view
+                        else R.string.switch_to_dual_view
+                    ),
+                    onClick = onToggleViewLayout,
+                    tint = ink,
+                    size = 48.dp,
+                    iconSize = 24.dp
+                )
+            } else if (!showCollapse) {
+                Spacer(modifier = Modifier.size(48.dp))
+            }
         }
 
         Column(
@@ -1519,21 +1538,6 @@ private fun NowPlayingHeaderRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-
-        if (onToggleViewLayout != null) {
-            EncoreIconButton(
-                iconRes = if (PlayerViewOptions.landscapeDualView) R.drawable.encore_icon_list_view_24
-                else R.drawable.encore_icon_grid_view_24,
-                contentDescription = stringResource(
-                    if (PlayerViewOptions.landscapeDualView) R.string.switch_to_full_view
-                    else R.string.switch_to_dual_view
-                ),
-                onClick = onToggleViewLayout,
-                tint = ink,
-                size = 48.dp,
-                iconSize = 24.dp
-            )
         }
 
         EncoreIconButton(
