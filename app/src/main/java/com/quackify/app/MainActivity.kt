@@ -13,6 +13,7 @@ import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -112,10 +113,12 @@ import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.HomeSplashHost
 import com.quackify.compose.screens.resetHomeSplash
 import com.quackify.compose.screens.LoginScreen
+import com.quackify.compose.screens.LogcatScreen
 import com.quackify.compose.screens.PathfinderCaptureScreen
 import com.quackify.compose.screens.PopularTrack
 import com.quackify.compose.screens.ProfileContextCard
 import com.quackify.compose.screens.SettingsLocks
+import com.quackify.compose.screens.SettingsScreen
 import com.quackify.compose.screens.SettingsSwitches
 import com.quackify.compose.search.SearchHistoryItem
 import com.quackify.compose.shell.EncoreAppShell
@@ -160,6 +163,12 @@ class MainActivity : ComponentActivity() {
      * composition swaps to the login screen with a toast instead of letting
      * every call fail silently. */
     private var sessionLapsed by mutableStateOf(false)
+
+    /** The settings pane opened from the logged-out login screen, so a fresh
+     *  install can still reach the debug door's sp_dc sign-in. */
+    private var loginSettingsOpen by mutableStateOf(false)
+
+    private var loginLogcatOpen by mutableStateOf(false)
 
     private fun markSessionLapsed() {
         if (sessionLapsed) return
@@ -1107,9 +1116,12 @@ class MainActivity : ComponentActivity() {
                     LoginScreen(
                         onLoggedIn = {
                             log.i("login completed")
+                            loginSettingsOpen = false
+                            loginLogcatOpen = false
                             finishLogin()
                             loggedIn = true
                         },
+                        onOpenSettings = { loginSettingsOpen = true },
                         onBackExhausted = {
                             if (handleLoginBack()) {
                                 loggedIn = true
@@ -1118,6 +1130,21 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     )
+                    if (loginSettingsOpen) {
+                        BackHandler { loginSettingsOpen = false }
+                        LoginSettingsHost(
+                            updates = updates,
+                            onBack = { loginSettingsOpen = false },
+                            onOpenLogcat = { loginLogcatOpen = true },
+                        )
+                    }
+                    if (loginLogcatOpen) {
+                        BackHandler { loginLogcatOpen = false }
+                        LogcatScreen(
+                            onBackClick = { loginLogcatOpen = false },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
 
                 QuackifyToastHost(
@@ -1569,6 +1596,36 @@ class MainActivity : ComponentActivity() {
             return false
         }
         return true
+    }
+
+    @Composable
+    private fun LoginSettingsHost(
+        updates: UpdateController,
+        onBack: () -> Unit,
+        onOpenLogcat: () -> Unit,
+    ) {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        SettingsScreen(
+            onBackClick = onBack,
+            switches = settingsSwitches,
+            locks = settingsLocks,
+            product = settingsProduct,
+            country = settingsCountry,
+            loading = settingsLoading,
+            onToggleMusicVideos = { on -> onToggleSettingHandler(scope, null, "musicVideoDisabled", !on) },
+            onToggleCanvas = { on -> onToggleSettingHandler(scope, null, "canvasDisabled", !on) },
+            onToggleOtherVideos = { on -> onToggleSettingHandler(scope, null, "otherVideoDisabled", !on) },
+            onToggleShowFollows = { on -> onToggleSettingHandler(scope, null, "showFollows", on) },
+            onToggleShowPlaylists = { on -> onToggleSettingHandler(scope, null, "showPublishedPlaylists", on) },
+            updateChecking = updates.checking,
+            updateChecked = updates.checked,
+            updateError = updates.error,
+            updateVersion = updates.appUpdate?.version,
+            onCheckUpdates = updates::requestManualCheck,
+            onAppIconChange = { option -> onAppIconChangeHandler(context, option) },
+            onOpenLogcat = onOpenLogcat,
+        )
     }
 
     @Composable
