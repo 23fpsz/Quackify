@@ -770,117 +770,129 @@ fun EncoreNowPlayingScreen(
                         }
                     }
 
-                    Column(
+                    BoxWithConstraints(
                         modifier = Modifier
                             .weight(LANDSCAPE_CONTROLS_PANE_WEIGHT)
                             .fillMaxHeight()
-                            .verticalScroll(state = scrollState)
                     ) {
-                        NowPlayingHeaderRow(
-                            resolvedContextTitle = resolvedContextTitle,
-                            contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
-                            showCollapse = !docked,
-                            onCollapseClick = onCollapseClick,
-                            onMoreClick = onMoreClick,
-                            dominantColor = animatedDominantColor,
-                            dragModifier = headerDragModifier,
-                            onToggleViewLayout = onToggleViewLayout
-                        )
+                        val paneHeight = maxHeight
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(state = scrollState)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = paneHeight),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                NowPlayingHeaderRow(
+                                    resolvedContextTitle = resolvedContextTitle,
+                                    contextSubtitle = if (hasSubtitle) albumOrPlaylistContext else null,
+                                    showCollapse = !docked,
+                                    onCollapseClick = onCollapseClick,
+                                    onMoreClick = onMoreClick,
+                                    dominantColor = animatedDominantColor,
+                                    dragModifier = headerDragModifier,
+                                    onToggleViewLayout = onToggleViewLayout
+                                )
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                                Column(
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    NowPlayingSyncedLyricLine(
+                                        lyricLine = activeLyricLine,
+                                        clockMs = lyricClock,
+                                        visible = previewLyricVisible,
+                                        height = if (previewLyricVisible) 44.dp else 0.dp,
+                                        onOpenLyrics = { isLyricsFullscreen = true }
+                                    )
 
-                        NowPlayingSyncedLyricLine(
-                            lyricLine = activeLyricLine,
-                            clockMs = lyricClock,
-                            visible = previewLyricVisible,
-                            height = if (previewLyricVisible) 44.dp else 0.dp,
-                            onOpenLyrics = { isLyricsFullscreen = true }
-                        )
+                                    NowPlayingTranscriptLine(
+                                        line = previewTranscriptRow,
+                                        clockMs = transcriptClock,
+                                        ink = contrastInk(dynamicArtworkColor),
+                                        visible = previewTranscriptVisible,
+                                        height = if (previewTranscriptVisible) 44.dp else 0.dp,
+                                        onOpenTranscript = { isTranscriptFullscreen = true }
+                                    )
 
-                        NowPlayingTranscriptLine(
-                            line = previewTranscriptRow,
-                            clockMs = transcriptClock,
-                            ink = contrastInk(dynamicArtworkColor),
-                            visible = previewTranscriptVisible,
-                            height = if (previewTranscriptVisible) 44.dp else 0.dp,
-                            onOpenTranscript = { isTranscriptFullscreen = true }
-                        )
+                                    MusicVideoSwitchRow(
+                                        available = musicVideoAvailable,
+                                        active = videoActive,
+                                        switching = videoSwitching,
+                                        onSwitch = onSwitchVideo
+                                    )
 
-                        MusicVideoSwitchRow(
-                            available = musicVideoAvailable,
-                            active = videoActive,
-                            switching = videoSwitching,
-                            onSwitch = onSwitchVideo
-                        )
+                                    if (previewLineVisible) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
 
-                        if (previewLineVisible) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
+                                    NowPlayingTrackInfoRow(
+                                        title = title,
+                                        artist = artist,
+                                        isExplicit = isExplicit,
+                                        isLiked = isLiked,
+                                        showSmartShuffleBadge = isEnhancedTrack,
+                                        onTitleClick = onTitleClick,
+                                        onArtistClick = onArtistClick,
+                                        onArtistLongClick = onArtistLongClick,
+                                        onLikeClick = onLikeClick,
+                                        onBanClick = onBanClick
+                                    )
 
-                        NowPlayingTrackInfoRow(
-                            title = title,
-                            artist = artist,
-                            isExplicit = isExplicit,
-                            isLiked = isLiked,
-                            showSmartShuffleBadge = isEnhancedTrack,
-                            onTitleClick = onTitleClick,
-                            onArtistClick = onArtistClick,
-                            onArtistLongClick = onArtistLongClick,
-                            onLikeClick = onLikeClick,
-                            onBanClick = onBanClick
-                        )
+                                    Spacer(modifier = Modifier.height(16.dp))
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                                    NowPlayingSeekBarSection(
+                                        progress = progress,
+                                        durationMs = durationMs,
+                                        currentPositionMs = currentPositionMs,
+                                        onSeek = onSeek,
+                                        isLoading = effectiveIsLoading,
+                                        canSeek = canSeek,
+                                        markers = chapterFractions(chapters, durationMs)
+                                    )
 
-                        NowPlayingSeekBarSection(
-                            progress = progress,
-                            durationMs = durationMs,
-                            currentPositionMs = currentPositionMs,
-                            onSeek = onSeek,
-                            isLoading = effectiveIsLoading,
-                            canSeek = canSeek,
-                            markers = chapterFractions(chapters, durationMs)
-                        )
+                                    Spacer(modifier = Modifier.height(16.dp))
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                                    if (isEpisode) {
+                                        EpisodeControlsRow(
+                                            playbackSpeed = playbackSpeed,
+                                            isPlaying = isPlaying,
+                                            isLoading = effectiveIsLoading,
+                                            onPlaybackSpeed = onPlaybackSpeed,
+                                            onSkipSeek = onSkipSeek,
+                                            onSkipPreviousClick = onSkipPreviousClick,
+                                            onPlayPauseClick = onPlayPauseClick,
+                                            onSkipNextClick = onSkipNextClick
+                                        )
+                                    } else {
+                                        NowPlayingControlsRow(
+                                            shuffleMode = shuffleMode,
+                                            repeatMode = repeatMode,
+                                            isPlaying = isPlaying,
+                                            isLoading = effectiveIsLoading,
+                                            canShuffle = canShuffle,
+                                            canSmartShuffle = canSmartShuffle,
+                                            canRepeat = canRepeat,
+                                            canSkipPrevious = canSkipPrevious,
+                                            onShuffleClick = onShuffleClick,
+                                            onSkipPreviousClick = onSkipPreviousClick,
+                                            onPlayPauseClick = onPlayPauseClick,
+                                            onSkipNextClick = onSkipNextClick,
+                                            onRepeatClick = onRepeatClick
+                                        )
+                                    }
+                                }
 
-                        if (isEpisode) {
-                            EpisodeControlsRow(
-                                playbackSpeed = playbackSpeed,
-                                isPlaying = isPlaying,
-                                isLoading = effectiveIsLoading,
-                                onPlaybackSpeed = onPlaybackSpeed,
-                                onSkipSeek = onSkipSeek,
-                                onSkipPreviousClick = onSkipPreviousClick,
-                                onPlayPauseClick = onPlayPauseClick,
-                                onSkipNextClick = onSkipNextClick
-                            )
-                        } else {
-                        NowPlayingControlsRow(
-                            shuffleMode = shuffleMode,
-                            repeatMode = repeatMode,
-                            isPlaying = isPlaying,
-                            isLoading = effectiveIsLoading,
-                            canShuffle = canShuffle,
-                            canSmartShuffle = canSmartShuffle,
-                            canRepeat = canRepeat,
-                            canSkipPrevious = canSkipPrevious,
-                            onShuffleClick = onShuffleClick,
-                            onSkipPreviousClick = onSkipPreviousClick,
-                            onPlayPauseClick = onPlayPauseClick,
-                            onSkipNextClick = onSkipNextClick,
-                            onRepeatClick = onRepeatClick
-                        )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        NowPlayingFooterRow(
-                            connectedDeviceName = connectedDeviceName,
-                            onDeviceClick = onDeviceClick,
-                            onQueueClick = onQueueClick,
-                            onShareClick = onShareClick
-                        )
+                                NowPlayingFooterRow(
+                                    connectedDeviceName = connectedDeviceName,
+                                    onDeviceClick = onDeviceClick,
+                                    onQueueClick = onQueueClick,
+                                    onShareClick = onShareClick
+                                )
+                            }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -940,7 +952,8 @@ fun EncoreNowPlayingScreen(
                         }
                     }
                 }
-            } else {
+            }
+        } else {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
