@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -55,6 +56,7 @@ import com.quackify.compose.util.rememberIsOffline
 import com.quackify.backend.core.webview.LOGIN_URL
 import com.quackify.backend.core.webview.LoginWebViewHost
 import com.quackify.backend.core.webview.PLAYER_URL
+import com.quackify.compose.components.EncoreIconButton
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -78,6 +80,11 @@ private sealed interface Resolve {
  * login is refused and [onDuplicateLogin] fires instead — the same account
  * cannot be added twice.
  *
+ * [onOpenSettings], when provided and no account is saved on the device,
+ * surfaces a native settings shortcut over the webview's top-left corner:
+ * on a fresh install it is the only road into the debug door's sp_dc sign-in
+ * before any login exists.
+ *
  * System back walks the webview back through its history first (a wrong
  * Google account pick goes back to the chooser instead of restarting the
  * flow). Only when no earlier page is left does [onBackExhausted] run; when
@@ -89,9 +96,13 @@ fun LoginScreen(
     isDuplicateAccount: ((EncoreAuth.Account) -> Boolean)? = null,
     onDuplicateLogin: ((EncoreAuth.Account) -> Unit)? = null,
     onBackExhausted: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
 ) {
 
     val context = LocalContext.current
+    val settingsShortcutAllowed = remember {
+        onOpenSettings != null && EncoreAuth.savedAccounts(context).isEmpty()
+    }
     var webviewAttempts by remember { mutableStateOf(0) }
     val host = remember(webviewAttempts) {
         runCatching { LoginWebViewHost(context) }.getOrElse { t ->
@@ -244,6 +255,19 @@ fun LoginScreen(
                 .alpha(webAlpha),
             factory = { host.container },
         )
+
+        if (settingsShortcutAllowed) {
+            EncoreIconButton(
+                iconRes = R.drawable.encore_icon_settings_24,
+                contentDescription = stringResource(R.string.settings),
+                onClick = { onOpenSettings?.invoke() },
+                tint = EncoreColors.TextPrimary,
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(start = 12.dp, top = 8.dp)
+                    .background(EncoreColors.CardElevated.copy(alpha = 0.92f), CircleShape),
+            )
+        }
 
         AnimatedVisibility(
             visible = splash,
