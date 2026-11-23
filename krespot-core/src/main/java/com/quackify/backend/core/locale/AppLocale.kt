@@ -27,11 +27,12 @@ object AppLocale {
 
     /** "System default" plus every language the app ships translations for. */
     val AVAILABLE: List<String> = listOf(
-        SYSTEM, "en", "de", "es", "fr", "it", "ja", "ko", "pt", "ru", "zh-CN",
+        SYSTEM, "en", "id", "de", "es", "fr", "it", "ja", "ko", "pt", "ru", "zh-CN",
     )
 
     private val NATIVE_NAMES = mapOf(
         "en" to "English",
+        "id" to "Bahasa Indonesia",
         "de" to "Deutsch",
         "es" to "Español",
         "fr" to "Français",
