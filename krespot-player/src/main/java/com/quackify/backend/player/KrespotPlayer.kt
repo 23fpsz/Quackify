@@ -264,6 +264,8 @@ class KrespotPlayer(private val context: Context) {
 
     private val resolving = java.util.concurrent.ConcurrentHashMap<String, Deferred<AudioSource?>>()
 
+    private val alternates = java.util.concurrent.ConcurrentHashMap<String, Deferred<YtStream?>>()
+
     @Volatile
     private var deepJob: Job? = null
 
@@ -339,13 +341,14 @@ class KrespotPlayer(private val context: Context) {
         val ticket = queueTicket.incrementAndGet()
         scope.launch {
             val cut: Cut? = if (alternateLeads) {
-                YtMusicStreams.resolve(context, track)?.let { Cut.Alternate(it, track.uri) }
+                resolveAlternate(track)?.let { Cut.Alternate(it, track.uri) }
             } else {
                 val source = cached ?: warmSource(track.uri, spclient)
                 if (source != null) {
+                    preResolveAlternate(track)
                     Cut.Catalogue(source, track.uri)
                 } else {
-                    YtMusicStreams.resolve(context, track)?.let { Cut.Alternate(it, track.uri) }
+                    resolveAlternate(track)?.let { Cut.Alternate(it, track.uri) }
                 }
             }
             if (cut == null) {
@@ -403,18 +406,49 @@ class KrespotPlayer(private val context: Context) {
      * handoff walks straight out of the resolve cache.
      */
     private fun warmAlternateNext(track: CommandTrack) {
-        if (StreamSources.order(context).firstOrNull() != StreamSource.YT_MUSIC) return
+        if (!StreamSources.order(context).contains(StreamSource.YT_MUSIC)) return
         if (!track.uri.startsWith("spotify:track:")) return
         synchronized(alternateWarming) {
             if (!alternateWarming.add(track.uri)) return
         }
         scope.launch {
             try {
-                runCatching { YtMusicStreams.resolve(context, track) }
+                resolveAlternate(track)
             } finally {
                 synchronized(alternateWarming) { alternateWarming.remove(track.uri) }
             }
         }
+    }
+
+    private fun alternateDeferred(track: CommandTrack): Deferred<YtStream?> {
+        alternates[track.uri]?.let { return it }
+        val deferred = scope.async {
+            runCatching { YtMusicStreams.resolve(context, track) }.getOrNull()
+        }
+        deferred.invokeOnCompletion { alternates.remove(track.uri, deferred) }
+        val racing = alternates.putIfAbsent(track.uri, deferred)
+        if (racing != null) {
+            deferred.cancel()
+            return racing
+        }
+        return deferred
+    }
+
+    private suspend fun resolveAlternate(track: CommandTrack): YtStream? =
+        runCatching { alternateDeferred(track).await() }.getOrNull()
+
+    /**
+     * Resolves the fallback stream for a track that is about to play or sit
+     * queued on the catalogue cut, while spotify is still serving it fine.
+     * The resolve is the expensive leg of a divert — search, player and
+     * probe round trips — so warming it here turns a licence refusal
+     * mid-song into a cache hit and the handover only pays the engine
+     * switch.
+     */
+    private fun preResolveAlternate(track: CommandTrack) {
+        if (StreamSources.after(context, StreamSource.SPOTIFY).isEmpty()) return
+        if (!track.uri.startsWith("spotify:track:")) return
+        scope.launch { resolveAlternate(track) }
     }
 
     private fun automixEnabled(): Boolean =
@@ -872,7 +906,7 @@ class KrespotPlayer(private val context: Context) {
             try {
                 val stack = StreamSources.order(context)
                 if (!divert && stack.firstOrNull() == StreamSource.YT_MUSIC) {
-                    val alternate = YtMusicStreams.resolve(context, track)
+                    val alternate = resolveAlternate(track)
                     if (alternate != null) {
                         playYtMusic(track, alternate, fromMs)
                         return@launch
@@ -882,7 +916,7 @@ class KrespotPlayer(private val context: Context) {
                 val source = sourceFor(track.uri) ?: warmSource(track.uri, spclient)
                 if (source == null) {
                     if (stack.firstOrNull() != StreamSource.YT_MUSIC) {
-                        val alternate = YtMusicStreams.resolve(context, track)
+                        val alternate = resolveAlternate(track)
                         if (alternate != null) {
                             playYtMusic(track, alternate, fromMs)
                             return@launch
@@ -894,6 +928,7 @@ class KrespotPlayer(private val context: Context) {
                 }
                 rememberFile(track.uri, source.fileId)
                 SongCache.touch(track.uri, context)
+                preResolveAlternate(track)
                 if (licenceSettling) {
                     log.i("licence deferred, the user is still skipping")
                     delay(LICENCE_SETTLE_MS.milliseconds)
@@ -1060,7 +1095,7 @@ class KrespotPlayer(private val context: Context) {
         licenceFrom = fromMs
         val id = generation
         scope.launch {
-            val alternate = YtMusicStreams.resolve(context, track)
+            val alternate = resolveAlternate(track)
             if (alternate == null) {
                 log.w("the licence is refused and youtube music did not resolve, the track stays parked")
                 if (failure != null && id == generation) {
@@ -1110,7 +1145,7 @@ class KrespotPlayer(private val context: Context) {
         scope.launch {
             if (id != generation) return@launch
             if (next == StreamSource.YT_MUSIC) {
-                val alternate = YtMusicStreams.resolve(context, track)
+                val alternate = resolveAlternate(track)
                 if (alternate == null) {
                     divertFailed(failure, id)
                     return@launch
