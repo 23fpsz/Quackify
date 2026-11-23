@@ -59,6 +59,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -1060,8 +1062,8 @@ fun SettingsScreen(
         initialSpDc = activeSpDc,
         onRemove = {
             spDcDialogOpen = false
-            spDcRevision++
-            onLogout()
+            EncoreAuth.removeCustomSpDc(context)
+            restartApp(context)
         },
         onConfirm = { value ->
             spDcDialogOpen = false
@@ -1081,6 +1083,7 @@ fun SettingsScreen(
                             ).show()
                             onSpDcSignedIn()
                             spDcRevision++
+                            restartApp(context)
                         }
                         // The server could not be reached to vouch for the
                         // cookie, so the user decides: keep it and let the
@@ -1118,10 +1121,30 @@ fun SettingsScreen(
                 Toast.makeText(context, R.string.sp_dc_signed_in_unchecked, Toast.LENGTH_SHORT).show()
                 onSpDcSignedIn()
                 spDcRevision++
+                restartApp(context)
             }
         },
         onDismiss = { spDcUnchecked = null }
     )
+}
+
+private const val APP_RESTART_DELAY_MS = 400L
+
+/** The debug door swaps the whole session, so only a cold process start
+ *  guarantees every in-memory hold (token memos, caches, the player) picks
+ *  the new one up. The launch intent is registered with the system before
+ *  the process dies, so the app comes straight back up on the new session. */
+private fun restartApp(context: Context) {
+    Handler(Looper.getMainLooper()).postDelayed({
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        if (intent == null) {
+            (context as? Activity)?.recreate()
+            return@postDelayed
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        Runtime.getRuntime().exit(0)
+    }, APP_RESTART_DELAY_MS)
 }
 
 /**
