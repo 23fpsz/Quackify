@@ -30,6 +30,7 @@ import kotlin.math.log2
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -39,7 +40,24 @@ internal data class TrackGrid(
     val beatStarts: DoubleArray,
     val barStarts: DoubleArray,
     val confidence: Double,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is TrackGrid) return false
+        return bpm == other.bpm &&
+            beatStarts.contentEquals(other.beatStarts) &&
+            barStarts.contentEquals(other.barStarts) &&
+            confidence == other.confidence
+    }
+
+    override fun hashCode(): Int {
+        var result = bpm.hashCode()
+        result = 31 * result + beatStarts.contentHashCode()
+        result = 31 * result + barStarts.contentHashCode()
+        result = 31 * result + confidence.hashCode()
+        return result
+    }
+}
 
 /**
  * Turns a mono PCM window into a beat grid: spectral-flux onset envelopes, a
@@ -253,8 +271,8 @@ internal object TrackAnalyzer {
         var metrical = best
         var metricalScore = Double.NEGATIVE_INFINITY
         for (ratio in doubleArrayOf(0.5, 1.0, 2.0)) {
-            val candidate = Math.round(best * ratio).toInt()
-            if (candidate < minLag || candidate > maxLag) continue
+            val candidate = (best * ratio).roundToInt()
+            if (candidate !in minLag..maxLag) continue
             val bpm = fps * 60.0 / candidate
             val prior = exp(-0.5 * (log2(bpm / 120.0) / 0.9).pow(2.0))
             val score = correlation(envelope, candidate) * prior
@@ -290,7 +308,7 @@ internal object TrackAnalyzer {
     // phase whenever the music offers one.
     private fun combPhase(envelope: DoubleArray, low: DoubleArray, lag: Double, limitFrames: Double): Phase {
         val limit = min(limitFrames, envelope.size - 1.0)
-        val phaseCount = max(1, Math.round(lag).toInt())
+        val phaseCount = max(1, lag.roundToInt())
         var best = 0.0
         var bestScore = Double.NEGATIVE_INFINITY
         for (phase in 0 until phaseCount) {
@@ -408,7 +426,7 @@ internal object TrackAnalyzer {
         fps: Double,
         lag: Double,
     ): Double {
-        val tempoStrength = correlation(envelope, max(1, Math.round(lag).toInt())).coerceIn(0.0, 1.0)
+        val tempoStrength = correlation(envelope, max(1, lag.roundToInt())).coerceIn(0.0, 1.0)
         if (tempoStrength < MIN_TEMPO_CORRELATION) return 0.0
         var beatStrength = 0.0
         for (beat in grid.beats) beatStrength += sampleEnvelope(envelope, beat * fps)
