@@ -1,105 +1,119 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One-row strip. It must fill whatever cell the launcher gives it: with a fixed height some
-     launchers shrink the whole widget to fit a short cell, or float it in empty space in a
-     taller one. HomeWidget tunes visibility and sizes per actual widget size. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- One-row strip: cover thumbnail, three lines of text and the transport, over a blurred and
+     darkened copy of the cover (HomeWidget makes it). Everything stretches to the cell, and
+     must: with a fixed height some launchers shrink the whole widget or float it in empty
+     space. clipToOutline rounds the backdrop to the background's corners. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_slim_background"
-    android:baselineAligned="false"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingStart="4dp"
-    android:paddingTop="4dp"
-    android:paddingEnd="6dp"
-    android:paddingBottom="4dp">
+    android:clipToOutline="true">
 
-    <!-- adjustViewBounds turns the row height into the width, so the cover stays square. -->
     <ImageView
-        android:id="@+id/img_cover"
-        android:layout_width="wrap_content"
+        android:id="@+id/img_backdrop"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:adjustViewBounds="true"
         android:importantForAccessibility="no"
         android:scaleType="centerCrop"
-        android:src="@drawable/logo_duck" />
+        android:visibility="gone" />
 
     <LinearLayout
-        android:id="@+id/text_container"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="4dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:id="@+id/strip_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="8dp">
 
-        <TextView
-            android:id="@+id/txt_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:includeFontPadding="false"
-            android:singleLine="true"
-            android:text="@string/txt_not_playing"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+        <!-- adjustViewBounds turns the row height into the width, so the cover stays square. -->
+        <ImageView
+            android:id="@+id/img_cover"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:adjustViewBounds="true"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:src="@drawable/logo_duck" />
 
-        <TextView
-            android:id="@+id/txt_artist"
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:id="@+id/text_container"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:ellipsize="end"
-            android:includeFontPadding="false"
-            android:singleLine="true"
-            android:textColor="#B3B3B3"
-            android:textSize="11sp"
-            android:visibility="gone" />
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/txt_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:singleLine="true"
+                android:text="@string/txt_not_playing"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/txt_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:singleLine="true"
+                android:textColor="#E6E6E6"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/txt_album"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:singleLine="true"
+                android:textColor="#C2C2C2"
+                android:textSize="12sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btn_prev"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/previous"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_widget_skip_previous" />
+
+        <ImageView
+            android:id="@+id/btn_play"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/widget_play_bg"
+            android:contentDescription="@string/play_pause"
+            android:padding="11dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_widget_play"
+            android:tint="#000000" />
+
+        <ImageView
+            android:id="@+id/btn_next"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/next"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_widget_skip_next" />
     </LinearLayout>
-
-    <ImageView
-        android:id="@+id/btn_like"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/save_to_your_library"
-        android:padding="7dp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_widget_heart"
-        android:tint="#B3B3B3" />
-
-    <ImageView
-        android:id="@+id/btn_prev"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/previous"
-        android:padding="6dp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_widget_skip_previous" />
-
-    <ImageView
-        android:id="@+id/btn_play"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
-        android:layout_marginStart="2dp"
-        android:layout_marginEnd="2dp"
-        android:background="@drawable/widget_play_bg"
-        android:contentDescription="@string/play_pause"
-        android:padding="8dp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_widget_play"
-        android:tint="#000000" />
-
-    <ImageView
-        android:id="@+id/btn_next"
-        android:layout_width="34dp"
-        android:layout_height="34dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/next"
-        android:padding="6dp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_widget_skip_next" />
-</LinearLayout>
+</FrameLayout>
