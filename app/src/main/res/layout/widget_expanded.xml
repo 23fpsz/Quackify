@@ -31,13 +31,18 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <!-- adjustViewBounds turns the row height into the width, so the cover stays square. -->
+            <!-- Square, as tall as the row allows but never over 120dp: on 3+ row widgets an
+                 uncapped cover eats the width the text needs. wrap_content (not match_parent)
+                 is what lets maxHeight apply; HomeWidget gives the bitmap a large intrinsic
+                 size so the row height or the cap decides, never the bitmap. -->
             <ImageView
                 android:id="@+id/img_cover"
                 android:layout_width="wrap_content"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:adjustViewBounds="true"
                 android:importantForAccessibility="no"
+                android:maxWidth="120dp"
+                android:maxHeight="120dp"
                 android:scaleType="centerCrop"
                 android:src="@drawable/logo_duck" />
 

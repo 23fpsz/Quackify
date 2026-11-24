@@ -19,6 +19,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.text.format.DateUtils
+import android.util.DisplayMetrics
 import android.util.SizeF
 import android.util.TypedValue
 import android.view.View
@@ -389,6 +391,9 @@ class HomeWidget : AppWidgetProvider() {
             canvas.drawRoundRect(bounds, radius, radius, paint)
             paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
             canvas.drawBitmap(source, Rect(left, top, left + side, top + side), bounds, paint)
+            // Intrinsic size becomes 256dp on any screen, above the card's 120dp cap, so the
+            // ImageView's row height or maxHeight sizes the cover instead of the pixel count.
+            output.density = DisplayMetrics.DENSITY_MEDIUM
             return output
         }
 
@@ -509,13 +514,9 @@ class HomeWidget : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT
             }
 
-        private fun formatTime(millis: Long): String {
-            if (millis <= 0L) return "0:00"
-            val totalSeconds = millis / 1000L
-            val seconds = totalSeconds % 60L
-            val minutes = totalSeconds / 60L
-            return "%d:%02d".format(minutes, seconds)
-        }
+        // Same formatter the ticking Chronometer uses, so position and length always match.
+        private fun formatTime(millis: Long): String =
+            DateUtils.formatElapsedTime(millis.coerceAtLeast(0L) / 1000L)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
