@@ -8,6 +8,7 @@ import com.quackify.compose.shell.PlaybackProgress
 data class WidgetSnapshot(
     val title: String = "",
     val artist: String = "",
+    val album: String = "",
     val coverUrl: String = "",
     val trackUri: String = "",
     val isPlaying: Boolean = false,
@@ -25,12 +26,13 @@ data class WidgetSnapshot(
         }
 
     internal fun fingerprint(): String =
-        "$trackUri|$title|$artist|$coverUrl|$isPlaying|$isLiked|${durationMs}|${positionMs / 5000L}"
+        "$trackUri|$title|$artist|$album|$coverUrl|$isPlaying|$isLiked|${durationMs}|${positionMs / 5000L}"
 
     companion object {
-        fun from(state: ComposePlaybackState, progress: PlaybackProgress): WidgetSnapshot = WidgetSnapshot(
+        fun from(state: ComposePlaybackState, progress: PlaybackProgress, album: String = ""): WidgetSnapshot = WidgetSnapshot(
             title = state.title,
             artist = state.artist,
+            album = album,
             coverUrl = state.coverUrl,
             trackUri = state.trackUri,
             isPlaying = state.isPlaying,
@@ -46,6 +48,7 @@ object WidgetSnapshotStore {
     private const val PREFS = "quackify.widget"
     private const val KEY_TITLE = "title"
     private const val KEY_ARTIST = "artist"
+    private const val KEY_ALBUM = "album"
     private const val KEY_COVER = "coverUrl"
     private const val KEY_TRACK = "trackUri"
     private const val KEY_PLAYING = "isPlaying"
@@ -57,6 +60,7 @@ object WidgetSnapshotStore {
         AppPrefs.edit(context, PREFS)
             .putString(KEY_TITLE, snapshot.title)
             .putString(KEY_ARTIST, snapshot.artist)
+            .putString(KEY_ALBUM, snapshot.album)
             .putString(KEY_COVER, snapshot.coverUrl)
             .putString(KEY_TRACK, snapshot.trackUri)
             .putBoolean(KEY_PLAYING, snapshot.isPlaying)
@@ -71,6 +75,7 @@ object WidgetSnapshotStore {
         return WidgetSnapshot(
             title = prefs.getString(KEY_TITLE, "").orEmpty(),
             artist = prefs.getString(KEY_ARTIST, "").orEmpty(),
+            album = prefs.getString(KEY_ALBUM, "").orEmpty(),
             coverUrl = prefs.getString(KEY_COVER, "").orEmpty(),
             trackUri = prefs.getString(KEY_TRACK, "").orEmpty(),
             isPlaying = prefs.getBoolean(KEY_PLAYING, false),

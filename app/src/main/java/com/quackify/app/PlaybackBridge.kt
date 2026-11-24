@@ -582,6 +582,12 @@ class PlaybackBridge(private val context: Context) {
     var cluster: ClusterState? by mutableStateOf(null)
         private set
 
+    /** Album name the server's player state gives for [uri]; empty when it doesn't say. */
+    fun albumTitleFor(uri: String): String {
+        if (uri.isBlank()) return ""
+        return connect.cluster.value?.window()?.firstOrNull { it.uri == uri }?.albumTitle.orEmpty()
+    }
+
     val listener = object : ComposePlayerListener {
         override fun onPlayPause() {
             scope.launch { toggle() }
