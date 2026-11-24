@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 40dp is the one-row minimum (70 * rows - 30); anything taller makes launchers that size
+     by minHeight reserve two rows. maxResizeHeight leaves room for the two-row card. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:initialLayout="@layout/home_widget"
-    android:minHeight="56dp"
+    android:previewLayout="@layout/home_widget"
+    android:minHeight="40dp"
     android:minWidth="250dp"
-    android:minResizeHeight="56dp"
-    android:maxResizeHeight="160dp"
+    android:minResizeHeight="40dp"
+    android:maxResizeHeight="240dp"
     android:minResizeWidth="180dp"
     android:maxResizeWidth="700dp"
     android:previewImage="@drawable/wpreview"

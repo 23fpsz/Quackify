@@ -7,17 +7,20 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.Shader
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.SizeF
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import com.quackify.app.MainActivity
@@ -27,6 +30,7 @@ import com.quackify.app.R
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
 import com.quackify.compose.components.resolveRemoteImageUrl
+import com.quackify.compose.R as UiR
 
 class HomeWidget : AppWidgetProvider() {
 
@@ -39,12 +43,38 @@ class HomeWidget : AppWidgetProvider() {
         private const val ACTION_SHUFFLE = "com.quackify.app.widget.SHUFFLE_ACTION"
         private const val ACTION_FAV = "com.quackify.app.widget.ADDTOFAV_ACTION"
 
-        private val COLOR_ACTIVE = Color.WHITE
-        private val COLOR_INACTIVE = Color.parseColor("#808080")
+        private val COLOR_ICON = Color.WHITE
+        private val COLOR_MUTED = Color.parseColor("#B3B3B3")
+        private val COLOR_ACCENT = Color.parseColor("#1DB954")
+        private val COLOR_ON_PLAY = Color.BLACK
+
+        // Sizes are in dp, as the launcher reports them. A two-row cell is at least 110dp, but
+        // the card needs ~130dp before its cover stops being a sliver; below that the strip
+        // simply grows to fill the height.
+        private const val CARD_MIN_HEIGHT_DP = 130f
+        private const val CARD_TIMES_MIN_HEIGHT_DP = 140f
+        private const val CARD_SIDE_CONTROLS_MIN_WIDTH_DP = 240f
+        private const val STRIP_LIKE_MIN_WIDTH_DP = 250f
+        private const val STRIP_TEXT_MIN_WIDTH_DP = 210f
+        private const val STRIP_ROOMY_HEIGHT_DP = 64f
+
+        // Used before the launcher has reported any size for a freshly placed widget.
+        private val DEFAULT_SIZE = SizeF(250f, 56f)
+
+        // RemoteViews(Map) accepts at most 16 sizes.
+        private const val MAX_SIZES = 16
+
+        private const val COVER_PX = 256
+        private const val COVER_CORNER_FRACTION = 0.16f
 
         private val handler = Handler(Looper.getMainLooper())
         private var isUpdateRunning = false
         private var appContext: Context? = null
+
+        // Updates run every 2s while playing; keep the cropped cover instead of redoing it each time.
+        private val coverLock = Any()
+        private var coverUrl: String? = null
+        private var coverBitmap: Bitmap? = null
 
         private val updateRunnable = object : Runnable {
             override fun run() {
@@ -58,6 +88,14 @@ class HomeWidget : AppWidgetProvider() {
                 }
             }
         }
+
+        private data class Frame(
+            val snapshot: WidgetSnapshot,
+            val repeatMode: RepeatMode,
+            val shuffleMode: ShuffleMode,
+            val cover: Bitmap?,
+            val openApp: PendingIntent,
+        )
 
         @JvmStatic
         fun updateAllWidgets(context: Context) {
@@ -77,208 +115,252 @@ class HomeWidget : AppWidgetProvider() {
         }
 
         private fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
-            val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
-            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
-            val rowSpan = if (minHeight > 0) ((minHeight + 30) / 70).coerceAtLeast(1) else 1
-            val isExpanded = rowSpan >= 2
-            val layoutId = if (isExpanded) R.layout.widget_expanded else R.layout.home_widget
-            val remoteViews = RemoteViews(context.packageName, layoutId)
-
             val bridge = PlaybackHost.bridge
             val live = bridge?.let { WidgetSnapshot.from(it.state, it.progress) }?.takeIf { it.hasTrack }
             val snapshot = WidgetSync.resolve(live, context)
-            val repeatMode = bridge?.state?.repeatMode ?: RepeatMode.OFF
-            val shuffleMode = bridge?.state?.shuffleMode ?: ShuffleMode.OFF
+            val frame = Frame(
+                snapshot = snapshot,
+                repeatMode = bridge?.state?.repeatMode ?: RepeatMode.OFF,
+                shuffleMode = bridge?.state?.shuffleMode ?: ShuffleMode.OFF,
+                cover = if (snapshot.hasTrack) coverFor(context, snapshot.coverUrl) else null,
+                openApp = openAppIntent(context, appWidgetId),
+            )
+            val options = appWidgetManager.getAppWidgetOptions(appWidgetId) ?: Bundle()
 
-            if (isExpanded) {
-                remoteViews.setChronometer(R.id.txt_position_chrono, SystemClock.elapsedRealtime(), null, false)
-                remoteViews.setViewVisibility(R.id.txt_position, View.VISIBLE)
-                remoteViews.setViewVisibility(R.id.txt_position_chrono, View.GONE)
+            try {
+                appWidgetManager.updateAppWidget(appWidgetId, buildViews(context, options, frame))
+            } catch (e: Throwable) {
+                // The cover can push the update past the RemoteViews size limit; retry without it.
+                try {
+                    appWidgetManager.updateAppWidget(appWidgetId, buildViews(context, options, frame.copy(cover = null)))
+                } catch (ignored: Throwable) {}
             }
+        }
 
-            if (snapshot.hasTrack) {
-                val title = snapshot.title
-                val artist = snapshot.artist
-                val isPlaying = snapshot.isPlaying
-                val isLiked = snapshot.isLiked
-                val duration = snapshot.durationMs
-                val position = snapshot.positionMs
-
-                val (repeatRes, repeatColor) = when (repeatMode) {
-                    RepeatMode.REPEAT_ONE -> Pair(R.drawable.repone, COLOR_ACTIVE)
-                    RepeatMode.REPEAT_ALL -> Pair(R.drawable.repon, COLOR_ACTIVE)
-                    else -> Pair(R.drawable.repoff, COLOR_INACTIVE)
+        /**
+         * Gives the launcher one layout per size the widget can appear at (portrait and
+         * landscape), so it never has to shrink or letterbox a layout made for another size.
+         */
+        private fun buildViews(context: Context, options: Bundle, frame: Frame): RemoteViews {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val sizes = reportedSizes(options)
+                if (sizes.isNotEmpty()) {
+                    return RemoteViews(sizes.associateWith { buildForSize(context, it, frame) })
                 }
+            }
+            // Older launchers only report bounds: portrait is min width x max height,
+            // landscape is max width x min height.
+            val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH).toFloat()
+            val maxWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH).toFloat()
+            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT).toFloat()
+            val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT).toFloat()
+            if (minWidth <= 0f || maxWidth <= 0f || minHeight <= 0f || maxHeight <= 0f) {
+                return buildForSize(context, DEFAULT_SIZE, frame)
+            }
+            return RemoteViews(
+                buildForSize(context, SizeF(maxWidth, minHeight), frame),
+                buildForSize(context, SizeF(minWidth, maxHeight), frame),
+            )
+        }
 
-                val (shuffleRes, shuffleColor) = when (shuffleMode) {
-                    ShuffleMode.SMART_SHUFFLE -> Pair(R.drawable.smart_shuffle, COLOR_ACTIVE)
-                    ShuffleMode.SHUFFLE -> Pair(R.drawable.shuffle, COLOR_ACTIVE)
-                    else -> Pair(R.drawable.shuffle, COLOR_INACTIVE)
-                }
-
-                val favRes = if (isLiked) R.drawable.favon else R.drawable.favoff
-                val favColor = if (isLiked) COLOR_ACTIVE else COLOR_INACTIVE
-
-                if (isExpanded) {
-                    remoteViews.setTextViewText(R.id.txt_title, title.ifBlank { context.getString(R.string.txt_notrack) })
-                    remoteViews.setTextViewText(R.id.txt_artist, artist.ifBlank { context.getString(R.string.txt_noartist) })
-                    remoteViews.setImageViewResource(R.id.btn_play, if (isPlaying) R.drawable.pause else R.drawable.play)
-
-                    remoteViews.setImageViewResource(R.id.btn_repeat, repeatRes)
-                    remoteViews.setInt(R.id.btn_repeat, "setColorFilter", repeatColor)
-
-                    remoteViews.setImageViewResource(R.id.btn_shuffle, shuffleRes)
-                    remoteViews.setInt(R.id.btn_shuffle, "setColorFilter", shuffleColor)
-
-                    remoteViews.setImageViewResource(R.id.btn_fav, favRes)
-                    remoteViews.setInt(R.id.btn_fav, "setColorFilter", favColor)
-
-                    if (isPlaying) {
-                        remoteViews.setViewVisibility(R.id.txt_position, View.GONE)
-                        remoteViews.setViewVisibility(R.id.txt_position_chrono, View.VISIBLE)
-                        remoteViews.setChronometer(
-                            R.id.txt_position_chrono,
-                            SystemClock.elapsedRealtime() - position,
-                            null,
-                            true,
-                        )
-                    } else {
-                        remoteViews.setViewVisibility(R.id.txt_position, View.VISIBLE)
-                        remoteViews.setViewVisibility(R.id.txt_position_chrono, View.GONE)
-                        remoteViews.setChronometer(R.id.txt_position_chrono, SystemClock.elapsedRealtime(), null, false)
-                        remoteViews.setTextViewText(R.id.txt_position, formatTime(position))
-                    }
-
-                    remoteViews.setTextViewText(R.id.txt_duration, formatTime(duration))
-                    val progressInt = if (duration > 0) (position * 1000L / duration).toInt().coerceIn(0, 1000) else 0
-                    remoteViews.setProgressBar(R.id.progress_bar, 1000, progressInt, false)
-                } else {
-                    val fullTitle = if (artist.isNotBlank() && title.isNotBlank()) {
-                        "$artist - $title"
-                    } else {
-                        title.ifBlank { artist.ifBlank { context.getString(R.string.txt_notrack) } }
-                    }
-                    remoteViews.setTextViewText(R.id.txt_fulltitle, fullTitle)
-                    remoteViews.setImageViewResource(R.id.btn_wplay, if (isPlaying) R.drawable.pause else R.drawable.play)
-
-                    remoteViews.setImageViewResource(R.id.btn_wrepeat, repeatRes)
-                    remoteViews.setInt(R.id.btn_wrepeat, "setColorFilter", repeatColor)
-
-                    remoteViews.setImageViewResource(R.id.btn_wfav, favRes)
-                    remoteViews.setInt(R.id.btn_wfav, "setColorFilter", favColor)
-                }
-
-                // Artwork with native rounded corners (expanded mode only; slim widget stays flush)
-                val artUrl = resolveRemoteImageUrl(snapshot.coverUrl)
-                val art = artUrl?.let { url -> runCatching { WidgetArt.cached(url) }.getOrNull() }
-                if (art != null && !art.isRecycled) {
-                    try {
-                        val maxDimension = 256
-                        val scale = Math.min(maxDimension.toFloat() / art.width, maxDimension.toFloat() / art.height)
-                        val targetW = Math.max(1, (art.width * (if (scale < 1.0f) scale else 1.0f)).toInt())
-                        val targetH = Math.max(1, (art.height * (if (scale < 1.0f) scale else 1.0f)).toInt())
-                        val scaled = Bitmap.createScaledBitmap(art, targetW, targetH, true)
-                        if (isExpanded) {
-                            val density = context.resources.displayMetrics.density
-                            val rounded = roundCorners(scaled, 12f, density)
-                            remoteViews.setImageViewBitmap(R.id.img_cover, rounded)
-                        } else {
-                            val safeBitmap = if (scaled.config != Bitmap.Config.RGB_565) {
-                                val rgbBitmap = scaled.copy(Bitmap.Config.RGB_565, false)
-                                if (scaled != art && !scaled.isRecycled) scaled.recycle()
-                                rgbBitmap ?: scaled
-                            } else {
-                                scaled
-                            }
-                            remoteViews.setImageViewBitmap(R.id.img_cover, safeBitmap)
-                        }
-                    } catch (e: Throwable) {
-                        remoteViews.setImageViewResource(R.id.img_cover, R.drawable.logo_duck)
-                    }
-                } else {
-                    remoteViews.setImageViewResource(R.id.img_cover, R.drawable.logo_duck)
-                    if (artUrl != null) {
-                        WidgetArt.prefetch(context.applicationContext, artUrl) {
-                            updateAllWidgets(context)
-                        }
-                    }
-                }
+        private fun reportedSizes(options: Bundle): List<SizeF> {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return emptyList()
+            val sizes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                options.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES, SizeF::class.java)
             } else {
-                // Idle state
-                if (isExpanded) {
-                    remoteViews.setTextViewText(R.id.txt_title, context.getString(R.string.txt_notrack))
-                    remoteViews.setTextViewText(R.id.txt_artist, context.getString(R.string.txt_noartist))
-                    remoteViews.setImageViewResource(R.id.btn_play, R.drawable.play)
-                    remoteViews.setImageViewResource(R.id.btn_repeat, R.drawable.repoff)
-                    remoteViews.setInt(R.id.btn_repeat, "setColorFilter", COLOR_INACTIVE)
-                    remoteViews.setImageViewResource(R.id.btn_shuffle, R.drawable.shuffle)
-                    remoteViews.setInt(R.id.btn_shuffle, "setColorFilter", COLOR_INACTIVE)
-                    remoteViews.setImageViewResource(R.id.btn_fav, R.drawable.favoff)
-                    remoteViews.setInt(R.id.btn_fav, "setColorFilter", COLOR_INACTIVE)
-                    remoteViews.setViewVisibility(R.id.txt_position, View.VISIBLE)
-                    remoteViews.setViewVisibility(R.id.txt_position_chrono, View.GONE)
-                    remoteViews.setChronometer(R.id.txt_position_chrono, SystemClock.elapsedRealtime(), null, false)
-                    remoteViews.setTextViewText(R.id.txt_position, "0:00")
-                    remoteViews.setTextViewText(R.id.txt_duration, "0:00")
-                    remoteViews.setProgressBar(R.id.progress_bar, 1000, 0, false)
-                } else {
-                    remoteViews.setTextViewText(R.id.txt_fulltitle, context.getString(R.string.txt_notrack))
-                    remoteViews.setImageViewResource(R.id.btn_wplay, R.drawable.play)
-                    remoteViews.setImageViewResource(R.id.btn_wrepeat, R.drawable.repoff)
-                    remoteViews.setInt(R.id.btn_wrepeat, "setColorFilter", COLOR_INACTIVE)
-                    remoteViews.setImageViewResource(R.id.btn_wfav, R.drawable.favoff)
-                    remoteViews.setInt(R.id.btn_wfav, "setColorFilter", COLOR_INACTIVE)
-                }
-                remoteViews.setImageViewResource(R.id.img_cover, R.drawable.logo_duck)
+                @Suppress("DEPRECATION")
+                options.getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)
+            }
+            return sizes.orEmpty()
+                .filter { it.width > 0f && it.height > 0f }
+                .distinct()
+                .take(MAX_SIZES)
+        }
+
+        private fun buildForSize(context: Context, size: SizeF, frame: Frame): RemoteViews =
+            if (size.height >= CARD_MIN_HEIGHT_DP) {
+                buildCard(context, size, frame)
+            } else {
+                buildStrip(context, size, frame)
             }
 
-            // Click Handlers
-            val mainIntent = Intent(context, MainActivity::class.java).apply {
+        private fun buildStrip(context: Context, size: SizeF, frame: Frame): RemoteViews {
+            val views = RemoteViews(context.packageName, R.layout.home_widget)
+            bindShared(views, context, frame)
+
+            views.setViewVisibility(
+                R.id.btn_like,
+                if (size.width >= STRIP_LIKE_MIN_WIDTH_DP) View.VISIBLE else View.GONE,
+            )
+            // INVISIBLE, not GONE: the weighted gap keeps the controls pinned to the right edge.
+            views.setViewVisibility(
+                R.id.text_container,
+                if (size.width >= STRIP_TEXT_MIN_WIDTH_DP) View.VISIBLE else View.INVISIBLE,
+            )
+
+            // Some launchers give a single row 80-100dp; use that height instead of a thin strip.
+            if (size.height >= STRIP_ROOMY_HEIGHT_DP) {
+                val pad = dp(context, 8f)
+                views.setViewPadding(R.id.widget_root, pad, pad, pad, pad)
+                views.setTextViewTextSize(R.id.txt_title, TypedValue.COMPLEX_UNIT_SP, 15f)
+                views.setTextViewTextSize(R.id.txt_artist, TypedValue.COMPLEX_UNIT_SP, 13f)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    views.setSquareSize(R.id.btn_play, 44f)
+                    views.setSquareSize(R.id.btn_prev, 40f)
+                    views.setSquareSize(R.id.btn_next, 40f)
+                    views.setSquareSize(R.id.btn_like, 40f)
+                    dp(context, 11f).let { views.setViewPadding(R.id.btn_play, it, it, it, it) }
+                    dp(context, 8f).let {
+                        views.setViewPadding(R.id.btn_prev, it, it, it, it)
+                        views.setViewPadding(R.id.btn_next, it, it, it, it)
+                    }
+                    dp(context, 10f).let { views.setViewPadding(R.id.btn_like, it, it, it, it) }
+                }
+            }
+            return views
+        }
+
+        private fun buildCard(context: Context, size: SizeF, frame: Frame): RemoteViews {
+            val views = RemoteViews(context.packageName, R.layout.widget_expanded)
+            bindShared(views, context, frame)
+            val snapshot = frame.snapshot
+
+            val sideControls = if (size.width >= CARD_SIDE_CONTROLS_MIN_WIDTH_DP) View.VISIBLE else View.GONE
+            views.setViewVisibility(R.id.btn_shuffle, sideControls)
+            views.setViewVisibility(R.id.btn_repeat, sideControls)
+
+            views.setImageViewResource(
+                R.id.btn_shuffle,
+                if (frame.shuffleMode == ShuffleMode.SMART_SHUFFLE) R.drawable.smart_shuffle else R.drawable.ic_notif_shuffle,
+            )
+            views.setInt(
+                R.id.btn_shuffle,
+                "setColorFilter",
+                if (frame.shuffleMode != ShuffleMode.OFF) COLOR_ACCENT else COLOR_MUTED,
+            )
+            views.setImageViewResource(
+                R.id.btn_repeat,
+                if (frame.repeatMode == RepeatMode.REPEAT_ONE) R.drawable.ic_notif_repeat_one else R.drawable.ic_notif_repeat,
+            )
+            views.setInt(
+                R.id.btn_repeat,
+                "setColorFilter",
+                if (frame.repeatMode != RepeatMode.OFF) COLOR_ACCENT else COLOR_MUTED,
+            )
+            views.setOnClickPendingIntent(R.id.btn_shuffle, createPendingIntent(context, ACTION_SHUFFLE))
+            views.setOnClickPendingIntent(R.id.btn_repeat, createPendingIntent(context, ACTION_REPEAT))
+
+            val duration = if (snapshot.hasTrack) snapshot.durationMs.coerceAtLeast(0L) else 0L
+            val position = if (snapshot.hasTrack) snapshot.positionMs.coerceAtLeast(0L) else 0L
+            val progress = if (duration > 0L) (position * 1000L / duration).toInt().coerceIn(0, 1000) else 0
+            views.setProgressBar(R.id.progress_bar, 1000, progress, false)
+
+            val showTimes = size.height >= CARD_TIMES_MIN_HEIGHT_DP
+            val ticking = showTimes && snapshot.hasTrack && snapshot.isPlaying
+            views.setViewVisibility(R.id.txt_duration, if (showTimes) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.txt_position, if (showTimes && !ticking) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.txt_position_chrono, if (ticking) View.VISIBLE else View.GONE)
+            views.setChronometer(
+                R.id.txt_position_chrono,
+                SystemClock.elapsedRealtime() - if (ticking) position else 0L,
+                null,
+                ticking,
+            )
+            views.setTextViewText(R.id.txt_position, formatTime(position))
+            views.setTextViewText(R.id.txt_duration, formatTime(duration))
+            return views
+        }
+
+        /** Views both layouts share: text, cover, play, like, skip, and their click targets. */
+        private fun bindShared(views: RemoteViews, context: Context, frame: Frame) {
+            val snapshot = frame.snapshot
+            if (snapshot.hasTrack) {
+                views.setTextViewText(R.id.txt_title, snapshot.title.ifBlank { context.getString(R.string.txt_notrack) })
+                views.setTextViewText(R.id.txt_artist, snapshot.artist)
+                views.setViewVisibility(R.id.txt_artist, if (snapshot.artist.isBlank()) View.GONE else View.VISIBLE)
+            } else {
+                views.setTextViewText(R.id.txt_title, context.getString(R.string.txt_not_playing))
+                views.setViewVisibility(R.id.txt_artist, View.GONE)
+            }
+
+            if (frame.cover != null) {
+                views.setImageViewBitmap(R.id.img_cover, frame.cover)
+            } else {
+                views.setImageViewResource(R.id.img_cover, R.drawable.logo_duck)
+            }
+
+            val playing = snapshot.hasTrack && snapshot.isPlaying
+            views.setImageViewResource(R.id.btn_play, if (playing) R.drawable.ic_widget_pause else R.drawable.ic_widget_play)
+            views.setInt(R.id.btn_play, "setColorFilter", COLOR_ON_PLAY)
+            views.setInt(R.id.btn_prev, "setColorFilter", COLOR_ICON)
+            views.setInt(R.id.btn_next, "setColorFilter", COLOR_ICON)
+
+            val liked = snapshot.hasTrack && snapshot.isLiked
+            views.setImageViewResource(R.id.btn_like, if (liked) R.drawable.ic_widget_heart_filled else R.drawable.ic_widget_heart)
+            views.setInt(R.id.btn_like, "setColorFilter", if (liked) COLOR_ACCENT else COLOR_MUTED)
+            views.setContentDescription(
+                R.id.btn_like,
+                context.getString(if (liked) UiR.string.remove_from_your_library else UiR.string.save_to_your_library),
+            )
+
+            views.setOnClickPendingIntent(R.id.widget_root, frame.openApp)
+            views.setOnClickPendingIntent(R.id.btn_play, createPendingIntent(context, ACTION_PLAYPAUSE))
+            views.setOnClickPendingIntent(R.id.btn_prev, createPendingIntent(context, ACTION_PREV))
+            views.setOnClickPendingIntent(R.id.btn_next, createPendingIntent(context, ACTION_NEXT))
+            views.setOnClickPendingIntent(R.id.btn_like, createPendingIntent(context, ACTION_FAV))
+        }
+
+        private fun RemoteViews.setSquareSize(viewId: Int, sizeDp: Float) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+            setViewLayoutWidth(viewId, sizeDp, TypedValue.COMPLEX_UNIT_DIP)
+            setViewLayoutHeight(viewId, sizeDp, TypedValue.COMPLEX_UNIT_DIP)
+        }
+
+        private fun dp(context: Context, value: Float): Int =
+            (value * context.resources.displayMetrics.density + 0.5f).toInt()
+
+        /** Square, rounded cover; null while the art is still downloading (a refresh follows). */
+        private fun coverFor(context: Context, rawUrl: String): Bitmap? {
+            val url = resolveRemoteImageUrl(rawUrl) ?: return null
+            synchronized(coverLock) {
+                if (url == coverUrl) coverBitmap?.let { return it }
+            }
+            val source = runCatching { WidgetArt.cached(url) }.getOrNull()
+            if (source == null || source.isRecycled) {
+                WidgetArt.prefetch(context.applicationContext, url) { updateAllWidgets(context) }
+                return null
+            }
+            val cover = runCatching { squareCover(source) }.getOrNull() ?: return null
+            synchronized(coverLock) {
+                coverUrl = url
+                coverBitmap = cover
+            }
+            return cover
+        }
+
+        private fun squareCover(source: Bitmap): Bitmap {
+            val side = minOf(source.width, source.height)
+            val left = (source.width - side) / 2
+            val top = (source.height - side) / 2
+            val output = Bitmap.createBitmap(COVER_PX, COVER_PX, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(output)
+            val bounds = RectF(0f, 0f, COVER_PX.toFloat(), COVER_PX.toFloat())
+            val radius = COVER_PX * COVER_CORNER_FRACTION
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            canvas.drawRoundRect(bounds, radius, radius, paint)
+            paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+            canvas.drawBitmap(source, Rect(left, top, left + side, top + side), bounds, paint)
+            return output
+        }
+
+        private fun openAppIntent(context: Context, appWidgetId: Int): PendingIntent {
+            val intent = Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
                 addCategory(Intent.CATEGORY_LAUNCHER)
                 putExtra(PlaybackService.EXTRA_OPEN_PLAYER, true)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
-            val mainPendingIntent = PendingIntent.getActivity(context, appWidgetId, mainIntent, getFlags())
-            remoteViews.setOnClickPendingIntent(R.id.widget_root, mainPendingIntent)
-
-            if (isExpanded) {
-                remoteViews.setOnClickPendingIntent(R.id.btn_play, createPendingIntent(context, ACTION_PLAYPAUSE))
-                remoteViews.setOnClickPendingIntent(R.id.btn_prev, createPendingIntent(context, ACTION_PREV))
-                remoteViews.setOnClickPendingIntent(R.id.btn_next, createPendingIntent(context, ACTION_NEXT))
-                remoteViews.setOnClickPendingIntent(R.id.btn_repeat, createPendingIntent(context, ACTION_REPEAT))
-                remoteViews.setOnClickPendingIntent(R.id.btn_shuffle, createPendingIntent(context, ACTION_SHUFFLE))
-                remoteViews.setOnClickPendingIntent(R.id.btn_fav, createPendingIntent(context, ACTION_FAV))
-            } else {
-                remoteViews.setOnClickPendingIntent(R.id.btn_wplay, createPendingIntent(context, ACTION_PLAYPAUSE))
-                remoteViews.setOnClickPendingIntent(R.id.btn_wprev, createPendingIntent(context, ACTION_PREV))
-                remoteViews.setOnClickPendingIntent(R.id.btn_wnext, createPendingIntent(context, ACTION_NEXT))
-                remoteViews.setOnClickPendingIntent(R.id.btn_wrepeat, createPendingIntent(context, ACTION_REPEAT))
-                remoteViews.setOnClickPendingIntent(R.id.btn_wfav, createPendingIntent(context, ACTION_FAV))
-            }
-
-            try {
-                appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
-            } catch (e: Throwable) {
-                // Fallback in case bitmap allocation limits exceed RemoteViews threshold
-                try {
-                    val fallbackViews = RemoteViews(context.packageName, layoutId)
-                    fallbackViews.setImageViewResource(R.id.img_cover, R.drawable.logo_duck)
-                    if (isExpanded) {
-                        fallbackViews.setTextViewText(R.id.txt_title, snapshot.title)
-                        fallbackViews.setTextViewText(R.id.txt_artist, snapshot.artist)
-                    } else {
-                        val fullTitle = if (snapshot.artist.isNotBlank() && snapshot.title.isNotBlank()) {
-                            "${snapshot.artist} - ${snapshot.title}"
-                        } else {
-                            snapshot.title
-                        }
-                        fallbackViews.setTextViewText(R.id.txt_fulltitle, fullTitle)
-                    }
-                    fallbackViews.setOnClickPendingIntent(R.id.widget_root, mainPendingIntent)
-                    appWidgetManager.updateAppWidget(appWidgetId, fallbackViews)
-                } catch (ignored: Throwable) {}
-            }
+            return PendingIntent.getActivity(context, appWidgetId, intent, getFlags())
         }
 
         private fun createPendingIntent(context: Context, action: String): PendingIntent {
@@ -301,18 +383,6 @@ class HomeWidget : AppWidgetProvider() {
             val seconds = totalSeconds % 60L
             val minutes = totalSeconds / 60L
             return "%d:%02d".format(minutes, seconds)
-        }
-
-        private fun roundCorners(bitmap: Bitmap, cornerRadiusDp: Float, density: Float): Bitmap {
-            val cornerRadiusPx = cornerRadiusDp * density
-            val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(output)
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-            val shader = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
-            paint.shader = shader
-            val rect = RectF(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat())
-            canvas.drawRoundRect(rect, cornerRadiusPx, cornerRadiusPx, paint)
-            return output
         }
     }
 
