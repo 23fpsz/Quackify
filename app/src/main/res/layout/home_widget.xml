@@ -85,35 +85,35 @@
 
         <ImageView
             android:id="@+id/btn_prev"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/previous"
-            android:padding="6dp"
+            android:padding="3dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_skip_previous" />
+            android:src="@drawable/previous" />
 
         <ImageView
             android:id="@+id/btn_play"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:layout_marginStart="4dp"
             android:layout_marginEnd="4dp"
             android:background="@drawable/widget_play_bg"
             android:contentDescription="@string/play_pause"
-            android:padding="11dp"
+            android:padding="10dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_play"
+            android:src="@drawable/play"
             android:tint="#000000" />
 
         <ImageView
             android:id="@+id/btn_next"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/next"
-            android:padding="6dp"
+            android:padding="3dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_widget_skip_next" />
+            android:src="@drawable/next" />
     </LinearLayout>
 </FrameLayout>

@@ -213,10 +213,11 @@ class HomeWidget : AppWidgetProvider() {
             bindShared(views, context, frame, isCard = false)
 
             // Mirrors home_widget.xml: padding, square cover, text margins, then the transport
-            // (prev + play + next + play's margins), which shrinks on compact strips.
+            // (prev 38 + play 46 + next 38 + play's margins). The buttons keep their size on
+            // compact strips; shrunk, they're too small to hit on a 1-row widget.
             val compact = size.height < STRIP_COMPACT_HEIGHT_DP
             val pad = if (compact) 6f else 8f
-            val transport = if (compact) 108f else 122f
+            val transport = 130f
             val textWidth = size.width - 2 * pad - (size.height - 2 * pad) - 12f - 8f - transport
             // INVISIBLE, not GONE: the weighted gap keeps the controls pinned to the right edge.
             views.setViewVisibility(
@@ -229,16 +230,6 @@ class HomeWidget : AppWidgetProvider() {
                 views.setViewVisibility(R.id.txt_album, View.GONE)
                 views.setTextViewTextSize(R.id.txt_title, TypedValue.COMPLEX_UNIT_SP, 13f)
                 views.setTextViewTextSize(R.id.txt_artist, TypedValue.COMPLEX_UNIT_SP, 11f)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    views.setSquareSize(R.id.btn_play, 36f)
-                    views.setSquareSize(R.id.btn_prev, 32f)
-                    views.setSquareSize(R.id.btn_next, 32f)
-                    dp(context, 9f).let { views.setViewPadding(R.id.btn_play, it, it, it, it) }
-                    dp(context, 5f).let {
-                        views.setViewPadding(R.id.btn_prev, it, it, it, it)
-                        views.setViewPadding(R.id.btn_next, it, it, it, it)
-                    }
-                }
             }
             return views
         }
@@ -254,7 +245,7 @@ class HomeWidget : AppWidgetProvider() {
 
             views.setImageViewResource(
                 R.id.btn_shuffle,
-                if (frame.shuffleMode == ShuffleMode.SMART_SHUFFLE) R.drawable.smart_shuffle else R.drawable.ic_notif_shuffle,
+                if (frame.shuffleMode == ShuffleMode.SMART_SHUFFLE) R.drawable.smart_shuffle else R.drawable.shuffle,
             )
             views.setInt(
                 R.id.btn_shuffle,
@@ -263,7 +254,11 @@ class HomeWidget : AppWidgetProvider() {
             )
             views.setImageViewResource(
                 R.id.btn_repeat,
-                if (frame.repeatMode == RepeatMode.REPEAT_ONE) R.drawable.ic_notif_repeat_one else R.drawable.ic_notif_repeat,
+                when (frame.repeatMode) {
+                    RepeatMode.REPEAT_ONE -> R.drawable.repone
+                    RepeatMode.REPEAT_ALL -> R.drawable.repon
+                    else -> R.drawable.repoff
+                },
             )
             views.setInt(
                 R.id.btn_repeat,
@@ -293,8 +288,8 @@ class HomeWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.txt_position, formatTime(position))
             views.setTextViewText(R.id.txt_duration, formatTime(duration))
 
-            // Height left for the top row: padding 24, controls 44 + 6, progress row (+ its 6 gap).
-            val topRow = size.height - 24f - 50f - if (showTimes) 19f else 9f
+            // Height left for the top row: padding 24, controls 54 + 6, progress row (+ its 6 gap).
+            val topRow = size.height - 24f - 60f - if (showTimes) 19f else 9f
             if (topRow < CARD_ALBUM_MIN_TOP_ROW_DP) views.setViewVisibility(R.id.txt_album, View.GONE)
             return views
         }
@@ -322,7 +317,7 @@ class HomeWidget : AppWidgetProvider() {
             }
 
             val playing = snapshot.hasTrack && snapshot.isPlaying
-            views.setImageViewResource(R.id.btn_play, if (playing) R.drawable.ic_widget_pause else R.drawable.ic_widget_play)
+            views.setImageViewResource(R.id.btn_play, if (playing) R.drawable.pause else R.drawable.play)
             views.setInt(R.id.btn_play, "setColorFilter", COLOR_ON_PLAY)
             views.setInt(R.id.btn_prev, "setColorFilter", COLOR_ICON)
             views.setInt(R.id.btn_next, "setColorFilter", COLOR_ICON)
@@ -341,19 +336,13 @@ class HomeWidget : AppWidgetProvider() {
             if (!isCard) return
 
             val liked = snapshot.hasTrack && snapshot.isLiked
-            views.setImageViewResource(R.id.btn_like, if (liked) R.drawable.ic_widget_heart_filled else R.drawable.ic_widget_heart)
+            views.setImageViewResource(R.id.btn_like, if (liked) R.drawable.favon else R.drawable.favoff)
             views.setInt(R.id.btn_like, "setColorFilter", if (liked) COLOR_ACCENT else COLOR_MUTED)
             views.setContentDescription(
                 R.id.btn_like,
                 context.getString(if (liked) UiR.string.remove_from_your_library else UiR.string.save_to_your_library),
             )
             views.setOnClickPendingIntent(R.id.btn_like, createPendingIntent(context, ACTION_FAV))
-        }
-
-        private fun RemoteViews.setSquareSize(viewId: Int, sizeDp: Float) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-            setViewLayoutWidth(viewId, sizeDp, TypedValue.COMPLEX_UNIT_DIP)
-            setViewLayoutHeight(viewId, sizeDp, TypedValue.COMPLEX_UNIT_DIP)
         }
 
         private fun dp(context: Context, value: Float): Int =
