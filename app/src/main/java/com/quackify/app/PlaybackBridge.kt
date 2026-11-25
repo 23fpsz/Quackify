@@ -806,6 +806,19 @@ class PlaybackBridge(private val context: Context) {
             }
         }
 
+        override fun onLikeSet(liked: Boolean) {
+            val uri = state.trackUri
+            if (!uri.startsWith("spotify:track:")) {
+                log.w("like set ignored, the state has no track uri")
+                return
+            }
+            if (state.isLiked == liked) return
+            // The library write already happened on the caller's side; this
+            // only catches the playback state up so the hearts reflect it.
+            log.i("like '${uri.takeLast(12)}' set -> $liked by the sheet pick")
+            state = state.copy(isLiked = liked)
+        }
+
         override fun onQueueAdd(uri: String) {
             queueAdd(uri)
         }

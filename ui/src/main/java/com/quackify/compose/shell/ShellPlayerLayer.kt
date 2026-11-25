@@ -157,16 +157,15 @@ internal fun BoxScope.ShellPlayerLayer(
             },
             onPlayPause = env.handlePlayPause,
             onLike = {
+                // Same as the Now Playing heart: open the Save-in sheet and let
+                // the pick do the saving, no instant Liked Songs toggle.
                 val playingUri = playbackState?.trackUri.orEmpty()
-                if (!env.isLiked) {
-                    if (env.playerListener != null) env.playerListener.onLikeToggle() else env.local.isLiked = true
-                }
                 val playingTrack = TrackItem(
                     title = env.currentTrackTitle,
                     artist = env.currentArtist,
                     uri = playingUri,
                     imageUrl = env.currentCoverUrl.takeIf { it.isNotBlank() },
-                    saved = true
+                    saved = env.isLiked
                 )
                 env.local.addTrackTarget = playingTrack
                 env.onAddToPlaylist?.invoke(playingTrack)

@@ -188,6 +188,7 @@ internal fun ShellSearchRoute(
         onPromoteRecentSearch = { item -> onPromoteRecentSearch?.invoke(item) },
         onRecordRecentSearch = { hit -> onRecordRecentSearch?.invoke(hit) },
         onToggleSaved = { uri, currentlySaved -> onToggleSaved?.invoke(uri, currentlySaved) },
+        onTrackHeart = { track -> env.actions.openAddToPlaylist(track) },
         onLoadSearchSection = onLoadSearchSection,
         onCategoryClick = { category ->
             env.navController.pushCurrentState()
@@ -265,7 +266,6 @@ internal fun ShellPlaylistRoute(
     onTogglePlaylistSaved: ((String, Boolean) -> Unit)?,
     playlistPermissions: PlaylistPermissions?,
     onLoadPlaylistContributors: (() -> Unit)?,
-    onPlaylistTrackLikeToggle: ((TrackItem) -> Unit)?,
     onEditPlaylist: ((String) -> Unit)?,
     onAddTracksOpen: (() -> Unit)?,
 ) {
@@ -310,7 +310,7 @@ internal fun ShellPlaylistRoute(
             env.flags.isContributorsOpen = true
             onLoadPlaylistContributors?.invoke()
         },
-        onTrackLikeToggle = { onPlaylistTrackLikeToggle?.invoke(it) },
+        onTrackLikeToggle = { env.actions.openAddToPlaylist(it) },
         onTrackAddToQueue = env.handleTrackAddToQueue,
         handleBack = env.handleBack,
         handleTrackOptions = env.handleTrackOptions,
@@ -347,7 +347,6 @@ internal fun ShellAlbumRoute(
     albumLoadingMore: Boolean,
     onLoadMoreAlbumTracks: (() -> Unit)?,
     onRetryAlbum: (() -> Unit)?,
-    onAlbumTrackLikeToggle: ((TrackItem) -> Unit)?,
     albumSaved: Boolean? = null,
     onAlbumSavedToggle: ((String, Boolean) -> Unit)? = null,
 ) {
@@ -378,7 +377,7 @@ internal fun ShellAlbumRoute(
         handleBack = env.handleBack,
         handlePlayPause = env.handlePlayPause,
         handleTrackOptions = env.handleTrackOptions,
-        onTrackLikeToggle = { onAlbumTrackLikeToggle?.invoke(it) },
+        onTrackLikeToggle = { env.actions.openAddToPlaylist(it) },
         onTrackAddToQueue = env.handleTrackAddToQueue,
         openArtist = env.openArtist,
         openAlbum = env.openAlbum,
@@ -409,7 +408,6 @@ internal fun ShellArtistRoute(
     artistBanned: Boolean? = null,
     onArtistUnban: ((String) -> Unit)? = null,
     onArtistFollowToggle: ((String, Boolean) -> Unit)?,
-    onArtistTrackLikeToggle: ((TrackItem) -> Unit)?,
 ) {
     ShellArtistPane(
         artistName = env.active.artistName,
@@ -442,7 +440,7 @@ internal fun ShellArtistRoute(
         },
         onTrackSelect = env.handleTrackPlay,
         onTrackOptionsClick = env.handleTrackOptions,
-        onTrackLikeToggle = { onArtistTrackLikeToggle?.invoke(it) },
+        onTrackLikeToggle = { env.actions.openAddToPlaylist(it) },
         onTrackAddToQueue = env.handleTrackAddToQueue,
         onFollowToggle = { uri, follow ->
             onArtistFollowToggle?.invoke(uri, follow)

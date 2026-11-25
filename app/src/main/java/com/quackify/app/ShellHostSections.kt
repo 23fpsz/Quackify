@@ -467,10 +467,7 @@ internal fun MainActivity.ShellAppHostSection(
     val onArtistFollowedBound: suspend (String) -> Boolean? = { uri -> onArtistFollowedHandler(context, uri) }
     val onArtistImageBound: suspend (String) -> String? = { uri -> onArtistImageHandler(context, uri) }
     val onShowFollowToggleBound: (String, Boolean) -> Unit = { uri, follow -> onShowFollowToggleHandler(scope, uri, follow) }
-    val onArtistTrackLikeToggleBound: (TrackItem) -> Unit = { track -> onArtistTrackLikeToggleHandler(scope, context, track) }
-    val onAlbumTrackLikeToggleBound: (TrackItem) -> Unit = { track -> onAlbumTrackLikeToggleHandler(scope, context, track) }
     val onAlbumSavedToggleBound: (String, Boolean) -> Unit = { uri, saved -> onAlbumSavedToggleHandler(scope, uri, saved) }
-    val onPlaylistTrackLikeToggleBound: (TrackItem) -> Unit = { track -> onPlaylistTrackLikeToggleHandler(scope, context, track) }
     val onArtistRadioBound: suspend (String) -> String? = { uri -> onArtistRadioHandler(context, uri) }
     val onSearchSubmitBound: (String) -> Unit = { query -> onSearchSubmitHandler(scope, context, query) }
     val onRemoveRecentSearchBound: (SearchHistoryItem) -> Unit = { item -> onRemoveRecentSearchHandler(scope, context, item) }
@@ -614,11 +611,8 @@ onArtistFollowToggle = onArtistFollowToggleBound,
 onArtistFollowed = onArtistFollowedBound,
 onArtistImage = onArtistImageBound,
 onShowFollowToggle = onShowFollowToggleBound,
-onArtistTrackLikeToggle = onArtistTrackLikeToggleBound,
-onAlbumTrackLikeToggle = onAlbumTrackLikeToggleBound,
     albumSaved = albumSaved,
 onAlbumSavedToggle = onAlbumSavedToggleBound,
-onPlaylistTrackLikeToggle = onPlaylistTrackLikeToggleBound,
 onArtistRadio = onArtistRadioBound,
     profile = profileDetail,
     profileTop = profileTop,
@@ -1026,37 +1020,12 @@ return radio
 
 /** Extracted from the EncoreAppShell wiring to keep the composable
  * method under the JVM 64KB limit. */
-internal fun MainActivity.onPlaylistTrackLikeToggleHandler(scope: kotlinx.coroutines.CoroutineScope, context: Context, track: com.quackify.compose.playlist.TrackItem) {
-togglePlaylistTrackLike(
-    context, scope, playlistUri, track,
-    getTracks = { playlistTracks }, setTracks = { playlistTracks = it },
-    getDetail = { playlistDetail }, setDetail = { playlistDetail = it },
-)
-}
-
-
-/** Extracted from the EncoreAppShell wiring to keep the composable
- * method under the JVM 64KB limit. */
 internal fun MainActivity.onAlbumSavedToggleHandler(scope: kotlinx.coroutines.CoroutineScope, uri: String, saved: Boolean) {
 scope.launch {
     val ok = Library.setSaved(applicationContext, listOf(uri), saved)
     log.i("album save '$uri' -> $saved ok=$ok")
     if (ok && uri == albumUri) albumSaved = saved
 }
-}
-
-
-/** Extracted from the EncoreAppShell wiring to keep the composable
- * method under the JVM 64KB limit. */
-internal fun MainActivity.onAlbumTrackLikeToggleHandler(scope: kotlinx.coroutines.CoroutineScope, context: Context, track: com.quackify.compose.playlist.TrackItem) {
-toggleAlbumTrackLike(context, scope, track, { albumTracks }) { albumTracks = it }
-}
-
-
-/** Extracted from the EncoreAppShell wiring to keep the composable
- * method under the JVM 64KB limit. */
-internal fun MainActivity.onArtistTrackLikeToggleHandler(scope: kotlinx.coroutines.CoroutineScope, context: Context, track: com.quackify.compose.playlist.TrackItem) {
-toggleArtistTrackLike(context, scope, track, { artistTracks }) { artistTracks = it }
 }
 
 
