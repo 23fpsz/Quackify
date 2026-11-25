@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
@@ -143,17 +144,26 @@ fun TrackOptionsSheet(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(
-                text = track.artist,
-                style = EncoreTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    color = EncoreColors.TextSecondary
-                ),
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-            )
+            ) {
+                if (track.isExplicit) {
+                    EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
+                }
+                Text(
+                    text = track.artist,
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        fontSize = 14.sp,
+                        color = EncoreColors.TextSecondary
+                    ),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+            }
 
             streamCount?.takeIf { it > 0L }?.let { plays ->
                 Spacer(modifier = Modifier.height(4.dp))
