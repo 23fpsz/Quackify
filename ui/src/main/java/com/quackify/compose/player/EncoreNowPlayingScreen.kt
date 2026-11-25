@@ -378,6 +378,7 @@ fun EncoreNowPlayingScreen(
                 controller.hide(WindowInsetsCompat.Type.systemBars())
             }
             VideoFullscreenLayout(
+                title = title,
                 videoQualities = videoQualities,
                 onVideoQuality = onVideoQuality,
                 onVideoSurface = onVideoSurface,
@@ -1662,7 +1663,8 @@ private fun NowPlayingArtworkCard(
                 ) {
                     MusicVideoSurface(
                         onSurface = onVideoSurface,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        sessionKey = title
                     )
                     AnimatedVisibility(
                         visible = seekHint != null,
@@ -2010,6 +2012,7 @@ private fun SwipeTrackArtworkSlot(
 
 @Composable
 private fun VideoFullscreenLayout(
+    title: String,
     videoQualities: List<Int>,
     onVideoQuality: (Int) -> Unit,
     onVideoSurface: (android.view.Surface?) -> Unit,
@@ -2041,7 +2044,7 @@ private fun VideoFullscreenLayout(
             .background(Color.Black)
     ) {
         NowPlayingArtworkCard(
-            title = "",
+            title = title,
             coverUrl = null,
             dominantColor = Color.Black,
             backgroundColor = Color.Black,
