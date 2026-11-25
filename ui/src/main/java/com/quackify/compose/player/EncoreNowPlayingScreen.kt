@@ -3316,7 +3316,21 @@ private fun FullscreenLyricsView(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-                    if (isCurrentLine && line.translation.isNotBlank()) {
+                    AnimatedVisibility(
+                        visible = isCurrentLine && line.translation.isNotBlank(),
+                        enter = fadeIn(
+                            animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
+                        ) + expandVertically(
+                            expandFrom = Alignment.Top,
+                            animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
+                        ),
+                        exit = fadeOut(
+                            animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+                        ) + shrinkVertically(
+                            shrinkTowards = Alignment.Top,
+                            animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+                        )
+                    ) {
                         Text(
                             text = line.translation,
                             style = EncoreTheme.typography.bodyMedium.copy(
@@ -3336,8 +3350,20 @@ private fun FullscreenLyricsView(
             // line blurrier than the one above, like the song is coming
             // into view through fog. Subtle on purpose: it is a whisper of
             // what is next, not a second lyric sheet.
-            if (showNextPeek) {
-                item(key = "nextTrackPeek") {
+            item(key = "nextTrackPeek") {
+                AnimatedVisibility(
+                    visible = showNextPeek,
+                    enter = fadeIn(
+                        animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
+                    ) + expandVertically(
+                        animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
+                    ),
+                    exit = fadeOut(
+                        animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+                    ) + shrinkVertically(
+                        animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+                    )
+                ) {
                     NextTrackPeek(
                         nextTrack = sheetPeekTrack,
                         nextLyrics = sheetPeekLyrics,
