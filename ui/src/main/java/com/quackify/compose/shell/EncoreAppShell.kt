@@ -33,6 +33,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.SaveableStateHolder
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Modifier
@@ -125,10 +127,12 @@ internal fun splitPlayerWidthFraction(): Float {
 @Composable
 internal fun ShellScreenSlot(
     screen: ShellScreen,
+    screenKey: String,
+    saveableStateHolder: SaveableStateHolder,
     content: @Composable (ShellScreen) -> Unit
 ) {
     AnimatedContent(
-        targetState = screen,
+        targetState = screen to screenKey,
         transitionSpec = {
             (
                 fadeIn(tween(EncoreAnimation.ScreenEnterDuration, easing = EncoreAnimation.BoxInterpolator)) +
@@ -138,8 +142,10 @@ internal fun ShellScreenSlot(
                 ) togetherWith fadeOut(tween(EncoreAnimation.ScreenExitDuration))
         },
         label = "ShellScreenTransition"
-    ) { target ->
-        content(target)
+    ) { (targetScreen, targetKey) ->
+        saveableStateHolder.SaveableStateProvider(key = targetKey) {
+            content(targetScreen)
+        }
     }
 }
 
@@ -380,6 +386,7 @@ fun EncoreAppShell(
     val active = remember { ShellActiveEntity() }
     val navState = remember { ShellNavState() }
     val local = remember { ShellLocalState() }
+    val saveableStateHolder = rememberSaveableStateHolder()
     val activityFeed = activityState?.feed.orEmpty()
     val activityLoading = activityState?.loading == true
     val activityFailed = activityState?.failed == true
@@ -420,6 +427,11 @@ fun EncoreAppShell(
             onOpenEpisode = onOpenEpisode,
             onOpenUserProfile = onOpenUserProfile,
             onAddTracksClosed = { onRetryPlaylist?.invoke() },
+            onScreenPopped = { leavingKey ->
+                if (!leavingKey.startsWith("root_")) {
+                    saveableStateHolder.removeState(leavingKey)
+                }
+            },
             libraryItems = libraryItems,
             searchData = searchData,
             nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
@@ -949,7 +961,11 @@ fun EncoreAppShell(
             isPlayerExpanded && !flags.isLogcatOpen &&
             com.quackify.compose.player.PlayerViewOptions.landscapeDualView
         val screenHost: @Composable () -> Unit = {
-            ShellScreenSlot(currentScreen) { screen ->
+            ShellScreenSlot(
+                screen = currentScreen,
+                screenKey = navState.currentScreenKey,
+                saveableStateHolder = saveableStateHolder
+            ) { screen ->
                 when (screen) {
                     ShellScreen.HOME -> ShellHomeRoute(
                         env = hosts.route(),

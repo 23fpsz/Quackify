@@ -21,7 +21,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -692,6 +694,7 @@ internal fun ShellHomePane(
     onOpenShow: (String) -> Unit,
     onOpenEpisode: (String) -> Unit,
     onOpenPlaylist: (String, String, String?) -> Unit,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     EncoreHomeScreen(
         onPlaylistClick = { playlist, uri ->
@@ -729,7 +732,8 @@ internal fun ShellHomePane(
         onArtistClick = onArtistClick,
         userDisplayName = userDisplayName,
         userAvatarUrl = userAvatarUrl,
-        userColorHex = userColorHex
+        userColorHex = userColorHex,
+        listState = listState
     )
 }
 
