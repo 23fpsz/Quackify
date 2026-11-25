@@ -899,7 +899,11 @@ class PlaybackBridge(private val context: Context) {
         return (queued + uri + context).distinct()
     }
 
-    private suspend fun writeQueue(uris: List<String>, cluster: ClusterState): Boolean {
+    private suspend fun writeQueue(
+        uris: List<String>,
+        cluster: ClusterState,
+        prevRows: List<ClusterTrack> = emptyList(),
+    ): Boolean {
         val known = (cluster.queued + cluster.fromContext).associateBy { it.uri }
         val missing = uris.filter { uri ->
             known[uri] == null &&
@@ -935,8 +939,44 @@ class PlaybackBridge(private val context: Context) {
         if (tracks.size != uris.size) {
             log.w("queue set: ${uris.size - tracks.size} of ${uris.size} rows have no metadata")
         }
-        val ok = connect.setQueue(tracks)
+        val ok = connect.setQueue(tracks, prevRows)
         log.i("queue = ${tracks.size} rows ok=$ok")
+        return ok
+    }
+
+    /**
+     * Re-seats one freshly added queue row at the tail of the queued section.
+     * The pending fields hold the tail order on screen until the server window
+     * matches, and the set_queue write carries it back with the prev rows
+     * echoed verbatim so the machine's history survives, the same rule
+     * clearQueue follows.
+     */
+    private suspend fun moveQueuedRowToTail(
+        uri: String,
+        cluster: ClusterState,
+        landedQueued: List<ClusterTrack>,
+    ): Boolean {
+        val reordered = landedQueued.filterNot { it.uri == uri } +
+            landedQueued.last { it.uri == uri }
+        val target = (reordered.map { it.uri } + cluster.fromContext.map { it.uri })
+            .filter { it.isNotBlank() }
+            .distinct()
+        pendingQueueOrder = target
+        pendingQueueRows = reordered.map { it.asTrackItem() }
+        pendingContextRows = cluster.fromContext.map { it.asTrackItem() }
+        pendingQueueRevision = cluster.queueRevision
+        pendingQueueAt = SystemClock.elapsedRealtime()
+        publishQueue(cluster)
+        val prevRows = cluster.prevTracks.reversed().takeLast(PREV_TRACKS_MAX)
+        val ok = writeQueue(target, cluster, prevRows)
+        log.i("queue tail-seat '$uri' ok=$ok, ${target.size} row(s) in the window")
+        if (ok) {
+            connect.refreshCluster(force = true)
+        } else {
+            pendingQueueOrder = emptyList()
+            pendingQueueRows = emptyList()
+            pendingContextRows = emptyList()
+        }
         return ok
     }
 
@@ -2222,7 +2262,21 @@ class PlaybackBridge(private val context: Context) {
                     publishQueue(cluster)
                     return@launch
                 }
-                publishQueue(cluster)
+                if (added) {
+                    // add_to_queue means "play next" to the server: the row lands
+                    // at the FRONT of next_tracks, which reads as newest-on-top
+                    // in the queue. Re-seat it at the tail so the order stays
+                    // oldest first, the way every client shows Add to Queue.
+                    connect.refreshCluster(force = true)
+                    val landed = connect.cluster.value
+                    val landedQueued = landed?.queued.orEmpty()
+                    if (landed != null &&
+                        landedQueued.indexOfLast { it.uri == uri } in 0 until landedQueued.size - 1
+                    ) {
+                        moveQueuedRowToTail(uri, landed, landedQueued)
+                    }
+                }
+                publishQueue(connect.cluster.value)
                 connect.refreshCluster()
                 scheduleDecorate(listOf(uri))
             } finally {
