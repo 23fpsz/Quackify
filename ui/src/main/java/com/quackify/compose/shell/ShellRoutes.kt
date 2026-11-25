@@ -198,7 +198,7 @@ internal fun ShellSearchRoute(
                 onOpenBrowse?.invoke(category.uri)
             } else {
                 env.navController.currentScreen = ShellScreen.CATEGORY
-                onOpenCategory?.invoke(category.title)
+                onOpenCategory?.invoke(category.uri)
             }
         },
         onAlbumClick = env.openAlbum,

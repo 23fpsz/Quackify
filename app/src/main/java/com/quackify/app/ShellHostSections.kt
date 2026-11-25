@@ -865,8 +865,8 @@ showDetail = null
 
 /** Extracted from the EncoreAppShell wiring to keep the composable
  * method under the JVM 64KB limit. */
-internal fun MainActivity.onOpenCategoryHandler(category: String) {
-categoryUri = "spotify:genre:" + category.lowercase().replace(" ", "-")
+internal fun MainActivity.onOpenCategoryHandler(uri: String) {
+categoryUri = uri
 categoryShelves = null
 }
 
