@@ -1,5 +1,7 @@
 package com.quackify.compose.screens
 
+import com.quackify.compose.util.localizeBrowseCategory
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -185,7 +187,7 @@ fun EncoreCategoryScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Text(
-                        text = categoryTitle,
+                        text = localizeBrowseCategory(categoryTitle),
                         style = EncoreTheme.typography.headlineLarge.copy(
                             fontSize = 34.sp,
                             fontWeight = FontWeight.Bold,
@@ -318,7 +320,7 @@ fun EncoreCategoryScreen(
                             .padding(top = 28.dp, bottom = 12.dp)
                     ) {
                         Text(
-                            text = stringResource(R.string.explore_category, categoryTitle),
+                            text = stringResource(R.string.explore_category, localizeBrowseCategory(categoryTitle)),
                             style = EncoreTheme.typography.titleLarge.copy(
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
@@ -397,7 +399,7 @@ fun EncoreCategoryScreen(
 
             if (topBarTitleAlpha > 0.01f) {
                 Text(
-                    text = categoryTitle,
+                    text = localizeBrowseCategory(categoryTitle),
                     style = EncoreTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White.copy(alpha = topBarTitleAlpha),

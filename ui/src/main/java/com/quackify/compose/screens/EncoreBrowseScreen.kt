@@ -1,5 +1,7 @@
 package com.quackify.compose.screens
 
+import com.quackify.compose.util.localizeBrowseCategory
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -253,7 +255,7 @@ private fun BrowseCardTile(card: BrowseCard, onClick: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = card.title,
+            text = localizeBrowseCategory(card.title),
             style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
             color = EncoreColors.TextPrimary,
             maxLines = 1,

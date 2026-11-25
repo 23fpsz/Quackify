@@ -1,5 +1,7 @@
 package com.quackify.compose.search
 
+import com.quackify.compose.util.localizeBrowseCategory
+
 import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1359,7 +1361,7 @@ fun EncoreSearchScreen(
                                 .fillMaxWidth(0.65f)
                         ) {
                             Text(
-                                text = category.title,
+                                text = localizeBrowseCategory(category.title),
                                 style = EncoreTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
