@@ -68,6 +68,9 @@
     <string name="link_copied">Ссылка скопирована</string>
     <string name="version_copied">Версия скопирована</string>
     <string name="title_copied">Название скопировано</string>
+    <string name="lyrics_copied">Текст скопирован</string>
+    <string name="lyrics_selection_count">Выбрано: %1$d</string>
+    <string name="copy_selected_lyrics">Скопировать выбранный текст</string>
     <string name="track_link">Ссылка на трек</string>
     <string name="liked_songs">Любимые треки</string>
     <string name="songs">Треки</string>

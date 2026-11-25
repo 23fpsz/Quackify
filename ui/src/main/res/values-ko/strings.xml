@@ -68,6 +68,9 @@
     <string name="link_copied">링크 복사됨</string>
     <string name="version_copied">버전 복사됨</string>
     <string name="title_copied">제목 복사됨</string>
+    <string name="lyrics_copied">가사 복생됨</string>
+    <string name="lyrics_selection_count">%1$d개 선택됨</string>
+    <string name="copy_selected_lyrics">선택한 가사 복사</string>
     <string name="track_link">곡 링크</string>
     <string name="liked_songs">좋아요한 곡</string>
     <string name="songs">곡</string>

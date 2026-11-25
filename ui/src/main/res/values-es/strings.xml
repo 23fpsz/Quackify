@@ -417,6 +417,9 @@
     <string name="link_copied">Enlace copiado</string>
     <string name="version_copied">Versión copiada</string>
     <string name="title_copied">Título copiado</string>
+    <string name="lyrics_copied">Letras copiadas</string>
+    <string name="lyrics_selection_count">%1$d seleccionadas</string>
+    <string name="copy_selected_lyrics">Copiar letras seleccionadas</string>
     <string name="track_link">Enlace de la canción</string>
     <string name="will_be_deleted_from_library"> se eliminará de Tu Biblioteca.</string>
     <string name="will_be_deleted_playlists_stay"> se eliminará. Las playlists dentro permanecerán en Tu Biblioteca.</string>

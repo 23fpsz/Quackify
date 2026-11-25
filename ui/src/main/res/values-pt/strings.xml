@@ -68,6 +68,9 @@
     <string name="link_copied">Link copiado</string>
     <string name="version_copied">Versão copiada</string>
     <string name="title_copied">Título copiado</string>
+    <string name="lyrics_copied">Letras copiadas</string>
+    <string name="lyrics_selection_count">%1$d selecionadas</string>
+    <string name="copy_selected_lyrics">Copiar letras selecionadas</string>
     <string name="track_link">Link da música</string>
     <string name="liked_songs">Músicas curtidas</string>
     <string name="songs">Músicas</string>
