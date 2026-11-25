@@ -51,6 +51,7 @@ internal class ShellNavController(
             BackStackItem(
                 screen = nav.currentScreen,
                 categoryTitle = active.categoryTitle,
+                categoryUri = active.categoryUri,
                 playlistTitle = active.playlistTitle,
                 playlistUri = active.playlistUri,
                 playlistCoverUrl = active.playlistCoverUrl,
@@ -73,6 +74,7 @@ internal class ShellNavController(
         if (stack.isNotEmpty()) {
             val previous = stack.removeAt(stack.lastIndex)
             currentScreen = previous.screen
+            active.categoryUri = previous.categoryUri
             if (previous.searchQuery.isNotEmpty()) {
                 onSearchQueryChange?.invoke(previous.searchQuery) ?: playerListener?.onSearch(previous.searchQuery)
             }
@@ -230,9 +232,14 @@ internal class ShellNavController(
         currentScreen = ShellScreen.ADD_TRACKS
     }
 
-    fun openCategory(title: String, color: androidx.compose.ui.graphics.Color) {
+    fun openCategory(
+        title: String,
+        color: androidx.compose.ui.graphics.Color,
+        uri: String = ""
+    ) {
         pushCurrentState()
         active.categoryTitle = title
+        active.categoryUri = uri
         active.categoryColor = color
         currentScreen = ShellScreen.CATEGORY
     }

@@ -114,6 +114,7 @@ fun getCategoryColor(title: String): Color = when (title.trim()) {
 @Composable
 fun EncoreCategoryScreen(
     categoryTitle: String,
+    categoryUri: String = "",
     categoryColor: Color = getCategoryColor(categoryTitle),
     onBackClick: () -> Unit = {},
     onPlaylistClick: (String, String) -> Unit = { _, _ -> },

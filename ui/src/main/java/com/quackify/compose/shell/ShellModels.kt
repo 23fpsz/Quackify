@@ -71,6 +71,7 @@ data class ActivityFeedState(
 data class BackStackItem(
     val screen: ShellScreen,
     val categoryTitle: String = "",
+    val categoryUri: String = "",
     val playlistTitle: String = "",
     val playlistUri: String = "",
     val playlistCoverUrl: String? = null,
@@ -278,6 +279,7 @@ internal class ShellActiveEntity {
     var artistUri by mutableStateOf("")
     var artistAvatarUrl by mutableStateOf<String?>(null)
     var categoryTitle by mutableStateOf("")
+    var categoryUri by mutableStateOf("")
     var categoryColor by mutableStateOf(Color(0xFF148A08))
     var showUri by mutableStateOf("")
     var episodeUri by mutableStateOf("")
