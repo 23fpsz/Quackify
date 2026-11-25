@@ -84,6 +84,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -384,6 +385,7 @@ fun EncoreNowPlayingScreen(
                 durationMs = durationMs,
                 currentPositionMs = currentPositionMs,
                 onSeek = onSeek,
+                onSkipSeek = onSkipSeek,
                 isLoading = isLoading,
                 canSeek = canSeek,
                 chapters = chapters,
@@ -1582,6 +1584,7 @@ private fun NowPlayingArtworkCard(
     videoFullBleed: Boolean = false,
     videoOverlayVisible: Boolean? = null,
     onVideoOverlayTap: (() -> Unit)? = null,
+    onDoubleTapSeek: ((Long) -> Unit)? = null,
     videoQualities: List<Int> = emptyList(),
     onVideoQuality: (Int) -> Unit = {},
     onVideoSurface: (android.view.Surface?) -> Unit = {},
@@ -1609,6 +1612,8 @@ private fun NowPlayingArtworkCard(
         when {
             videoActive -> {
                 var internalOverlay by remember { mutableStateOf(false) }
+                var seekHint by remember { mutableStateOf<Int?>(null) }
+                val currentDoubleTapSeek by rememberUpdatedState(onDoubleTapSeek)
                 val overlayVisible = videoOverlayVisible ?: internalOverlay
                 if (videoOverlayVisible == null) {
                     LaunchedEffect(internalOverlay) {
@@ -1618,6 +1623,12 @@ private fun NowPlayingArtworkCard(
                         }
                     }
                 }
+                LaunchedEffect(seekHint) {
+                    if (seekHint != null) {
+                        delay(650.milliseconds)
+                        seekHint = null
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .then(
@@ -1625,10 +1636,27 @@ private fun NowPlayingArtworkCard(
                             else Modifier.fillMaxWidth(0.8f).aspectRatio(16f / 9f)
                         )
                         .clip(if (videoFullBleed) RectangleShape else RoundedCornerShape(16.dp))
-                        .pointerInput(Unit) {
-                            detectTapGestures {
-                                if (videoOverlayVisible != null) onVideoOverlayTap?.invoke()
-                                else internalOverlay = !internalOverlay
+                        .pointerInput(onDoubleTapSeek != null) {
+                            if (onDoubleTapSeek != null) {
+                                detectTapGestures(
+                                    onDoubleTap = { offset ->
+                                        val seek = currentDoubleTapSeek
+                                        if (seek != null) {
+                                            val forward = offset.x >= size.width / 2f
+                                            seekHint = if (forward) 1 else -1
+                                            seek(if (forward) 15_000L else -15_000L)
+                                        }
+                                    },
+                                    onTap = {
+                                        if (videoOverlayVisible != null) onVideoOverlayTap?.invoke()
+                                        else internalOverlay = !internalOverlay
+                                    }
+                                )
+                            } else {
+                                detectTapGestures {
+                                    if (videoOverlayVisible != null) onVideoOverlayTap?.invoke()
+                                    else internalOverlay = !internalOverlay
+                                }
                             }
                         }
                 ) {
@@ -1636,6 +1664,41 @@ private fun NowPlayingArtworkCard(
                         onSurface = onVideoSurface,
                         modifier = Modifier.fillMaxSize()
                     )
+                    AnimatedVisibility(
+                        visible = seekHint != null,
+                        enter = fadeIn(tween(durationMillis = 120)),
+                        exit = fadeOut(tween(durationMillis = 280))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = if (seekHint == 1) {
+                                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f))
+                                        } else {
+                                            listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)
+                                        }
+                                    )
+                                ),
+                            contentAlignment = if (seekHint == 1) Alignment.CenterEnd else Alignment.CenterStart
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    if (seekHint == 1) R.drawable.encore_icon_seek_forward_15
+                                    else R.drawable.encore_icon_seek_back_15
+                                ),
+                                contentDescription = stringResource(
+                                    if (seekHint == 1) R.string.forward_15_seconds
+                                    else R.string.back_15_seconds
+                                ),
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .padding(horizontal = 40.dp)
+                                    .size(38.dp)
+                            )
+                        }
+                    }
                     AnimatedVisibility(
                         visible = overlayVisible,
                         enter = fadeIn(tween(durationMillis = 250)),
@@ -1954,6 +2017,7 @@ private fun VideoFullscreenLayout(
     durationMs: Long,
     currentPositionMs: Long,
     onSeek: (Float) -> Unit,
+    onSkipSeek: (Long) -> Unit,
     isLoading: Boolean,
     canSeek: Boolean,
     chapters: List<ChapterMarker>,
@@ -1991,6 +2055,7 @@ private fun VideoFullscreenLayout(
             onVideoSurface = onVideoSurface,
             onToggleVideoFullscreen = onExit,
             onVideoOverlayTap = { overlayVisible = !overlayVisible },
+            onDoubleTapSeek = onSkipSeek,
             modifier = Modifier.fillMaxSize()
         )
         AnimatedVisibility(
