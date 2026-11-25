@@ -1447,14 +1447,16 @@ class KrespotPlayer(private val context: Context) {
     /**
      * Plays a music video entity: resolves its source manifest, builds the DASH
      * session and takes over playback from the audio pipeline at fromMs.
+     * Returns false when the switch did not engage (unknown uri shape or no
+     * audio focus), true once the video session is on the engine.
      */
-    fun playVideo(videoUri: String, audioTrackUri: String, durationMs: Long, fromMs: Long) {
-        if (!videoUri.startsWith("spotify:track:") && !videoUri.startsWith("spotify:episode:")) return
+    fun playVideo(videoUri: String, audioTrackUri: String, durationMs: Long, fromMs: Long): Boolean {
+        if (!videoUri.startsWith("spotify:track:") && !videoUri.startsWith("spotify:episode:")) return false
         stopAudio()
         if (!focus.acquire()) {
             log.w("video play refused, another app holds the audio focus")
             _events.tryEmit(PlayerEvent.Failed("focus"))
-            return
+            return false
         }
         val id = ++generation
         pendingPause = false
@@ -1503,6 +1505,7 @@ class KrespotPlayer(private val context: Context) {
                 _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
             }
         }
+        return true
     }
 
     /** Leaves video mode; the caller resumes audio playback at fromMs. */
