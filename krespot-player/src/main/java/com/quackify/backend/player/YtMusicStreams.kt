@@ -320,8 +320,12 @@ internal object YtMusicStreams {
             return null
         }
         val ranked = officialRank(track, found.candidates).ifEmpty {
-            log.w("no official audio candidate for '${track.name.ifBlank { track.uri.takeLast(12) }}'")
-            return null
+            log.i("no strict official candidate for '${track.name}', falling back to candidates")
+            found.candidates.filter { candidate ->
+                val have = TitleParts.of(candidate.title)
+                val wanted = TitleParts.of(track.name)
+                titlesMatch(wanted, have) || candidate.title.contains(wanted.core, ignoreCase = true)
+            }.ifEmpty { found.candidates }
         }
         for (candidate in ranked.take(CANDIDATES)) {
             val stream = streamOf(context, track, candidate, found.visitorData) ?: continue

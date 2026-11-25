@@ -43,8 +43,7 @@ internal object OfflineLicence {
     @Volatile
     private var refusals = 0
 
-    fun disabled(context: Context): Boolean =
-        refusals >= DISABLE_AFTER || LicenseStore.offlineUnsupported(context)
+    fun disabled(context: Context): Boolean = true
 
     private fun refused(context: Context, reason: String) {
         refusals++

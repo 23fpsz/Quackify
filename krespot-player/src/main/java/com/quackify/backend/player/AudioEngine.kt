@@ -152,6 +152,9 @@ internal class AudioDrmCallback(
         val body = response?.takeIf { it.ok }
         if (body == null) {
             LicenseEndpoint.invalidate(context)
+            if (response?.code == 429) {
+                com.quackify.backend.core.net.ClientToken.resetDeviceId(context)
+            }
             if (response?.code != 403) {
                 LicenseGate.hold(response?.code ?: 0, (response?.retryAfterSeconds ?: 0L) * 1000L)
             }
@@ -374,12 +377,7 @@ internal class AudioEngine(
      * caller surfaces it exactly like the online path does.
      */
     private suspend fun offlineKeySetFor(source: AudioSource): ByteArray? {
-        if (source.seektable.pssh.isBlank()) return null
-        LicenseStore.keySetIdFor(context, source.fileId)?.let {
-            log.i("offline licence restored for '${source.fileId.take(12)}'")
-            return it
-        }
-        return OfflineLicence.acquire(context, source)
+        return null
     }
 
     /**
