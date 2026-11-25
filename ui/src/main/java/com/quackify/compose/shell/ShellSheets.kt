@@ -9,6 +9,7 @@ import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.compose.sheets.AccountsSheet
 import com.quackify.compose.sheets.AlbumOptionsSheet
 import com.quackify.compose.sheets.ArtistOptionsSheet
+import com.quackify.compose.sheets.AudioPipelineSheet
 import com.quackify.compose.sheets.EntityOptions
 import com.quackify.compose.sheets.EntityOptionsSheet
 import com.quackify.compose.sheets.LibraryCreateSheet
@@ -42,6 +43,7 @@ internal data class SheetFlags(
     val sleepTimer: Boolean = false,
     val canvasResolutionSheet: Boolean = false,
     val lyricsProviderSheet: Boolean = false,
+    val audioPipelineSheet: Boolean = false,
 )
 
 @Composable
@@ -106,6 +108,10 @@ internal fun ShellSheets(
     onCanvasResolution: (Int) -> Unit = {},
     onCanvasResolutionClick: () -> Unit = {},
     onDismissCanvasResolution: () -> Unit = {},
+    pipeline: PipelineInfo = PipelineInfo(),
+    trackOptionsFromPlayer: Boolean = false,
+    onAudioPipeline: () -> Unit = {},
+    onDismissAudioPipeline: () -> Unit = {},
     lyricsProviderOrder: List<com.quackify.backend.library.lyrics.LyricsProvider> = com.quackify.backend.library.lyrics.LyricsProvider.offered,
     onLyricsProviderOrder: (List<com.quackify.backend.library.lyrics.LyricsProvider>) -> Unit = {},
     onDismissLyricsProvider: () -> Unit = {},
@@ -253,6 +259,8 @@ internal fun ShellSheets(
         onPlaylistMoveToFolder = onPlaylistMoveToFolder,
         canPlaylistMoveToFolder = canPlaylistMoveToFolder,
         sleepTimer = sleepTimer,
+        trackOptionsFromPlayer = trackOptionsFromPlayer,
+        onAudioPipeline = onAudioPipeline,
     )
 
     ShellLibrarySheets(
@@ -273,6 +281,7 @@ internal fun ShellSheets(
         currentTrackArtist = currentTrackArtist,
         currentTrackCoverUrl = currentTrackCoverUrl,
         canvasResolution = canvasResolution,
+        pipeline = pipeline,
         onDismissSort = onDismissSort,
         onDismissCreate = onDismissCreate,
         onDismissDevice = onDismissDevice,
@@ -292,6 +301,7 @@ internal fun ShellSheets(
         onRemoveFromQueue = onRemoveFromQueue,
         onReorderQueue = onReorderQueue,
         onSleepTimerSelected = onSleepTimerSelected,
+        onDismissAudioPipeline = onDismissAudioPipeline,
     )
 }
 
@@ -415,6 +425,8 @@ private fun ShellEntityOptionsSheets(
     onAddPlaylistToAnother: (() -> Unit)? = null,
     onPlaylistMoveToFolder: (() -> Unit)? = null,
     canPlaylistMoveToFolder: Boolean = false,
+    trackOptionsFromPlayer: Boolean = false,
+    onAudioPipeline: () -> Unit = {},
 ) {
     TrackOptionsSheet(
         track = selectedTrack,
@@ -443,7 +455,10 @@ private fun ShellEntityOptionsSheets(
         sleepTimer = sleepTimer,
         lyricsUnderCoverAvailable = lyricsUnderCoverAvailable,
         isLyricsUnderCoverEnabled = isLyricsUnderCoverEnabled,
-        onLyricsUnderCoverToggle = onLyricsUnderCoverToggle
+        onLyricsUnderCoverToggle = onLyricsUnderCoverToggle,
+        showAudioPipeline = trackOptionsFromPlayer &&
+                selectedTrack?.uri.orEmpty().startsWith("spotify:track:") == true,
+        onAudioPipeline = onAudioPipeline
     )
 
     EntityOptionsSheet(
@@ -533,6 +548,8 @@ private fun ShellLibrarySheets(
     onDismissSleepTimer: () -> Unit,
     onCanvasResolution: (Int) -> Unit,
     onDismissCanvasResolution: () -> Unit,
+    pipeline: PipelineInfo = PipelineInfo(),
+    onDismissAudioPipeline: () -> Unit = {},
     lyricsProviderOrder: List<com.quackify.backend.library.lyrics.LyricsProvider>,
     onLyricsProviderOrder: (List<com.quackify.backend.library.lyrics.LyricsProvider>) -> Unit,
     onDismissLyricsProvider: () -> Unit,
@@ -613,6 +630,13 @@ private fun ShellLibrarySheets(
             selectedHeight = canvasResolution,
             onHeightSelected = onCanvasResolution,
             onDismiss = onDismissCanvasResolution
+        )
+    }
+
+    if (flags.audioPipelineSheet) {
+        AudioPipelineSheet(
+            pipeline = pipeline,
+            onDismiss = onDismissAudioPipeline
         )
     }
 

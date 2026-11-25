@@ -856,6 +856,46 @@ class KrespotPlayer(private val context: Context) {
 
     val quality: String get() = _state.value.quality
 
+    /**
+     * One read of the live pipeline for the now-playing sheet: the engine's
+     * measured decoder format beside whatever the serving source declared
+     * (catalogue file, alternate stream or music video dash). Null while
+     * nothing is on the player.
+     */
+    fun audioPipeline(): AudioPipelineSnapshot? {
+        if (videoActive) {
+            if (_state.value.trackUri.isBlank()) return null
+            val decoder = video.decoderFormat()
+            return AudioPipelineSnapshot(
+                sourceKey = AudioPipelineSnapshot.SOURCE_VIDEO,
+                mimeType = decoder?.mimeType,
+                codecs = decoder?.codecs,
+                sampleRateHz = decoder?.sampleRateHz,
+                channels = decoder?.channels,
+                bitDepth = decoder?.bitDepth,
+                decoderBitrateBps = decoder?.bitrateBps,
+            )
+        }
+        val uri = _state.value.trackUri
+        if (uri.isBlank()) return null
+        val decoder = engine?.decoderFormat()
+        val catalogue = sourceFor(uri)
+        val alternate = YtStreamTable.of(YtStreamTable.keyFor(uri))
+        return AudioPipelineSnapshot(
+            sourceKey = _state.value.source.key,
+            mimeType = decoder?.mimeType ?: alternate?.mime,
+            codecs = decoder?.codecs,
+            sampleRateHz = decoder?.sampleRateHz,
+            channels = decoder?.channels,
+            bitDepth = decoder?.bitDepth,
+            decoderBitrateBps = decoder?.bitrateBps,
+            declaredBitrateBps = catalogue?.bitrate ?: alternate?.bitrate,
+            declaredQuality = catalogue?.quality,
+            fileId = catalogue?.fileId,
+            videoId = alternate?.videoId ?: _state.value.videoId,
+        )
+    }
+
     val hasSource: Boolean
         get() = videoActive || (engine?.hasMedia == true && !engineIdle) || job?.isActive == true
 

@@ -257,6 +257,8 @@ internal class VideoEngine(
     val isBuffering: Boolean
         get() = runOnMain { player?.playbackState == Player.STATE_BUFFERING } ?: false
 
+    fun decoderFormat(): DecoderFormat? = runOnMain { player?.decoderAudioFormat() }
+
     fun setSurface(newSurface: Surface?) {
         surface = newSurface
         runOnMain { player?.setVideoSurface(newSurface) }
