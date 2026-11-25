@@ -2169,6 +2169,18 @@ class PlaybackBridge(private val context: Context) {
             player.play(track, connect.spclientHost, from)
             return
         }
+        if (!player.isPlaying && resumeUri == state.trackUri && resumeAt > 0L) {
+            // The engine sits idle after a stream failure and resume() is a
+            // no-op there; replay the source at the parked freeze point so a
+            // weak-network stall restarts where it froze, not at 0:00.
+            val track = command.currentTrack
+            val at = resumePositionFor(state.trackUri) ?: resumeAt
+            if (track != null && remoteTarget().isBlank()) {
+                log.i("toggle: the stalled '${track.name}' replays from ${at}ms")
+                player.play(track, connect.spclientHost, at)
+                return
+            }
+        }
         val wasPlaying = player.isPlaying
         if (wasPlaying) player.pause() else player.resume()
         val source = if (wasPlaying) DebugSource.PAUSE else DebugSource.RESUME
@@ -2997,6 +3009,18 @@ class PlaybackBridge(private val context: Context) {
         val metadata = runCatching { JSONObject(track.raw) }.getOrElse { JSONObject() }
         metadata.put("is_queued", "true")
         return track.copy(provider = "queue", queued = true, raw = metadata.toString())
+    }
+
+    /** Parks where a failing track froze so the next start of it - a toggle,
+     * a skip echo, a re-entry from the server - resumes there instead of
+     * restarting from zero. Cleared by the next track change like the engine
+     * does for its own resume store. */
+    private fun parkResumeAt(positionMs: Long) {
+        val uri = state.trackUri
+        if (uri.isBlank() || positionMs <= 0L) return
+        resumeUri = uri
+        resumeAt = positionMs
+        log.i("resume parked at ${positionMs}ms for '${uri.takeLast(12)}'")
     }
 
     private fun resumePositionFor(uri: String): Long? {
@@ -5090,6 +5114,7 @@ class PlaybackBridge(private val context: Context) {
                 is PlayerEvent.Failed -> {
                     log.w("player failed with no command: ${event.message}")
                     endPlaySession(state.trackUri, "trackerror")
+                    parkResumeAt(progress.positionMs)
                     gaplessQueuedUri = ""
                     state = state.copy(isPlaying = false, isBuffering = false)
                     scope.launch {
@@ -5227,6 +5252,7 @@ class PlaybackBridge(private val context: Context) {
             is PlayerEvent.Failed -> {
                 log.w("player failed: ${event.message}")
                 endPlaySession(state.trackUri, "trackerror")
+                parkResumeAt(progress.positionMs)
                 state = state.copy(isPlaying = false, isBuffering = false)
                 scope.launch {
                     runCatching {
