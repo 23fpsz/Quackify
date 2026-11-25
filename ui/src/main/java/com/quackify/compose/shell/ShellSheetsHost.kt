@@ -188,7 +188,8 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             queue = flags.isQueueSheetOpen,
             sleepTimer = flags.isSleepTimerOpen,
             canvasResolutionSheet = flags.isCanvasResolutionSheetOpen,
-            lyricsProviderSheet = flags.isLyricsProviderSheetOpen
+            lyricsProviderSheet = flags.isLyricsProviderSheetOpen,
+            audioPipelineSheet = flags.isAudioPipelineSheetOpen
         ),
         selectedTrack = local.trackForOptions,
         devices = playbackState?.devices.orEmpty(),
@@ -336,6 +337,10 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         onDismissSleepTimer = { flags.isSleepTimerOpen = false },
         onCanvasResolutionClick = { flags.isCanvasResolutionSheetOpen = true },
         onDismissCanvasResolution = { flags.isCanvasResolutionSheetOpen = false },
+        pipeline = playbackState?.pipeline ?: PipelineInfo(),
+        trackOptionsFromPlayer = flags.isTrackOptionsFromPlayer,
+        onAudioPipeline = { flags.isAudioPipelineSheetOpen = true },
+        onDismissAudioPipeline = { flags.isAudioPipelineSheetOpen = false },
         onShowCredits = {
             local.trackForOptions?.let { track ->
                 flags.isCreditsOpen = true

@@ -273,6 +273,8 @@ internal class AudioEngine(
     val isBuffering: Boolean
         get() = runOnMain { player?.playbackState == Player.STATE_BUFFERING } ?: false
 
+    fun decoderFormat(): DecoderFormat? = runOnMain { player?.decoderAudioFormat() }
+
     fun durationFor(uri: String): Long = itemDurations[uri] ?: 0L
 
     suspend fun prepare(

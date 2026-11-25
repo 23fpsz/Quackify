@@ -85,6 +85,9 @@ fun TrackOptionsSheet(
     sleepTimer: SleepTimerOption? = null,
     /** Opens the "Save in" picker; null hides the row (non-track entities). */
     onAddToPlaylist: (() -> Unit)? = null,
+    /** Shows the audio pipeline row; the caller gates it to the now-playing three-dot on tracks. */
+    showAudioPipeline: Boolean = false,
+    onAudioPipeline: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || track == null) return
@@ -297,6 +300,17 @@ fun TrackOptionsSheet(
                     onClick = {
                         onDismiss()
                         onShowCredits()
+                    }
+                )
+            }
+
+            if (showAudioPipeline) {
+                ContextMenuRowItem(
+                    title = stringResource(R.string.audio_pipeline),
+                    iconRes = R.drawable.encore_icon_audio_24,
+                    onClick = {
+                        onDismiss()
+                        onAudioPipeline()
                     }
                 )
             }

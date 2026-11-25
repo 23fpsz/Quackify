@@ -130,6 +130,8 @@ data class ComposePlaybackState(
     val streamSource: String = "",
     /** The YouTube video the audio streams from, when the source is YouTube Music. */
     val videoId: String = "",
+    /** The live audio pipeline as the bridge last read it off the player. */
+    val pipeline: PipelineInfo = PipelineInfo(),
     val artistUri: String = "",
     /** Every credited artist's uri on the playing track, in display order. */
     val artistUris: List<String> = emptyList(),
@@ -167,6 +169,26 @@ data class ChapterMarker(
     val title: String,
     val startMs: Long,
     val endMs: Long,
+)
+
+/**
+ * The audio pipeline for the now-playing sheet: what the decoder reports
+ * (measured) and what the serving source declared, in display-ready fields.
+ * Zero and blank mean "not stated" — the sheet leaves those lines out.
+ */
+data class PipelineInfo(
+    val sourceKey: String = "",
+    val mimeType: String = "",
+    val codecs: String = "",
+    val sampleRateHz: Int = 0,
+    val channels: Int = 0,
+    val bitDepth: Int = 0,
+    val decoderBitrateBps: Int = 0,
+    val declaredBitrateBps: Int = 0,
+    val declaredQuality: String = "",
+    val fileId: String = "",
+    val videoId: String = "",
+    val hasDecoder: Boolean = false,
 )
 
 enum class QueueEditKind { REMOVE, REORDER }
@@ -251,6 +273,7 @@ internal class ShellUiFlags {
     var isQueueSheetOpen by mutableStateOf(false)
     var isSleepTimerOpen by mutableStateOf(false)
     var isCanvasResolutionSheetOpen by mutableStateOf(false)
+    var isAudioPipelineSheetOpen by mutableStateOf(false)
     var isLyricsProviderSheetOpen by mutableStateOf(false)
     var isArtistAboutOpen by mutableStateOf(false)
     var isDiscographyOpen by mutableStateOf(false)

@@ -45,6 +45,7 @@ import com.quackify.backend.library.SmartShuffleSource
 import com.quackify.backend.library.TrackSource
 import com.quackify.backend.model.ConnectDevice
 import com.quackify.backend.model.DeviceKind
+import com.quackify.backend.player.AudioPipelineSnapshot
 import com.quackify.backend.player.KrespotPlayer
 import com.quackify.backend.player.PlayerEvent
 import com.quackify.backend.player.PlayerState
@@ -56,6 +57,7 @@ import com.quackify.compose.sheets.SleepTimerOption
 import com.quackify.compose.shell.ChapterMarker
 import com.quackify.compose.shell.ComposePlaybackState
 import com.quackify.compose.shell.ComposePlayerListener
+import com.quackify.compose.shell.PipelineInfo
 import com.quackify.compose.shell.PlaybackProgress
 import com.quackify.compose.shell.QueueEditKind
 import com.quackify.compose.shell.QueueEditResult
@@ -1151,7 +1153,11 @@ class PlaybackBridge(private val context: Context) {
                         threshold(playing)
                         return@collect
                     }
-                    state = next
+                    // The pipeline read rides the identity flip: the decoder
+                    // settles at the same moment the playing state does, so
+                    // the sheet never shows figures a track change overtook.
+                    val settled = if (identityChanged) pipelineInfoOf(player.audioPipeline()) else state.pipeline
+                    state = if (settled == state.pipeline) next else next.copy(pipeline = settled)
                     if (identityChanged) hydrateArtistCredits()
                     if (next.trackUri.startsWith("spotify:track:") && next.artistUri.isNotBlank()) {
                         com.quackify.backend.core.store.AppPrefs.prefs(context, CLIENT_PREFS).edit()
@@ -1401,6 +1407,24 @@ class PlaybackBridge(private val context: Context) {
             val index = cluster?.window()?.indexOfFirst { it.uri == audioUri }?.takeIf { it >= 0 } ?: -1
             startLocal(row, state.contextUri, index, progress.positionMs, playing = state.isPlaying)
         }
+    }
+
+    private fun pipelineInfoOf(snapshot: AudioPipelineSnapshot?): PipelineInfo {
+        if (snapshot == null) return PipelineInfo()
+        return PipelineInfo(
+            sourceKey = snapshot.sourceKey,
+            mimeType = snapshot.mimeType.orEmpty(),
+            codecs = snapshot.codecs.orEmpty(),
+            sampleRateHz = snapshot.sampleRateHz ?: 0,
+            channels = snapshot.channels ?: 0,
+            bitDepth = snapshot.bitDepth ?: 0,
+            decoderBitrateBps = snapshot.decoderBitrateBps ?: 0,
+            declaredBitrateBps = snapshot.declaredBitrateBps ?: 0,
+            declaredQuality = snapshot.declaredQuality.orEmpty(),
+            fileId = snapshot.fileId.orEmpty(),
+            videoId = snapshot.videoId.orEmpty(),
+            hasDecoder = snapshot.mimeType != null,
+        )
     }
 
     private fun refreshVideoFlags() {
