@@ -62,6 +62,9 @@ private const val SPOTIFY_ORIGIN = "https://open.spotify.com"
 
 private val LOGIN_PATH = Regex("^/(?:[a-zA-Z0-9]{2,8}(?:-[a-zA-Z0-9]{2,8})?/)?login/?$")
 
+private const val LOGIN_UA =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36 Edg/158.0.0.0"
+
 /** One main-frame failure surfaced to the login screen's error view. */
 data class LoginWebError(
     val id: Long,
@@ -87,8 +90,6 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
     val webView: WebView = buildWebView(webContext, container)
 
     private var tokenResult: CompletableDeferred<String>? = null
-
-    private val nativeUa: String = WebSettings.getDefaultUserAgent(context)
 
     @Volatile
     var onPlayerReached: (() -> Unit)? = null
@@ -189,7 +190,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
 
     init {
         AppLocale.pushLoginLocale()
-        log.i("init ua=native, desktop only on the player")
+        log.i("init ua=edge login, desktop on the player")
         container.addView(
             webView,
             FrameLayout.LayoutParams(
@@ -229,7 +230,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 if (url != null && isPlayerUrl(url) && view != null &&
                     view.settings.userAgentString != EncoreAuth.DESKTOP_UA
                 ) {
-                    log.i("player reached with the native user-agent, upgrading to desktop")
+                    log.i("player reached with the login user-agent, upgrading to desktop")
                     applyUserAgent(view, url)
                     view.reload()
                     return
@@ -539,9 +540,9 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
 
     private fun applyUserAgent(view: WebView?, url: String?) {
         if (view == null || url == null) return
-        val target = if (isPlayerUrl(url)) EncoreAuth.DESKTOP_UA else nativeUa
+        val target = if (isPlayerUrl(url)) EncoreAuth.DESKTOP_UA else LOGIN_UA
         if (view.settings.userAgentString == target) return
-        log.i("user-agent ${if (target == nativeUa) "native" else "desktop"} for $url")
+        log.i("user-agent ${if (target == EncoreAuth.DESKTOP_UA) "desktop" else "login"} for $url")
         view.settings.userAgentString = target
     }
 
