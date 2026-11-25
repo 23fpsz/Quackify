@@ -137,6 +137,36 @@ object Rootlist {
 
     suspend fun remove(context: Context, uri: String): Boolean = write(context, uri, add = false)
 
+    /**
+     * Flips an item attribute in the rootlist, the way the web player marks a
+     * playlist private: a plain UPDATE_ITEM_ATTRIBUTES delta, no baseRevision.
+     */
+    suspend fun setPublished(context: Context, uri: String, public: Boolean): Boolean {
+        if (uri.isBlank()) return false
+        val user = username(context)
+        if (user.isBlank()) {
+            log.w("no username yet, cannot flip the public flag of $uri")
+            return false
+        }
+        val op = JSONObject().put("kind", "UPDATE_ITEM_ATTRIBUTES").put(
+            "updateItemAttributes",
+            JSONObject()
+                .put("newAttributes", JSONObject().put("values", JSONObject().put("public", public)))
+                .put("item", JSONObject().put("uri", uri)),
+        )
+        val response = Net.postJson(
+            "$BASE/$user/rootlist/changes",
+            body(op),
+            headers(context),
+            "rootlist/setPublished",
+        )
+        val ok = response?.ok == true
+        log.i("setPublished $uri public=$public ok=$ok http=${response?.code ?: -1} " +
+                response?.body?.take(160).orEmpty()
+        )
+        return ok
+    }
+
     suspend fun setSaved(context: Context, uri: String, saved: Boolean): Boolean =
         if (saved) add(context, uri) else remove(context, uri)
 

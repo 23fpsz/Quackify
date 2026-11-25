@@ -112,6 +112,9 @@ internal fun ShellSheets(
     trackOptionsFromPlayer: Boolean = false,
     onAudioPipeline: () -> Unit = {},
     onDismissAudioPipeline: () -> Unit = {},
+    playlistIsPrivate: Boolean = false,
+    canAdministratePlaylist: Boolean = false,
+    onPlaylistPrivacyToggle: (Boolean) -> Unit = {},
     lyricsProviderOrder: List<com.quackify.backend.library.lyrics.LyricsProvider> = com.quackify.backend.library.lyrics.LyricsProvider.offered,
     onLyricsProviderOrder: (List<com.quackify.backend.library.lyrics.LyricsProvider>) -> Unit = {},
     onDismissLyricsProvider: () -> Unit = {},
@@ -261,6 +264,9 @@ internal fun ShellSheets(
         sleepTimer = sleepTimer,
         trackOptionsFromPlayer = trackOptionsFromPlayer,
         onAudioPipeline = onAudioPipeline,
+        playlistIsPrivate = playlistIsPrivate,
+        canAdministratePlaylist = canAdministratePlaylist,
+        onPlaylistPrivacyToggle = onPlaylistPrivacyToggle,
     )
 
     ShellLibrarySheets(
@@ -427,6 +433,9 @@ private fun ShellEntityOptionsSheets(
     canPlaylistMoveToFolder: Boolean = false,
     trackOptionsFromPlayer: Boolean = false,
     onAudioPipeline: () -> Unit = {},
+    playlistIsPrivate: Boolean = false,
+    canAdministratePlaylist: Boolean = false,
+    onPlaylistPrivacyToggle: (Boolean) -> Unit = {},
 ) {
     TrackOptionsSheet(
         track = selectedTrack,
@@ -471,6 +480,9 @@ private fun ShellEntityOptionsSheets(
         onSaveToggle = onTogglePlaylistSaved,
         canDeletePlaylist = playlistEditable,
         onDeletePlaylist = onDeletePlaylist,
+        playlistIsPrivate = playlistIsPrivate,
+        canAdministratePlaylist = canAdministratePlaylist,
+        onPlaylistPrivacyToggle = onPlaylistPrivacyToggle,
         onAddToPlaylist = onAddPlaylistToAnother?.let { handler ->
             {
                 // Only real playlists offer adding their tracks elsewhere.

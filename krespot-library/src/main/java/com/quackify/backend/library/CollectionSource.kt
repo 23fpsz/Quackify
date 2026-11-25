@@ -246,6 +246,8 @@ object CollectionSource {
             val capabilities = playlist.optJSONObject("currentUserCapabilities")
             val editable = capabilities?.optBoolean("canEditItems", false) == true ||
                 capabilities?.optBoolean("canEditMetadata", false) == true
+            val administrate = capabilities?.optBoolean("canAdministratePermissions", false) == true
+            val isPrivate = playlist.optString("basePermission") == PlaylistMember.PERMISSION_BLOCKED
             val detail = CollectionDetail(
                 uri = uri,
                 title = playlist.optString("name").plainText(),
@@ -269,9 +271,12 @@ object CollectionSource {
                 fetched = content?.optJSONArray("items")?.length() ?: 0,
                 editable = editable,
                 members = members(playlist),
+                isPrivate = isPrivate,
+                canAdministratePermissions = administrate,
             )
             log.i("playlist $uri '${detail.title}' -> ${rows.size}/$total owner='${detail.creator}' " +
-                    "followers=$followers editable=$editable members=${detail.members.size} " +
+                    "followers=$followers editable=$editable administrate=$administrate " +
+                    "private=$isPrivate members=${detail.members.size} " +
                     "saved=${rows.count { it.saved == true }} " +
                     "video=${rows.count { it.video }}"
             )
