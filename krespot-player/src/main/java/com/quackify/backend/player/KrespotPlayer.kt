@@ -312,7 +312,8 @@ class KrespotPlayer(private val context: Context) {
      * Hands the engine the next track of the queue so ExoPlayer prebuffers it
      * while the current one plays and the transition carries no silence. The
      * item that joins is the cut the transition will really land on: the
-     * alternate stream when it leads the stack, the catalogue file with the
+     * alternate stream when it leads the stack or the licence gate is closed,
+     * the catalogue file with the
      * alternate as the fallback otherwise - so a licence that closes mid-
      * queue still leaves a seamless handover in place. A warm source queues
      * right away; a cold one resolves here and only queues if the engine is
@@ -337,7 +338,12 @@ class KrespotPlayer(private val context: Context) {
         YtStreamPool.unpinAll()
         val file = track.best() ?: track.files.firstOrNull()
         val cached = sourceFor(track.uri)
-        val alternateLeads = StreamSources.order(context).firstOrNull() == StreamSource.YT_MUSIC
+        // A closed licence gate routes the pre-queue onto the alternate as
+        // well, so the queued cut never asks a refusing endpoint for a licence
+        // at transition time.
+        val alternateLeads = StreamSources.order(context).firstOrNull() == StreamSource.YT_MUSIC ||
+            (LicenseGate.remainingMs() > 0L &&
+                StreamSources.after(context, StreamSource.SPOTIFY).isNotEmpty())
         val ticket = queueTicket.incrementAndGet()
         scope.launch {
             val cut: Cut? = if (alternateLeads) {
@@ -980,13 +986,30 @@ class KrespotPlayer(private val context: Context) {
             var player: AudioEngine? = null
             try {
                 val stack = StreamSources.order(context)
-                if (!divert && stack.firstOrNull() == StreamSource.YT_MUSIC) {
+                // A closed licence gate means a spotify attempt is guaranteed to
+                // burn another refusal and extend the wait, so while it holds
+                // the alternate stream rides first even with spotify primary.
+                val gateClosed = !divert &&
+                    stack.firstOrNull() != StreamSource.YT_MUSIC &&
+                    LicenseGate.remainingMs() > 0L &&
+                    StreamSources.after(context, StreamSource.SPOTIFY).isNotEmpty()
+                if (!divert && (stack.firstOrNull() == StreamSource.YT_MUSIC || gateClosed)) {
                     val alternate = resolveAlternate(track)
                     if (alternate != null) {
+                        if (gateClosed) {
+                            log.i("the licence gate is closed for ${LicenseGate.remainingMs() / 1000}s, " +
+                                "riding youtube music first for '${track.name.ifBlank { track.uri }}'"
+                            )
+                        }
                         playYtMusic(track, alternate, fromMs)
                         return@launch
                     }
-                    log.w("youtube music leads the stack but the track did not resolve, trying spotify")
+                    if (gateClosed) {
+                        log.w("the licence gate is closed and youtube music did not resolve, " +
+                                "trying spotify anyway")
+                    } else {
+                        log.w("youtube music leads the stack but the track did not resolve, trying spotify")
+                    }
                 }
                 val source = sourceFor(track.uri) ?: warmSource(track.uri, spclient)
                 if (source == null) {
