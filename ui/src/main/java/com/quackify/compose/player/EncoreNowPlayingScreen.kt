@@ -3048,6 +3048,7 @@ private fun FullscreenLyricsView(
     )
     val activeIndex by rememberActiveLyricIndex(clockMs, lyrics)
     val listState = rememberLazyListState()
+    val trackKey = remember(lyrics) { lyrics.firstOrNull()?.startTimeMs }
 
     // Swipe a line right to start picking lines: the swiped line lands in
     // the selection, every other checkbox starts off, and the header trades
@@ -3080,7 +3081,6 @@ private fun FullscreenLyricsView(
     // rendering what the user was just reading while it leaves.
     val deepFeel = LyricsOptions.deepFeelEnabled
     val nextPeekEnabled = LyricsOptions.nextTrackPeek
-    val trackKey = remember(lyrics) { lyrics.firstOrNull()?.startTimeMs }
     var handoffExit by remember { mutableStateOf(false) }
     var heldTitle by remember { mutableStateOf(title) }
     var heldArtist by remember { mutableStateOf(artist) }
@@ -3522,36 +3522,16 @@ private fun FullscreenLyricsView(
             // into view through fog. Subtle on purpose: it is a whisper of
             // what is next, not a second lyric sheet.
             item(key = "nextTrackPeek") {
-                AnimatedVisibility(
+                NextTrackPeekReveal(
                     visible = showNextPeek,
-                    enter = fadeIn(
-                        animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
-                    ) + expandVertically(
-                        animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
-                    ),
-                    exit = fadeOut(
-                        animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
-                    ) + shrinkVertically(
-                        animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
-                    )
-                ) {
-                    NextTrackPeek(
-                        nextTrack = sheetPeekTrack,
-                        nextLyrics = sheetPeekLyrics,
-                        ink = ink,
-                        // In the plain reader the backdrop IS the dominant
-                        // colour, so tinting the eyebrow with it made the
-                        // "next up" label vanish into the background; the
-                        // contrast ink keeps it legible in both modes.
-                        accent = if (deepFeel) deepFeelPalette.accent else ink,
-                        deepFeel = deepFeel,
-                        // During the hand-off the peek is the engine: it is
-                        // already the next song's opening, so it travels
-                        // further upward than the sheet carrying it and the
-                        // old lines appear to be dragged after it.
-                        leadFraction = if (handoffExit) peekLead else 0f
-                    )
-                }
+                    nextTrack = sheetPeekTrack,
+                    nextLyrics = sheetPeekLyrics,
+                    ink = ink,
+                    accent = if (deepFeel) deepFeelPalette.accent else ink,
+                    deepFeel = deepFeel,
+                    handoffExit = handoffExit,
+                    peekLead = peekLead
+                )
             }
             if (sheetProvider.isNotBlank()) {
                 item {
@@ -3582,6 +3562,55 @@ private fun FullscreenLyricsView(
             )
         }
         }
+    }
+}
+
+/**
+ * The next-track peek with its own reveal animation, in a composable of
+ * its own so the peek's AnimatedVisibility resolves in a plain scope:
+ * inside the reader's list the sheet's layout scopes sit behind the
+ * toast's overlay Box and are not implicitly reachable there.
+ */
+@Composable
+private fun NextTrackPeekReveal(
+    visible: Boolean,
+    nextTrack: TrackItem?,
+    nextLyrics: List<TimeSyncedLyric>,
+    ink: Color,
+    accent: Color,
+    deepFeel: Boolean,
+    handoffExit: Boolean,
+    peekLead: Float
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(
+            animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
+        ) + expandVertically(
+            animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
+        ),
+        exit = fadeOut(
+            animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+        ) + shrinkVertically(
+            animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+        )
+    ) {
+        NextTrackPeek(
+            nextTrack = nextTrack,
+            nextLyrics = nextLyrics,
+            ink = ink,
+            // In the plain reader the backdrop IS the dominant colour, so
+            // tinting the eyebrow with it made the "next up" label vanish
+            // into the background; the contrast ink keeps it legible in
+            // both modes.
+            accent = accent,
+            deepFeel = deepFeel,
+            // During the hand-off the peek is the engine: it is already
+            // the next song's opening, so it travels further upward than
+            // the sheet carrying it and the old lines appear to be dragged
+            // after it.
+            leadFraction = if (handoffExit) peekLead else 0f
+        )
     }
 }
 
