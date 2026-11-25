@@ -171,14 +171,6 @@ internal class AutomixAnalysis(private val context: Context) {
         return grid
     }
 
-    /**
-     * Measures the trailing silence off a decoded window that reaches the end
-     * of the track, so blends can be anchored where the music actually stops
-     * instead of the file's nominal length. RMS windows are judged against the
-     * window's own percentile levels, the same envelope pass Orchard and
-     * BitChord run over the whole file: a quiet fade-out still counts as
-     * music, only a genuinely dead tail is trimmed.
-     */
     private fun rememberTailSilence(cut: Cut, pcm: Pcm, windowStartSec: Double, durationSec: Double) {
         if (pcm.rate <= 0) return
         val windowSec = pcm.samples.size.toDouble() / pcm.rate

@@ -23,7 +23,6 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /**
  * The song position, ticking every frame.
@@ -33,8 +32,7 @@ import kotlin.math.roundToInt
  * singer. Between readings this advances the last known position at one
  * millisecond per frame millisecond, and each new reading steers — rather
  * than sets — the clock: a reading only a little ahead of or behind the
- * estimate nudges it, one far away (a seek) snaps to it. Adapted from
- * BitChord's LyricClock.
+ * estimate nudges it, one far away (a seek) snaps to it
  *
  * While paused, every reading is the truth, including a seek made while
  * paused.
