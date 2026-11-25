@@ -23,6 +23,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -49,12 +50,19 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.time.Duration.Companion.milliseconds
 
 private val log = Logs.of(Logs.Module.PLAYER)
 
 private const val PROGRESS_MS = 500L
+
+/** A buffer that neither advances nor errors for this long while play is wanted is a dead stream. */
+private const val STALL_LIMIT_MS = 4_000L
+
+/** Position movement below this counts as standing still. */
+private const val STALL_JITTER_MS = 250L
 
 /** Shorter measured tails are treated as measurement noise, not a trim. */
 private const val MIN_TAIL_TRIM_MS = 500L
@@ -250,6 +258,15 @@ internal class AudioEngine(
     private var lastPositionMs = 0L
 
     @Volatile
+    private var stallLastPositionMs = 0L
+
+    @Volatile
+    private var stallSinceWallMs = 0L
+
+    @Volatile
+    private var stallNotified = false
+
+    @Volatile
     private var duckLevel = 1f
 
     @Volatile
@@ -301,6 +318,7 @@ internal class AudioEngine(
             announced = false
             lastItemUri = uri
             tailSilence = null
+            resetStall()
             if (uri.isNotBlank()) itemDurations[uri] = totalMs
             // The player instance survives track changes: swapping the media
             // source keeps the renderers, the codec and the audio sink warm, so
@@ -478,6 +496,7 @@ internal class AudioEngine(
             announced = false
             lastItemUri = uri
             tailSilence = null
+            resetStall()
             if (uri.isNotBlank()) itemDurations[uri] = totalMs
             // The player instance survives track changes: swapping the media
             // source keeps the renderers, the codec and the audio sink warm, so
@@ -575,6 +594,7 @@ internal class AudioEngine(
             announced = false
             lastItemUri = uri
             tailSilence = null
+            resetStall()
             if (uri.isNotBlank() && trackDurationMs > 0L) itemDurations[uri] = trackDurationMs
             // The player instance survives track changes: swapping the media
             // source keeps the renderers, the codec and the audio sink warm, so
@@ -680,6 +700,7 @@ internal class AudioEngine(
         durationMs = 0L
         lastItemUri = ""
         tailSilence = null
+        resetStall()
         progressJob?.cancel()
         progressJob = null
         runOnMain {
@@ -781,19 +802,62 @@ internal class AudioEngine(
         log.i("crossfade handed the session to '${uri.takeLast(12)}'")
     }
 
+    private fun resetStall() {
+        stallLastPositionMs = 0L
+        stallSinceWallMs = 0L
+        stallNotified = false
+    }
+
     private fun startProgress() {
         if (progressJob?.isActive == true) return
         progressJob = scope.launch {
             while (isActive && started) {
-                val position = runOnMain { player?.currentPosition } ?: lastPositionMs
+                val read = runOnMain {
+                    val p = player ?: return@runOnMain null
+                    Triple(p.currentPosition, p.playbackState, p.playWhenReady)
+                }
+                val position = read?.first ?: lastPositionMs
                 if (position >= 0L) {
                     lastPositionMs = position
                     onEvent(PlayerEvent.Progress(position, durationMs))
                 }
                 trimSilentTail(position)
+                if (read != null) watchStall(position, read.second, read.third)
                 delay(PROGRESS_MS.milliseconds)
             }
         }
+    }
+
+    /**
+     * A stream that dies mid-song without an error code leaves the player
+     * buffering forever at the position where its buffer ran dry. The watchdog
+     * turns that frozen hold into a transport failure so the layer above can
+     * hand the track to the next source at the frozen spot, and it speaks once
+     * per stall - re-armed only when the position moves again.
+     */
+    private fun watchStall(position: Long, playbackState: Int, playWhenReady: Boolean) {
+        if (abs(position - stallLastPositionMs) > STALL_JITTER_MS) {
+            stallLastPositionMs = position
+            stallSinceWallMs = 0L
+            stallNotified = false
+            return
+        }
+        if (stallNotified || !playWhenReady || playbackState != Player.STATE_BUFFERING || !announced) {
+            stallSinceWallMs = 0L
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        if (stallSinceWallMs == 0L) {
+            stallSinceWallMs = now
+            return
+        }
+        if (now - stallSinceWallMs < STALL_LIMIT_MS) return
+        stallNotified = true
+        log.w(
+            "the stream stalled at ${position}ms for ${(now - stallSinceWallMs) / 1000}s, " +
+                "reporting it as a transport failure"
+        )
+        onEvent(PlayerEvent.Failed("stall at ${position}ms"))
     }
 
     /**
@@ -841,6 +905,7 @@ internal class AudioEngine(
                 announced = false
                 lastPositionMs = 0L
                 lastItemUri = newUri
+                resetStall()
                 itemDurations[newUri]?.let { durationMs = it }
             }
             if (auto) {
