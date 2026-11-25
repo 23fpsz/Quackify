@@ -133,6 +133,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -433,7 +434,11 @@ class MainActivity : ComponentActivity() {
                         }
                         LaunchedEffect(Unit) {
                             val before = EncoreAuth.token(context)
-                            SilentTokenRefresh.ensureFresh(context, "startup")
+                            // Bounded: whatever the refresh path does, the
+                            // skeleton gate must not depend on it finishing.
+                            withTimeoutOrNull(STARTUP_REFRESH_TIMEOUT_MS) {
+                                SilentTokenRefresh.ensureFresh(context, "startup")
+                            }
                             tokenChecked = true
                             if (EncoreAuth.token(context) != before) retryScreensLeftEmpty()
                             while (true) {
@@ -1708,6 +1713,7 @@ class MainActivity : ComponentActivity() {
         const val RESUME_REFRESH_AFTER_MS = 60_000L
         const val TOKEN_STILL_GOOD_MS = 60_000L
         const val TOKEN_CHECK_INTERVAL_MS = 48L * 60 * 60 * 1000L
+        const val STARTUP_REFRESH_TIMEOUT_MS = 35_000L
         const val RECENTS_SYNC_THROTTLE_MS = 5 * 60_000L
         const val RECENT_SEARCH_SETTLE_MS = 4_000L
         const val VIDEO_AUTO_EXIT_MIN_MS = 1_500L
