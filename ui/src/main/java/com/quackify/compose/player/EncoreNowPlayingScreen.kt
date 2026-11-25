@@ -1,6 +1,9 @@
 package com.quackify.compose.player
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.res.Configuration
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
@@ -81,6 +84,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -141,8 +145,10 @@ import com.quackify.compose.components.EncorePlayButton
 import com.quackify.compose.components.EncoreRepeatButton
 import com.quackify.compose.components.EncoreSmartShuffleButton
 import com.quackify.compose.components.MusicVideoSurface
+import com.quackify.compose.components.QuackifyToastHost
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
+import com.quackify.compose.components.rememberQuackifyToastState
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.sheets.DarkSystemBarsSheet
 import com.quackify.compose.sheets.LyricsProviderSheet
@@ -3043,6 +3049,27 @@ private fun FullscreenLyricsView(
     val activeIndex by rememberActiveLyricIndex(clockMs, lyrics)
     val listState = rememberLazyListState()
 
+    // Swipe a line right to start picking lines: the swiped line lands in
+    // the selection, every other checkbox starts off, and the header trades
+    // its controls for the count + copy pair until the reader is done.
+    var selectionMode by remember { mutableStateOf(false) }
+    val selectedLines = remember { mutableStateListOf<Int>() }
+    val context = LocalContext.current
+    val lyricsToast = rememberQuackifyToastState()
+    val lyricsCopiedLabel = stringResource(R.string.lyrics_copied)
+    val clipboard = remember {
+        context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    }
+    val density = LocalDensity.current
+    val selectionSwipeThresholdPx = with(density) { 48.dp.toPx() }
+    BackHandler(enabled = selectionMode) {
+        selectionMode = false
+    }
+    LaunchedEffect(trackKey) {
+        selectionMode = false
+        selectedLines.clear()
+    }
+
     // ---- The sneak peek hand-off ----------------------------------------
     // When the song ends and the next one starts while the reader is open,
     // the peek earns its keep: it is already showing the opening of what is
@@ -3131,8 +3158,8 @@ private fun FullscreenLyricsView(
         animationSpec = tween(durationMillis = 600, easing = EncoreAnimation.DecelerateInterpolator),
         label = "deepFeelBackgroundBottom"
     )
-    LaunchedEffect(heldLyricIndex) {
-        if (heldLyricIndex != null) {
+    LaunchedEffect(heldLyricIndex, selectionMode) {
+        if (heldLyricIndex != null || selectionMode) {
             suppressAutoScroll = true
         } else {
             delay(2500.milliseconds)
@@ -3157,12 +3184,21 @@ private fun FullscreenLyricsView(
     // it. Window flag, not a wake lock: nothing to acquire or release by
     // hand, and Android clears it never — the flag simply rides on this
     // window and is removed the moment it is cleared.
-    val context = LocalContext.current
     val keepScreenOn = LyricsOptions.keepScreenOn
     DisposableEffect(keepScreenOn) {
         val window = (context as? Activity)?.window ?: return@DisposableEffect onDispose { }
         if (keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onDispose { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
+    val copySelectedLyrics = {
+        val picked = selectedLines.sorted()
+        if (picked.isNotEmpty()) {
+            val text = picked.mapNotNull { sheetLyrics.getOrNull(it)?.text }.joinToString("\n")
+            clipboard?.setPrimaryClip(ClipData.newPlainText("Lyrics", text))
+            lyricsToast.show(lyricsCopiedLabel)
+        }
+        selectionMode = false
     }
 
     Column(
@@ -3187,58 +3223,85 @@ private fun FullscreenLyricsView(
                 .padding(horizontal = EncoreSpacers.Looser2)
                 .padding(vertical = EncoreSpacers.Tighter2)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                EncoreIconButton(
-                    iconRes = R.drawable.encore_icon_chevron_down_24,
-                    contentDescription = stringResource(R.string.close_lyrics),
-                    onClick = onClose,
-                    tint = ink
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            if (selectionMode) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     EncoreIconButton(
-                        iconRes = R.drawable.encore_icon_deepfeel_24,
-                        contentDescription = stringResource(R.string.lyrics_deepfeel),
-                        onClick = { LyricsOptions.setDeepFeelEnabled(context, !deepFeel) },
-                        tint = ink,
-                        isActive = deepFeel,
-                        activeTint = deepFeelPalette.accent
+                        iconRes = R.drawable.encore_icon_x_24,
+                        contentDescription = stringResource(R.string.close),
+                        onClick = { selectionMode = false },
+                        tint = ink
+                    )
+                    Text(
+                        text = stringResource(R.string.lyrics_selection_count, selectedLines.size),
+                        style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
+                        maxLines = 1
                     )
                     EncoreIconButton(
-                        iconRes = R.drawable.encore_icon_more_android_24,
-                        contentDescription = stringResource(R.string.lyrics_menu),
-                        onClick = onLyricsMenuClick,
+                        iconRes = R.drawable.encore_icon_copy_24,
+                        contentDescription = stringResource(R.string.copy_selected_lyrics),
+                        onClick = copySelectedLyrics,
                         tint = ink
                     )
                 }
-            }
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(horizontal = 96.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = sheetTitle,
-                    style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = sheetArtist,
-                    style = EncoreTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    EncoreIconButton(
+                        iconRes = R.drawable.encore_icon_chevron_down_24,
+                        contentDescription = stringResource(R.string.close_lyrics),
+                        onClick = onClose,
+                        tint = ink
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        EncoreIconButton(
+                            iconRes = R.drawable.encore_icon_deepfeel_24,
+                            contentDescription = stringResource(R.string.lyrics_deepfeel),
+                            onClick = { LyricsOptions.setDeepFeelEnabled(context, !deepFeel) },
+                            tint = ink,
+                            isActive = deepFeel,
+                            activeTint = deepFeelPalette.accent
+                        )
+                        EncoreIconButton(
+                            iconRes = R.drawable.encore_icon_more_android_24,
+                            contentDescription = stringResource(R.string.lyrics_menu),
+                            onClick = onLyricsMenuClick,
+                            tint = ink
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .padding(horizontal = 96.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = sheetTitle,
+                        style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = sheetArtist,
+                        style = EncoreTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(EncoreSpacers.Looser2))
 
+        Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
             // The hand-off rides the list: while the old song's sheet exits
@@ -3356,67 +3419,100 @@ private fun FullscreenLyricsView(
                             alpha = lineAlpha
                             transformOrigin = TransformOrigin(0f, 0.5f)
                         }
+                        .pointerInput(selectionSwipeThresholdPx) {
+                            var swipedRight = 0f
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    swipedRight = (swipedRight + dragAmount).coerceAtLeast(0f)
+                                },
+                                onDragEnd = {
+                                    if (swipedRight >= selectionSwipeThresholdPx) {
+                                        selectionMode = true
+                                        if (!selectedLines.remove(index)) selectedLines.add(index)
+                                    }
+                                    swipedRight = 0f
+                                },
+                                onDragCancel = { swipedRight = 0f }
+                            )
+                        }
                         .clickable(
                             interactionSource = lineInteraction,
                             indication = null
                         ) {
-                            if (!holdConsumed.value) onSeekMs(line.startTimeMs)
+                            if (selectionMode) {
+                                if (!selectedLines.remove(index)) selectedLines.add(index)
+                            } else if (!holdConsumed.value) {
+                                onSeekMs(line.startTimeMs)
+                            }
                         }
                         // The wash behind the active line is full-bleed, so
                         // the horizontal inset lives on the text itself.
                         .padding(horizontal = EncoreSpacers.Looser2)
                 ) {
-                    if (isCurrentLine && line.isWordSynced) {
-                        WordSyncedLyricSweepText(
-                            lyric = line,
-                            positionMs = clockMs,
-                            sungColor = ink,
-                            unsungColor = ink.copy(alpha = if (deepFeel) 0.42f else 0.35f),
-                            style = EncoreTheme.typography.titleLarge.copy(
-                                fontSize = lineFont.sp,
-                                lineHeight = (lineFont * 1.42f).sp,
-                                fontWeight = FontWeight.Bold,
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        Text(
-                            text = line.text,
-                            style = EncoreTheme.typography.titleLarge.copy(
-                                fontSize = lineFont.sp,
-                                lineHeight = (lineFont * 1.42f).sp,
-                                fontWeight = FontWeight.Bold,
-                                color = ink
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    AnimatedVisibility(
-                        visible = isCurrentLine && line.translation.isNotBlank(),
-                        enter = fadeIn(
-                            animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
-                        ) + expandVertically(
-                            expandFrom = Alignment.Top,
-                            animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
-                        ),
-                        exit = fadeOut(
-                            animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
-                        ) + shrinkVertically(
-                            shrinkTowards = Alignment.Top,
-                            animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
-                        )
-                    ) {
-                        Text(
-                            text = line.translation,
-                            style = EncoreTheme.typography.bodyMedium.copy(
-                                fontSize = 15.sp,
-                                lineHeight = 21.sp,
-                                color = ink.copy(alpha = if (deepFeel) 0.5f else 0.55f)
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 3.dp)
-                        )
+                    Row(verticalAlignment = Alignment.Top) {
+                        if (selectionMode) {
+                            LyricSelectionCheckbox(
+                                checked = index in selectedLines,
+                                ink = ink,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            if (isCurrentLine && line.isWordSynced) {
+                                WordSyncedLyricSweepText(
+                                    lyric = line,
+                                    positionMs = clockMs,
+                                    sungColor = ink,
+                                    unsungColor = ink.copy(alpha = if (deepFeel) 0.42f else 0.35f),
+                                    style = EncoreTheme.typography.titleLarge.copy(
+                                        fontSize = lineFont.sp,
+                                        lineHeight = (lineFont * 1.42f).sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                Text(
+                                    text = line.text,
+                                    style = EncoreTheme.typography.titleLarge.copy(
+                                        fontSize = lineFont.sp,
+                                        lineHeight = (lineFont * 1.42f).sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ink
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            AnimatedVisibility(
+                                visible = isCurrentLine && line.translation.isNotBlank(),
+                                enter = fadeIn(
+                                    animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
+                                ) + expandVertically(
+                                    expandFrom = Alignment.Top,
+                                    animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
+                                ),
+                                exit = fadeOut(
+                                    animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+                                ) + shrinkVertically(
+                                    shrinkTowards = Alignment.Top,
+                                    animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+                                )
+                            ) {
+                                Text(
+                                    text = line.translation,
+                                    style = EncoreTheme.typography.bodyMedium.copy(
+                                        fontSize = 15.sp,
+                                        lineHeight = 21.sp,
+                                        color = ink.copy(alpha = if (deepFeel) 0.5f else 0.55f)
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 3.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -3474,6 +3570,51 @@ private fun FullscreenLyricsView(
                     )
                 }
             }
+        }
+
+        if (lyricsToast.entries.isNotEmpty()) {
+            QuackifyToastHost(
+                state = lyricsToast,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            )
+        }
+        }
+    }
+}
+
+/**
+ * The pick marker beside a lyric line while the reader is in selection mode:
+ * a quiet ring that snaps to the app green with a check the moment the line
+ * is chosen, sized to sit beside the 28sp lyric text.
+ */
+@Composable
+private fun LyricSelectionCheckbox(
+    checked: Boolean,
+    ink: Color,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(if (checked) EncoreColors.Green else Color.Transparent)
+            .border(
+                width = if (checked) 0.dp else 2.dp,
+                color = if (checked) EncoreColors.Green else ink.copy(alpha = 0.55f),
+                shape = CircleShape
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        if (checked) {
+            Icon(
+                painter = painterResource(id = R.drawable.encore_icon_check_24),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(14.dp)
+            )
         }
     }
 }
