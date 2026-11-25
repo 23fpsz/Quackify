@@ -302,6 +302,10 @@ class PlaybackBridge(private val context: Context) {
             log.i("seamless: the sleep timer stops at this track, nothing pre-queued")
             return
         }
+        // The video engine owns the stream while a video plays: there is no
+        // audio playlist to queue into, and the marker this would set would
+        // describe a queue that does not exist.
+        if (videoActive()) return
         val next = peekNextTrack(currentUri) ?: return
         if (!next.uri.startsWith("spotify:track:")) {
             log.i("seamless: '${next.uri.takeLast(12)}' is not a track, nothing pre-queued")
@@ -1334,13 +1338,23 @@ class PlaybackBridge(private val context: Context) {
                     return@launch
                 }
                 log.i("video switch -> video at ${at}ms")
+                // The audio engine the seamless handoff rode on is being torn
+                // down: a stale marker left behind would route any failure
+                // during the video into a hard advance instead of the
+                // same-track fallback.
+                gaplessQueuedUri = ""
+                player.clearQueuedNext()
+                val engaged = player.playVideo(videoUri, audioUri, source.manifest.durationMs, at)
                 state = state.copy(
-                    videoActive = true,
+                    videoActive = engaged,
                     musicVideoAvailable = true,
-                    videoQualities = source.manifest.videoProfiles.map { it.height }.distinct().sortedDescending(),
+                    videoQualities = if (engaged) {
+                        source.manifest.videoProfiles.map { it.height }.distinct().sortedDescending()
+                    } else {
+                        emptyList()
+                    },
                     videoSwitching = false,
                 )
-                player.playVideo(videoUri, audioUri, source.manifest.durationMs, at)
             } else {
                 if (!videoActive()) {
                     state = state.copy(videoSwitching = false)
@@ -5101,15 +5115,15 @@ class PlaybackBridge(private val context: Context) {
                         )
                     }
                 }
+                if (videoActive()) {
+                    fallbackFromVideo()
+                    return
+                }
                 if (gaplessQueuedUri.isNotBlank()) {
                     log.w("gapless: the queued '${gaplessQueuedUri.takeLast(12)}' failed to take over, advancing the hard way")
                     gaplessQueuedUri = ""
                     player.clearQueuedNext()
                     scope.launch { advance(state.trackUri) }
-                    return
-                }
-                if (videoActive()) {
-                    fallbackFromVideo()
                     return
                 }
                 if (event.message.startsWith("license") || event.message.startsWith("licence")) {
