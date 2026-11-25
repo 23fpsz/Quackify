@@ -972,18 +972,22 @@ class KrespotPlayer(private val context: Context) {
                                     if (id == generation) play(waiting, spclient, from)
                                 }
                             } else if (refusedSource != null) {
-                                if (!divertToAlternate(waiting, from)) {
+                                if (!divertToAlternate(waiting, from, failedEvent)) {
                                     log.w("the licence is rate limited, keeping format ${refusedSource.format}")
                                     licencePending = waiting
                                     licenceFrom = if (movedOn) 0L else fromMs
+                                    mirror(event, player?.durationMs ?: totalMs)
+                                    _events.tryEmit(event)
                                 }
                             } else if (LicenseGate.remainingMs() > 0L) {
-                                if (!divertToAlternate(waiting, from)) {
+                                if (!divertToAlternate(waiting, from, failedEvent)) {
                                     refused = waiting
                                     refusedFrom = from
                                     log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
                                             "keeping '${waiting.name.ifBlank { waiting.uri }}' for a retry"
                                     )
+                                    mirror(event, player?.durationMs ?: totalMs)
+                                    _events.tryEmit(event)
                                 }
                             } else if (!divertToAlternate(waiting, from, failedEvent)) {
                                 log.w("the licence failed on '${waiting.name.ifBlank { waiting.uri }}', " +
