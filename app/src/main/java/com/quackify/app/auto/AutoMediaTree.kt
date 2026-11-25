@@ -33,7 +33,7 @@ class AutoMediaTree(private val context: Context) {
 
     @Volatile
     var lastBrowsedContext: String = ""
-        private set
+        internal set
 
     fun getRoot(
         clientPackageName: String,
@@ -497,6 +497,8 @@ class AutoMediaTree(private val context: Context) {
             result.sendResult(emptyList())
             return
         }
+        val searchContextUri = Search.searchUriOf(query)
+        lastBrowsedContext = searchContextUri
         result.detach()
         scope.launch {
             try {
@@ -537,6 +539,7 @@ class AutoMediaTree(private val context: Context) {
                                 title = hit.title,
                                 subtitle = sub,
                                 iconUri = hit.imageUrl.takeIf { it.isNotBlank() },
+                                contextUri = searchContextUri,
                                 groupTitle = groupTitle
                             )
                         )

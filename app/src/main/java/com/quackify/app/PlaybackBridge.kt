@@ -27,6 +27,7 @@ import com.quackify.app.bridge.targetFrom
 import com.quackify.backend.api.ArtistBanStore
 import com.quackify.backend.api.Library
 import com.quackify.backend.api.Podcasts
+import com.quackify.backend.api.Search
 import com.quackify.backend.connect.KrespotConnect
 import com.quackify.backend.connect.cluster.ClusterState
 import com.quackify.backend.connect.cluster.ClusterTrack
@@ -688,6 +689,11 @@ class PlaybackBridge(private val context: Context) {
             val at = enhanced.indexOfFirst { it.uri == uri }
             if (at >= 0) {
                 scope.launch { playTrack(uri, chainContext, at) }
+                return
+            }
+            if (chainRows.any { it == uri }) {
+                val index = chainRows.indexOf(uri)
+                scope.launch { playTrack(uri, chainContext, index) }
                 return
             }
             val context = screenContext(uri)
@@ -2611,7 +2617,7 @@ class PlaybackBridge(private val context: Context) {
         publishQueue(connect.cluster.value)
         loadChapters(row.uri)
         if (row.uri.startsWith("spotify:track:") || row.uri.startsWith("spotify:episode:")) {
-            if (contextUri.isBlank() || contextUri == row.uri) primeStation(row.uri)
+            if (contextUri.isBlank() || contextUri == row.uri || contextUri.startsWith("spotify:search:")) primeStation(row.uri)
         }
     }
 
@@ -2718,7 +2724,7 @@ class PlaybackBridge(private val context: Context) {
         if (seed.isBlank()) return
         if (chainContext == primedStationFor && chainRows.isNotEmpty()) return
         if (primedStationFor == seed && primeJob?.isActive == true) return
-        if (chainContext.isNotBlank() && chainRows.isNotEmpty()) return
+        if (chainContext.isNotBlank() && !chainContext.startsWith("spotify:search:") && chainRows.isNotEmpty()) return
         primedStationFor = seed
         primeJob?.cancel()
         primeJob = scope.launch {
@@ -2730,14 +2736,18 @@ class PlaybackBridge(private val context: Context) {
                 ?.filter { it.startsWith("spotify:track:") || it.startsWith("spotify:episode:") }
                 .orEmpty()
             if (rows.isEmpty()) return@launch
-            if (chainContext.isNotBlank() && chainContext != station) return@launch
+            if (chainContext.isNotBlank() && !chainContext.startsWith("spotify:search:") && chainContext != station) return@launch
             if (player.state.value.trackUri != seed) return@launch
-            val start = rows.indexOfFirst { it != seed }.coerceAtLeast(0)
-            chainRows = rows
-            chainContext = station
+            val isSearch = chainContext.startsWith("spotify:search:")
+            val allRows = if (isSearch && seed !in rows) listOf(seed) + rows else rows
+            val start = allRows.indexOfFirst { it != seed }.coerceAtLeast(0)
+            chainRows = allRows
+            if (!isSearch) {
+                chainContext = station
+            }
             resumeRow = start
             log.i("station '$station' primed from '${seed.takeLast(12)}', " +
-                    "${rows.size} rows at row $start"
+                    "${allRows.size} rows at row $start (search=$isSearch)"
             )
             publishQueue(connect.cluster.value)
         }
@@ -4273,13 +4283,18 @@ class PlaybackBridge(private val context: Context) {
         val live = connect.playback?.currentTrack?.contextUri.orEmpty()
         val clusterContext = cluster?.contextUri.orEmpty()
         val chain = chainFor()
-        val context = live.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
-            ?: chainContext.takeIf { it.isNotBlank() && chain.isNotEmpty() }
-            ?: clusterContext.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
-                .orEmpty()
+        val searchActive = chainContext.startsWith("spotify:search:") || state.contextUri.startsWith("spotify:search:")
+        val context = if (searchActive) {
+            chainContext.ifBlank { state.contextUri }
+        } else {
+            live.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
+                ?: chainContext.takeIf { it.isNotBlank() && chain.isNotEmpty() }
+                ?: clusterContext.takeIf { it.isNotBlank() && !it.startsWith("spotify:track:") }
+                    .orEmpty()
+        }
         val single = clusterContext.startsWith("spotify:track:") ||
                 clusterContext.startsWith("spotify:episode:")
-        val follows = clusterContext.isNotBlank() &&
+        val follows = !searchActive && clusterContext.isNotBlank() &&
                 (clusterContext == context || (single && context.isBlank()))
         val smartActive = smartOn(cluster)
         val serverTracks = if (server && follows) {
@@ -4302,7 +4317,10 @@ class PlaybackBridge(private val context: Context) {
         }
         val radio = server && follows &&
                 cluster.fromContext.let { it.isNotEmpty() && it.all { row -> row.isAutoplay } }
-        val label = if (server && follows && !radio && !single) {
+        val label = if (searchActive) {
+            val q = Search.queryOfSearchUri(context)
+            if (q.isNotBlank()) "\"$q\" in Search" else "Search"
+        } else if (server && follows && !radio && !single) {
             cluster.contextDescription.ifBlank {
                 state.queueContextLabel.takeIf { state.queueContext == context }.orEmpty()
             }.ifBlank { playlistLabelOf(context) }
@@ -5255,6 +5273,7 @@ class PlaybackBridge(private val context: Context) {
 
     private fun chainFor(): List<String> {
         if (chainContext.isBlank()) return emptyList()
+        if (chainContext.startsWith("spotify:search:")) return chainRows
         val cluster = connect.cluster.value
         val playing = cluster?.contextUri.orEmpty()
         if (playing.isNotBlank() && playing != chainContext) {

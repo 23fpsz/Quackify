@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quackify.backend.api.Search
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.BrowseCard
@@ -164,15 +165,28 @@ internal fun nowPlayingContext(
     val uri = contextUri.orEmpty()
     return when {
         !trackLoaded -> stringResource(R.string.nothing_playing) to stringResource(R.string.pick_a_song_to_get_started)
-        origin != null -> when (origin.screen) {
+        uri.startsWith("spotify:search:") -> {
+            val query = Search.queryOfSearchUri(uri)
+            val sub = searchSub(query.ifBlank { if (origin?.screen == ShellScreen.SEARCH) origin.label else contextLabel })
+            stringResource(R.string.playing_from_search) to sub
+        }
+        uri.startsWith("spotify:album:") -> stringResource(R.string.playing_from_album) to contextLabel.ifBlank { if (origin?.screen == ShellScreen.ALBUM) origin.label else "" }
+        uri.startsWith("spotify:artist:") -> stringResource(R.string.playing_from_artist) to contextLabel.ifBlank { if (origin?.screen == ShellScreen.ARTIST) origin.label else "" }
+        origin != null && (
+            uri.isBlank() ||
+            uri.startsWith("spotify:track:") ||
+            uri.startsWith("spotify:episode:") ||
+            origin.screen == ShellScreen.SEARCH ||
+            (origin.screen == ShellScreen.PLAYLIST && (uri.startsWith("spotify:playlist:") || uri.startsWith("spotify:collection:"))) ||
+            (origin.screen == ShellScreen.ALBUM && uri.startsWith("spotify:album:")) ||
+            (origin.screen == ShellScreen.ARTIST && uri.startsWith("spotify:artist:"))
+        ) -> when (origin.screen) {
             ShellScreen.SEARCH -> stringResource(R.string.playing_from_search) to searchSub(origin.label)
             ShellScreen.ALBUM -> stringResource(R.string.playing_from_album) to origin.label
             ShellScreen.ARTIST -> stringResource(R.string.playing_from_artist) to origin.label
             ShellScreen.HOME -> stringResource(R.string.playing_from_home) to origin.label
             else -> playlistContext(origin.label)
         }
-        uri.startsWith("spotify:album:") -> stringResource(R.string.playing_from_album) to contextLabel
-        uri.startsWith("spotify:artist:") -> stringResource(R.string.playing_from_artist) to contextLabel
         else -> playlistContext(contextLabel)
     }
 }

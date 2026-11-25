@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import com.quackify.backend.api.Search
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.library.LibraryItemType
 import com.quackify.compose.playlist.TrackItem
@@ -71,11 +72,14 @@ internal class ShellActions(
                     ShellScreen.ARTIST -> active.artistUri
                     ShellScreen.PLAYLIST -> active.playlistUri
                     ShellScreen.ALBUM -> active.albumUri
+                    ShellScreen.SEARCH -> Search.searchUriOf(searchQuery().trim())
                     else -> ""
                 }
                 val index = rows.indexOfFirst { it == track.uri }
                 if (contextUri.isNotBlank() && index >= 0) {
                     playerListener.onPlayTrack(track.uri, contextUri, index)
+                } else if (contextUri.startsWith("spotify:search:")) {
+                    playerListener.onPlayTrack(track.uri, contextUri, -1)
                 } else {
                     playerListener.onPlayUri(track.uri)
                 }
