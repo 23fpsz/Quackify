@@ -468,7 +468,11 @@ class KrespotPlayer(private val context: Context) {
      * warning's promised crossfade happens even with the crossfade slider at
      * zero. Both paths anchor on the outgoing track's measured audible end, so
      * a silent tail no longer swallows the blend; a plain fade with automix
-     * off reuses an already measured tail without decoding anything new.
+     * off reuses an already measured tail without decoding anything new. The
+     * incoming side is cued past its measured leading silence on both paths
+     * too, so the blend never opens on a held breath: the automix path decodes
+     * a short head window for it, the plain path reuses what an earlier pass
+     * measured.
      */
     private suspend fun automixSpecFor(next: CommandTrack, nextCut: Cut): TransitionSpec? {
         val crossfadeMs = AppPrefs.getInt(context, CLIENT_STORE, CROSSFADE_MS_PREF, 0).toLong()
@@ -493,6 +497,7 @@ class KrespotPlayer(private val context: Context) {
                 nextCut.lengthMs,
                 crossfadeMs,
                 silenceMs,
+                headSilenceCachedMsFor(nextCut),
             )
         }
         if (AutomixPlanner.unmixable(next.name)) {
@@ -536,6 +541,12 @@ class KrespotPlayer(private val context: Context) {
         } else {
             null
         }
+        val inSilenceMs = if (inGrid != null) {
+            headSilenceCachedMsFor(nextCut)
+        } else {
+            val left = (budget - (SystemClock.elapsedRealtime() - startedAt)).coerceAtLeast(0L)
+            headSilenceMsFor(nextCut, nextDurationMs, left, stillWanted)
+        }
         if (outGrid == null && inGrid == null) {
             log.i("automix: no grid on either side of '${next.name}', blending with the plain fade")
         }
@@ -546,9 +557,10 @@ class KrespotPlayer(private val context: Context) {
             nextDurationMs,
             crossfadeMs,
             outSilenceMs,
+            inSilenceMs,
         )
         log.i(
-            "automix into '${next.name}' fade=${spec.fadeMs}ms rate=${spec.incomingRate} " +
+            "automix into '${next.name}' fade=${spec.fadeMs}ms cue=${spec.cueMs}ms rate=${spec.incomingRate} " +
                 "lock=${spec.phaseLock} shift=${spec.outSilenceMs}ms"
         )
         return spec
@@ -573,6 +585,29 @@ class KrespotPlayer(private val context: Context) {
     private fun tailSilenceMsFor(cut: Cut): Long =
         if (cut.uri.startsWith("spotify:track:")) {
             (automixAnalysis.tailSilenceSec(cut) * 1000.0).roundToLong().coerceAtLeast(0L)
+        } else {
+            0L
+        }
+
+    private fun headSilenceCachedMsFor(cut: Cut): Long =
+        if (cut.uri.startsWith("spotify:track:")) {
+            automixAnalysis.headSilenceCached(cut)
+                ?.let { (it * 1000.0).roundToLong().coerceAtLeast(0L) }
+                ?: 0L
+        } else {
+            0L
+        }
+
+    private suspend fun headSilenceMsFor(
+        cut: Cut,
+        durationMs: Long,
+        budgetMs: Long,
+        stillWanted: () -> Boolean,
+    ): Long =
+        if (cut.uri.startsWith("spotify:track:")) {
+            automixAnalysis.headSilence(cut, durationMs, budgetMs, stillWanted)
+                ?.let { (it * 1000.0).roundToLong().coerceAtLeast(0L) }
+                ?: 0L
         } else {
             0L
         }

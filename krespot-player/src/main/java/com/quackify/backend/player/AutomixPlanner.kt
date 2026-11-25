@@ -41,6 +41,9 @@ internal class TransitionSpec(
  */
 private const val MAX_OUT_SILENCE_MS = 12_000L
 
+/** The most leading silence a plan may cue past on the incoming side. */
+private const val MAX_IN_SILENCE_MS = 10_000L
+
 /**
  * Sizes a DJ-style transition from one track's beat grid into the next. The
  * ambition follows the evidence in explicit steps: a trusted grid on both
@@ -50,7 +53,9 @@ private const val MAX_OUT_SILENCE_MS = 12_000L
  * anything less - no grid, weak confidence, or tempi too far apart - falls
  * back to a plain crossfade of the manually configured length. [outSilenceMs]
  * moves the whole plan earlier by the track's silent tail, so the blend
- * crosses audible music instead of decaying into dead air.
+ * crosses audible music instead of decaying into dead air; [inSilenceMs]
+ * cues the incoming side past its silent intro, so the rising side of the
+ * curve lands on the first audible frame rather than on a held breath.
  */
 internal object AutomixPlanner {
 
@@ -95,6 +100,7 @@ internal object AutomixPlanner {
         inDurationMs: Long,
         fallbackFadeMs: Long,
         outSilenceMs: Long = 0L,
+        inSilenceMs: Long = 0L,
     ): TransitionSpec {
         val inDuration = inDurationMs / 1000.0
         val nominal = outDurationMs / 1000.0
@@ -114,7 +120,7 @@ internal object AutomixPlanner {
         }
         val outBpm = localBpm(out, outDuration - LOCAL_WINDOW_SECONDS)
         if (out == null || outBpm <= 0.0 || out.beatStarts.size < 2 || out.confidence < MIN_DJ_CONFIDENCE) {
-            return plain(out, into, fallbackFadeMs, outDuration, inDuration, planSilenceMs)
+            return plain(out, into, fallbackFadeMs, outDuration, inDuration, planSilenceMs, inSilenceMs)
         }
         val inBpm = localBpm(into, 0.0)
         val rate = if (inBpm > 0.0) 1.0 / foldedRatio(outBpm, inBpm) else 1.0
@@ -131,7 +137,7 @@ internal object AutomixPlanner {
         val span = (outDuration - start).coerceIn(MIN_FADE_SECONDS, MAX_FADE_SECONDS)
         return TransitionSpec(
             fadeMs = (span * 1000.0).roundToLong(),
-            cueMs = 0L,
+            cueMs = incomingCueMs(inSilenceMs, inDurationMs, into, beatmatched, beatSeconds),
             incomingRate = if (beatmatched) roundRate(rate) else 1.0,
             phaseLock = beatmatched,
             outSilenceMs = planSilenceMs,
@@ -147,6 +153,7 @@ internal object AutomixPlanner {
         outDuration: Double,
         inDuration: Double,
         outSilenceMs: Long,
+        inSilenceMs: Long = 0L,
     ): TransitionSpec {
         val fallback = (if (fallbackFadeMs > 0L) fallbackFadeMs else DEFAULT_FALLBACK_MS) / 1000.0
         val span = if (outDuration > 0.0 && inDuration > 0.0) {
@@ -156,13 +163,52 @@ internal object AutomixPlanner {
         }
         return TransitionSpec(
             fadeMs = (span * 1000.0).roundToLong(),
-            cueMs = 0L,
+            cueMs = incomingCueMs(inSilenceMs, (inDuration * 1000.0).toLong(), null, false, 0.0),
             incomingRate = 1.0,
             phaseLock = false,
             outSilenceMs = outSilenceMs,
             outGrid = out,
             inGrid = into,
         )
+    }
+
+    /**
+     * Where the incoming track should start rendering: past its leading
+     * silence, snapped to the incoming grid's own structure when a beatmatch
+     * is on and a bar line sits within a bar of the audible start, and never
+     * so far in that the blend eats a quarter of the track.
+     */
+    private fun incomingCueMs(
+        inSilenceMs: Long,
+        inDurationMs: Long,
+        into: TrackGrid?,
+        beatmatched: Boolean,
+        beatSeconds: Double,
+    ): Long {
+        if (inDurationMs <= 0L) return 0L
+        val ceiling = minOf(MAX_IN_SILENCE_MS, inDurationMs / 4)
+        val raw = inSilenceMs.coerceIn(0L, ceiling)
+        if (raw <= 0L) return 0L
+        if (!beatmatched || into == null) return raw
+        val snapLimitMs = raw + (4 * beatSeconds * 1000.0).roundToLong()
+        val target = raw / 1000.0
+        val bars = into.barStarts
+        if (bars.isNotEmpty()) {
+            val barIndex = indexAtOrAfter(bars, target)
+            if (barIndex < bars.size) {
+                val bar = (bars[barIndex] * 1000.0).roundToLong()
+                if (bar in raw..snapLimitMs) return bar
+            }
+        }
+        val beats = into.beatStarts
+        if (beats.isNotEmpty()) {
+            val beatIndex = indexAtOrAfter(beats, target)
+            if (beatIndex < beats.size) {
+                val beat = (beats[beatIndex] * 1000.0).roundToLong()
+                if (beat in raw..snapLimitMs) return beat
+            }
+        }
+        return raw
     }
 
     /** The tempo around [atSec] read off the grid's own beats, so drift is honoured; the reported tempo otherwise. */
