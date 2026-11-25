@@ -2,7 +2,7 @@ package com.quackify.backend.player
 
 import androidx.media3.common.C
 import androidx.media3.common.Format
-import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 
 /**
  * What the player is actually being fed, as one read for the now-playing
@@ -43,7 +43,7 @@ data class DecoderFormat(
  * The live audio renderer's format, or null before it has been configured.
  * Must be read on the player's application thread.
  */
-internal fun Player.decoderAudioFormat(): DecoderFormat? {
+internal fun ExoPlayer.decoderAudioFormat(): DecoderFormat? {
     val format: Format = audioFormat ?: return null
     return DecoderFormat(
         mimeType = format.sampleMimeType,
