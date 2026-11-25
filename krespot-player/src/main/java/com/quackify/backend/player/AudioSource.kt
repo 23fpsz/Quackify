@@ -27,6 +27,7 @@ import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ClientToken
 import com.quackify.backend.core.net.Net
+import com.quackify.backend.core.locale.AppLocale
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import org.json.JSONObject
@@ -75,12 +76,12 @@ internal object PlayerHeaders {
         "sec-ch-ua-mobile" to "?0",
         "sec-ch-ua-platform" to "\"Windows\"",
         "Accept" to "*/*",
-        "Accept-Language" to "en-US,en;q=0.9",
+        "Accept-Language" to AppLocale.acceptLanguage(context),
     )
 
     suspend fun license(context: Context, force: Boolean = false): Map<String, String> = mapOf(
         "Accept" to "*/*",
-        "Accept-Language" to "en-US,en;q=0.9,id;q=0.8",
+        "Accept-Language" to AppLocale.acceptLanguage(context),
         "Authorization" to "Bearer ${EncoreAuth.token(context)}",
         "client-token" to ClientToken.get(context, force),
         "Cache-Control" to "no-cache",
