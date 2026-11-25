@@ -416,6 +416,7 @@
     <string name="copyright">© 2026 Quackify Team</string>
     <string name="link_copied">Link copiato</string>
     <string name="version_copied">Versione copiata</string>
+    <string name="title_copied">Titolo copiato</string>
     <string name="track_link">Link del brano</string>
     <string name="will_be_deleted_from_library"> verrà eliminato dalla tua libreria.</string>
     <string name="will_be_deleted_playlists_stay"> verrà eliminato. Le playlist al suo interno rimarranno nella tua libreria.</string>

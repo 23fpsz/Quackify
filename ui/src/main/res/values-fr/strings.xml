@@ -67,6 +67,7 @@
     <string name="copy_link">Copier le lien</string>
     <string name="link_copied">Lien copié</string>
     <string name="version_copied">Version copiée</string>
+    <string name="title_copied">Titre copié</string>
     <string name="track_link">Lien du titre</string>
     <string name="liked_songs">Titres aimés</string>
     <string name="songs">Titres</string>
