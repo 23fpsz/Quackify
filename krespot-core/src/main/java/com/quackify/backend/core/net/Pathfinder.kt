@@ -22,6 +22,7 @@ package com.quackify.backend.core.net
 
 import android.content.Context
 import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.core.locale.AppLocale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -312,6 +313,7 @@ object Pathfinder {
         }
         put("Origin", "https://open.spotify.com")
         put("Referer", "https://open.spotify.com/")
+        put("Accept-Language", AppLocale.acceptLanguage(context))
         put("User-Agent", Net.DESKTOP_UA)
         ClientToken.get(context).takeIf { it.isNotBlank() }?.let {
             put("client-token", it)

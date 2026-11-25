@@ -61,6 +61,28 @@ object AppLocale {
 
     fun nativeName(tag: String): String? = NATIVE_NAMES[tag]
 
+    /**
+     * The Accept-Language every Spotify request carries: the app language
+     * first, its bare-language fallback under it and English last. The server
+     * localizes the same strings the web player would for that language
+     * (artist biographies, credit roles, genres, ...). "System default"
+     * resolves through the device locale, which is what the UI already
+     * renders with.
+     */
+    fun acceptLanguage(context: Context): String {
+        val stored = current(context)
+        val locale = if (stored == SYSTEM) Locale.getDefault() else localeFor(stored)
+        val language = locale?.language?.takeIf { it.isNotBlank() && it != "und" } ?: "en"
+        val full = locale?.toLanguageTag().orEmpty()
+            .takeIf { it.isNotBlank() && it != "und" } ?: language
+        val parts = ArrayList<String>(4)
+        parts += full
+        if (full != language) parts += "$language;q=0.9"
+        parts += "en-US;q=0.8"
+        parts += "en;q=0.7"
+        return parts.joinToString(",")
+    }
+
     fun wrap(base: Context): Context {
         val tag = current(base)
         val config = base.resources.configuration
