@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.res.Configuration
 import android.content.Context
@@ -772,6 +773,12 @@ fun EncoreAppShell(
 
     val shareEntity: (String) -> Unit = { uri -> actions.shareEntity(context, uri) }
 
+    val titleCopiedLabel = stringResource(R.string.title_copied)
+    val copyTrackTitle: (String) -> Unit = { title ->
+        clipboard.setPrimaryClip(ClipData.newPlainText("Track title", title))
+        toast.show(titleCopiedLabel)
+    }
+
     val libraryFolderChoices = remember(libraryItems) {
         libraryItems.orEmpty()
             .filter { it.type == LibraryItemType.FOLDER }
@@ -820,6 +827,7 @@ fun EncoreAppShell(
             handleLibraryLongPress = handleLibraryLongPress,
             handleFolderClick = handleFolderClick,
             shareEntity = shareEntity,
+            copyTrackTitle = copyTrackTitle,
             progressState = progressState,
             currentScreen = currentScreen,
             isPlayerExpanded = isPlayerExpanded,

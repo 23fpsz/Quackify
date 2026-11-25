@@ -279,6 +279,7 @@ fun EncoreNowPlayingScreen(
     onDeviceClick: () -> Unit,
     onShareClick: () -> Unit = {},
     onTitleClick: () -> Unit = {},
+    onTitleLongClick: (() -> Unit)? = null,
     onArtistClick: () -> Unit = {},
     onArtistLongClick: (() -> Unit)? = null,
     canvasFilePath: String? = null,
@@ -839,6 +840,7 @@ fun EncoreNowPlayingScreen(
                                         isLiked = isLiked,
                                         showSmartShuffleBadge = isEnhancedTrack,
                                         onTitleClick = onTitleClick,
+                                        onTitleLongClick = onTitleLongClick,
                                         onArtistClick = onArtistClick,
                                         onArtistLongClick = onArtistLongClick,
                                         onLikeClick = onLikeClick,
@@ -1090,6 +1092,7 @@ fun EncoreNowPlayingScreen(
                                 isLiked = isLiked,
                                 showSmartShuffleBadge = isEnhancedTrack,
                                 onTitleClick = onTitleClick,
+                                onTitleLongClick = onTitleLongClick,
                                 onArtistClick = onArtistClick,
                                 onArtistLongClick = onArtistLongClick,
                                 onLikeClick = onLikeClick,
@@ -2289,6 +2292,7 @@ private fun NowPlayingTrackInfoRow(
     isLiked: Boolean,
     showSmartShuffleBadge: Boolean,
     onTitleClick: () -> Unit,
+    onTitleLongClick: (() -> Unit)? = null,
     onArtistClick: () -> Unit,
     onArtistLongClick: (() -> Unit)? = null,
     onLikeClick: () -> Unit,
@@ -2322,7 +2326,10 @@ private fun NowPlayingTrackInfoRow(
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable(onClick = onTitleClick)
+                modifier = Modifier.combinedClickable(
+                    onClick = onTitleClick,
+                    onLongClick = onTitleLongClick
+                )
             )
             Spacer(modifier = Modifier.height(EncoreSpacers.Tighter4))
             Row(verticalAlignment = Alignment.CenterVertically) {

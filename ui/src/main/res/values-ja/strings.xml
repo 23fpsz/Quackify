@@ -67,6 +67,7 @@
     <string name="copy_link">リンクをコピー</string>
     <string name="link_copied">リンクをコピーしました</string>
     <string name="version_copied">バージョンをコピーしました</string>
+    <string name="title_copied">タイトルをコピーしました</string>
     <string name="track_link">曲のリンク</string>
     <string name="liked_songs">お気に入りの曲</string>
     <string name="songs">曲</string>

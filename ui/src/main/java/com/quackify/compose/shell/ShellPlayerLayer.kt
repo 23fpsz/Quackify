@@ -95,6 +95,7 @@ internal class ShellPlayerEnv(
     val openAlbum: (String, String, String) -> Unit,
     val openArtist: (String, String) -> Unit,
     val shareEntity: (String) -> Unit,
+    val copyTrackTitle: (String) -> Unit = {},
 )
 
 /**
@@ -401,6 +402,7 @@ private fun NowPlayingScreenLayer(
             env.setIsPlayerExpanded(false)
             env.openAlbum(env.currentTrackTitle, env.currentArtist, env.resolvedAlbumUri)
         },
+        onTitleLongClick = { env.copyTrackTitle(env.currentTrackTitle) },
         onArtistClick = {
             // A tap jumps straight into the artist page when the track names
             // one artist; two or more credited artists open the picker sheet

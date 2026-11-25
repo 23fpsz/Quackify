@@ -67,6 +67,7 @@
     <string name="copy_link">复制链接</string>
     <string name="link_copied">链接已复制</string>
     <string name="version_copied">版本已复制</string>
+    <string name="title_copied">标题已复制</string>
     <string name="track_link">歌曲链接</string>
     <string name="liked_songs">喜欢的歌曲</string>
     <string name="songs">歌曲</string>

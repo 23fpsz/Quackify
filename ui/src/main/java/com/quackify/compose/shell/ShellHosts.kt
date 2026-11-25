@@ -66,6 +66,7 @@ internal class ShellHosts(
     val handleLibraryLongPress: (LibraryItem) -> Unit,
     val handleFolderClick: (LibraryItem) -> Unit,
     val shareEntity: (String) -> Unit,
+    val copyTrackTitle: (String) -> Unit = {},
     val progressState: PlaybackProgress?,
     val currentScreen: ShellScreen,
     val isPlayerExpanded: Boolean,
@@ -298,6 +299,7 @@ internal class ShellHosts(
         openAlbum = openAlbum,
         openArtist = openArtist,
         shareEntity = shareEntity,
+        copyTrackTitle = copyTrackTitle,
     )
 
     fun sheets(): ShellSheetsEnv = ShellSheetsEnv(

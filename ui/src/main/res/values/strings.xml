@@ -552,6 +552,7 @@
     <string name="copyright">© 2026 Quackify Team</string>
     <string name="link_copied">Link copied</string>
     <string name="version_copied">Version copied</string>
+    <string name="title_copied">Title copied</string>
     <string name="track_link">Track link</string>
     <string name="will_be_deleted_from_library">" will be deleted from Your Library."</string>
     <string name="will_be_deleted_playlists_stay">" will be deleted. The playlists inside stay in Your Library."</string>
