@@ -1514,14 +1514,14 @@ class KrespotPlayer(private val context: Context) {
                 val source = VideoManifests.resolve(context, spclient, videoUri)
                 if (source == null) {
                     log.w("video '$videoUri' did not resolve, falling back to audio")
-                    videoActive = false
+                    stopVideo()
                     _events.emit(PlayerEvent.Failed("no video source"))
                     return@launch
                 }
                 if (id != generation) return@launch
                 val ready = video.prepare(source.manifest, fromMs, autoplay = !pendingPause)
                 if (!ready) {
-                    videoActive = false
+                    stopVideo()
                     _events.emit(PlayerEvent.Failed("video engine failed"))
                     return@launch
                 }
@@ -1541,7 +1541,7 @@ class KrespotPlayer(private val context: Context) {
                 throw cancellation
             } catch (failure: Throwable) {
                 log.e("video play failed ${failure.javaClass.simpleName}: ${failure.message}")
-                videoActive = false
+                stopVideo()
                 _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
             }
         }
@@ -1550,7 +1550,12 @@ class KrespotPlayer(private val context: Context) {
 
     /** Leaves video mode; the caller resumes audio playback at fromMs. */
     fun stopVideo() {
-        if (!videoActive) return
+        if (!videoActive) {
+            if (_state.value.isVideo) {
+                _state.update { it.copy(isVideo = false, playing = false, buffering = false) }
+            }
+            return
+        }
         videoActive = false
         video.stop()
         _state.update { it.copy(isVideo = false, playing = false, buffering = false) }
