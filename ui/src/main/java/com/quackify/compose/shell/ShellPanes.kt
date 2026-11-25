@@ -504,6 +504,7 @@ internal fun ShellSearchPane(
     onPromoteRecentSearch: (SearchHistoryItem) -> Unit,
     onRecordRecentSearch: (SearchHit) -> Unit,
     onToggleSaved: (String, Boolean) -> Unit,
+    onTrackHeart: ((TrackItem) -> Unit)? = null,
     onLoadSearchSection: (suspend (SearchKind, Int) -> List<SearchHit>)?,
     onCategoryClick: (CategoryCard) -> Unit,
     onAlbumClick: (String, String, String) -> Unit,
@@ -550,6 +551,7 @@ internal fun ShellSearchPane(
         onPromoteRecent = onPromoteRecentSearch,
         onRecordRecent = onRecordRecentSearch,
         onToggleSaved = onToggleSaved,
+        onTrackHeart = onTrackHeart,
         savedOverrides = searchSavedOverrides,
         onLoadSection = onLoadSearchSection,
         browseCategories = remember(browseCategories) {

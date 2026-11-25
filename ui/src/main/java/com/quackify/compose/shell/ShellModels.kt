@@ -210,6 +210,9 @@ interface ComposePlayerListener {
     fun onPreviousSwipe() { onSkipPrevious() }
     fun onSeek(positionMs: Long) {}
     fun onLikeToggle() {}
+    /** Sets the playing track's liked flag without writing the library: the
+     * caller already saved there and only needs the hearts to catch up. */
+    fun onLikeSet(liked: Boolean) {}
     fun onShuffleToggle() {}
     fun onRepeatToggle() {}
     fun onTrackSelect(title: String, artist: String) {}

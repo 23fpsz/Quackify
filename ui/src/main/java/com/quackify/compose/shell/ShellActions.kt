@@ -27,6 +27,8 @@ internal class ShellActions(
     private val offlineGate: () -> Boolean = { false },
     /** Fired whenever one of those actions is refused, so the shell can toast. */
     private val onBlocked: () -> Unit = {},
+    /** Loads the Save-in sheet's playlist choices for a track. */
+    private val onAddToPlaylist: ((TrackItem) -> Unit)? = null,
 ) {
     private val active get() = navController.active
 
@@ -136,6 +138,18 @@ internal class ShellActions(
         local.trackForOptions = track
         flags.isTrackOptionsFromPlayer = false
         flags.isTrackOptionsOpen = true
+    }
+
+    /**
+     * Opens the Save-in sheet for a track, the same sheet the Now Playing
+     * heart opens, instead of toggling Liked Songs straight away.
+     */
+    fun openAddToPlaylist(track: TrackItem) {
+        if (!track.uri.startsWith("spotify:track:")) return
+        flags.isTrackOptionsOpen = false
+        onAddToPlaylist?.invoke(track)
+        local.addTrackTarget = track
+        flags.isAddToPlaylistOpen = true
     }
 
     fun libraryLongPress(item: LibraryItem) {

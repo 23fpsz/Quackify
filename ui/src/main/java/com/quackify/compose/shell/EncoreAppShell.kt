@@ -359,11 +359,8 @@ fun EncoreAppShell(
     onArtistFollowed: (suspend (artistUri: String) -> Boolean?)? = null,
     onArtistImage: (suspend (artistUri: String) -> String?)? = null,
     onShowFollowToggle: ((showUri: String, follow: Boolean) -> Unit)? = null,
-    onArtistTrackLikeToggle: ((TrackItem) -> Unit)? = null,
-    onAlbumTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     albumSaved: Boolean? = null,
     onAlbumSavedToggle: ((uri: String, saved: Boolean) -> Unit)? = null,
-    onPlaylistTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     onArtistRadio: (suspend (artistUri: String) -> String?)? = null,
     profile: UserProfile? = null,
     profileTop: ProfileTopContent? = null,
@@ -553,6 +550,7 @@ fun EncoreAppShell(
         clipboard = clipboard,
         offlineGate = { offlineNow },
         onBlocked = offlineBlockedToast,
+        onAddToPlaylist = onAddToPlaylist,
     )
 
     val pushCurrentState: () -> Unit = { navController.pushCurrentState() }
@@ -1037,7 +1035,6 @@ fun EncoreAppShell(
                         onTogglePlaylistSaved = onTogglePlaylistSaved,
                         playlistPermissions = playlistPermissions,
                         onLoadPlaylistContributors = onLoadPlaylistContributors,
-                        onPlaylistTrackLikeToggle = onPlaylistTrackLikeToggle,
                         onEditPlaylist = onEditPlaylist,
                         onAddTracksOpen = onAddTracksOpen,
                     )
@@ -1052,7 +1049,6 @@ fun EncoreAppShell(
                         albumLoadingMore = albumLoadingMore,
                         onLoadMoreAlbumTracks = onLoadMoreAlbumTracks,
                         onRetryAlbum = onRetryAlbum,
-                        onAlbumTrackLikeToggle = onAlbumTrackLikeToggle,
                         albumSaved = albumSaved,
                         onAlbumSavedToggle = onAlbumSavedToggle,
                     )
@@ -1070,7 +1066,6 @@ fun EncoreAppShell(
                         artistBanned = artistBanned,
                         onArtistUnban = onArtistUnban,
                         onArtistFollowToggle = onArtistFollowToggle,
-                        onArtistTrackLikeToggle = onArtistTrackLikeToggle,
                     )
     
                     ShellScreen.CATEGORY -> ShellCategoryRoute(

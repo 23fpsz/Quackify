@@ -1273,11 +1273,25 @@ class MainActivity : ComponentActivity() {
     internal suspend fun fetchEditablePlaylists(trackUri: String): List<PlaylistChoice> =
         if (trackUri.isBlank()) emptyList() else Krespot.playlists.editable(applicationContext, trackUri)
 
+    /** The library write already succeeded on the caller's side; when the saved
+     * track is the one playing, catch the playback state's liked flag up so the
+     * Now Playing and miniplayer hearts refresh instead of waiting for a track
+     * change to re-query Library.saved. */
+    internal fun syncPlayingTrackLiked(uri: String, liked: Boolean) {
+        val host = PlaybackHost.bridge ?: return
+        if (uri == host.state.trackUri && host.state.isLiked != liked) {
+            host.listener.onLikeSet(liked)
+        }
+    }
+
     internal suspend fun addToPlaylistTarget(choice: PlaylistChoice, trackUri: String, trackTitle: String) {
         if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
             val saved = Library.setSaved(applicationContext, listOf(trackUri), true)
             log.i("add '$trackTitle' to Liked Songs ok=$saved")
-            if (saved) refreshLoadedPlaylist(choice.uri)
+            if (saved) {
+                syncPlayingTrackLiked(trackUri, true)
+                refreshLoadedPlaylist(choice.uri)
+            }
         } else {
             val added = Krespot.playlists.addTrack(applicationContext, choice.uri, trackUri)
             log.i("add '$trackTitle' to '${choice.name}' ok=$added")
@@ -1292,14 +1306,11 @@ class MainActivity : ComponentActivity() {
         shouldAdd: Boolean,
     ) {
         if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
-            val host = PlaybackHost.bridge
-            if (trackUri == host?.state?.trackUri && host.state.isLiked != shouldAdd) {
-                host.listener.onLikeToggle()
+            val saved = Library.setSaved(applicationContext, listOf(trackUri), shouldAdd)
+            log.i("${if (shouldAdd) "add" else "remove"} '$trackTitle' to/from Liked Songs ok=$saved")
+            if (saved) {
+                syncPlayingTrackLiked(trackUri, shouldAdd)
                 refreshLoadedPlaylist(choice.uri)
-            } else {
-                val saved = Library.setSaved(applicationContext, listOf(trackUri), shouldAdd)
-                log.i("${if (shouldAdd) "add" else "remove"} '$trackTitle' to/from Liked Songs ok=$saved")
-                if (saved) refreshLoadedPlaylist(choice.uri)
             }
         } else {
             val res = if (shouldAdd) {
