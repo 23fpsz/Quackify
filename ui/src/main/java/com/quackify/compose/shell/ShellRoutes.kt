@@ -133,6 +133,7 @@ internal fun ShellHomeRoute(
         onOpenShow = env.openShow,
         onOpenEpisode = env.openEpisode,
         onOpenPlaylist = env.openPlaylist,
+        listState = env.navController.nav.homeListState,
     )
 }
 

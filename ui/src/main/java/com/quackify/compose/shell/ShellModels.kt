@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -69,6 +70,7 @@ data class ActivityFeedState(
 )
 
 data class BackStackItem(
+    val key: String = "",
     val screen: ShellScreen,
     val categoryTitle: String = "",
     val playlistTitle: String = "",
@@ -309,10 +311,48 @@ internal class ShellActiveEntity {
 }
 
 internal class ShellNavState {
-    var currentScreen by mutableStateOf(ShellScreen.HOME)
+    private var _currentScreen by mutableStateOf(ShellScreen.HOME)
+    var currentScreenKey by mutableStateOf("root_home")
+        private set
+    private var keyCounter = 0L
+
+    var currentScreen: ShellScreen
+        get() = _currentScreen
+        set(value) {
+            if (_currentScreen != value) {
+                currentScreenKey = when (value) {
+                    ShellScreen.HOME -> "root_home"
+                    ShellScreen.SEARCH -> "root_search"
+                    ShellScreen.LIBRARY -> "root_library"
+                    else -> "${value.name}_${++keyCounter}"
+                }
+                _currentScreen = value
+            }
+        }
+
+    fun openScreen(screen: ShellScreen, entityKey: String) {
+        currentScreenKey = "${entityKey}_${++keyCounter}"
+        _currentScreen = screen
+    }
+
+    fun restoreScreen(screen: ShellScreen, key: String) {
+        currentScreenKey = key.ifBlank {
+            when (screen) {
+                ShellScreen.HOME -> "root_home"
+                ShellScreen.SEARCH -> "root_search"
+                ShellScreen.LIBRARY -> "root_library"
+                else -> "${screen.name}_${++keyCounter}"
+            }
+        }
+        _currentScreen = screen
+    }
+
     var selectedNavIndex by mutableIntStateOf(0)
     var isPlayerExpanded by mutableStateOf(false)
     val backStack = mutableStateListOf<BackStackItem>()
+    val homeListState = LazyListState()
+    val libraryListState = LazyListState()
+    val searchListState = LazyListState()
 }
 
 internal class ShellLocalState {

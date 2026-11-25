@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -117,6 +119,7 @@ fun EncoreHomeScreen(
     selectedFacet: String = "",
     onFacetSelected: (String) -> Unit = {},
     greeting: String = "",
+    listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
     val bottomPadding = rememberBottomPadding()
@@ -163,6 +166,7 @@ fun EncoreHomeScreen(
             .background(heroBackdropBrush)
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = bottomPadding)
         ) {

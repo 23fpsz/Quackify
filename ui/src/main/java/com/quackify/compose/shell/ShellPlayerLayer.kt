@@ -25,6 +25,7 @@ import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 
 internal class ShellPlayerEnv(
@@ -143,13 +144,24 @@ internal fun BoxScope.ShellPlayerLayer(
             onNavSelect = { index ->
                 env.setSelectedNavIndex(index)
                 when (index) {
-                    0 -> if (env.currentScreen != ShellScreen.HOME) { env.navBackStack.clear(); env.setCurrentScreen(ShellScreen.HOME) }
+                    0 -> if (env.currentScreen != ShellScreen.HOME) {
+                        env.navBackStack.clear()
+                        env.setCurrentScreen(ShellScreen.HOME)
+                    } else {
+                        env.shellScope.launch { env.navController.nav.homeListState.animateScrollToItem(0) }
+                    }
                     1 -> if (env.currentScreen != ShellScreen.SEARCH) {
-                        env.navBackStack.clear(); env.setCurrentScreen(ShellScreen.SEARCH)
+                        env.navBackStack.clear()
+                        env.setCurrentScreen(ShellScreen.SEARCH)
                     } else {
                         runCatching { env.searchFieldFocusRequester.requestFocus() }
                     }
-                    2 -> if (env.currentScreen != ShellScreen.LIBRARY) { env.navBackStack.clear(); env.setCurrentScreen(ShellScreen.LIBRARY) }
+                    2 -> if (env.currentScreen != ShellScreen.LIBRARY) {
+                        env.navBackStack.clear()
+                        env.setCurrentScreen(ShellScreen.LIBRARY)
+                    } else {
+                        env.shellScope.launch { env.navController.nav.libraryListState.animateScrollToItem(0) }
+                    }
                 }
             },
             onSearchDoubleTap = {
