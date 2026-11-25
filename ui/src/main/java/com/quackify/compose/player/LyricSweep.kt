@@ -102,12 +102,13 @@ internal fun rememberLyricClock(
             if (reading != lastReported) {
                 val estimate = clock.longValue
                 // Steer, don't set: small corrections ease in, big jumps
-                // (seeks) are taken whole. A reading only slightly behind the
-                // estimate is reporting jitter, not truth — rewinding the sweep
-                // by a few frames reads as a stutter, so it is held.
+                // (seeks) are taken whole. Reading jitter only ever nudges
+                // the clock forward and in small steps, so the boundary
+                // never snaps or rewinds mid-word — both read as a stutter
+                // on fast words.
                 val delta = reading - estimate
                 clock.longValue = when {
-                    delta in -60L..60L -> reading.coerceAtLeast(estimate - 8L)
+                    abs(delta) <= 60L -> estimate + (delta / 4).coerceAtLeast(0L)
                     abs(delta) < 600L -> estimate + delta / 2
                     else -> reading
                 }
