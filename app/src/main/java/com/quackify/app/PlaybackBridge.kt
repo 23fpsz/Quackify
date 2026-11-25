@@ -429,8 +429,6 @@ class PlaybackBridge(private val context: Context) {
 
     @Volatile
     private var queuedTail: List<TrackItem> = emptyList()
-    private var promotedContext: Set<String> = emptySet()
-    private var promotedContextFor: String = ""
 
     /** The queue order the user just set, mirrored on screen before the
      * server answers. publishQueue keeps showing these rows until the
@@ -850,24 +848,20 @@ class PlaybackBridge(private val context: Context) {
             }
             val pendingRows = mutableListOf<TrackItem>()
             val pendingContext = mutableListOf<TrackItem>()
-            val tail = mutableListOf<TrackItem>()
             uris.forEach { uri ->
                 val fromQueue = takeFrom(queuePool, uri)
                 if (fromQueue != null) {
                     pendingRows += fromQueue
-                    tail += fromQueue
                     return@forEach
                 }
                 val fromContext = takeFrom(contextPool, uri)
                 if (fromContext != null) {
                     pendingContext += fromContext
-                    tail += fromContext
                     return@forEach
                 }
                 val known = previousTail.firstOrNull { it.uri == uri }
                     ?: TrackItem(title = "", artist = "", uri = uri)
                 pendingRows += known
-                tail += known
             }
             val editId = ++queueEditSerial
             pendingQueueOrder = uris
@@ -875,7 +869,10 @@ class PlaybackBridge(private val context: Context) {
             pendingContextRows = pendingContext
             pendingQueueRevision = cluster.queueRevision
             pendingQueueAt = SystemClock.elapsedRealtime()
-            queuedTail = tail
+            // The tail is the user queue only: parking the context rows here
+            // made publishQueue append them after the queue section (a clone
+            // on screen) and made the advance replay them as queued copies.
+            queuedTail = pendingRows
             publishQueue(cluster)
             scope.launch {
                 val allowed = uris.filter { uri ->
@@ -885,15 +882,15 @@ class PlaybackBridge(private val context: Context) {
                 if (allowed.size < uris.size) {
                     log.i("queue set: dropped ${uris.size - allowed.size} banned row(s)")
                 }
-                if (allowed.isNotEmpty() && writeQueue(allowed, cluster)) {
+                if (allowed.isNotEmpty() &&
+                    writeQueue(
+                        allowed,
+                        cluster,
+                        cluster.prevTracks.reversed().takeLast(PREV_TRACKS_MAX),
+                    )
+                ) {
                     if (editId == queueEditSerial) {
                         reportQueueEdit(if (sameRows) QueueEditKind.REORDER else QueueEditKind.REMOVE)
-                    }
-                    val promoted = previousContext.map { it.uri }.filter { it.isNotBlank() }
-                    if (promoted.isNotEmpty()) {
-                        promotedContext = promotedContext + promoted
-                        promotedContextFor = cluster.contextUri
-                        log.i("queue: ${promoted.size} context row(s) queued, their context copies get skipped")
                     }
                     publishQueue(connect.cluster.value)
                     connect.refreshCluster(force = true)
@@ -923,9 +920,10 @@ class PlaybackBridge(private val context: Context) {
         cluster: ClusterState,
         prevRows: List<ClusterTrack> = emptyList(),
     ): Boolean {
-        val known = (cluster.queued + cluster.fromContext).associateBy { it.uri }
+        val knownQueued = cluster.queued.associateBy { it.uri }
+        val knownContext = cluster.fromContext.associateBy { it.uri }
         val missing = uris.filter { uri ->
-            known[uri] == null &&
+            knownQueued[uri] == null && knownContext[uri] == null &&
                 (decorated[uri] ?: queuedTail.firstOrNull { it.uri == uri })?.title.isNullOrBlank()
         }
         if (missing.isNotEmpty()) {
@@ -954,7 +952,19 @@ class PlaybackBridge(private val context: Context) {
                 )
             }
         }
-        val tracks = uris.mapNotNull { uri -> known[uri] ?: clusterRowFor(uri) }
+        // A uri seated in both sections keeps both roles: the first pass in
+        // the flattened order carries its queued copy, the second its context
+        // copy, so the rewrite does not clone one role over the other.
+        val seated = HashSet<String>()
+        val tracks = uris.mapNotNull { uri ->
+            val row = if (uri in seated) {
+                knownContext[uri] ?: knownQueued[uri]
+            } else {
+                knownQueued[uri] ?: knownContext[uri]
+            } ?: clusterRowFor(uri)
+            seated += uri
+            row
+        }
         if (tracks.size != uris.size) {
             log.w("queue set: ${uris.size - tracks.size} of ${uris.size} rows have no metadata")
         }
@@ -2843,8 +2853,10 @@ class PlaybackBridge(private val context: Context) {
             if (rows.isEmpty()) return@launch
             if (chainContext.isNotBlank() && !chainContext.startsWith("spotify:search:") && chainContext != station) return@launch
             if (player.state.value.trackUri != seed) return@launch
+            val played = autoplayPlayedUris() - seed
+            val usable = rows.filterNot { it in played }.ifEmpty { rows }
             val isSearch = chainContext.startsWith("spotify:search:")
-            val allRows = if (isSearch && seed !in rows) listOf(seed) + rows else rows
+            val allRows = if (isSearch && seed !in usable) listOf(seed) + usable else usable
             val start = allRows.indexOfFirst { it != seed }.coerceAtLeast(0)
             chainRows = allRows
             if (!isSearch) {
@@ -5559,6 +5571,16 @@ class PlaybackBridge(private val context: Context) {
         playTrack(target.track.uri, cluster.contextUri, target.index)
     }
 
+    /** Rows the autoplay tail should not hand back: the recent play history,
+     * the outgoing chain's own rows and anything already queued. The stations
+     * seeded by similar tracks overlap heavily, so without this the same
+     * songs return every time the context re-seeds. */
+    private fun autoplayPlayedUris(): Set<String> = buildSet {
+        PlayHistory.all(context).takeLast(AUTOPLAY_HISTORY).forEach { add(it.item.uri) }
+        chainRows.forEach { add(it) }
+        queuedTail.forEach { add(it.uri) }
+    }
+
     private suspend fun autoplayFrom(ended: String) {
         if (ended.isBlank() || ended.startsWith(AD_PREFIX)) return
         if (!autoplayEnabled()) {
@@ -5578,16 +5600,18 @@ class PlaybackBridge(private val context: Context) {
             ?.map { it.uri }
             ?.filter { it.startsWith("spotify:track:") || it.startsWith("spotify:episode:") }
             .orEmpty()
-        val start = rows.indexOfFirst { it != ended }
-        val first = rows.getOrNull(start)
+        val played = autoplayPlayedUris() + ended
+        val usable = rows.filterNot { it in played }.ifEmpty { rows.filter { it != ended } }
+        val start = usable.indexOfFirst { it != ended }
+        val first = usable.getOrNull(start)
         if (first == null) {
             log.w("autoplay: the station '$station' has no playable rows, staying quiet")
             return
         }
         log.i("autoplay -> '${first.takeLast(12)}' from the station '$station' " +
-                "seeded by '${seed.takeLast(12)}', ${rows.size} rows at row $start"
+                "seeded by '${seed.takeLast(12)}', ${usable.size} of ${rows.size} row(s) fresh at row $start"
         )
-        chainRows = rows
+        chainRows = usable
         chainContext = station
         resumeRow = start
         playTrack(first, station, start)
@@ -5642,10 +5666,7 @@ class PlaybackBridge(private val context: Context) {
         playingUri(cluster, navigatorState())
 
     private fun targetFrom(cluster: ClusterState, offset: Int): QueueTarget? =
-        targetFrom(cluster, offset, navigatorState(), promotedContextOrEmpty(cluster))
-
-    private fun promotedContextOrEmpty(cluster: ClusterState): Set<String> =
-        if (cluster.contextUri == promotedContextFor) promotedContext else emptySet()
+        targetFrom(cluster, offset, navigatorState())
 
     private fun navigatorState(): QueueNavigatorState = QueueNavigatorState(
         engineUri = player.state.value.trackUri,
@@ -5680,6 +5701,7 @@ class PlaybackBridge(private val context: Context) {
         const val REMOTE_INTENT_MS = 10_000L
         const val BLANK = "blank"
         const val AUTOPLAY_WINDOW_MS = 30_000L
+        const val AUTOPLAY_HISTORY = 50
         const val GONE_READS = 2
         const val TRANSFER_FRESH_MS = 120_000L
         const val ENHANCED_TAIL_MAX = 80
