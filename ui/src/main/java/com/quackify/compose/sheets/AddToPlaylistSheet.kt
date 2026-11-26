@@ -94,6 +94,7 @@ fun AddToPlaylistSheet(
     onLoadFolder: (suspend (folderUri: String) -> List<PlaylistChoice>)? = null,
     onLoadTrackCount: (suspend (playlistUri: String) -> Int)? = null,
     onCreateNew: () -> Unit,
+    onDone: (savedChanges: Boolean) -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -117,28 +118,31 @@ fun AddToPlaylistSheet(
         else playlistSearchEngine.filter(rows, query, PLAYLIST_CHOICE_FIELDS)
     }
 
+    fun initialSaved(choice: PlaylistChoice): Boolean =
+        if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
+            choice.containsTrack || isTargetLiked
+        } else {
+            choice.containsTrack
+        }
+
     val selectionState = remember {
         mutableStateMapOf<String, Boolean>().apply {
-            choices.forEach { choice ->
-                val initialSelected = if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
-                    choice.containsTrack || isTargetLiked
-                } else {
-                    choice.containsTrack
-                }
-                put(choice.uri, initialSelected)
-            }
+            choices.forEach { choice -> put(choice.uri, initialSaved(choice)) }
+        }
+    }
+    val initialSelection = remember {
+        mutableStateMapOf<String, Boolean>().apply {
+            choices.forEach { choice -> put(choice.uri, initialSaved(choice)) }
         }
     }
 
     LaunchedEffect(choices) {
         choices.forEach { choice ->
             if (!selectionState.containsKey(choice.uri)) {
-                val initialSelected = if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
-                    choice.containsTrack || isTargetLiked
-                } else {
-                    choice.containsTrack
-                }
-                selectionState[choice.uri] = initialSelected
+                selectionState[choice.uri] = initialSaved(choice)
+            }
+            if (!initialSelection.containsKey(choice.uri)) {
+                initialSelection[choice.uri] = initialSaved(choice)
             }
         }
     }
@@ -167,6 +171,9 @@ fun AddToPlaylistSheet(
 
     fun handleToggle(choice: PlaylistChoice) {
         val currentlySelected = selectionState[choice.uri] ?: choice.containsTrack
+        if (!initialSelection.containsKey(choice.uri)) {
+            initialSelection[choice.uri] = currentlySelected
+        }
         val next = !currentlySelected
         selectionState[choice.uri] = next
         if (onToggle != null) {
@@ -174,6 +181,14 @@ fun AddToPlaylistSheet(
         } else {
             onPick(choice)
         }
+    }
+
+    fun finishDone() {
+        val changed = selectionState.keys.any { key ->
+            initialSelection[key] != selectionState[key]
+        }
+        onDone(changed)
+        onDismiss()
     }
 
     fun openFolder(folder: PlaylistChoice) {
@@ -246,7 +261,7 @@ fun AddToPlaylistSheet(
                         fontSize = 15.sp
                     ),
                     modifier = Modifier
-                        .clickable(onClick = onDismiss)
+                        .clickable(onClick = { finishDone() })
                         .padding(vertical = 4.dp)
                 )
             }
@@ -421,7 +436,7 @@ fun AddToPlaylistSheet(
                         .height(48.dp)
                         .clip(RoundedCornerShape(24.dp))
                         .background(EncoreColors.Green)
-                        .clickable(onClick = onDismiss)
+                        .clickable(onClick = { finishDone() })
                         .padding(horizontal = 36.dp),
                     contentAlignment = Alignment.Center
                 ) {

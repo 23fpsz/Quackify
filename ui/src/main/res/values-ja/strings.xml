@@ -215,6 +215,8 @@
     <string name="no_playlists_you_can_add_to">追加できるプレイリストがありません</string>
     <string name="saved_in">保存先：</string>
     <string name="save_in">保存先</string>
+    <string name="changes_saved">変更を保存しました</string>
+    <string name="no_changes_to_save">保存する変更はありません</string>
     <string name="shuffle_on">シャッフルオン</string>
     <string name="shuffle_off">シャッフルオフ</string>
     <string name="repeat_off">リピートオフ</string>

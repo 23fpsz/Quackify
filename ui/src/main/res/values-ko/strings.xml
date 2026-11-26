@@ -215,6 +215,8 @@
     <string name="no_playlists_you_can_add_to">추가할 수 있는 플레이리스트가 없어요</string>
     <string name="saved_in">저장 위치: </string>
     <string name="save_in">저장 위치</string>
+    <string name="changes_saved">변경사항이 저장되었습니다</string>
+    <string name="no_changes_to_save">저장할 변경사항이 없습니다</string>
     <string name="shuffle_on">셔플 켬</string>
     <string name="shuffle_off">셔플 끔</string>
     <string name="repeat_off">반복 끔</string>

@@ -439,6 +439,8 @@
     <string name="your_stats">Le tue statistiche</string>
     <string name="saved_in">Salvato in</string>
     <string name="save_in">Salva in</string>
+    <string name="changes_saved">Modifiche salvate</string>
+    <string name="no_changes_to_save">Nessuna modifica da salvare</string>
     <string name="this_folder_empty">Questa cartella è vuota</string>
     <string name="no_playlists_you_can_add_to">Nessuna playlist a cui aggiungere</string>
     <string name="monthly_listeners">ascoltatori mensili</string>

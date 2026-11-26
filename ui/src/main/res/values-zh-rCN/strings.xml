@@ -215,6 +215,8 @@
     <string name="no_playlists_you_can_add_to">没有可添加的歌单</string>
     <string name="saved_in">已保存至</string>
     <string name="save_in">保存至</string>
+    <string name="changes_saved">更改已保存</string>
+    <string name="no_changes_to_save">没有可保存的更改</string>
     <string name="shuffle_on">随机播放开</string>
     <string name="shuffle_off">随机播放关</string>
     <string name="repeat_off">列表循环关</string>

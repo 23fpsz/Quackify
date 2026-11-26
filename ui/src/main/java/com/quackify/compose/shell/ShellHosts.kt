@@ -418,6 +418,7 @@ internal class ShellHosts(
         onLoadPlaylistFolder = onLoadPlaylistFolder,
         onLoadTrackCount = onLoadTrackCount,
         onCreatePlaylistWith = onCreatePlaylistWith,
+        toastState = toastState,
         openArtist = openArtist,
         openAlbum = openAlbum,
         openUserProfile = openUserProfile,

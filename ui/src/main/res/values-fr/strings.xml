@@ -215,6 +215,8 @@
     <string name="no_playlists_you_can_add_to">Aucune playlist à laquelle ajouter</string>
     <string name="saved_in">Enregistré dans</string>
     <string name="save_in">Enregistrer dans</string>
+    <string name="changes_saved">Modifications enregistrées</string>
+    <string name="no_changes_to_save">Aucune modification à enregistrer</string>
     <string name="shuffle_on">Aléatoire activé</string>
     <string name="shuffle_off">Aléatoire désactivé</string>
     <string name="repeat_off">Répétition désactivée</string>

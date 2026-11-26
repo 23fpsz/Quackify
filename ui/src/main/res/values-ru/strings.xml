@@ -215,6 +215,8 @@
     <string name="no_playlists_you_can_add_to">Нет плейлистов для добавления</string>
     <string name="saved_in">Сохранено в</string>
     <string name="save_in">Сохранить в</string>
+    <string name="changes_saved">Изменения сохранены</string>
+    <string name="no_changes_to_save">Нет изменений для сохранения</string>
     <string name="shuffle_on">Перемешать включено</string>
     <string name="shuffle_off">Перемешать выключено</string>
     <string name="repeat_off">Повтор выключен</string>

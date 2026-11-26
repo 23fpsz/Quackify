@@ -215,6 +215,8 @@
     <string name="no_playlists_you_can_add_to">Keine Playlists, zu denen du hinzufügen kannst</string>
     <string name="saved_in">Gespeichert in</string>
     <string name="save_in">Speichern in</string>
+    <string name="changes_saved">Änderungen gespeichert</string>
+    <string name="no_changes_to_save">Keine Änderungen zum Speichern</string>
     <string name="shuffle_on">Zufällig an</string>
     <string name="shuffle_off">Zufällig aus</string>
     <string name="repeat_off">Wiederholen aus</string>
