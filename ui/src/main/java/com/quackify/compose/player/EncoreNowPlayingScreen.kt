@@ -128,6 +128,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -394,6 +395,7 @@ fun EncoreNowPlayingScreen(
             }
             VideoFullscreenLayout(
                 title = title,
+                transcript = transcript,
                 videoQualities = videoQualities,
                 onVideoQuality = onVideoQuality,
                 onVideoSurface = onVideoSurface,
@@ -1617,6 +1619,7 @@ private fun NowPlayingArtworkCard(
     onVideoQuality: (Int) -> Unit = {},
     onVideoSurface: (android.view.Surface?) -> Unit = {},
     onToggleVideoFullscreen: () -> Unit = {},
+    hideOverlayActions: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val corner = when {
@@ -1738,62 +1741,64 @@ private fun NowPlayingArtworkCard(
                                 .fillMaxSize()
                                 .background(Color.Black.copy(alpha = 0.25f))
                         ) {
-                            var menuOpen by remember { mutableStateOf(false) }
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
+                            if (!hideOverlayActions) {
+                                var menuOpen by remember { mutableStateOf(false) }
+                                Row(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(50))
-                                        .background(Color.Black.copy(alpha = 0.45f))
-                                        .clickable { onToggleVideoFullscreen() }
-                                        .padding(7.dp)
+                                        .align(Alignment.TopEnd)
+                                        .padding(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.encore_icon_fullscreen_24),
-                                        contentDescription = stringResource(R.string.toggle_fullscreen_video),
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                Box {
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(50))
                                             .background(Color.Black.copy(alpha = 0.45f))
-                                            .clickable { menuOpen = true }
+                                            .clickable { onToggleVideoFullscreen() }
                                             .padding(7.dp)
                                     ) {
                                         Icon(
-                                            painter = painterResource(R.drawable.encore_icon_settings_24),
-                                            contentDescription = stringResource(R.string.video_quality),
+                                            painter = painterResource(R.drawable.encore_icon_fullscreen_24),
+                                            contentDescription = stringResource(R.string.toggle_fullscreen_video),
                                             tint = Color.White,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
-                                    EncoreMenu(
-                                        expanded = menuOpen,
-                                        onDismiss = { menuOpen = false },
-                                    ) {
-                                        EncoreMenuItem(
-                                            label = stringResource(R.string.auto),
-                                            onClick = {
-                                                onVideoQuality(0)
-                                                menuOpen = false
-                                            }
-                                        )
-                                        videoQualities.forEach { height ->
+                                    Box {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(50))
+                                                .background(Color.Black.copy(alpha = 0.45f))
+                                                .clickable { menuOpen = true }
+                                                .padding(7.dp)
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.encore_icon_settings_24),
+                                                contentDescription = stringResource(R.string.video_quality),
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        EncoreMenu(
+                                            expanded = menuOpen,
+                                            onDismiss = { menuOpen = false },
+                                        ) {
                                             EncoreMenuItem(
-                                                label = "${height}p",
+                                                label = stringResource(R.string.auto),
                                                 onClick = {
-                                                    onVideoQuality(height)
+                                                    onVideoQuality(0)
                                                     menuOpen = false
                                                 }
                                             )
+                                            videoQualities.forEach { height ->
+                                                EncoreMenuItem(
+                                                    label = "${height}p",
+                                                    onClick = {
+                                                        onVideoQuality(height)
+                                                        menuOpen = false
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -2040,6 +2045,7 @@ private fun SwipeTrackArtworkSlot(
 @Composable
 private fun VideoFullscreenLayout(
     title: String,
+    transcript: List<TranscriptLine>,
     videoQualities: List<Int>,
     onVideoQuality: (Int) -> Unit,
     onVideoSurface: (android.view.Surface?) -> Unit,
@@ -2058,9 +2064,27 @@ private fun VideoFullscreenLayout(
     onSkipNext: () -> Unit,
     onExit: () -> Unit,
 ) {
+    val context = LocalContext.current
     var overlayVisible by remember { mutableStateOf(true) }
-    LaunchedEffect(overlayVisible) {
-        if (overlayVisible) {
+    var transcriptShown by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var languageSheetOpen by remember { mutableStateOf(false) }
+    val appLocale = LocalConfiguration.current.locales[0] ?: java.util.Locale.getDefault()
+    val translationLanguage = LyricsOptions.translationLanguage
+    val deviceLanguageName = remember(appLocale) {
+        appLocale.displayLanguage.takeIf { it.isNotBlank() && !it.equals(appLocale.language, ignoreCase = true) }
+            ?: appLocale.getDisplayLanguage(appLocale)
+    }
+    val deviceLanguageTemplate = stringResource(R.string.lyrics_translation_device_language, deviceLanguageName)
+    val translationLanguageValue = if (translationLanguage == TRANSLATION_DEVICE_LANGUAGE) {
+        deviceLanguageTemplate
+    } else {
+        remember(translationLanguage, appLocale) {
+            translationLanguageName(translationLanguage, appLocale)
+        }
+    }
+    LaunchedEffect(overlayVisible, menuOpen) {
+        if (overlayVisible && !menuOpen) {
             delay(3000.milliseconds)
             overlayVisible = false
         }
@@ -2084,10 +2108,24 @@ private fun VideoFullscreenLayout(
             onVideoQuality = onVideoQuality,
             onVideoSurface = onVideoSurface,
             onToggleVideoFullscreen = onExit,
+            hideOverlayActions = true,
             onVideoOverlayTap = { overlayVisible = !overlayVisible },
             onDoubleTapSeek = onSkipSeek,
             modifier = Modifier.fillMaxSize()
         )
+        if (transcriptShown && transcript.isNotEmpty()) {
+            val transcriptBottomPadding by animateDpAsState(
+                targetValue = if (overlayVisible) 140.dp else 28.dp,
+                animationSpec = tween(durationMillis = 250),
+                label = "videoTranscriptBottomPadding"
+            )
+            VideoTranscriptOverlay(
+                lines = transcript,
+                currentPositionMs = currentPositionMs,
+                bottomPadding = transcriptBottomPadding,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
         AnimatedVisibility(
             visible = overlayVisible,
             enter = fadeIn(tween(durationMillis = 250)),
@@ -2108,6 +2146,88 @@ private fun VideoFullscreenLayout(
                     tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
+            }
+        }
+        AnimatedVisibility(
+            visible = overlayVisible,
+            enter = fadeIn(tween(durationMillis = 250)),
+            exit = fadeOut(tween(durationMillis = 250)),
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
+            Box {
+                Box(
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .clickable { menuOpen = true }
+                        .padding(7.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.encore_icon_more_android_24),
+                        contentDescription = stringResource(R.string.more_options),
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                EncoreMenu(
+                    expanded = menuOpen,
+                    onDismiss = { menuOpen = false },
+                ) {
+                    if (transcript.isNotEmpty()) {
+                        EncoreMenuItem(
+                            label = stringResource(
+                                if (transcriptShown) R.string.hide_transcript else R.string.show_transcript
+                            ),
+                            onClick = {
+                                transcriptShown = !transcriptShown
+                                menuOpen = false
+                            }
+                        )
+                        if (transcriptShown) {
+                            EncoreMenuItem(
+                                label = stringResource(R.string.transcript_translation),
+                                selected = LyricsOptions.transcriptTranslationEnabled,
+                                onClick = {
+                                    LyricsOptions.setTranscriptTranslationEnabled(
+                                        context,
+                                        !LyricsOptions.transcriptTranslationEnabled
+                                    )
+                                }
+                            )
+                            EncoreMenuItem(
+                                label = stringResource(R.string.lyrics_translation_language) + ": " + translationLanguageValue,
+                                onClick = {
+                                    menuOpen = false
+                                    languageSheetOpen = true
+                                }
+                            )
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.video_quality),
+                        style = EncoreTheme.typography.bodySmall.copy(
+                            color = Color.White.copy(alpha = 0.6f)
+                        ),
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp)
+                    )
+                    EncoreMenuItem(
+                        label = stringResource(R.string.auto),
+                        onClick = {
+                            onVideoQuality(0)
+                            menuOpen = false
+                        }
+                    )
+                    videoQualities.forEach { height ->
+                        EncoreMenuItem(
+                            label = "${height}p",
+                            onClick = {
+                                onVideoQuality(height)
+                                menuOpen = false
+                            }
+                        )
+                    }
+                }
             }
         }
         AnimatedVisibility(
@@ -2162,6 +2282,62 @@ private fun VideoFullscreenLayout(
                     markers = chapterFractions(chapters, durationMs)
                 )
             }
+        }
+        if (languageSheetOpen) {
+            TranslationLanguageSheet(
+                selectedCode = LyricsOptions.translationLanguage,
+                onLanguageSelected = { code ->
+                    LyricsOptions.setTranslationLanguage(context, code)
+                },
+                onDismiss = { languageSheetOpen = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun VideoTranscriptOverlay(
+    lines: List<TranscriptLine>,
+    currentPositionMs: Long,
+    bottomPadding: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val activeIndex = remember(currentPositionMs, lines) {
+        lines.indexOfLast { currentPositionMs >= it.startMs }.coerceAtLeast(0)
+    }
+    val activeRow = lines.getOrNull(activeIndex)
+    val row = if (activeRow?.speaker == true) lines.getOrNull(activeIndex + 1) ?: activeRow else activeRow
+    if (row == null || row.speaker) return
+    val translationOn = LyricsOptions.transcriptTranslationEnabled
+    val text = if (translationOn) row.translation.ifBlank { row.text } else row.text
+    Box(
+        modifier = modifier
+            .padding(bottom = bottomPadding)
+            .padding(horizontal = 40.dp)
+    ) {
+        AnimatedContent(
+            targetState = text,
+            transitionSpec = {
+                (fadeIn(tween(durationMillis = 200)) + slideInVertically { it / 6 })
+                    .togetherWith(fadeOut(tween(durationMillis = 150)) + slideOutVertically { -it / 6 })
+            },
+            label = "videoTranscriptOverlay"
+        ) { value ->
+            Text(
+                text = value,
+                style = EncoreTheme.typography.bodyMedium.copy(
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
     }
 }

@@ -404,6 +404,8 @@
     <string name="transcript_offset">Transkript-Versatz</string>
     <string name="transcript_offset_desc">Verschiebt das Timing des Transkripts, wenn es nicht zum Ton passt</string>
     <string name="transcript_menu">Transkript-Optionen</string>
+    <string name="show_transcript">Transkript anzeigen</string>
+    <string name="hide_transcript">Transkript ausblenden</string>
     <string name="transcript_translation">Transkript übersetzen</string>
     <string name="transcript_translation_desc">Zeigt eine Übersetzung jeder Transkriptzeile</string>
     <string name="next_episode">Nächste Episode</string>

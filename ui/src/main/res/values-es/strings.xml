@@ -24,6 +24,8 @@
     <string name="transcript_offset">Desfase de transcripción</string>
     <string name="transcript_offset_desc">Ajusta el tiempo de la transcripción cuando no está sincronizada con el audio</string>
     <string name="transcript_menu">Opciones de transcripción</string>
+    <string name="show_transcript">Mostrar transcripción</string>
+    <string name="hide_transcript">Ocultar transcripción</string>
     <string name="transcript_translation">Traducir transcripción</string>
     <string name="transcript_translation_desc">Muestra una traducción de cada línea de la transcripción</string>
     <string name="next_episode">Episodio siguiente</string>

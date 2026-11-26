@@ -402,6 +402,8 @@
     <string name="transcript_offset">文字起こしのオフセット</string>
     <string name="transcript_offset_desc">音声とズレを感じるときに文字起こしのタイミングをずらす</string>
     <string name="transcript_menu">文字起こしのオプション</string>
+    <string name="show_transcript">文字起こしを表示</string>
+    <string name="hide_transcript">文字起こしを非表示</string>
     <string name="transcript_translation">文字起こしを翻訳</string>
     <string name="transcript_translation_desc">文字起こしの各行の翻訳を表示します</string>
     <string name="next_episode">次のエピソード</string>
