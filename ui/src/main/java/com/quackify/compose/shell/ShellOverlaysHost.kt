@@ -130,6 +130,7 @@ internal fun ShellOverlaysHost(env: ShellOverlaysEnv) {
         openArtist = env.openArtist,
         openAlbum = env.openAlbum,
         openUserProfile = env.openUserProfile,
+        toastState = env.toastState,
     )
 
     EncoreCreateNameDialog(
@@ -234,6 +235,7 @@ internal fun ShellOverlaySheets(
     openArtist: (String, String) -> Unit,
     openAlbum: (String, String, String) -> Unit,
     openUserProfile: (String, String) -> Unit,
+    toastState: QuackifyToastState? = null,
 ) {
     if (flags.isProfileFollowOpen) {
         ProfileFollowSheet(
@@ -400,7 +402,7 @@ internal fun ShellOverlaySheets(
                 flags.isAddToPlaylistOpen = false
             },
             onDone = { saved ->
-                env.toastState?.show(if (saved) changesSavedMsg else noChangesToSaveMsg)
+                toastState?.show(if (saved) changesSavedMsg else noChangesToSaveMsg)
             },
             onDismiss = { flags.isAddToPlaylistOpen = false }
         )
