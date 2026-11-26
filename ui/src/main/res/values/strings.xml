@@ -383,6 +383,9 @@
     <string name="sp_dc_signed_in_unchecked">Signed in — the profile will sync when the connection is back</string>
     <string name="sp_dc_pending_name">Sp_dc account</string>
     <string name="remove_custom_sp_dc">Remove custom sp_dc</string>
+    <string name="sp_dc_export_title">Export your sp_dc?</string>
+    <string name="sp_dc_export_body">The sp_dc cookie is the key to your account. Anyone who holds it can sign in as you, change your email and password, and take the account over for good. Real support, giveaways, bots and scripts never need it: anyone asking for your sp_dc is trying to scam you or take your account. A leaked cookie cannot be revoked from here — only changing your password kills it. You export it at your own risk, and you alone are responsible for what happens to it.</string>
+    <string name="sp_dc_export_confirm">I understand, export it</string>
     <string name="singles_and_eps">Singles &amp; EPs</string>
     <string name="sleep_timer">Sleep timer</string>
     <string name="sleep_timer_custom">Custom</string>
@@ -552,6 +555,9 @@
     <string name="copyright">© 2026 Quackify Team</string>
     <string name="link_copied">Link copied</string>
     <string name="version_copied">Version copied</string>
+    <string name="export_my_sp_dc">Export my current account sp_dc</string>
+    <string name="export_my_sp_dc_subtitle">Copy this session\'s sp_dc cookie to the clipboard</string>
+    <string name="sp_dc_copied">sp_dc copied to the clipboard</string>
     <string name="title_copied">Title copied</string>
     <string name="lyrics_copied">Lyrics copied</string>
     <string name="lyrics_selection_count">%1$d selected</string>

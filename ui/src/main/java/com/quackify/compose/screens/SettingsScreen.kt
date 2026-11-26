@@ -251,10 +251,12 @@ fun SettingsScreen(
     val versionCopiedLabel = stringResource(R.string.version_copied)
     val debugUnlockedLabel = stringResource(R.string.debug_unlocked)
     val debugDisabledLabel = stringResource(R.string.debug_disabled)
+    val spDcExportedLabel = stringResource(R.string.sp_dc_copied)
     var playerButtonsConfig by remember { mutableStateOf(PlayerButtonsStore.load(context)) }
     var playerButtonsSheetOpen by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf<Int?>(null) }
     var spDcDialogOpen by remember { mutableStateOf(false) }
+    var spDcExportWarnOpen by remember { mutableStateOf(false) }
     // Holds the sp_dc that could not be checked while the user decides
     // whether to keep it anyway; blank when no decision is pending.
     var spDcUnchecked by remember { mutableStateOf<String?>(null) }
@@ -1056,6 +1058,33 @@ fun SettingsScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(EncoreColors.Card)
+                                .clickable { spDcExportWarnOpen = true }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.export_my_sp_dc),
+                                    style = EncoreTheme.typography.bodyMediumBold
+                                )
+                                Text(
+                                    text = stringResource(R.string.export_my_sp_dc_subtitle),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
+                            Icon(
+                                painter = painterResource(R.drawable.encore_icon_chevron_right_24),
+                                contentDescription = null,
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -1102,6 +1131,20 @@ fun SettingsScreen(
             }
         },
         onDismiss = { spDcDialogOpen = false }
+    )
+
+    SpDcExportWarnDialog(
+        isOpen = spDcExportWarnOpen,
+        onConfirm = {
+            spDcExportWarnOpen = false
+            val spDc = EncoreAuth.spDc(context)
+            if (spDc.isNotBlank()) {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("sp_dc", "sp_dc=$spDc"))
+                toastState?.show(spDcExportedLabel)
+            }
+        },
+        onDismiss = { spDcExportWarnOpen = false }
     )
 
     SpDcUncheckedConfirmDialog(
@@ -1432,6 +1475,101 @@ private fun SpDcSignInDialog(
                             onClick = { onConfirm(textFieldValue.text.trim()) }
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The gate before the clipboard ever sees the sp_dc: the sp_dc door's
+ * cinematic canvas, but lit in the app's error red with the account lock
+ * at its head. The cookie is the account's key, so the pill it guards is
+ * the one place the app asks the user to accept a risk it cannot undo.
+ */
+@Composable
+private fun SpDcExportWarnDialog(
+    isOpen: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!isOpen) return
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF5A2020),
+                            Color(0xFF241212),
+                            Color(0xFF121212)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {} // block outside clicks
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.encore_icon_locked_24),
+                    contentDescription = null,
+                    tint = EncoreColors.Error,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = stringResource(R.string.sp_dc_export_title),
+                    style = EncoreTheme.typography.titleLarge.copy(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = stringResource(R.string.sp_dc_export_body),
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        color = Color.White.copy(alpha = 0.75f),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(48.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SpDcDialogPill(
+                        label = stringResource(R.string.cancel),
+                        background = Color.Transparent,
+                        contentColor = Color.White,
+                        onClick = onDismiss
+                    )
+                    SpDcDialogPill(
+                        label = stringResource(R.string.sp_dc_export_confirm),
+                        background = EncoreColors.Error,
+                        contentColor = Color.White,
+                        onClick = onConfirm
+                    )
                 }
             }
         }

@@ -67,6 +67,9 @@
     <string name="copy_link">Копировать ссылку</string>
     <string name="link_copied">Ссылка скопирована</string>
     <string name="version_copied">Версия скопирована</string>
+    <string name="export_my_sp_dc">Экспортировать sp_dc моего аккаунта</string>
+    <string name="export_my_sp_dc_subtitle">Копирует cookie sp_dc этой сессии в буфер обмена</string>
+    <string name="sp_dc_copied">sp_dc скопирован в буфер обмена</string>
     <string name="title_copied">Название скопировано</string>
     <string name="lyrics_copied">Текст скопирован</string>
     <string name="lyrics_selection_count">Выбрано: %1$d</string>

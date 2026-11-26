@@ -67,6 +67,9 @@
     <string name="copy_link">링크 복사</string>
     <string name="link_copied">링크 복사됨</string>
     <string name="version_copied">버전 복사됨</string>
+    <string name="export_my_sp_dc">내 현재 계정의 sp_dc 내보내기</string>
+    <string name="export_my_sp_dc_subtitle">이 세션의 sp_dc 쿠키를 클립보드에 복사합니다</string>
+    <string name="sp_dc_copied">sp_dc가 클립보드에 복사되었습니다</string>
     <string name="title_copied">제목 복사됨</string>
     <string name="lyrics_copied">가사 복생됨</string>
     <string name="lyrics_selection_count">%1$d개 선택됨</string>
