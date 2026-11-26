@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="custom_spdc_startup_toast">カスタム sp_dc セッションで実行中（%1$d バイト）</string>
+    <string name="widget_4x1_desc">カバー、いいね、操作ボタンを備えた再生バー</string>
+    <string name="widget_3x2_desc">カバー、進行状況、操作ボタンを備えた再生カード</string>
+    <string name="widget_3x3_desc">大きなカバーと操作ボタンを備えた大型再生カード</string>
+    <string name="slim_player">スリムプレーヤー</string>
+    <string name="music_card_label">ミュージックカード</string>
+    <string name="square_art_label">アルバムアート</string>
+    <string name="txt_not_playing">再生していません</string>
+    <string name="txt_notrack">曲がありません</string>
+    <string name="txt_noartist">アーティストがありません</string>
+    <string name="android_auto_navigation_home">ホーム</string>
+    <string name="android_auto_navigation_recently_played">最近再生した項目</string>
+    <string name="android_auto_navigation_your_library">ライブラリ</string>
+    <string name="android_auto_navigation_browse">見つける</string>
+    <string name="your_library_content_filter_playlists">プレイリスト</string>
+    <string name="your_library_content_filter_albums">アルバム</string>
+    <string name="your_library_content_filter_artists">アーティスト</string>
+    <string name="your_library_content_filter_podcasts">ポッドキャスト</string>
+    <string name="collection_liked_songs_title">お気に入りの曲</string>
+</resources>

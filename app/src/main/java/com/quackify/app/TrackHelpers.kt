@@ -47,7 +47,6 @@ import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
-import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.Credits
 import com.quackify.backend.model.EpisodeDetail
 import com.quackify.backend.model.HomeChip
@@ -223,81 +222,6 @@ internal suspend fun withSavedPopularTracks(context: Context, rows: List<Popular
     val liked = Library.saved(context, uris)
     return rows.map { popTrack ->
         popTrack.copy(track = popTrack.track.copy(saved = popTrack.track.uri in liked))
-    }
-}
-
-internal fun toggleArtistTrackLike(
-    context: Context,
-    scope: CoroutineScope,
-    track: TrackItem,
-    getTracks: () -> List<PopularTrack>?,
-    setTracks: (List<PopularTrack>?) -> Unit,
-) {
-    val next = track.saved != true
-    val swap = { liked: Boolean ->
-        setTracks(
-            getTracks()?.map { popTrack ->
-                if (popTrack.track.uri == track.uri) {
-                    popTrack.copy(track = popTrack.track.copy(saved = liked))
-                } else {
-                    popTrack
-                }
-            }
-        )
-    }
-    swap(next)
-    scope.launch {
-        val ok = Library.setSaved(context, listOf(track.uri), next)
-        log.i("artist heart '${track.title}' -> $next ok=$ok")
-        if (!ok) swap(!next)
-    }
-}
-
-internal fun toggleAlbumTrackLike(
-    context: Context,
-    scope: CoroutineScope,
-    track: TrackItem,
-    getTracks: () -> List<TrackItem>?,
-    setTracks: (List<TrackItem>?) -> Unit,
-) {
-    val next = track.saved != true
-    val swap = { liked: Boolean ->
-        setTracks(getTracks()?.map { if (it.uri == track.uri) it.copy(saved = liked) else it })
-    }
-    swap(next)
-    scope.launch {
-        val ok = Library.setSaved(context, listOf(track.uri), next)
-        log.i("album heart '${track.title}' -> $next ok=$ok")
-        if (!ok) swap(!next)
-    }
-}
-
-internal fun togglePlaylistTrackLike(
-    context: Context,
-    scope: CoroutineScope,
-    playlistUri: String,
-    track: TrackItem,
-    getTracks: () -> List<TrackItem>?,
-    setTracks: (List<TrackItem>?) -> Unit,
-    getDetail: () -> CollectionDetail?,
-    setDetail: (CollectionDetail?) -> Unit,
-) {
-    val next = track.saved != true
-    val isLikedSongs = playlistUri == "spotify:collection:tracks"
-    if (!next && isLikedSongs) {
-        setTracks(getTracks()?.filterNot { it.uri == track.uri })
-        setDetail(getDetail()?.let { it.copy(total = (it.total - 1).coerceAtLeast(0)) })
-    } else {
-        setTracks(getTracks()?.map { if (it.uri == track.uri) it.copy(saved = next) else it })
-    }
-    scope.launch {
-        val ok = Library.setSaved(context, listOf(track.uri), next)
-        log.i("playlist heart '${track.title}' -> $next ok=$ok")
-        if (!ok) {
-            val fresh = Krespot.collections.collection(context, playlistUri)
-            setDetail(fresh)
-            setTracks(fresh?.tracks?.map { it.toTrackItem() })
-        }
     }
 }
 

@@ -22,6 +22,7 @@ package com.quackify.backend.core.net
 
 import android.content.Context
 import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.core.locale.AppLocale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -306,12 +307,14 @@ object Pathfinder {
     ): Map<String, String> = buildMap {
         put("Authorization", "Bearer $token")
         put("Accept", "application/json")
+        put("Accept-Language", AppLocale.acceptLanguage(context))
         if (operation != HOME_OP) {
             put("app-platform", "WebPlayer")
             put("spotify-app-version", "9.1.92.3058")
         }
         put("Origin", "https://open.spotify.com")
         put("Referer", "https://open.spotify.com/")
+        put("Accept-Language", AppLocale.acceptLanguage(context))
         put("User-Agent", Net.DESKTOP_UA)
         ClientToken.get(context).takeIf { it.isNotBlank() }?.let {
             put("client-token", it)

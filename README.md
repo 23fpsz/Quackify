@@ -2,10 +2,13 @@
   <img src="art/quackifyart.png" alt="Quackify" width="480" />
   <p>Quackify is the continuation of SpotiDuck, a native Android music client built with Jetpack Compose and Material 3. It offers a familiar streaming experience, inspired by modern player apps, without needing a WebView.</p>
   <p>
-    <a href="https://github.com/23fpsz/Quackify/stargazers"><img src="https://img.shields.io/github/stars/23fpsz/Quackify?style=flat-square&color=yellow" alt="Stars" /></a>
-    <a href="https://github.com/23fpsz/Quackify/releases"><img src="https://img.shields.io/github/downloads/23fpsz/Quackify/total?style=flat-square&color=green" alt="Downloads" /></a>
-    <a href="https://deepwiki.com/23fpsz/Quackify"><img src="https://img.shields.io/badge/Ask_DeepWiki-6E56CF?style=flat-square" alt="Ask DeepWiki" /></a>
-    <a href="https://discord.gg/NNXDGZEDFs"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
+    <a href="https://trendshift.io/repositories/354517?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-354517" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/354517/daily?language=Kotlin" alt="23fpsz%2FQuackify | Trendshift" width="250" height="55"/></a>
+  </p>
+  <p>
+    <a href="https://github.com/23fpsz/Quackify/stargazers"><img src="https://img.shields.io/github/stars/23fpsz/Quackify?style=for-the-badge&color=yellow" alt="Stars" /></a>
+    <a href="https://github.com/23fpsz/Quackify/releases"><img src="https://img.shields.io/github/downloads/23fpsz/Quackify/total?style=for-the-badge&color=green" alt="Downloads" /></a>
+    <a href="https://deepwiki.com/23fpsz/Quackify"><img src="https://img.shields.io/badge/Ask_DeepWiki-6E56CF?style=for-the-badge" alt="Ask DeepWiki" /></a>
+    <a href="https://discord.gg/NNXDGZEDFs"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" /></a>
   </p>
 </div>
 

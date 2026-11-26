@@ -44,6 +44,10 @@
     <string name="transcript_offset">Transcript offset</string>
     <string name="transcript_offset_desc">Shifts the transcript timing when it feels out of sync with the audio</string>
     <string name="transcript_menu">Transcript options</string>
+    <string name="show_transcript">Show transcript</string>
+    <string name="hide_transcript">Hide transcript</string>
+    <string name="transcript_translation">Translate transcript</string>
+    <string name="transcript_translation_desc">Show a translation of each transcript line</string>
     <string name="next_episode">Next episode</string>
     <string name="previous_episode">Previous episode</string>
     <string name="account">Account</string>
@@ -73,6 +77,7 @@
     <string name="artist_options">Artist options</string>
     <string name="artists">Artists</string>
     <string name="artwork_tint">Artwork tint</string>
+    <string name="audio_pipeline">Audio pipeline</string>
     <string name="auto">Auto</string>
     <string name="automix">Automix</string>
     <string name="automix_subtitle">DJ-style transitions that beat-match and tempo-stretch the next track into the current one.</string>
@@ -115,6 +120,7 @@
     <string name="couldnt_load">Couldn\'t load</string>
     <string name="couldn_t_load_categories">Couldn\'t load categories</string>
     <string name="couldn_t_load_contributors">Couldn\'t load contributors</string>
+    <string name="couldn_t_load_friend_activity">Couldn\'t load friend activity</string>
     <string name="couldn_t_load_notifications">Couldn\'t load notifications</string>
     <string name="couldn_t_load_this_album">Couldn\'t load this album</string>
     <string name="couldn_t_load_this_artist">Couldn\'t load this artist</string>
@@ -170,6 +176,7 @@
     <string name="followers_and_following">Followers and following</string>
     <string name="following">Following</string>
     <string name="forward_15_seconds">Forward 15 seconds</string>
+    <string name="friend_activity">Friend Activity</string>
     <string name="from_your_liked_songs">From your Liked Songs</string>
     <string name="gallery">Gallery</string>
     <string name="gapless_playback">Gapless playback</string>
@@ -240,6 +247,8 @@
     <string name="lyrics_offset_value">%1$.1f s</string>
     <string name="lyrics_provided_by">Lyrics provided by %1$s</string>
     <string name="share_lyrics_desc">Share the lyrics of this track</string>
+    <string name="make_playlist_private">Make playlist private</string>
+    <string name="make_playlist_public">Make playlist public</string>
     <string name="minutes_played">Minutes played</string>
     <string name="more">More</string>
     <string name="more_like_this">More Like This</string>
@@ -266,6 +275,7 @@
     <string name="no_credits_for_this_track">No credits for this track</string>
     <string name="no_music_video_for_this_track">No music video for this track</string>
     <string name="no_folders_yet_create_one_from_the_button">No folders yet. Create one from the + button.</string>
+    <string name="no_friend_activity_yet">No friend activity yet</string>
     <string name="no_notifications_yet">No notifications yet</string>
     <string name="no_release_notes">No release notes.</string>
     <string name="no_tracks_in_this_album">No tracks in this album</string>
@@ -282,6 +292,22 @@
     <string name="pick_the_launcher_icon_it_can_take_a_moment_for">Pick the launcher icon. It can take a moment for your home screen to update, and the app may restart once.</string>
     <string name="pinned">Pinned</string>
     <string name="pinned_with_dot">"Pinned • "</string>
+    <string name="pipeline_bit_depth">Bit depth</string>
+    <string name="pipeline_bitrate">Bitrate</string>
+    <string name="pipeline_channels">Channels</string>
+    <string name="pipeline_channels_mono">Mono</string>
+    <string name="pipeline_channels_multi">%1$d channels</string>
+    <string name="pipeline_channels_stereo">Stereo</string>
+    <string name="pipeline_codec">Codec</string>
+    <string name="pipeline_declared">Declared %1$d kbps</string>
+    <string name="pipeline_no_stream">Nothing is playing</string>
+    <string name="pipeline_pending">Waiting for decoder data</string>
+    <string name="pipeline_sample_rate">Sample rate</string>
+    <string name="pipeline_source">Source</string>
+    <string name="pipeline_source_spotify">Spotify</string>
+    <string name="pipeline_source_video">Music video</string>
+    <string name="pipeline_source_ytmusic">YouTube Music</string>
+    <string name="pipeline_stream_id">Stream ID</string>
     <string name="plan">Plan</string>
     <string name="play">Play</string>
     <string name="play_preview">Play preview</string>
@@ -289,6 +315,8 @@
     <string name="playback">Playback</string>
     <string name="playback_and_app_information">Playback and app information</string>
     <string name="playlist">Playlist</string>
+    <string name="playlist_now_private">Playlist is now private</string>
+    <string name="playlist_now_public">Playlist is now public</string>
     <string name="playlist_options">Playlist options</string>
     <string name="playlists">Playlists</string>
     <string name="podcasts_and_shows">Podcasts &amp; Shows</string>
@@ -362,6 +390,9 @@
     <string name="sp_dc_signed_in_unchecked">Signed in — the profile will sync when the connection is back</string>
     <string name="sp_dc_pending_name">Sp_dc account</string>
     <string name="remove_custom_sp_dc">Remove custom sp_dc</string>
+    <string name="sp_dc_export_title">Export your sp_dc?</string>
+    <string name="sp_dc_export_body">The sp_dc cookie is the key to your account. Anyone who holds it can sign in as you, change your email and password, and take the account over for good. Real support, giveaways, bots and scripts never need it: anyone asking for your sp_dc is trying to scam you or take your account. A leaked cookie cannot be revoked from here — only changing your password kills it. You export it at your own risk, and you alone are responsible for what happens to it.</string>
+    <string name="sp_dc_export_confirm">I understand, export it</string>
     <string name="singles_and_eps">Singles &amp; EPs</string>
     <string name="sleep_timer">Sleep timer</string>
     <string name="sleep_timer_custom">Custom</string>
@@ -432,6 +463,7 @@
     <string name="whats_new_lowercase">What\'s new</string>
     <string name="when_off_music_videos_and_live_performances_play">When off, music videos and live performances play as audio-only.</string>
     <string name="when_someone_follows_you_or_interacts_with_your">When someone follows you or interacts with your playlists, you\'ll see it here.</string>
+    <string name="when_friends_you_follow_play_something_it_ll_show_up_here">When friends you follow play something, you\'ll see it here.</string>
     <string name="when_you_open_the_app_the_loaded_track_starts_pl">When you open the app, the loaded track starts playing right away.</string>
     <string name="widget">Widget</string>
     <string name="yesterday">Yesterday</string>
@@ -441,6 +473,8 @@
     <string name="your_stats">Your stats</string>
     <string name="saved_in">Saved in</string>
     <string name="save_in">Save in</string>
+    <string name="changes_saved">Changes saved</string>
+    <string name="no_changes_to_save">No changes to save</string>
     <string name="this_folder_empty">This folder is empty</string>
     <string name="no_playlists_you_can_add_to">No playlists you can add to</string>
     <string name="monthly_listeners">monthly listeners</string>
@@ -470,6 +504,7 @@
     <string name="save_to_your_library">Save to Your Library</string>
     <string name="remove_from_your_library">Remove from Your Library</string>
     <string name="connect">Connect</string>
+    <string name="connect_no_devices">No other devices found. Sign in on another device with the same account and it will show up here.</string>
     <string name="unknown_device">Unknown device</string>
     <string name="track_on_device">%1$s - %2$s</string>
     <string name="this_phone">This Phone</string>
@@ -531,6 +566,15 @@
     <string name="copyright">© 2026 Quackify Team</string>
     <string name="link_copied">Link copied</string>
     <string name="version_copied">Version copied</string>
+    <string name="export_my_sp_dc">Export my current account sp_dc</string>
+    <string name="export_my_sp_dc_subtitle">Copy this session\'s sp_dc cookie to the clipboard</string>
+    <string name="sp_dc_copied">sp_dc copied to the clipboard</string>
+    <string name="sp_dc_export_unavailable">There is no session sp_dc to export</string>
+    <string name="sp_dc_export_failed">Could not copy the sp_dc to the clipboard</string>
+    <string name="title_copied">Title copied</string>
+    <string name="lyrics_copied">Lyrics copied</string>
+    <string name="lyrics_selection_count">%1$d selected</string>
+    <string name="copy_selected_lyrics">Copy selected lyrics</string>
     <string name="track_link">Track link</string>
     <string name="will_be_deleted_from_library">" will be deleted from Your Library."</string>
     <string name="will_be_deleted_playlists_stay">" will be deleted. The playlists inside stay in Your Library."</string>
@@ -554,6 +598,7 @@
     <string name="excluded_from_taste_profile">Excluded from your taste profile</string>
     <string name="included_in_taste_profile">Included in your taste profile</string>
     <string name="couldnt_update_taste_profile">Couldn\'t update your taste profile</string>
+    <string name="couldnt_update_this_playlist">Couldn\'t update this playlist</string>
     <string name="include_in_taste_profile">Include in your taste profile</string>
     <string name="exclude_from_taste_profile">Exclude from your taste profile</string>
     <string name="turn_off_canvas">Turn off Canvas</string>

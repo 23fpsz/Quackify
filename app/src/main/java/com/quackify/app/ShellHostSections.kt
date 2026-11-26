@@ -28,6 +28,7 @@ import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.player.TranscriptWordSpan
 import com.quackify.compose.shell.ActivityFeedState
+import com.quackify.compose.shell.FriendActivityState
 import com.quackify.compose.screens.CategoryRecommendationItem
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.shell.EncoreAppShell
@@ -359,13 +360,42 @@ internal fun MainActivity.rememberNowPlayingData(
             }
         )
     }
-    LaunchedEffect(playback?.trackUri) {
+    LaunchedEffect(
+        playback?.trackUri,
+        LyricsOptions.transcriptTranslationEnabled,
+        LyricsOptions.translationLanguage,
+    ) {
         val uri = playback?.trackUri.orEmpty()
         if (!uri.startsWith("spotify:episode:")) {
             writers.setTranscript(null)
             return@LaunchedEffect
         }
-        writers.setTranscript(Krespot.transcripts.transcript(this@rememberNowPlayingData, uri))
+        var transcript = Krespot.transcripts.transcript(this@rememberNowPlayingData, uri)
+        if (transcript != null && LyricsOptions.transcriptTranslationEnabled) {
+            val speakable = transcript.lines.filter { !it.speaker && it.text.isNotBlank() }
+            if (speakable.isNotEmpty()) {
+                val translated = com.quackify.backend.library.lyrics.LyricsTranslation.translate(
+                    context = this@rememberNowPlayingData,
+                    trackId = uri,
+                    lines = speakable.map { it.text },
+                    targetLanguageTag = LyricsOptions.translationTargetTag(this@rememberNowPlayingData),
+                )
+                if (translated is com.quackify.backend.library.lyrics.LyricsTranslation.Result.Translated) {
+                    val texts = translated.texts
+                    var slot = 0
+                    transcript = transcript.copy(
+                        lines = transcript.lines.map { line ->
+                            if (!line.speaker && line.text.isNotBlank()) {
+                                line.copy(translation = texts.getOrNull(slot++).orEmpty())
+                            } else {
+                                line
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        writers.setTranscript(transcript)
     }
     LaunchedEffect(playback?.trackUri, canvasAllowed, canvasResolution) {
         writers.setCanvasFile(null)
@@ -428,6 +458,7 @@ internal fun MainActivity.ShellAppHostSection(
     nowPlaying: ShellNowPlayingData,
     contributors: PlaylistContributorController,
     activity: ActivityFeedController,
+    friendActivity: FriendActivityFeedController,
     recents: List<RecentSearches.Entry>,
 ) {
     val onAddRecommendedBound: (TrackItem) -> Unit = { track -> onAddRecommendedHandler(scope, track) }
@@ -467,10 +498,7 @@ internal fun MainActivity.ShellAppHostSection(
     val onArtistFollowedBound: suspend (String) -> Boolean? = { uri -> onArtistFollowedHandler(context, uri) }
     val onArtistImageBound: suspend (String) -> String? = { uri -> onArtistImageHandler(context, uri) }
     val onShowFollowToggleBound: (String, Boolean) -> Unit = { uri, follow -> onShowFollowToggleHandler(scope, uri, follow) }
-    val onArtistTrackLikeToggleBound: (TrackItem) -> Unit = { track -> onArtistTrackLikeToggleHandler(scope, context, track) }
-    val onAlbumTrackLikeToggleBound: (TrackItem) -> Unit = { track -> onAlbumTrackLikeToggleHandler(scope, context, track) }
     val onAlbumSavedToggleBound: (String, Boolean) -> Unit = { uri, saved -> onAlbumSavedToggleHandler(scope, uri, saved) }
-    val onPlaylistTrackLikeToggleBound: (TrackItem) -> Unit = { track -> onPlaylistTrackLikeToggleHandler(scope, context, track) }
     val onArtistRadioBound: suspend (String) -> String? = { uri -> onArtistRadioHandler(context, uri) }
     val onSearchSubmitBound: (String) -> Unit = { query -> onSearchSubmitHandler(scope, context, query) }
     val onRemoveRecentSearchBound: (SearchHistoryItem) -> Unit = { item -> onRemoveRecentSearchHandler(scope, context, item) }
@@ -614,11 +642,8 @@ onArtistFollowToggle = onArtistFollowToggleBound,
 onArtistFollowed = onArtistFollowedBound,
 onArtistImage = onArtistImageBound,
 onShowFollowToggle = onShowFollowToggleBound,
-onArtistTrackLikeToggle = onArtistTrackLikeToggleBound,
-onAlbumTrackLikeToggle = onAlbumTrackLikeToggleBound,
     albumSaved = albumSaved,
 onAlbumSavedToggle = onAlbumSavedToggleBound,
-onPlaylistTrackLikeToggle = onPlaylistTrackLikeToggleBound,
 onArtistRadio = onArtistRadioBound,
     profile = profileDetail,
     profileTop = profileTop,
@@ -683,7 +708,9 @@ onToggleSetting = onToggleSettingBound,
     notificationsLoading = whatsNewLoading,
     notificationsFailed = whatsNewFailed,
     onRefreshWhatsNew = { whatsNewFetch++ },
-    activityState = buildActivityFeedState(activity),    historyToday = home.historyToday,
+    activityState = buildActivityFeedState(activity),
+    friendActivityState = buildFriendActivityState(friendActivity),
+    historyToday = home.historyToday,
     historyYesterday = home.historyYesterday,
     historyEarlier = home.historyEarlier,
     historyStats = home.historyStats,
@@ -1026,37 +1053,12 @@ return radio
 
 /** Extracted from the EncoreAppShell wiring to keep the composable
  * method under the JVM 64KB limit. */
-internal fun MainActivity.onPlaylistTrackLikeToggleHandler(scope: kotlinx.coroutines.CoroutineScope, context: Context, track: com.quackify.compose.playlist.TrackItem) {
-togglePlaylistTrackLike(
-    context, scope, playlistUri, track,
-    getTracks = { playlistTracks }, setTracks = { playlistTracks = it },
-    getDetail = { playlistDetail }, setDetail = { playlistDetail = it },
-)
-}
-
-
-/** Extracted from the EncoreAppShell wiring to keep the composable
- * method under the JVM 64KB limit. */
 internal fun MainActivity.onAlbumSavedToggleHandler(scope: kotlinx.coroutines.CoroutineScope, uri: String, saved: Boolean) {
 scope.launch {
     val ok = Library.setSaved(applicationContext, listOf(uri), saved)
     log.i("album save '$uri' -> $saved ok=$ok")
     if (ok && uri == albumUri) albumSaved = saved
 }
-}
-
-
-/** Extracted from the EncoreAppShell wiring to keep the composable
- * method under the JVM 64KB limit. */
-internal fun MainActivity.onAlbumTrackLikeToggleHandler(scope: kotlinx.coroutines.CoroutineScope, context: Context, track: com.quackify.compose.playlist.TrackItem) {
-toggleAlbumTrackLike(context, scope, track, { albumTracks }) { albumTracks = it }
-}
-
-
-/** Extracted from the EncoreAppShell wiring to keep the composable
- * method under the JVM 64KB limit. */
-internal fun MainActivity.onArtistTrackLikeToggleHandler(scope: kotlinx.coroutines.CoroutineScope, context: Context, track: com.quackify.compose.playlist.TrackItem) {
-toggleArtistTrackLike(context, scope, track, { artistTracks }) { artistTracks = it }
 }
 
 
@@ -1493,6 +1495,7 @@ internal fun MainActivity.mapNowPlayingTranscript(nowPlayingTranscript: EpisodeT
             words = line.words.map { span ->
                 TranscriptWordSpan(span.startMs, span.startChar, span.endChar)
             },
+            translation = line.translation,
         )
     }.orEmpty()
 }
@@ -1551,6 +1554,17 @@ private fun buildActivityFeedState(activity: ActivityFeedController): ActivityFe
         onRetry = activity::open,
         onLeave = activity::leave,
         onDrawerOpened = activity::refreshUnread,
+    )
+}
+
+private fun buildFriendActivityState(friendActivity: FriendActivityFeedController): FriendActivityState {
+    return FriendActivityState(
+        feed = friendActivity.feed,
+        loading = friendActivity.loading,
+        failed = friendActivity.failed,
+        onOpen = friendActivity::open,
+        onRetry = friendActivity::open,
+        onSilentRefresh = friendActivity::refreshSilently,
     )
 }
 

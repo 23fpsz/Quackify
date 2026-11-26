@@ -132,7 +132,7 @@ object SmartShuffleSource {
         val ok = response?.ok == true
         log.i("signal '$identifier' -> ${response?.code ?: "no response"} ok=$ok")
         if (!ok) return emptyList()
-        return parseRows(response!!.bytes.toString(Charsets.UTF_8))
+        return parseRows(response.bytes.toString(Charsets.UTF_8))
     }
 
     private suspend fun post(

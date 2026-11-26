@@ -60,7 +60,9 @@ private val log = Logs.of(Logs.Module.PLAYER)
  * of the playing one through the normal DRM pipeline, a pass-through audio
  * processor taps the decoded PCM, and [TrackAnalyzer] turns each window into a
  * grid. A window that cannot be decoded in the caller's time budget returns
- * null and the transition falls back to the plain crossfade.
+ * null and the transition falls back to the plain crossfade. The same windows
+ * also measure the leading silence of the incoming cut, so a blend can be
+ * cued at the first audible frame instead of into a silent intro.
  */
 internal class AutomixAnalysis(private val context: Context) {
 
@@ -110,6 +112,33 @@ internal class AutomixAnalysis(private val context: Context) {
 
     fun tailSilenceSec(cut: Cut): Double = GridCache.getSilence(context, cut.cacheKey)
 
+    fun headSilenceCached(cut: Cut): Double? = GridCache.getHeadSilence(context, cut.cacheKey)
+
+    /**
+     * The incoming cut's leading silence, measured now when no decode ever
+     * covered its head: a short muted window instead of the full grid pass,
+     * inside the caller's budget, null when the time is not there.
+     */
+    suspend fun headSilence(
+        cut: Cut,
+        durationMs: Long,
+        budgetMs: Long,
+        stillWanted: () -> Boolean,
+    ): Double? {
+        headSilenceCached(cut)?.let { return it }
+        val durationSec = durationMs / 1000.0
+        if (durationSec < MIN_TRACK_SECONDS) return null
+        if (budgetMs < MIN_DECODE_BUDGET_MS) return null
+        if (!stillWanted()) return null
+        val token = generation.get()
+        val windowSec = min(HEAD_SILENCE_WINDOW_SECONDS, durationSec - 1.0)
+        if (windowSec < MIN_HEAD_WINDOW_SECONDS) return null
+        val pcm = mutex.withLock {
+            decodeWindow(cut, 0.0, windowSec, budgetMs, token, stillWanted)
+        } ?: return null
+        return rememberHeadSilence(cut, pcm)
+    }
+
     fun interrupt() {
         generation.incrementAndGet()
         main.post { runCatching { player?.stop() } }
@@ -152,6 +181,7 @@ internal class AutomixAnalysis(private val context: Context) {
             decodeWindow(cut, start, windowSec, budgetMs, token, stillWanted)
         } ?: return null
         rememberTailSilence(cut, pcm, start, durationSec)
+        if (start <= 0.0) rememberHeadSilence(cut, pcm)
         val grid = withContext(Dispatchers.Default) {
             runCatching { TrackAnalyzer.analyze(pcm.samples, pcm.rate, start) }.getOrNull()
         }
@@ -171,14 +201,6 @@ internal class AutomixAnalysis(private val context: Context) {
         return grid
     }
 
-    /**
-     * Measures the trailing silence off a decoded window that reaches the end
-     * of the track, so blends can be anchored where the music actually stops
-     * instead of the file's nominal length. RMS windows are judged against the
-     * window's own percentile levels, the same envelope pass Orchard and
-     * BitChord run over the whole file: a quiet fade-out still counts as
-     * music, only a genuinely dead tail is trimmed.
-     */
     private fun rememberTailSilence(cut: Cut, pcm: Pcm, windowStartSec: Double, durationSec: Double) {
         if (pcm.rate <= 0) return
         val windowSec = pcm.samples.size.toDouble() / pcm.rate
@@ -191,6 +213,18 @@ internal class AutomixAnalysis(private val context: Context) {
                     "blends will stop at the audible end"
             )
         }
+    }
+
+    private fun rememberHeadSilence(cut: Cut, pcm: Pcm): Double {
+        val silence = leadingSilenceSec(pcm.samples, pcm.rate)
+        GridCache.putHeadSilence(context, cut.cacheKey, silence)
+        if (silence >= MIN_HEAD_SILENCE_SECONDS) {
+            log.i(
+                "automix: '${cut.uri.takeLast(12)}' opens silent for the first " +
+                    "${"%.1f".format(silence)}s, blends will cue past it"
+            )
+        }
+        return silence
     }
 
     private fun trailingSilenceSec(samples: FloatArray, rate: Int, windowStartSec: Double, durationSec: Double): Double {
@@ -229,6 +263,34 @@ internal class AutomixAnalysis(private val context: Context) {
         if (values.isEmpty()) return 0.0
         val sorted = values.copyOf().also { it.sort() }
         return sorted[((sorted.size - 1) * fraction).toInt().coerceIn(0, sorted.size - 1)]
+    }
+
+    private fun leadingSilenceSec(samples: FloatArray, rate: Int): Double {
+        if (rate <= 0) return 0.0
+        val windowSamples = (MEASURE_WINDOW_SECONDS * rate).toInt()
+        if (windowSamples <= 0) return 0.0
+        val windows = minOf(samples.size / windowSamples, MAX_HEAD_SILENCE_WINDOWS)
+        if (windows < 2) return 0.0
+        val levels = DoubleArray(windows)
+        for (index in 0 until windows) {
+            val from = index * windowSamples
+            var sum = 0.0
+            for (cursor in from until from + windowSamples) {
+                val sample = samples[cursor].toDouble()
+                sum += sample * sample
+            }
+            levels[index] = sqrt(sum / windowSamples)
+        }
+        val noiseFloor = percentile(levels, 0.05)
+        val reference = percentile(levels, 0.85)
+        if (reference <= 0.0) return 0.0
+        val activeThreshold = maxOf(0.0025, minOf(noiseFloor * 2.6, reference * 0.28), reference * 0.1)
+        val silenceThreshold = maxOf(0.0015, minOf(activeThreshold * 0.25, reference * 0.04))
+        var quiet = 0
+        while (quiet < windows && levels[quiet] < silenceThreshold) quiet++
+        val silence = quiet * MEASURE_WINDOW_SECONDS
+        if (silence < MIN_HEAD_SILENCE_SECONDS) return 0.0
+        return minOf(silence, MAX_HEAD_SILENCE_SECONDS)
     }
 
     private class Pcm(val samples: FloatArray, val rate: Int)
@@ -406,6 +468,16 @@ internal class AutomixAnalysis(private val context: Context) {
         const val MAX_TAIL_SILENCE_SECONDS = 12.0
 
         const val END_COVER_TOLERANCE_SECONDS = 2.0
+
+        const val HEAD_SILENCE_WINDOW_SECONDS = 12.0
+
+        const val MIN_HEAD_WINDOW_SECONDS = 2.0
+
+        const val MIN_HEAD_SILENCE_SECONDS = 0.3
+
+        const val MAX_HEAD_SILENCE_SECONDS = 10.0
+
+        const val MAX_HEAD_SILENCE_WINDOWS = 48
     }
 }
 
@@ -511,6 +583,8 @@ private object GridCache {
 
     private const val SILENCE_SUFFIX = "#silence"
 
+    private const val HEAD_SILENCE_SUFFIX = "#headsilence"
+
     private const val LIMIT = 48
 
     private val lock = Any()
@@ -518,6 +592,8 @@ private object GridCache {
     private val memory = LinkedHashMap<String, TrackGrid>()
 
     private val memorySilence = LinkedHashMap<String, Double>()
+
+    private val memoryHeadSilence = LinkedHashMap<String, Double>()
 
     fun get(context: Context, key: String): TrackGrid? {
         synchronized(lock) { memory[key]?.let { return it } }
@@ -577,6 +653,28 @@ private object GridCache {
             val prefs = AppPrefs.prefs(context, STORE)
             val editor = prefs.edit().putString(key, seconds.toString())
             touchIndex(prefs, editor, key)
+            editor.apply()
+        }
+    }
+
+    fun getHeadSilence(context: Context, key: String): Double? {
+        synchronized(lock) { memoryHeadSilence[key]?.let { return it } }
+        val raw = runCatching {
+            AppPrefs.prefs(context, STORE).getString(key + HEAD_SILENCE_SUFFIX, null)
+        }.getOrNull() ?: return null
+        val value = raw.toDoubleOrNull() ?: return null
+        if (!value.isFinite() || value < 0.0) return null
+        synchronized(lock) { memoryHeadSilence[key] = value }
+        return value
+    }
+
+    fun putHeadSilence(context: Context, key: String, seconds: Double) {
+        synchronized(lock) { memoryHeadSilence[key] = seconds }
+        runCatching {
+            val storeKey = key + HEAD_SILENCE_SUFFIX
+            val prefs = AppPrefs.prefs(context, STORE)
+            val editor = prefs.edit().putString(storeKey, seconds.toString())
+            touchIndex(prefs, editor, storeKey)
             editor.apply()
         }
     }

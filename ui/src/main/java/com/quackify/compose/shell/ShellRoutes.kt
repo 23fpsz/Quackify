@@ -9,6 +9,7 @@ import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.EpisodeDetail
+import com.quackify.backend.model.FriendActivityEntry
 import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.PlaylistPermissions
 import com.quackify.backend.model.ProfileTopContent
@@ -43,6 +44,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import com.quackify.compose.R
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.components.matchesCurrentContext
 
 internal class ShellRouteEnv(
@@ -81,6 +83,7 @@ internal class ShellRouteEnv(
     val handleLibraryLongPress: (LibraryItem) -> Unit,
     val handleFolderClick: (LibraryItem) -> Unit,
     val shareEntity: (String) -> Unit,
+    val toastState: QuackifyToastState? = null,
 )
 
 @Composable
@@ -133,6 +136,7 @@ internal fun ShellHomeRoute(
         onOpenShow = env.openShow,
         onOpenEpisode = env.openEpisode,
         onOpenPlaylist = env.openPlaylist,
+        listState = env.navController.nav.homeListState,
     )
 }
 
@@ -188,6 +192,7 @@ internal fun ShellSearchRoute(
         onPromoteRecentSearch = { item -> onPromoteRecentSearch?.invoke(item) },
         onRecordRecentSearch = { hit -> onRecordRecentSearch?.invoke(hit) },
         onToggleSaved = { uri, currentlySaved -> onToggleSaved?.invoke(uri, currentlySaved) },
+        onTrackHeart = { track -> env.actions.openAddToPlaylist(track) },
         onLoadSearchSection = onLoadSearchSection,
         onCategoryClick = { category ->
             env.navController.pushCurrentState()
@@ -265,7 +270,6 @@ internal fun ShellPlaylistRoute(
     onTogglePlaylistSaved: ((String, Boolean) -> Unit)?,
     playlistPermissions: PlaylistPermissions?,
     onLoadPlaylistContributors: (() -> Unit)?,
-    onPlaylistTrackLikeToggle: ((TrackItem) -> Unit)?,
     onEditPlaylist: ((String) -> Unit)?,
     onAddTracksOpen: (() -> Unit)?,
 ) {
@@ -310,7 +314,7 @@ internal fun ShellPlaylistRoute(
             env.flags.isContributorsOpen = true
             onLoadPlaylistContributors?.invoke()
         },
-        onTrackLikeToggle = { onPlaylistTrackLikeToggle?.invoke(it) },
+        onTrackLikeToggle = { env.actions.openAddToPlaylist(it) },
         onTrackAddToQueue = env.handleTrackAddToQueue,
         handleBack = env.handleBack,
         handleTrackOptions = env.handleTrackOptions,
@@ -347,7 +351,6 @@ internal fun ShellAlbumRoute(
     albumLoadingMore: Boolean,
     onLoadMoreAlbumTracks: (() -> Unit)?,
     onRetryAlbum: (() -> Unit)?,
-    onAlbumTrackLikeToggle: ((TrackItem) -> Unit)?,
     albumSaved: Boolean? = null,
     onAlbumSavedToggle: ((String, Boolean) -> Unit)? = null,
 ) {
@@ -378,7 +381,7 @@ internal fun ShellAlbumRoute(
         handleBack = env.handleBack,
         handlePlayPause = env.handlePlayPause,
         handleTrackOptions = env.handleTrackOptions,
-        onTrackLikeToggle = { onAlbumTrackLikeToggle?.invoke(it) },
+        onTrackLikeToggle = { env.actions.openAddToPlaylist(it) },
         onTrackAddToQueue = env.handleTrackAddToQueue,
         openArtist = env.openArtist,
         openAlbum = env.openAlbum,
@@ -409,7 +412,6 @@ internal fun ShellArtistRoute(
     artistBanned: Boolean? = null,
     onArtistUnban: ((String) -> Unit)? = null,
     onArtistFollowToggle: ((String, Boolean) -> Unit)?,
-    onArtistTrackLikeToggle: ((TrackItem) -> Unit)?,
 ) {
     ShellArtistPane(
         artistName = env.active.artistName,
@@ -442,7 +444,7 @@ internal fun ShellArtistRoute(
         },
         onTrackSelect = env.handleTrackPlay,
         onTrackOptionsClick = env.handleTrackOptions,
-        onTrackLikeToggle = { onArtistTrackLikeToggle?.invoke(it) },
+        onTrackLikeToggle = { env.actions.openAddToPlaylist(it) },
         onTrackAddToQueue = env.handleTrackAddToQueue,
         onFollowToggle = { uri, follow ->
             onArtistFollowToggle?.invoke(uri, follow)
@@ -537,7 +539,8 @@ internal fun ShellSettingsRoute(
         updateChecked = updateChecked,
         updateError = updateError,
         updateVersion = updateVersion,
-        onCheckUpdates = { onCheckUpdates?.invoke() }
+        onCheckUpdates = { onCheckUpdates?.invoke() },
+        toastState = env.toastState,
     )
 }
 
@@ -610,6 +613,38 @@ internal fun ShellActivityRoute(
             }
         },
         onLeave = { onLeave?.invoke() }
+    )
+}
+
+@Composable
+internal fun ShellFriendActivityRoute(
+    env: ShellRouteEnv,
+    friends: List<FriendActivityEntry>,
+    loading: Boolean,
+    loadFailed: Boolean,
+    onRetry: (() -> Unit)?,
+    onSilentRefresh: (() -> Unit)?,
+) {
+    ShellFriendActivityPane(
+        onBackClick = env.handleBack,
+        friends = friends,
+        loading = loading,
+        loadFailed = loadFailed,
+        onRetry = { onRetry?.invoke() },
+        onSilentRefresh = { onSilentRefresh?.invoke() },
+        onOpenFriend = { friend ->
+            when {
+                friend.trackUri.startsWith("spotify:episode:") ->
+                    env.openEpisode(friend.trackUri)
+                friend.albumUri.startsWith("spotify:album:") ->
+                    env.openAlbum(friend.albumName.ifBlank { friend.trackName }, friend.artistLine, friend.albumUri)
+                friend.primaryArtistUri.startsWith("spotify:artist:") ->
+                    env.openArtist(friend.primaryArtistName.ifBlank { friend.artistLine }, friend.primaryArtistUri)
+            }
+        },
+        onOpenFriendProfile = { friend ->
+            env.openUserProfile(friend.userUri, friend.userName)
+        }
     )
 }
 

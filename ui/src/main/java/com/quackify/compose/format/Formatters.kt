@@ -28,7 +28,10 @@ fun formatCollectionDuration(ms: Long, isEstimate: Boolean = false): String {
 fun formatTrackLength(ms: Long): String {
     if (ms <= 0L) return ""
     val seconds = ms / 1000
-    return "%d:%02d".format(seconds / 60, seconds % 60)
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    return if (hours > 0L) "%d:%02d:%02d".format(hours, minutes, seconds % 60)
+    else "%d:%02d".format(minutes, seconds % 60)
 }
 
 fun formatExactCount(value: Long): String =

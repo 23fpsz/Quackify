@@ -308,7 +308,7 @@ object ClusterParser {
             isPlaying = playing && !paused,
             positionMs = player.optLong("position_as_of_timestamp", 0L),
             durationMs = player.optLong("duration", 0L),
-            disallowSeeking = (restrictions?.optJSONArray("disallow_seeking_reasons")?.length() ?: 0) > 0,
+            disallowSeeking = !allowed(restrictions?.optJSONArray("disallow_seeking_reasons")),
             adBreak = parseAdBreak(player.optJSONObject("ad_break_context")),
             updateReason = root.text("update_reason"),
             queueRevision = player.text("queue_revision"),

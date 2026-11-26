@@ -252,8 +252,13 @@ object Net {
         bodyPreview: String? = null,
     ): Response? {
         val first = attempt(method, url, headers, body, tag, bodyPreview)
-        if (first == null || first.code != 401) return first
-        val fresh = refreshed(bearerOf(headers), "$method ${short(url)}") ?: return first
+        // Only a request that actually carried a bearer may consult the
+        // refresh hook: the hook itself mints tokens over cookie-only
+        // endpoints, and a 401 from one of those re-entering the gate while
+        // it is already held deadlocks every fetch in the app.
+        val sentBearer = bearerOf(headers)
+        if (first == null || first.code != 401 || sentBearer.isBlank()) return first
+        val fresh = refreshed(sentBearer, "$method ${short(url)}") ?: return first
         log.w("${tag.ifBlank { method }} retrying with a token ${fresh.length}B long after a 401")
         return attempt(method, url, withBearer(headers, fresh), body, tag, bodyPreview)
     }
@@ -371,8 +376,9 @@ object Net {
         tag: String = "",
     ): Blob? {
         val first = attemptPostBlob(url, body, contentType, headers, tag)
-        if (first == null || first.code != 401) return first
-        val fresh = refreshed(bearerOf(headers), "POST ${short(url)}") ?: return first
+        val sentBearer = bearerOf(headers)
+        if (first == null || first.code != 401 || sentBearer.isBlank()) return first
+        val fresh = refreshed(sentBearer, "POST ${short(url)}") ?: return first
         log.w("${tag.ifBlank { "postBlob" }} retrying with a fresh token after a 401")
         return attemptPostBlob(url, body, contentType, withBearer(headers, fresh), tag)
     }

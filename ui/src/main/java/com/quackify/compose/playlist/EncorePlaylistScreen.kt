@@ -1896,10 +1896,10 @@ private fun readSort(
     preferences: com.quackify.backend.core.store.AppPrefs.Prefs,
     key: String,
 ): Pair<PlaylistSort, SortDirection> {
-    if (key.isBlank()) return PlaylistSort.CUSTOM to SortDirection.ASCENDING
+    if (key.isBlank()) return PlaylistSort.DEFAULT to SortDirection.ASCENDING
     val stored = preferences.getString(SORT_KEY_PREFIX + key, "").orEmpty()
     val option = PlaylistSort.values().firstOrNull { it.name == stored }
-        ?: return PlaylistSort.CUSTOM to SortDirection.ASCENDING
+        ?: return PlaylistSort.DEFAULT to SortDirection.ASCENDING
     val storedDirection = preferences.getString(SORT_KEY_PREFIX + key + SORT_DIR_KEY_SUFFIX, "")
         .orEmpty()
     val direction = SortDirection.values().firstOrNull { it.name == storedDirection }

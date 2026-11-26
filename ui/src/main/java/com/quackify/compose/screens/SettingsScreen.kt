@@ -100,6 +100,7 @@ import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.store.StreamSource
 import com.quackify.backend.core.store.StreamSources
 import com.quackify.compose.components.EncoreIconButton
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
@@ -165,6 +166,7 @@ fun SettingsScreen(
     onAppIconChange: (String) -> Unit = {},
     onOpenLogcat: () -> Unit = {},
     onSpDcSignedIn: () -> Unit = {},
+    toastState: QuackifyToastState? = null,
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
@@ -246,10 +248,17 @@ fun SettingsScreen(
         mutableStateOf(clientPrefs.getBoolean("debugLogging", false))
     }
     var versionTaps by remember { mutableIntStateOf(0) }
+    val versionCopiedLabel = stringResource(R.string.version_copied)
+    val debugUnlockedLabel = stringResource(R.string.debug_unlocked)
+    val debugDisabledLabel = stringResource(R.string.debug_disabled)
+    val spDcExportedLabel = stringResource(R.string.sp_dc_copied)
+    val spDcExportUnavailableLabel = stringResource(R.string.sp_dc_export_unavailable)
+    val spDcExportFailedLabel = stringResource(R.string.sp_dc_export_failed)
     var playerButtonsConfig by remember { mutableStateOf(PlayerButtonsStore.load(context)) }
     var playerButtonsSheetOpen by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf<Int?>(null) }
     var spDcDialogOpen by remember { mutableStateOf(false) }
+    var spDcExportWarnOpen by remember { mutableStateOf(false) }
     // Holds the sp_dc that could not be checked while the user decides
     // whether to keep it anyway; blank when no decision is pending.
     var spDcUnchecked by remember { mutableStateOf<String?>(null) }
@@ -261,8 +270,14 @@ fun SettingsScreen(
     val activeSpDc = remember(spDcRevision) {
         if (EncoreAuth.customSpDc(context)) EncoreAuth.spDc(context) else ""
     }
+    // The export row only makes sense on a web-login session: a custom sp_dc
+    // came from the user's own clipboard, and a fresh install has no session
+    // to read at all.
+    val spDcExportable = remember(spDcRevision) {
+        EncoreAuth.isLoggedIn(context) && !EncoreAuth.customSpDc(context)
+    }
     val scope = rememberCoroutineScope()
-    val disableDebug = {
+    val disableDebug: () -> Unit = {
         debugUnlocked = false
         debugLogging = false
         versionTaps = 0
@@ -271,7 +286,7 @@ fun SettingsScreen(
         Logs.floor = Logs.Level.INFO
         clientPrefs.edit().putLong("logcatEpochMs", System.currentTimeMillis()).apply()
         if (category == 3) category = null
-        Toast.makeText(context, R.string.debug_disabled, Toast.LENGTH_SHORT).show()
+        toastState?.show(debugDisabledLabel)
     }
     var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
     var translationLanguageSheetOpen by remember { mutableStateOf(false) }
@@ -897,7 +912,7 @@ fun SettingsScreen(
                                         if (versionTaps >= 5) {
                                             debugUnlocked = true
                                             clientPrefs.edit().putBoolean("debugUnlocked", true).apply()
-                                            Toast.makeText(context, R.string.debug_unlocked, Toast.LENGTH_SHORT).show()
+                                            toastState?.show(debugUnlockedLabel)
                                         }
                                     }
                                 },
@@ -905,7 +920,7 @@ fun SettingsScreen(
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                                     if (clipboard != null) {
                                         clipboard.setPrimaryClip(ClipData.newPlainText("Version", version))
-                                        Toast.makeText(context, R.string.version_copied, Toast.LENGTH_SHORT).show()
+                                        toastState?.show(versionCopiedLabel)
                                     }
                                     if (debugUnlocked || debugLogging) disableDebug()
                                 }
@@ -1051,6 +1066,36 @@ fun SettingsScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(EncoreColors.Card)
+                                .clickable(enabled = spDcExportable) { spDcExportWarnOpen = true }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.export_my_sp_dc),
+                                    style = EncoreTheme.typography.bodyMediumBold.copy(
+                                        color = if (spDcExportable) EncoreColors.Error
+                                        else EncoreColors.TextSecondary
+                                    )
+                                )
+                                Text(
+                                    text = stringResource(R.string.export_my_sp_dc_subtitle),
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                                )
+                            }
+                            Icon(
+                                painter = painterResource(R.drawable.encore_icon_chevron_right_24),
+                                contentDescription = null,
+                                tint = EncoreColors.TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -1099,10 +1144,37 @@ fun SettingsScreen(
         onDismiss = { spDcDialogOpen = false }
     )
 
+    SpDcExportWarnDialog(
+        isOpen = spDcExportWarnOpen,
+        onConfirm = {
+            spDcExportWarnOpen = false
+            val spDc = EncoreAuth.spDc(context)
+            if (spDc.isBlank()) {
+                toastState?.show(spDcExportUnavailableLabel)
+                return@SpDcExportWarnDialog
+            }
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val copied = clipboard?.let {
+                runCatching {
+                    it.setPrimaryClip(ClipData.newPlainText("sp_dc", "sp_dc=$spDc"))
+                }.isSuccess
+            } == true
+            if (copied) {
+                toastState?.show(spDcExportedLabel)
+            } else {
+                toastState?.show(spDcExportFailedLabel)
+            }
+        },
+        onDismiss = { spDcExportWarnOpen = false }
+    )
+
     SpDcUncheckedConfirmDialog(
         spDc = spDcUnchecked,
         onConfirm = {
             val spDc = spDcUnchecked
+                ?.trim()
+                ?.removePrefix("sp_dc=")
+                ?.trim()
             spDcUnchecked = null
             if (spDc.isNullOrBlank()) return@SpDcUncheckedConfirmDialog
             scope.launch {
@@ -1427,6 +1499,101 @@ private fun SpDcSignInDialog(
                             onClick = { onConfirm(textFieldValue.text.trim()) }
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The gate before the clipboard ever sees the sp_dc: the sp_dc door's
+ * cinematic canvas, but lit in the app's error red with the account lock
+ * at its head. The cookie is the account's key, so the pill it guards is
+ * the one place the app asks the user to accept a risk it cannot undo.
+ */
+@Composable
+private fun SpDcExportWarnDialog(
+    isOpen: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!isOpen) return
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF5A2020),
+                            Color(0xFF241212),
+                            Color(0xFF121212)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {} // block outside clicks
+                    ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.encore_icon_locked_24),
+                    contentDescription = null,
+                    tint = EncoreColors.Error,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = stringResource(R.string.sp_dc_export_title),
+                    style = EncoreTheme.typography.titleLarge.copy(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = stringResource(R.string.sp_dc_export_body),
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        color = Color.White.copy(alpha = 0.75f),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(48.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SpDcDialogPill(
+                        label = stringResource(R.string.cancel),
+                        background = Color.Transparent,
+                        contentColor = Color.White,
+                        onClick = onDismiss
+                    )
+                    SpDcDialogPill(
+                        label = stringResource(R.string.sp_dc_export_confirm),
+                        background = EncoreColors.Error,
+                        contentColor = Color.White,
+                        onClick = onConfirm
+                    )
                 }
             }
         }

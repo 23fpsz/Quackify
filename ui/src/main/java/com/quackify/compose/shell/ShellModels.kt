@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -11,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import com.quackify.backend.model.ActivityNotification
 import com.quackify.backend.model.ConnectDevice
+import com.quackify.backend.model.FriendActivityEntry
 import com.quackify.backend.model.SelfProfile
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
@@ -33,6 +35,7 @@ enum class ShellScreen {
     SETTINGS,
     NOTIFICATIONS,
     ACTIVITY,
+    FRIEND_ACTIVITY,
     HISTORY,
     FOLDER,
     SHOW,
@@ -68,7 +71,17 @@ data class ActivityFeedState(
     val onDrawerOpened: () -> Unit = {},
 )
 
+data class FriendActivityState(
+    val feed: List<FriendActivityEntry> = emptyList(),
+    val loading: Boolean = false,
+    val failed: Boolean = false,
+    val onOpen: () -> Unit = {},
+    val onRetry: () -> Unit = {},
+    val onSilentRefresh: () -> Unit = {},
+)
+
 data class BackStackItem(
+    val key: String = "",
     val screen: ShellScreen,
     val categoryTitle: String = "",
     val playlistTitle: String = "",
@@ -130,6 +143,8 @@ data class ComposePlaybackState(
     val streamSource: String = "",
     /** The YouTube video the audio streams from, when the source is YouTube Music. */
     val videoId: String = "",
+    /** The live audio pipeline as the bridge last read it off the player. */
+    val pipeline: PipelineInfo = PipelineInfo(),
     val artistUri: String = "",
     /** Every credited artist's uri on the playing track, in display order. */
     val artistUris: List<String> = emptyList(),
@@ -169,6 +184,26 @@ data class ChapterMarker(
     val endMs: Long,
 )
 
+/**
+ * The audio pipeline for the now-playing sheet: what the decoder reports
+ * (measured) and what the serving source declared, in display-ready fields.
+ * Zero and blank mean "not stated" — the sheet leaves those lines out.
+ */
+data class PipelineInfo(
+    val sourceKey: String = "",
+    val mimeType: String = "",
+    val codecs: String = "",
+    val sampleRateHz: Int = 0,
+    val channels: Int = 0,
+    val bitDepth: Int = 0,
+    val decoderBitrateBps: Int = 0,
+    val declaredBitrateBps: Int = 0,
+    val declaredQuality: String = "",
+    val fileId: String = "",
+    val videoId: String = "",
+    val hasDecoder: Boolean = false,
+)
+
 enum class QueueEditKind { REMOVE, REORDER }
 
 data class QueueEditResult(
@@ -186,6 +221,9 @@ interface ComposePlayerListener {
     fun onPreviousSwipe() { onSkipPrevious() }
     fun onSeek(positionMs: Long) {}
     fun onLikeToggle() {}
+    /** Sets the playing track's liked flag without writing the library: the
+     * caller already saved there and only needs the hearts to catch up. */
+    fun onLikeSet(liked: Boolean) {}
     fun onShuffleToggle() {}
     fun onRepeatToggle() {}
     fun onTrackSelect(title: String, artist: String) {}
@@ -251,6 +289,7 @@ internal class ShellUiFlags {
     var isQueueSheetOpen by mutableStateOf(false)
     var isSleepTimerOpen by mutableStateOf(false)
     var isCanvasResolutionSheetOpen by mutableStateOf(false)
+    var isAudioPipelineSheetOpen by mutableStateOf(false)
     var isLyricsProviderSheetOpen by mutableStateOf(false)
     var isArtistAboutOpen by mutableStateOf(false)
     var isDiscographyOpen by mutableStateOf(false)
@@ -286,10 +325,48 @@ internal class ShellActiveEntity {
 }
 
 internal class ShellNavState {
-    var currentScreen by mutableStateOf(ShellScreen.HOME)
+    private var _currentScreen by mutableStateOf(ShellScreen.HOME)
+    var currentScreenKey by mutableStateOf("root_home")
+        private set
+    private var keyCounter = 0L
+
+    var currentScreen: ShellScreen
+        get() = _currentScreen
+        set(value) {
+            if (_currentScreen != value) {
+                currentScreenKey = when (value) {
+                    ShellScreen.HOME -> "root_home"
+                    ShellScreen.SEARCH -> "root_search"
+                    ShellScreen.LIBRARY -> "root_library"
+                    else -> "${value.name}_${++keyCounter}"
+                }
+                _currentScreen = value
+            }
+        }
+
+    fun openScreen(screen: ShellScreen, entityKey: String) {
+        currentScreenKey = "${entityKey}_${++keyCounter}"
+        _currentScreen = screen
+    }
+
+    fun restoreScreen(screen: ShellScreen, key: String) {
+        currentScreenKey = key.ifBlank {
+            when (screen) {
+                ShellScreen.HOME -> "root_home"
+                ShellScreen.SEARCH -> "root_search"
+                ShellScreen.LIBRARY -> "root_library"
+                else -> "${screen.name}_${++keyCounter}"
+            }
+        }
+        _currentScreen = screen
+    }
+
     var selectedNavIndex by mutableIntStateOf(0)
     var isPlayerExpanded by mutableStateOf(false)
     val backStack = mutableStateListOf<BackStackItem>()
+    val homeListState = LazyListState()
+    val libraryListState = LazyListState()
+    val searchListState = LazyListState()
 }
 
 internal class ShellLocalState {

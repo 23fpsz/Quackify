@@ -27,6 +27,7 @@ internal class ShellNavController(
     private val nowPlayingCoverUrl: String?,
     private val nowPlayingAlbumUri: () -> String,
     private val onAddTracksClosed: (() -> Unit)? = null,
+    private val onScreenPopped: ((String) -> Unit)? = null,
 ) {
     var currentScreen
         get() = nav.currentScreen
@@ -49,6 +50,7 @@ internal class ShellNavController(
     fun pushCurrentState() {
         nav.backStack.add(
             BackStackItem(
+                key = nav.currentScreenKey,
                 screen = nav.currentScreen,
                 categoryTitle = active.categoryTitle,
                 playlistTitle = active.playlistTitle,
@@ -68,11 +70,11 @@ internal class ShellNavController(
     }
 
     fun handleBack() {
+        val leavingKey = nav.currentScreenKey
         val leaving = currentScreen
         val stack = nav.backStack
         if (stack.isNotEmpty()) {
             val previous = stack.removeAt(stack.lastIndex)
-            currentScreen = previous.screen
             if (previous.searchQuery.isNotEmpty()) {
                 onSearchQueryChange?.invoke(previous.searchQuery) ?: playerListener?.onSearch(previous.searchQuery)
             }
@@ -120,6 +122,10 @@ internal class ShellNavController(
             if (leaving == ShellScreen.ADD_TRACKS) {
                 onAddTracksClosed?.invoke()
             }
+            nav.restoreScreen(previous.screen, previous.key)
+            if (!leavingKey.startsWith("root_")) {
+                onScreenPopped?.invoke(leavingKey)
+            }
         } else if (currentScreen != ShellScreen.HOME) {
             currentScreen = ShellScreen.HOME
             selectedNavIndex = 0
@@ -131,7 +137,7 @@ internal class ShellNavController(
             onOpenQuackifySettings()
         } else {
             pushCurrentState()
-            currentScreen = ShellScreen.SETTINGS
+            nav.openScreen(ShellScreen.SETTINGS, "settings")
         }
     }
 
@@ -149,23 +155,20 @@ internal class ShellNavController(
         active.albumTitle = title
         active.albumArtist = artist
         active.albumUri = albumUriToLoad
-        // The now-playing cover is the artwork of the very album a track
-        // sheet opens, so it doubles as the fallback every other path
-        // (library, search) supplies through its own image field.
         active.albumCoverUrl = foundEntity?.imageUrl
             ?: nowPlayingCoverUrl?.takeIf { albumUriToLoad == nowPlayingAlbumUri() }
 
         if (onLoadAlbum != null) onLoadAlbum.invoke(albumUriToLoad, title) else playerListener?.onLoadAlbum(albumUriToLoad, title, active.albumArtist)
 
         pushCurrentState()
-        currentScreen = ShellScreen.ALBUM
+        nav.openScreen(ShellScreen.ALBUM, "album_$albumUriToLoad")
     }
 
     fun openShow(uri: String) {
         if (uri.isBlank()) return
         pushCurrentState()
         active.showUri = uri
-        currentScreen = ShellScreen.SHOW
+        nav.openScreen(ShellScreen.SHOW, "show_$uri")
         onOpenShow?.invoke(uri)
     }
 
@@ -177,11 +180,8 @@ internal class ShellNavController(
         pushCurrentState()
         active.playlistTitle = title
         active.playlistUri = uri
-        // Callers that know the artwork (library, home) pass it along; everyone
-        // else clears the field so the playlist screen falls back to the cover
-        // the detail fetch returns instead of showing the last opened one.
         active.playlistCoverUrl = coverUrl
-        currentScreen = ShellScreen.PLAYLIST
+        nav.openScreen(ShellScreen.PLAYLIST, "playlist_$uri")
         if (onLoadPlaylist != null) onLoadPlaylist.invoke(uri) else playerListener?.onLoadPlaylist(uri)
     }
 
@@ -189,7 +189,7 @@ internal class ShellNavController(
         if (uri.isBlank()) return
         pushCurrentState()
         active.episodeUri = uri
-        currentScreen = ShellScreen.EPISODE
+        nav.openScreen(ShellScreen.EPISODE, "episode_$uri")
         onOpenEpisode?.invoke(uri)
     }
 
@@ -214,42 +214,47 @@ internal class ShellNavController(
         if (onLoadArtist != null) onLoadArtist.invoke(artistUriToLoad, artist) else playerListener?.onLoadArtist(artistUriToLoad, artist)
 
         pushCurrentState()
-        currentScreen = ShellScreen.ARTIST
+        nav.openScreen(ShellScreen.ARTIST, "artist_$artistUriToLoad")
     }
 
     fun openFolder(item: LibraryItem, onOpenFolder: ((String) -> Unit)?) {
         pushCurrentState()
         active.folderUri = item.uri
         active.folderTitle = item.title
-        currentScreen = ShellScreen.FOLDER
+        nav.openScreen(ShellScreen.FOLDER, "folder_${item.uri}")
         onOpenFolder?.invoke(item.uri)
     }
 
     fun openAddTracks() {
         pushCurrentState()
-        currentScreen = ShellScreen.ADD_TRACKS
+        nav.openScreen(ShellScreen.ADD_TRACKS, "add_tracks")
     }
 
     fun openCategory(title: String, color: androidx.compose.ui.graphics.Color) {
         pushCurrentState()
         active.categoryTitle = title
         active.categoryColor = color
-        currentScreen = ShellScreen.CATEGORY
+        nav.openScreen(ShellScreen.CATEGORY, "category_$title")
     }
 
     fun openNotifications() {
         pushCurrentState()
-        currentScreen = ShellScreen.NOTIFICATIONS
+        nav.openScreen(ShellScreen.NOTIFICATIONS, "notifications")
     }
 
     fun openActivity() {
         pushCurrentState()
-        currentScreen = ShellScreen.ACTIVITY
+        nav.openScreen(ShellScreen.ACTIVITY, "activity")
+    }
+
+    fun openFriendActivity() {
+        pushCurrentState()
+        nav.openScreen(ShellScreen.FRIEND_ACTIVITY, "friend_activity")
     }
 
     fun openProfile() {
         pushCurrentState()
-        currentScreen = ShellScreen.PROFILE
+        nav.openScreen(ShellScreen.PROFILE, "profile")
     }
 
     fun openUserProfile(context: Context, uri: String, name: String) {
@@ -258,13 +263,13 @@ internal class ShellNavController(
             return
         }
         pushCurrentState()
-        currentScreen = ShellScreen.PROFILE
+        nav.openScreen(ShellScreen.PROFILE, "user_$uri")
         onOpenUserProfile?.invoke(uri, name)
     }
 
     fun openHistory(onOpenHistory: (() -> Unit)?) {
         pushCurrentState()
-        currentScreen = ShellScreen.HISTORY
+        nav.openScreen(ShellScreen.HISTORY, "history")
         onOpenHistory?.invoke()
     }
 
