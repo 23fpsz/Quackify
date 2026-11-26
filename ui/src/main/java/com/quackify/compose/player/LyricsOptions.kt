@@ -49,6 +49,8 @@ object LyricsOptions {
 
     private const val KEY_TRANSCRIPT_OFFSET_TENTHS = "transcriptOffsetTenths"
 
+    private const val KEY_TRANSCRIPT_TRANSLATION = "transcriptTranslationEnabled"
+
     var enabled by mutableStateOf(true)
         private set
 
@@ -96,6 +98,9 @@ object LyricsOptions {
     var transcriptOffsetTenths by mutableStateOf(0)
         private set
 
+    var transcriptTranslationEnabled by mutableStateOf(false)
+        private set
+
     fun load(context: Context) {
         val prefs = AppPrefs.prefs(context, PREFS)
         enabled = prefs.getBoolean(KEY_ENABLED, true)
@@ -117,6 +122,7 @@ object LyricsOptions {
         transcriptSmoothSweep = prefs.getBoolean(KEY_TRANSCRIPT_SMOOTH_SWEEP, true)
         transcriptOffsetTenths = prefs.getInt(KEY_TRANSCRIPT_OFFSET_TENTHS, 0)
             .coerceIn(LYRICS_OFFSET_TENTHS_MIN, LYRICS_OFFSET_TENTHS_MAX)
+        transcriptTranslationEnabled = prefs.getBoolean(KEY_TRANSCRIPT_TRANSLATION, false)
     }
 
     fun setEnabled(context: Context, value: Boolean) {
@@ -205,6 +211,11 @@ object LyricsOptions {
         val clamped = tenths.coerceIn(LYRICS_OFFSET_TENTHS_MIN, LYRICS_OFFSET_TENTHS_MAX)
         transcriptOffsetTenths = clamped
         AppPrefs.edit(context, PREFS).putInt(KEY_TRANSCRIPT_OFFSET_TENTHS, clamped).apply()
+    }
+
+    fun setTranscriptTranslationEnabled(context: Context, value: Boolean) {
+        transcriptTranslationEnabled = value
+        AppPrefs.edit(context, PREFS).putBoolean(KEY_TRANSCRIPT_TRANSLATION, value).apply()
     }
 
     /** The sweep position offset to apply, in milliseconds. */

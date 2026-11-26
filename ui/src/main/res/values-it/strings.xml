@@ -24,6 +24,8 @@
     <string name="transcript_offset">Offset della trascrizione</string>
     <string name="transcript_offset_desc">Sposta la temporizzazione della trascrizione quando non è sincronizzata con l\'audio</string>
     <string name="transcript_menu">Opzioni trascrizione</string>
+    <string name="transcript_translation">Traduci trascrizione</string>
+    <string name="transcript_translation_desc">Mostra una traduzione di ogni riga della trascrizione</string>
     <string name="next_episode">Episodio successivo</string>
     <string name="previous_episode">Episodio precedente</string>
     <string name="account">Account</string>

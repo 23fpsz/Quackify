@@ -402,6 +402,8 @@
     <string name="transcript_offset">文字稿偏移</string>
     <string name="transcript_offset_desc">当文字稿与音频不同步时调整其时间</string>
     <string name="transcript_menu">文字稿选项</string>
+    <string name="transcript_translation">翻译文字稿</string>
+    <string name="transcript_translation_desc">显示文字稿每行的翻译</string>
     <string name="next_episode">下一单集</string>
     <string name="previous_episode">上一单集</string>
     <string name="add_contributor">添加协作者</string>

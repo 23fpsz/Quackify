@@ -402,6 +402,8 @@
     <string name="transcript_offset">대본 오프셋</string>
     <string name="transcript_offset_desc">음성과 어긋난다고 느낄 때 대본 타이밍을 조정합니다</string>
     <string name="transcript_menu">대본 옵션</string>
+    <string name="transcript_translation">대본 번역</string>
+    <string name="transcript_translation_desc">대본의 각 줄에 대한 번역을 표시합니다</string>
     <string name="next_episode">다음 에피소드</string>
     <string name="previous_episode">이전 에피소드</string>
     <string name="add_contributor">공동 작업자 추가</string>
