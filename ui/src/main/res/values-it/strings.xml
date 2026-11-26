@@ -543,6 +543,8 @@
     <string name="export_my_sp_dc">Esporta lo sp_dc del mio account attuale</string>
     <string name="export_my_sp_dc_subtitle">Copia il cookie sp_dc di questa sessione negli appunti</string>
     <string name="sp_dc_copied">sp_dc copiato negli appunti</string>
+    <string name="sp_dc_export_unavailable">Non c’è alcuno sp_dc di sessione da esportare</string>
+    <string name="sp_dc_export_failed">Impossibile copiare lo sp_dc negli appunti</string>
     <string name="title_copied">Titolo copiato</string>
     <string name="lyrics_copied">Testi copiati</string>
     <string name="lyrics_selection_count">%1$d selezionati</string>

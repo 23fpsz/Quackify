@@ -107,6 +107,8 @@
     <string name="export_my_sp_dc">导出我当前账号的 sp_dc</string>
     <string name="export_my_sp_dc_subtitle">将本次会话的 sp_dc Cookie 复制到剪贴板</string>
     <string name="sp_dc_copied">sp_dc 已复制到剪贴板</string>
+    <string name="sp_dc_export_unavailable">没有可导出的会话 sp_dc</string>
+    <string name="sp_dc_export_failed">无法将 sp_dc 复制到剪贴板</string>
     <string name="title_copied">标题已复制</string>
     <string name="lyrics_copied">歌词已复制</string>
     <string name="lyrics_selection_count">已选择 %1$d 行</string>

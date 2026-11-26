@@ -107,6 +107,8 @@
     <string name="export_my_sp_dc">現在のアカウントのsp_dcをエクスポート</string>
     <string name="export_my_sp_dc_subtitle">このセッションのsp_dcクッキーをクリップボードにコピーします</string>
     <string name="sp_dc_copied">sp_dcをクリップボードにコピーしました</string>
+    <string name="sp_dc_export_unavailable">エクスポートできるセッションのsp_dcがありません</string>
+    <string name="sp_dc_export_failed">sp_dcをクリップボードにコピーできませんでした</string>
     <string name="title_copied">タイトルをコピーしました</string>
     <string name="lyrics_copied">歌詞をコピーしました</string>
     <string name="lyrics_selection_count">%1$d件選択中</string>

@@ -107,6 +107,8 @@
     <string name="export_my_sp_dc">Exportar o sp_dc da minha conta atual</string>
     <string name="export_my_sp_dc_subtitle">Copia o cookie sp_dc desta sessão para a área de transferência</string>
     <string name="sp_dc_copied">sp_dc copiado para a área de transferência</string>
+    <string name="sp_dc_export_unavailable">Não há sp_dc de sessão para exportar</string>
+    <string name="sp_dc_export_failed">Não foi possível copiar o sp_dc para a área de transferência</string>
     <string name="title_copied">Título copiado</string>
     <string name="lyrics_copied">Letras copiadas</string>
     <string name="lyrics_selection_count">%1$d selecionadas</string>
