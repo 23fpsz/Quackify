@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="custom_spdc_startup_toast">Session sp_dc personnalisée en cours (%1$d octets)</string>
+    <string name="widget_4x1_desc">Barre de lecture avec pochette, j\'aime et commandes</string>
+    <string name="widget_3x2_desc">Carte de lecture avec pochette, progression et commandes</string>
+    <string name="widget_3x3_desc">Grande carte de lecture avec grande pochette et commandes</string>
+    <string name="slim_player">Lecteur compact</string>
+    <string name="music_card_label">Carte musicale</string>
+    <string name="square_art_label">Pochette d\'album</string>
+    <string name="txt_not_playing">Aucune lecture</string>
+    <string name="txt_notrack">Aucun titre</string>
+    <string name="txt_noartist">Aucun artiste</string>
+    <string name="android_auto_navigation_home">Accueil</string>
+    <string name="android_auto_navigation_recently_played">Écoutés récemment</string>
+    <string name="android_auto_navigation_your_library">Ta bibliothèque</string>
+    <string name="android_auto_navigation_browse">Explorer</string>
+    <string name="your_library_content_filter_playlists">Playlists</string>
+    <string name="your_library_content_filter_albums">Albums</string>
+    <string name="your_library_content_filter_artists">Artistes</string>
+    <string name="your_library_content_filter_podcasts">Podcasts</string>
+    <string name="collection_liked_songs_title">Titres aimés</string>
+</resources>

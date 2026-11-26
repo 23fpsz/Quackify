@@ -128,7 +128,7 @@
     <string name="song">Song</string>
     <string name="podcasts">Podcasts</string>
     <string name="podcast">Podcast</string>
-    <string name="show">Show</string>
+    <string name="show">Podcast</string>
     <string name="single">Single</string>
     <string name="ep">EP</string>
     <string name="music_video">Musikvideo</string>
@@ -662,7 +662,7 @@
     <string name="title">Titel</string>
     <string name="recents">Zuletzt</string>
     <string name="alphabetical">Alphabetisch</string>
-    <string name="creator">Creator</string>
+    <string name="creator">Ersteller</string>
     <string name="audio">Audio</string>
     <string name="artist_photo_cd">Foto von %1$s</string>
     <string name="webview_missing_message">Das Android-System-WebView-Paket fehlt, ist deaktiviert oder wird gerade aktualisiert, daher kann sich die Anmeldeseite nicht öffnen. Aktiviere oder aktualisiere Android System WebView in den Systemeinstellungen und versuche es erneut.</string>

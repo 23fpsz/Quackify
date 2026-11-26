@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="custom_spdc_startup_toast">Sesión sp_dc personalizada en uso (%1$d bytes)</string>
+    <string name="widget_4x1_desc">Barra de reproducción con portada, me gusta y controles</string>
+    <string name="widget_3x2_desc">Tarjeta de reproducción con portada, progreso y controles</string>
+    <string name="widget_3x3_desc">Tarjeta de reproducción grande con portada grande y controles</string>
+    <string name="slim_player">Reproductor compacto</string>
+    <string name="music_card_label">Tarjeta de música</string>
+    <string name="square_art_label">Portada del álbum</string>
+    <string name="txt_not_playing">Sin reproducción</string>
+    <string name="txt_notrack">Sin canción</string>
+    <string name="txt_noartist">Sin artista</string>
+    <string name="android_auto_navigation_home">Inicio</string>
+    <string name="android_auto_navigation_recently_played">Reproducidos recientemente</string>
+    <string name="android_auto_navigation_your_library">Tu Biblioteca</string>
+    <string name="android_auto_navigation_browse">Explorar</string>
+    <string name="your_library_content_filter_playlists">Playlists</string>
+    <string name="your_library_content_filter_albums">Álbumes</string>
+    <string name="your_library_content_filter_artists">Artistas</string>
+    <string name="your_library_content_filter_podcasts">Podcasts</string>
+    <string name="collection_liked_songs_title">Canciones que te gustan</string>
+</resources>
