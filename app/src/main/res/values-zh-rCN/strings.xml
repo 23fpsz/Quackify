@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="custom_spdc_startup_toast">正在使用自定义 sp_dc 会话（%1$d 字节）</string>
+    <string name="widget_4x1_desc">带封面、收藏和控件的播放栏</string>
+    <string name="widget_3x2_desc">带封面、进度和控件的播放卡片</string>
+    <string name="widget_3x3_desc">带大封面和控件的大型播放卡片</string>
+    <string name="slim_player">迷你播放器</string>
+    <string name="music_card_label">音乐卡片</string>
+    <string name="square_art_label">专辑封面</string>
+    <string name="txt_not_playing">未在播放</string>
+    <string name="txt_notrack">暂无曲目</string>
+    <string name="txt_noartist">暂无艺人</string>
+    <string name="android_auto_navigation_home">首页</string>
+    <string name="android_auto_navigation_recently_played">最近播放</string>
+    <string name="android_auto_navigation_your_library">你的媒体库</string>
+    <string name="android_auto_navigation_browse">发现</string>
+    <string name="your_library_content_filter_playlists">歌单</string>
+    <string name="your_library_content_filter_albums">专辑</string>
+    <string name="your_library_content_filter_artists">艺人</string>
+    <string name="your_library_content_filter_podcasts">播客</string>
+    <string name="collection_liked_songs_title">喜欢的歌曲</string>
+</resources>

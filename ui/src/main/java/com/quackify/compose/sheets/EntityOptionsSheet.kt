@@ -68,6 +68,11 @@ fun EntityOptionsSheet(
     onGoToRadio: () -> Unit = {},
     canDeletePlaylist: Boolean = false,
     onDeletePlaylist: () -> Unit = {},
+    /** The playlist's current visibility; only meaningful with the administrate flag below. */
+    playlistIsPrivate: Boolean = false,
+    /** True only for playlists this account may make public/private. */
+    canAdministratePlaylist: Boolean = false,
+    onPlaylistPrivacyToggle: (Boolean) -> Unit = {},
     onSeeDescription: (() -> Unit)? = null,
     onSleepTimerClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -139,6 +144,25 @@ fun EntityOptionsSheet(
                     onClick = {
                         onDismiss()
                         onEditPlaylist()
+                    }
+                )
+            }
+
+            if (canAdministratePlaylist && entity.uri.startsWith("spotify:playlist:")) {
+                EntityRow(
+                    title = if (playlistIsPrivate) {
+                        stringResource(R.string.make_playlist_public)
+                    } else {
+                        stringResource(R.string.make_playlist_private)
+                    },
+                    iconRes = if (playlistIsPrivate) {
+                        R.drawable.encore_icon_globe_24
+                    } else {
+                        R.drawable.encore_icon_locked_24
+                    },
+                    onClick = {
+                        onDismiss()
+                        onPlaylistPrivacyToggle(playlistIsPrivate)
                     }
                 )
             }

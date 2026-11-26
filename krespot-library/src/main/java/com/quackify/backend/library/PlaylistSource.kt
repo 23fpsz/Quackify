@@ -448,6 +448,63 @@ object PlaylistSource {
         return ok
     }
 
+    /**
+     * Flips a playlist between public and private the way the web player does:
+     * going private unpublishes it from the rootlist and sets the base
+     * permission to BLOCKED; going public opens the base permission back to
+     * VIEWER, which is all the web player sends for that direction.
+     */
+    suspend fun setPrivacy(context: Context, playlistUri: String, public: Boolean): Boolean {
+        if (id(playlistUri).isBlank()) {
+            log.w("setPrivacy: bad uri '$playlistUri'")
+            return false
+        }
+        val listed = if (public) true else Rootlist.setPublished(context, playlistUri, public)
+        val level = if (public) PlaylistMember.PERMISSION_VIEWER else PlaylistMember.PERMISSION_BLOCKED
+        val gated = setBasePermission(context, playlistUri, level)
+        val ok = listed && gated
+        log.i("setPrivacy '$playlistUri' public=$public listed=$listed gated=$gated ok=$ok")
+        return ok
+    }
+
+    /**
+     * Sets who the whole world is against this playlist: VIEWER lets anyone
+     * with the link open it, BLOCKED keeps it to the members. The current
+     * revision is read first so the write lands as a checked change, the same
+     * optimistic guard the member writes use.
+     */
+    suspend fun setBasePermission(context: Context, playlistUri: String, level: String): Boolean {
+        val playlist = id(playlistUri)
+        if (playlist.isBlank()) {
+            log.w("setBasePermission: bad uri '$playlistUri'")
+            return false
+        }
+        val response = Net.get(
+            "$PERMISSIONS/playlist/$playlist/permission/base",
+            headers(context),
+            "playlist/basePermission",
+        )
+        val revision = response?.json()?.optString("revision").orEmpty()
+        if (revision.isBlank()) {
+            log.w("setBasePermission: no revision, http=${response?.code ?: -1} " +
+                    response?.body?.take(120).orEmpty()
+            )
+        }
+        val body = JSONObject().put("permissionLevel", level)
+        if (revision.isNotBlank()) body.put("revision", revision)
+        val write = Net.postJson(
+            "$PERMISSIONS/playlist/$playlist/permission/base",
+            body.toString(),
+            protoHeaders(context),
+            "playlist/setBasePermission",
+        )
+        val ok = write?.ok == true
+        log.i("setBasePermission '$playlistUri' -> $level ok=$ok http=${write?.code ?: -1} " +
+                write?.body?.take(160).orEmpty()
+        )
+        return ok
+    }
+
     private suspend fun memberRevisions(context: Context, playlist: String): Map<String, String> {
         val response = Net.get(
             "$PERMISSIONS/playlist/$playlist/permission/members",

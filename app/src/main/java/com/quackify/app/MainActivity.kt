@@ -83,6 +83,7 @@ import com.quackify.backend.model.TrackLyrics
 import com.quackify.backend.model.UserProfile
 import com.quackify.compose.R as ComposeR
 import com.quackify.compose.components.QuackifyToastHost
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.components.UpdateDialog
 import com.quackify.compose.components.UpdateInstallPhase
 import com.quackify.compose.components.rememberQuackifyToastState
@@ -133,6 +134,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -437,7 +439,11 @@ class MainActivity : ComponentActivity() {
                         }
                         LaunchedEffect(Unit) {
                             val before = EncoreAuth.token(context)
-                            SilentTokenRefresh.ensureFresh(context, "startup")
+                            // Bounded: whatever the refresh path does, the
+                            // skeleton gate must not depend on it finishing.
+                            withTimeoutOrNull(STARTUP_REFRESH_TIMEOUT_MS) {
+                                SilentTokenRefresh.ensureFresh(context, "startup")
+                            }
                             tokenChecked = true
                             if (EncoreAuth.token(context) != before) retryScreensLeftEmpty()
                             while (true) {
@@ -1140,6 +1146,7 @@ class MainActivity : ComponentActivity() {
                             updates = updates,
                             onBack = { loginSettingsOpen = false },
                             onOpenLogcat = { loginLogcatOpen = true },
+                            toastState = sessionToast,
                         )
                     }
                     if (loginLogcatOpen) {
@@ -1277,11 +1284,25 @@ class MainActivity : ComponentActivity() {
     internal suspend fun fetchEditablePlaylists(trackUri: String): List<PlaylistChoice> =
         if (trackUri.isBlank()) emptyList() else Krespot.playlists.editable(applicationContext, trackUri)
 
+    /** The library write already succeeded on the caller's side; when the saved
+     * track is the one playing, catch the playback state's liked flag up so the
+     * Now Playing and miniplayer hearts refresh instead of waiting for a track
+     * change to re-query Library.saved. */
+    internal fun syncPlayingTrackLiked(uri: String, liked: Boolean) {
+        val host = PlaybackHost.bridge ?: return
+        if (uri == host.state.trackUri && host.state.isLiked != liked) {
+            host.listener.onLikeSet(liked)
+        }
+    }
+
     internal suspend fun addToPlaylistTarget(choice: PlaylistChoice, trackUri: String, trackTitle: String) {
         if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
             val saved = Library.setSaved(applicationContext, listOf(trackUri), true)
             log.i("add '$trackTitle' to Liked Songs ok=$saved")
-            if (saved) refreshLoadedPlaylist(choice.uri)
+            if (saved) {
+                syncPlayingTrackLiked(trackUri, true)
+                refreshLoadedPlaylist(choice.uri)
+            }
         } else {
             val added = Krespot.playlists.addTrack(applicationContext, choice.uri, trackUri)
             log.i("add '$trackTitle' to '${choice.name}' ok=$added")
@@ -1296,14 +1317,11 @@ class MainActivity : ComponentActivity() {
         shouldAdd: Boolean,
     ) {
         if (choice.uri == PlaylistChoice.LIKED_SONGS_URI) {
-            val host = PlaybackHost.bridge
-            if (trackUri == host?.state?.trackUri && host.state.isLiked != shouldAdd) {
-                host.listener.onLikeToggle()
+            val saved = Library.setSaved(applicationContext, listOf(trackUri), shouldAdd)
+            log.i("${if (shouldAdd) "add" else "remove"} '$trackTitle' to/from Liked Songs ok=$saved")
+            if (saved) {
+                syncPlayingTrackLiked(trackUri, shouldAdd)
                 refreshLoadedPlaylist(choice.uri)
-            } else {
-                val saved = Library.setSaved(applicationContext, listOf(trackUri), shouldAdd)
-                log.i("${if (shouldAdd) "add" else "remove"} '$trackTitle' to/from Liked Songs ok=$saved")
-                if (saved) refreshLoadedPlaylist(choice.uri)
             }
         } else {
             val res = if (shouldAdd) {
@@ -1607,6 +1625,7 @@ class MainActivity : ComponentActivity() {
         updates: UpdateController,
         onBack: () -> Unit,
         onOpenLogcat: () -> Unit,
+        toastState: QuackifyToastState? = null,
     ) {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
@@ -1629,6 +1648,7 @@ class MainActivity : ComponentActivity() {
             onCheckUpdates = updates::requestManualCheck,
             onAppIconChange = { option -> onAppIconChangeHandler(context, option) },
             onOpenLogcat = onOpenLogcat,
+            toastState = toastState,
         )
     }
 
@@ -1646,8 +1666,12 @@ class MainActivity : ComponentActivity() {
         val playback = bridge.state
         val contributors = rememberPlaylistContributorController(context, playlistUri)
         val activity = remember { ActivityFeedController(context.applicationContext, scope) }
+        val friendActivity = remember { FriendActivityFeedController(context.applicationContext, scope) }
         LaunchedEffect(activity.fetchTick) {
             if (activity.fetchTick > 0) activity.load()
+        }
+        LaunchedEffect(friendActivity.fetchTick) {
+            if (friendActivity.fetchTick > 0) friendActivity.load()
         }
         LaunchedEffect(Unit) {
             activity.refreshUnread()
@@ -1683,6 +1707,7 @@ class MainActivity : ComponentActivity() {
                 nowPlaying = nowPlaying,
                 contributors = contributors,
                 activity = activity,
+                friendActivity = friendActivity,
                 recents = recents,
             )
         }
@@ -1701,6 +1726,7 @@ class MainActivity : ComponentActivity() {
         const val RESUME_REFRESH_AFTER_MS = 60_000L
         const val TOKEN_STILL_GOOD_MS = 60_000L
         const val TOKEN_CHECK_INTERVAL_MS = 48L * 60 * 60 * 1000L
+        const val STARTUP_REFRESH_TIMEOUT_MS = 35_000L
         const val RECENTS_SYNC_THROTTLE_MS = 5 * 60_000L
         const val RECENT_SEARCH_SETTLE_MS = 4_000L
         const val VIDEO_AUTO_EXIT_MIN_MS = 1_500L

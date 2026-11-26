@@ -312,7 +312,8 @@ class KrespotPlayer(private val context: Context) {
      * Hands the engine the next track of the queue so ExoPlayer prebuffers it
      * while the current one plays and the transition carries no silence. The
      * item that joins is the cut the transition will really land on: the
-     * alternate stream when it leads the stack, the catalogue file with the
+     * alternate stream when it leads the stack or the licence gate is closed,
+     * the catalogue file with the
      * alternate as the fallback otherwise - so a licence that closes mid-
      * queue still leaves a seamless handover in place. A warm source queues
      * right away; a cold one resolves here and only queues if the engine is
@@ -337,7 +338,12 @@ class KrespotPlayer(private val context: Context) {
         YtStreamPool.unpinAll()
         val file = track.best() ?: track.files.firstOrNull()
         val cached = sourceFor(track.uri)
-        val alternateLeads = StreamSources.order(context).firstOrNull() == StreamSource.YT_MUSIC
+        // A closed licence gate routes the pre-queue onto the alternate as
+        // well, so the queued cut never asks a refusing endpoint for a licence
+        // at transition time.
+        val alternateLeads = StreamSources.order(context).firstOrNull() == StreamSource.YT_MUSIC ||
+            (LicenseGate.remainingMs() > 0L &&
+                StreamSources.after(context, StreamSource.SPOTIFY).isNotEmpty())
         val ticket = queueTicket.incrementAndGet()
         scope.launch {
             val cut: Cut? = if (alternateLeads) {
@@ -468,7 +474,11 @@ class KrespotPlayer(private val context: Context) {
      * warning's promised crossfade happens even with the crossfade slider at
      * zero. Both paths anchor on the outgoing track's measured audible end, so
      * a silent tail no longer swallows the blend; a plain fade with automix
-     * off reuses an already measured tail without decoding anything new.
+     * off reuses an already measured tail without decoding anything new. The
+     * incoming side is cued past its measured leading silence on both paths
+     * too, so the blend never opens on a held breath: the automix path decodes
+     * a short head window for it, the plain path reuses what an earlier pass
+     * measured.
      */
     private suspend fun automixSpecFor(next: CommandTrack, nextCut: Cut): TransitionSpec? {
         val crossfadeMs = AppPrefs.getInt(context, CLIENT_STORE, CROSSFADE_MS_PREF, 0).toLong()
@@ -493,6 +503,7 @@ class KrespotPlayer(private val context: Context) {
                 nextCut.lengthMs,
                 crossfadeMs,
                 silenceMs,
+                headSilenceCachedMsFor(nextCut),
             )
         }
         if (AutomixPlanner.unmixable(next.name)) {
@@ -536,6 +547,12 @@ class KrespotPlayer(private val context: Context) {
         } else {
             null
         }
+        val inSilenceMs = if (inGrid != null) {
+            headSilenceCachedMsFor(nextCut)
+        } else {
+            val left = (budget - (SystemClock.elapsedRealtime() - startedAt)).coerceAtLeast(0L)
+            headSilenceMsFor(nextCut, nextDurationMs, left, stillWanted)
+        }
         if (outGrid == null && inGrid == null) {
             log.i("automix: no grid on either side of '${next.name}', blending with the plain fade")
         }
@@ -546,9 +563,10 @@ class KrespotPlayer(private val context: Context) {
             nextDurationMs,
             crossfadeMs,
             outSilenceMs,
+            inSilenceMs,
         )
         log.i(
-            "automix into '${next.name}' fade=${spec.fadeMs}ms rate=${spec.incomingRate} " +
+            "automix into '${next.name}' fade=${spec.fadeMs}ms cue=${spec.cueMs}ms rate=${spec.incomingRate} " +
                 "lock=${spec.phaseLock} shift=${spec.outSilenceMs}ms"
         )
         return spec
@@ -573,6 +591,29 @@ class KrespotPlayer(private val context: Context) {
     private fun tailSilenceMsFor(cut: Cut): Long =
         if (cut.uri.startsWith("spotify:track:")) {
             (automixAnalysis.tailSilenceSec(cut) * 1000.0).roundToLong().coerceAtLeast(0L)
+        } else {
+            0L
+        }
+
+    private fun headSilenceCachedMsFor(cut: Cut): Long =
+        if (cut.uri.startsWith("spotify:track:")) {
+            automixAnalysis.headSilenceCached(cut)
+                ?.let { (it * 1000.0).roundToLong().coerceAtLeast(0L) }
+                ?: 0L
+        } else {
+            0L
+        }
+
+    private suspend fun headSilenceMsFor(
+        cut: Cut,
+        durationMs: Long,
+        budgetMs: Long,
+        stillWanted: () -> Boolean,
+    ): Long =
+        if (cut.uri.startsWith("spotify:track:")) {
+            automixAnalysis.headSilence(cut, durationMs, budgetMs, stillWanted)
+                ?.let { (it * 1000.0).roundToLong().coerceAtLeast(0L) }
+                ?: 0L
         } else {
             0L
         }
@@ -856,6 +897,46 @@ class KrespotPlayer(private val context: Context) {
 
     val quality: String get() = _state.value.quality
 
+    /**
+     * One read of the live pipeline for the now-playing sheet: the engine's
+     * measured decoder format beside whatever the serving source declared
+     * (catalogue file, alternate stream or music video dash). Null while
+     * nothing is on the player.
+     */
+    fun audioPipeline(): AudioPipelineSnapshot? {
+        if (videoActive) {
+            if (_state.value.trackUri.isBlank()) return null
+            val decoder = video.decoderFormat()
+            return AudioPipelineSnapshot(
+                sourceKey = AudioPipelineSnapshot.SOURCE_VIDEO,
+                mimeType = decoder?.mimeType,
+                codecs = decoder?.codecs,
+                sampleRateHz = decoder?.sampleRateHz,
+                channels = decoder?.channels,
+                bitDepth = decoder?.bitDepth,
+                decoderBitrateBps = decoder?.bitrateBps,
+            )
+        }
+        val uri = _state.value.trackUri
+        if (uri.isBlank()) return null
+        val decoder = engine?.decoderFormat()
+        val catalogue = sourceFor(uri)
+        val alternate = YtStreamTable.of(YtStreamTable.keyFor(uri))
+        return AudioPipelineSnapshot(
+            sourceKey = _state.value.source.key,
+            mimeType = decoder?.mimeType ?: alternate?.mime,
+            codecs = decoder?.codecs,
+            sampleRateHz = decoder?.sampleRateHz,
+            channels = decoder?.channels,
+            bitDepth = decoder?.bitDepth,
+            decoderBitrateBps = decoder?.bitrateBps,
+            declaredBitrateBps = catalogue?.bitrate ?: alternate?.bitrate,
+            declaredQuality = catalogue?.quality,
+            fileId = catalogue?.fileId,
+            videoId = alternate?.videoId ?: _state.value.videoId,
+        )
+    }
+
     val hasSource: Boolean
         get() = videoActive || (engine?.hasMedia == true && !engineIdle) || job?.isActive == true
 
@@ -905,13 +986,30 @@ class KrespotPlayer(private val context: Context) {
             var player: AudioEngine? = null
             try {
                 val stack = StreamSources.order(context)
-                if (!divert && stack.firstOrNull() == StreamSource.YT_MUSIC) {
+                // A closed licence gate means a spotify attempt is guaranteed to
+                // burn another refusal and extend the wait, so while it holds
+                // the alternate stream rides first even with spotify primary.
+                val gateClosed = !divert &&
+                    stack.firstOrNull() != StreamSource.YT_MUSIC &&
+                    LicenseGate.remainingMs() > 0L &&
+                    StreamSources.after(context, StreamSource.SPOTIFY).isNotEmpty()
+                if (!divert && (stack.firstOrNull() == StreamSource.YT_MUSIC || gateClosed)) {
                     val alternate = resolveAlternate(track)
                     if (alternate != null) {
+                        if (gateClosed) {
+                            log.i("the licence gate is closed for ${LicenseGate.remainingMs() / 1000}s, " +
+                                "riding youtube music first for '${track.name.ifBlank { track.uri }}'"
+                            )
+                        }
                         playYtMusic(track, alternate, fromMs)
                         return@launch
                     }
-                    log.w("youtube music leads the stack but the track did not resolve, trying spotify")
+                    if (gateClosed) {
+                        log.w("the licence gate is closed and youtube music did not resolve, " +
+                                "trying spotify anyway")
+                    } else {
+                        log.w("youtube music leads the stack but the track did not resolve, trying spotify")
+                    }
                 }
                 val source = sourceFor(track.uri) ?: warmSource(track.uri, spclient)
                 if (source == null) {
@@ -972,18 +1070,22 @@ class KrespotPlayer(private val context: Context) {
                                     if (id == generation) play(waiting, spclient, from)
                                 }
                             } else if (refusedSource != null) {
-                                if (!divertToAlternate(waiting, from)) {
+                                if (!divertToAlternate(waiting, from, failedEvent)) {
                                     log.w("the licence is rate limited, keeping format ${refusedSource.format}")
                                     licencePending = waiting
                                     licenceFrom = if (movedOn) 0L else fromMs
+                                    mirror(event, player?.durationMs ?: totalMs)
+                                    _events.tryEmit(event)
                                 }
                             } else if (LicenseGate.remainingMs() > 0L) {
-                                if (!divertToAlternate(waiting, from)) {
+                                if (!divertToAlternate(waiting, from, failedEvent)) {
                                     refused = waiting
                                     refusedFrom = from
                                     log.w("the licence is closed for ${LicenseGate.remainingMs() / 1000}s, " +
                                             "keeping '${waiting.name.ifBlank { waiting.uri }}' for a retry"
                                     )
+                                    mirror(event, player?.durationMs ?: totalMs)
+                                    _events.tryEmit(event)
                                 }
                             } else if (!divertToAlternate(waiting, from, failedEvent)) {
                                 log.w("the licence failed on '${waiting.name.ifBlank { waiting.uri }}', " +
@@ -1447,14 +1549,16 @@ class KrespotPlayer(private val context: Context) {
     /**
      * Plays a music video entity: resolves its source manifest, builds the DASH
      * session and takes over playback from the audio pipeline at fromMs.
+     * Returns false when the switch did not engage (unknown uri shape or no
+     * audio focus), true once the video session is on the engine.
      */
-    fun playVideo(videoUri: String, audioTrackUri: String, durationMs: Long, fromMs: Long) {
-        if (!videoUri.startsWith("spotify:track:") && !videoUri.startsWith("spotify:episode:")) return
+    fun playVideo(videoUri: String, audioTrackUri: String, durationMs: Long, fromMs: Long): Boolean {
+        if (!videoUri.startsWith("spotify:track:") && !videoUri.startsWith("spotify:episode:")) return false
         stopAudio()
         if (!focus.acquire()) {
             log.w("video play refused, another app holds the audio focus")
             _events.tryEmit(PlayerEvent.Failed("focus"))
-            return
+            return false
         }
         val id = ++generation
         pendingPause = false
@@ -1472,14 +1576,14 @@ class KrespotPlayer(private val context: Context) {
                 val source = VideoManifests.resolve(context, spclient, videoUri)
                 if (source == null) {
                     log.w("video '$videoUri' did not resolve, falling back to audio")
-                    videoActive = false
+                    stopVideo()
                     _events.emit(PlayerEvent.Failed("no video source"))
                     return@launch
                 }
                 if (id != generation) return@launch
                 val ready = video.prepare(source.manifest, fromMs, autoplay = !pendingPause)
                 if (!ready) {
-                    videoActive = false
+                    stopVideo()
                     _events.emit(PlayerEvent.Failed("video engine failed"))
                     return@launch
                 }
@@ -1499,15 +1603,21 @@ class KrespotPlayer(private val context: Context) {
                 throw cancellation
             } catch (failure: Throwable) {
                 log.e("video play failed ${failure.javaClass.simpleName}: ${failure.message}")
-                videoActive = false
+                stopVideo()
                 _events.emit(PlayerEvent.Failed(failure.message.orEmpty()))
             }
         }
+        return true
     }
 
     /** Leaves video mode; the caller resumes audio playback at fromMs. */
     fun stopVideo() {
-        if (!videoActive) return
+        if (!videoActive) {
+            if (_state.value.isVideo) {
+                _state.update { it.copy(isVideo = false, playing = false, buffering = false) }
+            }
+            return
+        }
         videoActive = false
         video.stop()
         _state.update { it.copy(isVideo = false, playing = false, buffering = false) }

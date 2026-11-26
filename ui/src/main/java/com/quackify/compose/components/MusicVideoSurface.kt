@@ -30,6 +30,7 @@ fun MusicVideoSurface(
     onSurface: (Surface?) -> Unit,
     cornerRadius: Dp = 16.dp,
     modifier: Modifier = Modifier,
+    sessionKey: Any? = null,
 ) {
     val context = LocalContext.current
     val radiusPx = with(LocalDensity.current) { cornerRadius.toPx() }
@@ -48,7 +49,7 @@ fun MusicVideoSurface(
             }
         }
     }
-    DisposableEffect(view) {
+    DisposableEffect(view, sessionKey) {
         val listener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
                 onSurface(Surface(st))

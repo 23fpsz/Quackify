@@ -88,11 +88,16 @@ object CommandClient {
         return response
     }
 
+    /**
+     * A queue edit has to reach the device holding the state machine: aimed
+     * at anyone else the server still answers 202 and nobody consumes it.
+     */
     suspend fun addToQueue(
         context: Context,
         spclient: String,
         deviceId: String,
         trackUri: String,
+        targetDeviceId: String = "",
     ): Net.Response? {
         val command = JSONObject()
             .put(
@@ -104,10 +109,11 @@ object CommandClient {
             )
             .put("logging_params", JSONObject().put("command_id", commandId()))
             .put("endpoint", "add_to_queue")
-        val url = "https://$spclient/connect-state/v1/player/command/from/$deviceId/to/$deviceId"
+        val to = targetDeviceId.ifBlank { deviceId }
+        val url = "https://$spclient/connect-state/v1/player/command/from/$deviceId/to/$to"
         val body = JSONObject().put("command", command).toString()
         val response = Net.postJson(url, body, ConnectHeaders.of(context), tag = "add_to_queue")
-        log.i("queue += '$trackUri' -> ${response?.code ?: "no response"}")
+        log.i("queue += '$trackUri' on ${to.take(8)} -> ${response?.code ?: "no response"}")
         return response
     }
 
@@ -144,7 +150,8 @@ object CommandClient {
      * the server wrote it (entity_uri, added_at, iteration, hidden), and
      * is_queued stamped only on rows that really are queued. Rewriting
      * metadata from local guesses desynchronised every other client's queue
-     * view from the server's own machine.
+     * view from the server's own machine. The command only lands on the
+     * device holding the machine; anyone else gets a silent 202.
      */
     suspend fun setQueue(
         context: Context,
@@ -153,6 +160,7 @@ object CommandClient {
         nextRows: List<ClusterTrack>,
         prevRows: List<ClusterTrack>,
         queueRevision: String,
+        targetDeviceId: String = "",
     ): Net.Response? {
         val next = JSONArray()
         nextRows.forEach { next.put(trackNode(it)) }
@@ -164,10 +172,12 @@ object CommandClient {
             .put("queue_revision", queueRevision)
             .put("logging_params", JSONObject().put("command_id", commandId()))
             .put("endpoint", "set_queue")
-        val url = "https://$spclient/connect-state/v1/player/command/from/$deviceId/to/$deviceId"
+        val to = targetDeviceId.ifBlank { deviceId }
+        val url = "https://$spclient/connect-state/v1/player/command/from/$deviceId/to/$to"
         val body = JSONObject().put("command", command).toString()
         val response = Net.postJson(url, body, ConnectHeaders.of(context), tag = "set_queue")
-        log.i("queue = ${nextRows.size} next + ${prevRows.size} prev rev=${queueRevision.take(12)} -> ${response?.code ?: "no response"}")
+        log.i("queue = ${nextRows.size} next + ${prevRows.size} prev rev=${queueRevision.take(12)} " +
+                "on ${to.take(8)} -> ${response?.code ?: "no response"}")
         return response
     }
 

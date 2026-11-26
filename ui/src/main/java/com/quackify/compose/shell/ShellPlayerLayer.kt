@@ -25,6 +25,7 @@ import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 
 internal class ShellPlayerEnv(
@@ -93,7 +94,9 @@ internal class ShellPlayerEnv(
     val onAddToPlaylist: ((TrackItem) -> Unit)?,
     val openAlbum: (String, String, String) -> Unit,
     val openArtist: (String, String) -> Unit,
+    val openShow: (String) -> Unit,
     val shareEntity: (String) -> Unit,
+    val copyTrackTitle: (String) -> Unit = {},
 )
 
 /**
@@ -136,6 +139,7 @@ internal fun BoxScope.ShellPlayerLayer(
             isLiked = env.isLiked,
             coverUrl = env.currentCoverUrl,
             coverColor = nowPlayingDominantColor,
+            isExplicit = playbackState?.explicit ?: false,
             connectedDevice = effectiveConnectedDevice,
             connectedDeviceKind = activeDeviceKind,
             navItems = env.navItems,
@@ -143,13 +147,24 @@ internal fun BoxScope.ShellPlayerLayer(
             onNavSelect = { index ->
                 env.setSelectedNavIndex(index)
                 when (index) {
-                    0 -> if (env.currentScreen != ShellScreen.HOME) { env.navBackStack.clear(); env.setCurrentScreen(ShellScreen.HOME) }
+                    0 -> if (env.currentScreen != ShellScreen.HOME) {
+                        env.navBackStack.clear()
+                        env.setCurrentScreen(ShellScreen.HOME)
+                    } else {
+                        env.shellScope.launch { env.navController.nav.homeListState.animateScrollToItem(0) }
+                    }
                     1 -> if (env.currentScreen != ShellScreen.SEARCH) {
-                        env.navBackStack.clear(); env.setCurrentScreen(ShellScreen.SEARCH)
+                        env.navBackStack.clear()
+                        env.setCurrentScreen(ShellScreen.SEARCH)
                     } else {
                         runCatching { env.searchFieldFocusRequester.requestFocus() }
                     }
-                    2 -> if (env.currentScreen != ShellScreen.LIBRARY) { env.navBackStack.clear(); env.setCurrentScreen(ShellScreen.LIBRARY) }
+                    2 -> if (env.currentScreen != ShellScreen.LIBRARY) {
+                        env.navBackStack.clear()
+                        env.setCurrentScreen(ShellScreen.LIBRARY)
+                    } else {
+                        env.shellScope.launch { env.navController.nav.libraryListState.animateScrollToItem(0) }
+                    }
                 }
             },
             onSearchDoubleTap = {
@@ -157,16 +172,15 @@ internal fun BoxScope.ShellPlayerLayer(
             },
             onPlayPause = env.handlePlayPause,
             onLike = {
+                // Same as the Now Playing heart: open the Save-in sheet and let
+                // the pick do the saving, no instant Liked Songs toggle.
                 val playingUri = playbackState?.trackUri.orEmpty()
-                if (!env.isLiked) {
-                    if (env.playerListener != null) env.playerListener.onLikeToggle() else env.local.isLiked = true
-                }
                 val playingTrack = TrackItem(
                     title = env.currentTrackTitle,
                     artist = env.currentArtist,
                     uri = playingUri,
                     imageUrl = env.currentCoverUrl.takeIf { it.isNotBlank() },
-                    saved = true
+                    saved = env.isLiked
                 )
                 env.local.addTrackTarget = playingTrack
                 env.onAddToPlaylist?.invoke(playingTrack)
@@ -390,23 +404,35 @@ private fun NowPlayingScreenLayer(
             env.setIsPlayerExpanded(false)
             env.openAlbum(env.currentTrackTitle, env.currentArtist, env.resolvedAlbumUri)
         },
+        onTitleLongClick = { env.copyTrackTitle(env.currentTrackTitle) },
         onArtistClick = {
             // A tap jumps straight into the artist page when the track names
             // one artist; two or more credited artists open the picker sheet
-            // so each artist has their own row instead.
+            // so each artist has their own row instead. Podcast episodes
+            // credit a show rather than artists, so the tap opens the show.
+            val showUri = env.nowPlayingShow?.uri.orEmpty()
+                .takeIf { it.startsWith("spotify:show:") }
             val uris = env.playbackState?.artistUris.orEmpty()
                 .filter { it.startsWith("spotify:artist:") }
-            if (uris.size > 1) {
-                env.local.artistListTrack = null
-                env.flags.isArtistListOpen = true
-            } else {
-                env.setIsPlayerExpanded(false)
-                env.openArtist(env.currentArtist, env.resolvedArtistUri)
+            when {
+                showUri != null && uris.isEmpty() -> {
+                    env.setIsPlayerExpanded(false)
+                    env.openShow(showUri)
+                }
+                uris.size > 1 -> {
+                    env.local.artistListTrack = null
+                    env.flags.isArtistListOpen = true
+                }
+                else -> {
+                    env.setIsPlayerExpanded(false)
+                    env.openArtist(env.currentArtist, env.resolvedArtistUri)
+                }
             }
         },
         onArtistLongClick = {
             // Long-press mirrors the tap: the picker for a multi-artist
             // credit, the follow / ban / radio / share options sheet for one.
+            // Episodes have no artist image, so the show cover stands in.
             val uris = env.playbackState?.artistUris.orEmpty()
                 .filter { it.startsWith("spotify:artist:") }
             if (uris.size > 1) {
@@ -416,6 +442,7 @@ private fun NowPlayingScreenLayer(
                 env.local.artistOptionsName = env.currentArtist
                 env.local.artistOptionsUri = env.resolvedArtistUri
                 env.local.artistOptionsAvatarUrl = env.nowPlayingArtistImageUrl
+                    ?: env.nowPlayingShow?.imageUrl?.takeIf { it.isNotBlank() }
                 env.local.artistOptionsFollowed = env.nowPlayingArtistFollowed
                 env.flags.isArtistOptionsFromPlayer = true
                 env.flags.isArtistOptionsOpen = true

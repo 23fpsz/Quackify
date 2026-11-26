@@ -8,6 +8,7 @@ import com.quackify.backend.model.PlaylistChoice
 import com.quackify.backend.model.PlaylistPermissions
 import com.quackify.backend.model.ProfileUser
 import com.quackify.backend.model.SearchHit
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.format.formatCount
 import com.quackify.compose.library.LibraryItem
 import com.quackify.compose.playlist.TrackItem
@@ -62,6 +63,7 @@ internal class ShellOverlaysEnv(
     val onLoadPlaylistFolder: (suspend (trackUri: String, folderUri: String) -> List<PlaylistChoice>)?,
     val onLoadTrackCount: (suspend (playlistUri: String) -> Int)?,
     val onCreatePlaylistWith: ((TrackItem) -> Unit)?,
+    val toastState: QuackifyToastState? = null,
     val openArtist: (String, String) -> Unit,
     val openAlbum: (String, String, String) -> Unit,
     val openUserProfile: (String, String) -> Unit,
@@ -128,6 +130,7 @@ internal fun ShellOverlaysHost(env: ShellOverlaysEnv) {
         openArtist = env.openArtist,
         openAlbum = env.openAlbum,
         openUserProfile = env.openUserProfile,
+        toastState = env.toastState,
     )
 
     EncoreCreateNameDialog(
@@ -232,6 +235,7 @@ internal fun ShellOverlaySheets(
     openArtist: (String, String) -> Unit,
     openAlbum: (String, String, String) -> Unit,
     openUserProfile: (String, String) -> Unit,
+    toastState: QuackifyToastState? = null,
 ) {
     if (flags.isProfileFollowOpen) {
         ProfileFollowSheet(
@@ -347,6 +351,8 @@ internal fun ShellOverlaySheets(
     if (flags.isAddToPlaylistOpen) {
         val target = local.addTrackTarget
         val targetIsLiked = if (target?.uri == playbackState?.trackUri) isLiked else (target?.saved == true)
+        val changesSavedMsg = stringResource(R.string.changes_saved)
+        val noChangesToSaveMsg = stringResource(R.string.no_changes_to_save)
         AddToPlaylistSheet(
             isOpen = true,
             trackTitle = target?.title.orEmpty(),
@@ -394,6 +400,9 @@ internal fun ShellOverlaySheets(
             onCreateNew = {
                 local.addTrackTarget?.let { track -> onCreatePlaylistWith?.invoke(track) }
                 flags.isAddToPlaylistOpen = false
+            },
+            onDone = { saved ->
+                toastState?.show(if (saved) changesSavedMsg else noChangesToSaveMsg)
             },
             onDismiss = { flags.isAddToPlaylistOpen = false }
         )

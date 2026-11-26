@@ -120,30 +120,44 @@ internal class UpdateController {
     suspend fun install(context: android.content.Context) {
         val target = prompt ?: appUpdate ?: return
         prompt = target
-        phase = UpdateInstallPhase.Downloading
-        downloadedMb = 0f
-        totalMb = 0f
-        speedMbps = 0f
-        val file = withContext(Dispatchers.IO) {
-            UpdateInstaller.download(context, target) { done, total, speed ->
-                downloadedMb = done / 1_000_000f
-                totalMb = total / 1_000_000f
-                speedMbps = speed / 1_000_000f
+
+        // If the APK is already cached and valid, skip download entirely and prompt installation
+        val cached = withContext(Dispatchers.IO) { UpdateInstaller.cachedApk(context, target) }
+        val file = if (cached != null) {
+            log.i("Using already downloaded update APK: ${cached.name}")
+            cached
+        } else {
+            phase = UpdateInstallPhase.Downloading
+            downloadedMb = 0f
+            totalMb = 0f
+            speedMbps = 0f
+            val downloaded = withContext(Dispatchers.IO) {
+                UpdateInstaller.download(context, target) { done, total, speed ->
+                    downloadedMb = done / 1_000_000f
+                    totalMb = total / 1_000_000f
+                    speedMbps = speed / 1_000_000f
+                }
             }
+            if (downloaded == null) {
+                phase = UpdateInstallPhase.Idle
+                Toast.makeText(context, "Download failed", Toast.LENGTH_SHORT).show()
+                return
+            }
+            downloaded
         }
-        if (file == null) {
-            phase = UpdateInstallPhase.Idle
-            Toast.makeText(context, "Download failed", Toast.LENGTH_SHORT).show()
-            return
-        }
+
         phase = UpdateInstallPhase.Installing
         runCatching {
             UpdateInstaller.install(context, file) { ok, message ->
                 phase = UpdateInstallPhase.Idle
                 if (!ok) {
-                    prompt = null
                     log.w("install failed $message")
-                    Toast.makeText(context, "Install failed: $message", Toast.LENGTH_LONG).show()
+                    // If the user was just redirected to Settings to enable unknown app installs,
+                    // don't dismiss the prompt or show an error toast—let them return and install.
+                    if (message != UpdateInstaller.ERR_PERMISSION_REQUIRED) {
+                        prompt = null
+                        Toast.makeText(context, "Install failed: $message", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }.onFailure {
@@ -160,7 +174,8 @@ internal fun rememberUpdateController(): UpdateController = remember { UpdateCon
 internal fun UpdateEffects(controller: UpdateController) {
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) { UpdateInstaller.cleanup(context) }
+        val targetVersion = controller.prompt?.version ?: controller.appUpdate?.version
+        withContext(Dispatchers.IO) { UpdateInstaller.cleanup(context, keepVersion = targetVersion) }
         controller.onHomeEntered()
         while (isActive) {
             delay(30 * 60 * 1000L)

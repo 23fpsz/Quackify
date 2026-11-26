@@ -77,6 +77,19 @@ object ClientToken {
         return generated
     }
 
+    fun resetDeviceId(context: Context): String {
+        val newId = UUID.randomUUID().toString()
+        SecureStore.prefs(context).edit()
+            .putString(KEY_DEVICE, newId)
+            .remove(KEY_REFRESH)
+            .remove(KEY_MINTED_AT)
+            .apply()
+        refreshAtMemo = -1L
+        EncoreAuth.saveClientToken(context, "", 0L)
+        log.i("device id rotated to $newId and client-token cleared")
+        return newId
+    }
+
     fun invalidate(context: Context) {
         log.w("client-token dropped, the next call mints a new one")
         SecureStore.prefs(context).edit()

@@ -22,6 +22,7 @@ import android.support.v4.media.session.PlaybackStateCompat
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.session.MediaButtonReceiver
 import com.quackify.app.auto.AutoMediaTree
+import com.quackify.backend.api.Search
 import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.net.ConnectivityMonitor
 import com.quackify.app.widget.WidgetSync
@@ -265,7 +266,8 @@ class PlaybackService : MediaBrowserServiceCompat() {
                             it.startsWith("spotify:artist:") ||
                             it.startsWith("spotify:show:") ||
                             it.startsWith("spotify:collection:") ||
-                            it.startsWith("spotify:user:")
+                            it.startsWith("spotify:user:") ||
+                            it.startsWith("spotify:search:")
                         }
                         if (!validCtx.isNullOrBlank()) {
                             bridge.listener.onPlayTrack(mediaId, validCtx, -1)
@@ -284,7 +286,30 @@ class PlaybackService : MediaBrowserServiceCompat() {
                 log.i("onPlayFromSearch received: query=$query")
                 PlaybackHost.startService(this@PlaybackService)
                 if (!query.isNullOrBlank()) {
-                    bridge.listener.onPlayUri(query)
+                    if (query.startsWith("spotify:track:") || query.startsWith("spotify:episode:")) {
+                        val ctx = autoMediaTree.lastBrowsedContext.takeIf { it.startsWith("spotify:search:") } ?: Search.searchUriOf(query)
+                        bridge.listener.onPlayTrack(query, ctx, -1)
+                    } else if (query.startsWith("spotify:")) {
+                        bridge.listener.onPlayUri(query)
+                    } else {
+                        val searchContextUri = Search.searchUriOf(query)
+                        autoMediaTree.lastBrowsedContext = searchContextUri
+                        scope.launch {
+                            try {
+                                val results = Search.query(applicationContext, query)
+                                val topPlayable = results?.top?.takeIf { it.uri.startsWith("spotify:track:") || it.uri.startsWith("spotify:episode:") }
+                                    ?: results?.tracks?.firstOrNull()
+                                if (topPlayable != null) {
+                                    bridge.listener.onPlayTrack(topPlayable.uri, searchContextUri, -1)
+                                } else {
+                                    bridge.listener.onPlayUri(query)
+                                }
+                            } catch (e: Exception) {
+                                log.e("onPlayFromSearch failed for '$query'", e)
+                                bridge.listener.onPlayUri(query)
+                            }
+                        }
+                    }
                 } else {
                     onPlay()
                 }
