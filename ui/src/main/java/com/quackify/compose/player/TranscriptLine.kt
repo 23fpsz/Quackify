@@ -5,6 +5,7 @@ data class TranscriptLine(
     val text: String,
     val speaker: Boolean,
     val words: List<TranscriptWordSpan> = emptyList(),
+    val translation: String = "",
 )
 
 data class TranscriptWordSpan(

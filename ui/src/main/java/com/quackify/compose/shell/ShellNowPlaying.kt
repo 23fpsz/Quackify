@@ -113,6 +113,7 @@ internal fun ShellNowPlaying(
     onDevice: () -> Unit,
     onShare: () -> Unit = {},
     onTitleClick: () -> Unit = {},
+    onTitleLongClick: (() -> Unit)? = null,
     onArtistClick: () -> Unit = {},
     onArtistLongClick: (() -> Unit)? = null,
 ) {
@@ -198,6 +199,7 @@ internal fun ShellNowPlaying(
             onDeviceClick = onDevice,
             onShareClick = onShare,
             onTitleClick = onTitleClick,
+            onTitleLongClick = onTitleLongClick,
             onArtistClick = onArtistClick,
             onArtistLongClick = onArtistLongClick
         )

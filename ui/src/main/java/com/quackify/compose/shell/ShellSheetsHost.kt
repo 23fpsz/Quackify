@@ -12,6 +12,7 @@ import com.quackify.backend.api.ArtistBanStore
 import com.quackify.backend.api.Collection2
 import com.quackify.backend.api.Podcasts
 import com.quackify.backend.core.auth.EncoreAuth
+import com.quackify.backend.library.Krespot
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.CollectionDetail
@@ -86,6 +87,7 @@ internal class ShellSheetsEnv(
     val onLoadProfile: (() -> Unit)?,
     val onOpenHistory: (() -> Unit)?,
     val onOpenActivity: (() -> Unit)?,
+    val onOpenFriendActivity: (() -> Unit)? = null,
     val activityUnread: Boolean,
     val onAddToPlaylist: ((TrackItem) -> Unit)?,
     val onShowCredits: ((String) -> Unit)?,
@@ -124,6 +126,9 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
     val tasteExcludedMsg = stringResource(R.string.excluded_from_taste_profile)
     val tasteIncludedMsg = stringResource(R.string.included_in_taste_profile)
     val tasteUpdateFailedMsg = stringResource(R.string.couldnt_update_taste_profile)
+    val playlistNowPublicMsg = stringResource(R.string.playlist_now_public)
+    val playlistNowPrivateMsg = stringResource(R.string.playlist_now_private)
+    val playlistPrivacyFailedMsg = stringResource(R.string.couldnt_update_this_playlist)
     val trackRadioTitle = stringResource(R.string.radio_title, local.trackForOptions?.title.orEmpty())
     val albumRadioTitle = stringResource(R.string.radio_title, active.albumTitle)
 
@@ -139,6 +144,32 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
     }
     val artistRadioTitle = stringResource(R.string.radio_title, sheetArtistName)
     var artistBannedState by remember { mutableStateOf<Boolean?>(null) }
+    // The privacy flip rides the loaded playlist detail; the override keeps
+    // what this device last set until the playlist reloads.
+    var playlistPrivacyOverride by remember(active.playlistUri) { mutableStateOf<Boolean?>(null) }
+    val playlistIsPrivate = playlistPrivacyOverride ?: env.playlistDetail?.isPrivate ?: false
+    val canAdministratePlaylist = env.playlistDetail?.canAdministratePermissions == true
+    val playlistPrivacyToggle: (Boolean) -> Unit = { toPublic ->
+        val uri = active.playlistUri
+        if (uri.startsWith("spotify:playlist:")) {
+            val previous = playlistPrivacyOverride
+            playlistPrivacyOverride = !toPublic
+            env.shellScope.launch {
+                val ok = runCatching { Krespot.playlists.setPrivacy(env.context, uri, toPublic) }
+                    .getOrDefault(false)
+                if (ok) {
+                    Toast.makeText(
+                        env.context,
+                        if (toPublic) playlistNowPublicMsg else playlistNowPrivateMsg,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    playlistPrivacyOverride = previous
+                    Toast.makeText(env.context, playlistPrivacyFailedMsg, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     LaunchedEffect(flags.isArtistOptionsOpen, sheetArtistUri) {
         if (!flags.isArtistOptionsOpen) return@LaunchedEffect
         if (!sheetArtistUri.startsWith("spotify:artist:")) return@LaunchedEffect
@@ -188,7 +219,8 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             queue = flags.isQueueSheetOpen,
             sleepTimer = flags.isSleepTimerOpen,
             canvasResolutionSheet = flags.isCanvasResolutionSheetOpen,
-            lyricsProviderSheet = flags.isLyricsProviderSheetOpen
+            lyricsProviderSheet = flags.isLyricsProviderSheetOpen,
+            audioPipelineSheet = flags.isAudioPipelineSheetOpen
         ),
         selectedTrack = local.trackForOptions,
         devices = playbackState?.devices.orEmpty(),
@@ -336,6 +368,13 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         onDismissSleepTimer = { flags.isSleepTimerOpen = false },
         onCanvasResolutionClick = { flags.isCanvasResolutionSheetOpen = true },
         onDismissCanvasResolution = { flags.isCanvasResolutionSheetOpen = false },
+        playlistIsPrivate = playlistIsPrivate,
+        canAdministratePlaylist = canAdministratePlaylist,
+        onPlaylistPrivacyToggle = playlistPrivacyToggle,
+        pipeline = playbackState?.pipeline ?: PipelineInfo(),
+        trackOptionsFromPlayer = flags.isTrackOptionsFromPlayer,
+        onAudioPipeline = { flags.isAudioPipelineSheetOpen = true },
+        onDismissAudioPipeline = { flags.isAudioPipelineSheetOpen = false },
         onShowCredits = {
             local.trackForOptions?.let { track ->
                 flags.isCreditsOpen = true
@@ -365,6 +404,10 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             env.onOpenActivity?.invoke()
         },
         notificationsUnread = env.activityUnread,
+        onFriendActivity = {
+            env.navController.openFriendActivity()
+            env.onOpenFriendActivity?.invoke()
+        },
         onProfile = {
             env.pushCurrentState()
             env.setCurrentScreen(ShellScreen.PROFILE)

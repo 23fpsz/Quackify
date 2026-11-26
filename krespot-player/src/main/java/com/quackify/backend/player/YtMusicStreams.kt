@@ -50,6 +50,16 @@ private const val LENGTH_TIGHT = 30
 
 private const val LENGTH_CLOSE = 10
 
+private const val VERSION_EXACT = 24
+
+/** A shared live marker outranks every other partial version agreement. */
+private const val VERSION_LIVE_SHARED = 18
+
+private const val VERSION_MISS = -10
+
+/** A different take of the song: ranked, but only as the last resort. */
+private const val VERSION_TAKE_MISS = -32
+
 /** Past this many seconds of drift the candidate is a different take. */
 private const val LENGTH_LIMIT_SECONDS = 30L
 
@@ -67,6 +77,9 @@ private val DURATION = Regex("""(\d+):(\d{2})""")
 private val BRACKETED = Regex("""[(\[]([^()\[\]]*)[)\]]""")
 
 private val FEATURING = Regex("""\b(feat|ft|featuring)\b.*""")
+
+/** A catalogue title hyphenated onto its version line: "Song - Live in Mexico City". */
+private val DASH_SEGMENT = Regex("""\s+[-–—]\s+""")
 
 private val NON_ALNUM = Regex("""[^\p{L}\p{N}]""")
 
@@ -307,8 +320,12 @@ internal object YtMusicStreams {
             return null
         }
         val ranked = officialRank(track, found.candidates).ifEmpty {
-            log.w("no official audio candidate for '${track.name.ifBlank { track.uri.takeLast(12) }}'")
-            return null
+            log.i("no strict official candidate for '${track.name}', falling back to candidates")
+            found.candidates.filter { candidate ->
+                val have = TitleParts.of(candidate.title)
+                val wanted = TitleParts.of(track.name)
+                titlesMatch(wanted, have) || candidate.title.contains(wanted.core, ignoreCase = true)
+            }.ifEmpty { found.candidates }
         }
         for (candidate in ranked.take(CANDIDATES)) {
             val stream = streamOf(context, track, candidate, found.visitorData) ?: continue
@@ -322,9 +339,10 @@ internal object YtMusicStreams {
 
     /**
      * The catalogue's own audio for the track: a song row, the same take, the
-     * same credit. A music video, a cover by another artist or a sped-up edit
-     * is dropped rather than streamed, so the audio lines up with the Spotify
-     * master the queue asked for.
+     * same credit. Version markers score instead of veto, weighted so a live
+     * query keeps ranking live takes above the studio master while a video
+     * row, a cover by another artist or a grossly wrong length is still
+     * dropped rather than streamed.
      */
     private fun officialRank(track: CommandTrack, candidates: List<YtCandidate>): List<YtCandidate> {
         val wanted = TitleParts.of(track.name)
@@ -334,11 +352,19 @@ internal object YtMusicStreams {
             val have = TitleParts.of(candidate.title)
             if (have.core.isBlank() || wanted.core.isBlank()) return@mapNotNull null
             if (!titlesMatch(wanted, have)) return@mapNotNull null
-            if (wanted.versions != have.versions) return@mapNotNull null
             val credit = creditScore(wantedArtists, candidate.artists) ?: return@mapNotNull null
             val length = lengthScore(track.durationMs / 1000, candidate.durationSeconds)
-            candidate to (credit + length)
+            val version = versionScore(wanted.versions, have.versions)
+            if (version < 0 && credit + version <= 0) return@mapNotNull null
+            candidate to (credit + length + version)
         }.sortedByDescending { it.second }.map { it.first }
+    }
+
+    private fun versionScore(wanted: Set<String>, have: Set<String>): Int = when {
+        wanted == have -> VERSION_EXACT
+        "live" in wanted && "live" in have -> VERSION_LIVE_SHARED
+        ("live" in wanted) != ("live" in have) -> VERSION_TAKE_MISS
+        else -> VERSION_MISS
     }
 
     private fun titlesMatch(wanted: TitleParts, have: TitleParts): Boolean {
@@ -376,6 +402,13 @@ internal object YtMusicStreams {
                     }
                 }
                 text = text.replace(FEATURING, " ")
+                val segments = text.split(DASH_SEGMENT)
+                if (segments.size > 1) {
+                    for (index in 1 until segments.size) {
+                        classify(segments[index], versions)
+                    }
+                    text = segments.first()
+                }
                 var words = text.split(WHITESPACE)
                     .map { it.replace(NON_ALNUM, "") }
                     .filter { it.isNotEmpty() }

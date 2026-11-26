@@ -25,7 +25,7 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
 /**
- * On-demand lyric translation, adapted from BitChord's approach.
+ * On-demand lyric translation
  *
  * Translations are fetched from Google Translate's public web endpoint
  * (client=dict-chrome-ex) in batches: lines are joined with a private-use

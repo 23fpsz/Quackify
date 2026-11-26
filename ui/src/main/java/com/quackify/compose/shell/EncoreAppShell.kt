@@ -1,5 +1,6 @@
 package com.quackify.compose.shell
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.res.Configuration
 import android.content.Context
@@ -33,6 +34,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.SaveableStateHolder
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Modifier
@@ -125,10 +128,12 @@ internal fun splitPlayerWidthFraction(): Float {
 @Composable
 internal fun ShellScreenSlot(
     screen: ShellScreen,
+    screenKey: String,
+    saveableStateHolder: SaveableStateHolder,
     content: @Composable (ShellScreen) -> Unit
 ) {
     AnimatedContent(
-        targetState = screen,
+        targetState = screen to screenKey,
         transitionSpec = {
             (
                 fadeIn(tween(EncoreAnimation.ScreenEnterDuration, easing = EncoreAnimation.BoxInterpolator)) +
@@ -138,8 +143,10 @@ internal fun ShellScreenSlot(
                 ) togetherWith fadeOut(tween(EncoreAnimation.ScreenExitDuration))
         },
         label = "ShellScreenTransition"
-    ) { target ->
-        content(target)
+    ) { (targetScreen, targetKey) ->
+        saveableStateHolder.SaveableStateProvider(key = targetKey) {
+            content(targetScreen)
+        }
     }
 }
 
@@ -227,6 +234,7 @@ fun EncoreAppShell(
     notificationsFailed: Boolean = false,
     onRefreshWhatsNew: (() -> Unit)? = null,
     activityState: ActivityFeedState? = null,
+    friendActivityState: FriendActivityState? = null,
     historyToday: List<TrackItem> = emptyList(),
     historyYesterday: List<TrackItem> = emptyList(),
     historyEarlier: List<TrackItem> = emptyList(),
@@ -353,11 +361,8 @@ fun EncoreAppShell(
     onArtistFollowed: (suspend (artistUri: String) -> Boolean?)? = null,
     onArtistImage: (suspend (artistUri: String) -> String?)? = null,
     onShowFollowToggle: ((showUri: String, follow: Boolean) -> Unit)? = null,
-    onArtistTrackLikeToggle: ((TrackItem) -> Unit)? = null,
-    onAlbumTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     albumSaved: Boolean? = null,
     onAlbumSavedToggle: ((uri: String, saved: Boolean) -> Unit)? = null,
-    onPlaylistTrackLikeToggle: ((TrackItem) -> Unit)? = null,
     onArtistRadio: (suspend (artistUri: String) -> String?)? = null,
     profile: UserProfile? = null,
     profileTop: ProfileTopContent? = null,
@@ -380,6 +385,7 @@ fun EncoreAppShell(
     val active = remember { ShellActiveEntity() }
     val navState = remember { ShellNavState() }
     val local = remember { ShellLocalState() }
+    val saveableStateHolder = rememberSaveableStateHolder()
     val activityFeed = activityState?.feed.orEmpty()
     val activityLoading = activityState?.loading == true
     val activityFailed = activityState?.failed == true
@@ -389,6 +395,12 @@ fun EncoreAppShell(
     val onRetryActivity = activityState?.onRetry
     val onLeaveActivity = activityState?.onLeave
     val onProfileDrawerOpened = activityState?.onDrawerOpened
+    val friendActivityFeed = friendActivityState?.feed.orEmpty()
+    val friendActivityLoading = friendActivityState?.loading == true
+    val friendActivityFailed = friendActivityState?.failed == true
+    val onOpenFriendActivity = friendActivityState?.onOpen
+    val onRetryFriendActivity = friendActivityState?.onRetry
+    val onSilentRefreshFriendActivity = friendActivityState?.onSilentRefresh
     val searchQueryNow = searchQuery
     val navController = remember(
         searchQueryNow,
@@ -420,6 +432,11 @@ fun EncoreAppShell(
             onOpenEpisode = onOpenEpisode,
             onOpenUserProfile = onOpenUserProfile,
             onAddTracksClosed = { onRetryPlaylist?.invoke() },
+            onScreenPopped = { leavingKey ->
+                if (!leavingKey.startsWith("root_")) {
+                    saveableStateHolder.removeState(leavingKey)
+                }
+            },
             libraryItems = libraryItems,
             searchData = searchData,
             nowPlayingArtistImageUrl = nowPlayingArtistImageUrl,
@@ -541,6 +558,7 @@ fun EncoreAppShell(
         clipboard = clipboard,
         offlineGate = { offlineNow },
         onBlocked = offlineBlockedToast,
+        onAddToPlaylist = onAddToPlaylist,
     )
 
     val pushCurrentState: () -> Unit = { navController.pushCurrentState() }
@@ -762,6 +780,12 @@ fun EncoreAppShell(
 
     val shareEntity: (String) -> Unit = { uri -> actions.shareEntity(context, uri) }
 
+    val titleCopiedLabel = stringResource(R.string.title_copied)
+    val copyTrackTitle: (String) -> Unit = { title ->
+        clipboard.setPrimaryClip(ClipData.newPlainText("Track title", title))
+        toast.show(titleCopiedLabel)
+    }
+
     val libraryFolderChoices = remember(libraryItems) {
         libraryItems.orEmpty()
             .filter { it.type == LibraryItemType.FOLDER }
@@ -810,6 +834,7 @@ fun EncoreAppShell(
             handleLibraryLongPress = handleLibraryLongPress,
             handleFolderClick = handleFolderClick,
             shareEntity = shareEntity,
+            copyTrackTitle = copyTrackTitle,
             progressState = progressState,
             currentScreen = currentScreen,
             isPlayerExpanded = isPlayerExpanded,
@@ -888,6 +913,7 @@ fun EncoreAppShell(
             onLoadProfile = onLoadProfile,
             onOpenHistory = onOpenHistory,
             onOpenActivity = onOpenActivity,
+            onOpenFriendActivity = onOpenFriendActivity,
             activityUnread = activityUnread,
             onShowCredits = onShowCredits,
             onEditPlaylist = onEditPlaylist,
@@ -949,7 +975,11 @@ fun EncoreAppShell(
             isPlayerExpanded && !flags.isLogcatOpen &&
             com.quackify.compose.player.PlayerViewOptions.landscapeDualView
         val screenHost: @Composable () -> Unit = {
-            ShellScreenSlot(currentScreen) { screen ->
+            ShellScreenSlot(
+                screen = currentScreen,
+                screenKey = navState.currentScreenKey,
+                saveableStateHolder = saveableStateHolder
+            ) { screen ->
                 when (screen) {
                     ShellScreen.HOME -> ShellHomeRoute(
                         env = hosts.route(),
@@ -1021,7 +1051,6 @@ fun EncoreAppShell(
                         onTogglePlaylistSaved = onTogglePlaylistSaved,
                         playlistPermissions = playlistPermissions,
                         onLoadPlaylistContributors = onLoadPlaylistContributors,
-                        onPlaylistTrackLikeToggle = onPlaylistTrackLikeToggle,
                         onEditPlaylist = onEditPlaylist,
                         onAddTracksOpen = onAddTracksOpen,
                     )
@@ -1036,7 +1065,6 @@ fun EncoreAppShell(
                         albumLoadingMore = albumLoadingMore,
                         onLoadMoreAlbumTracks = onLoadMoreAlbumTracks,
                         onRetryAlbum = onRetryAlbum,
-                        onAlbumTrackLikeToggle = onAlbumTrackLikeToggle,
                         albumSaved = albumSaved,
                         onAlbumSavedToggle = onAlbumSavedToggle,
                     )
@@ -1054,7 +1082,6 @@ fun EncoreAppShell(
                         artistBanned = artistBanned,
                         onArtistUnban = onArtistUnban,
                         onArtistFollowToggle = onArtistFollowToggle,
-                        onArtistTrackLikeToggle = onArtistTrackLikeToggle,
                     )
     
                     ShellScreen.CATEGORY -> ShellCategoryRoute(
@@ -1101,6 +1128,15 @@ fun EncoreAppShell(
                         self = activitySelf,
                         onRetry = onRetryActivity,
                         onLeave = onLeaveActivity,
+                    )
+
+                    ShellScreen.FRIEND_ACTIVITY -> ShellFriendActivityRoute(
+                        env = hosts.route(),
+                        friends = friendActivityFeed,
+                        loading = friendActivityLoading,
+                        loadFailed = friendActivityFailed,
+                        onRetry = onRetryFriendActivity,
+                        onSilentRefresh = onSilentRefreshFriendActivity,
                     )
     
                     ShellScreen.HISTORY -> ShellHistoryRoute(

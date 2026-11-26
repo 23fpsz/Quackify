@@ -61,6 +61,10 @@ data class CollectionDetail(
     val fetched: Int = 0,
     val editable: Boolean = false,
     val members: List<PlaylistMember> = emptyList(),
+    /** True when the base permission is BLOCKED: only members can open the playlist. */
+    val isPrivate: Boolean = false,
+    /** Whether this account may change the playlist's base permission at all. */
+    val canAdministratePermissions: Boolean = false,
 ) {
     val hasMore: Boolean get() = fetched > 0 && offset + fetched < total
     val complete: Boolean get() = fetched > 0 && offset + fetched >= total

@@ -764,22 +764,26 @@ class KrespotConnect(private val context: Context) {
         return response?.ok == true
     }
 
-    suspend fun addToQueue(trackUri: String): Boolean {
+    suspend fun addToQueue(trackUri: String, targetDeviceId: String = ""): Boolean {
         if (spclient.isBlank() || trackUri.isBlank()) {
             log.w("queue: nothing to add, spclient='$spclient' uri='$trackUri'")
             return false
         }
-        val response = CommandClient.addToQueue(context, spclient, deviceId, trackUri)
+        val response = CommandClient.addToQueue(context, spclient, deviceId, trackUri, targetDeviceId)
         return response?.ok == true
     }
 
-    suspend fun setQueue(nextRows: List<ClusterTrack>, prevRows: List<ClusterTrack> = emptyList()): Boolean {
+    suspend fun setQueue(
+        nextRows: List<ClusterTrack>,
+        prevRows: List<ClusterTrack> = emptyList(),
+        targetDeviceId: String = "",
+    ): Boolean {
         if (spclient.isBlank()) {
             log.w("queue: dealer not connected yet")
             return false
         }
         val revision = _cluster.value?.queueRevision.orEmpty()
-        val response = CommandClient.setQueue(context, spclient, deviceId, nextRows, prevRows, revision)
+        val response = CommandClient.setQueue(context, spclient, deviceId, nextRows, prevRows, revision, targetDeviceId)
         return response?.ok == true
     }
 

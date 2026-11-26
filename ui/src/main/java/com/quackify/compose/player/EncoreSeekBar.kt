@@ -268,9 +268,11 @@ fun EncoreSeekBar(
         ) {
             val previewMs = (displayProgress * durationMs).toLong()
             val totalSeconds = (previewMs / 1000).coerceAtLeast(0)
-            val minutes = totalSeconds / 60
+            val hours = totalSeconds / 3600
+            val minutes = (totalSeconds % 3600) / 60
             val seconds = totalSeconds % 60
-            val formatted = String.format("%d:%02d", minutes, seconds)
+            val formatted = if (hours > 0L) String.format("%d:%02d:%02d", hours, minutes, seconds)
+            else String.format("%d:%02d", minutes, seconds)
 
             Box(
                 modifier = Modifier

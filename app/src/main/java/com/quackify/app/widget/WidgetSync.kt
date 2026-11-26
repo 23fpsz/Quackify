@@ -75,7 +75,7 @@ object WidgetSync {
                     try {
                         val bridge = PlaybackHost.bridge
                         val live = bridge
-                            ?.let { WidgetSnapshot.from(it.state, it.progress) }
+                            ?.let { WidgetSnapshot.from(it.state, it.progress, WidgetAlbumNames.nameFor(app, it)) }
                             ?.takeIf { it.hasTrack }
                         val snapshot = resolve(live, app)
                         val key = snapshot.fingerprint()

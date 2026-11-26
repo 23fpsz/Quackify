@@ -66,6 +66,7 @@ internal class ShellHosts(
     val handleLibraryLongPress: (LibraryItem) -> Unit,
     val handleFolderClick: (LibraryItem) -> Unit,
     val shareEntity: (String) -> Unit,
+    val copyTrackTitle: (String) -> Unit = {},
     val progressState: PlaybackProgress?,
     val currentScreen: ShellScreen,
     val isPlayerExpanded: Boolean,
@@ -144,6 +145,7 @@ internal class ShellHosts(
     val onLoadProfile: (() -> Unit)?,
     val onOpenHistory: (() -> Unit)?,
     val onOpenActivity: (() -> Unit)?,
+    val onOpenFriendActivity: (() -> Unit)? = null,
     val activityUnread: Boolean,
     val onShowCredits: ((String) -> Unit)?,
     val onEditPlaylist: ((String) -> Unit)?,
@@ -229,6 +231,7 @@ internal class ShellHosts(
         handleLibraryLongPress = handleLibraryLongPress,
         handleFolderClick = handleFolderClick,
         shareEntity = shareEntity,
+        toastState = toastState,
     )
 
     fun player(): ShellPlayerEnv = ShellPlayerEnv(
@@ -297,7 +300,9 @@ internal class ShellHosts(
         onAddToPlaylist = onAddToPlaylist,
         openAlbum = openAlbum,
         openArtist = openArtist,
+        openShow = openShow,
         shareEntity = shareEntity,
+        copyTrackTitle = copyTrackTitle,
     )
 
     fun sheets(): ShellSheetsEnv = ShellSheetsEnv(
@@ -358,6 +363,7 @@ internal class ShellHosts(
         onLoadProfile = onLoadProfile,
         onOpenHistory = onOpenHistory,
         onOpenActivity = onOpenActivity,
+        onOpenFriendActivity = onOpenFriendActivity,
         activityUnread = activityUnread,
         onAddToPlaylist = onAddToPlaylist,
         onShowCredits = onShowCredits,
@@ -414,6 +420,7 @@ internal class ShellHosts(
         onLoadPlaylistFolder = onLoadPlaylistFolder,
         onLoadTrackCount = onLoadTrackCount,
         onCreatePlaylistWith = onCreatePlaylistWith,
+        toastState = toastState,
         openArtist = openArtist,
         openAlbum = openAlbum,
         openUserProfile = openUserProfile,

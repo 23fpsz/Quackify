@@ -1,7 +1,5 @@
 package com.quackify.compose.search
 
-import com.quackify.compose.util.localizeBrowseCategory
-
 import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -198,6 +196,9 @@ fun EncoreSearchScreen(
     onRecordRecent: (SearchHit) -> Unit = {},
     onLoadSection: (suspend (SearchKind, Int) -> List<SearchHit>)? = null,
     onToggleSaved: (uri: String, currentlySaved: Boolean) -> Unit = { _, _ -> },
+    /** Track hearts open the Save-in sheet; onToggleSaved keeps serving the
+     * artist follow and album save hearts, which are not tracks. */
+    onTrackHeart: ((TrackItem) -> Unit)? = null,
     savedOverrides: Map<String, Boolean> = emptyMap(),
     browseCategories: List<CategoryCard> = emptyList(),
     userDisplayName: String = "Duck User",
@@ -810,7 +811,7 @@ fun EncoreSearchScreen(
                                 else R.drawable.encore_icon_heart_24,
                                 contentDescription = if (hit.saved) "Remove ${hit.title} from Liked Songs"
                                 else "Save ${hit.title} to Liked Songs",
-                                onClick = { onToggleSaved(hit.uri, hit.saved) },
+                                onClick = { onTrackHeart?.invoke(hit.toTrackItem()) ?: onToggleSaved(hit.uri, hit.saved) },
                                 size = 36.dp,
                                 iconSize = 20.dp,
                                 tint = if (hit.saved) EncoreColors.Green else EncoreColors.TextSecondary
@@ -1033,7 +1034,7 @@ fun EncoreSearchScreen(
                                         playFromSearch(track)
                                     },
                                     onMoreClick = { onTrackOptionsClick(track) },
-                                    onLikeClick = { onToggleSaved(track.uri, track.saved == true) },
+                                    onLikeClick = { onTrackHeart?.invoke(track) ?: onToggleSaved(track.uri, track.saved == true) },
                                     onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(track) } }
                                 )
                             }
@@ -1164,6 +1165,7 @@ fun EncoreSearchScreen(
                                     onArtistClick = onArtistClick,
                                     onPlaylistClick = onPlaylistClick,
                                     onToggleSaved = onToggleSaved,
+                                    onTrackHeart = onTrackHeart,
                                     onOpen = { openHit(hit) },
                                     onRecordRecent = onRecordRecent
                                 )
@@ -1229,6 +1231,7 @@ fun EncoreSearchScreen(
                                         onArtistClick = onArtistClick,
                                         onPlaylistClick = onPlaylistClick,
                                         onToggleSaved = onToggleSaved,
+                                        onTrackHeart = onTrackHeart,
                                         onOpen = { openHit(hit) },
                                         onRecordRecent = onRecordRecent
                                     )
@@ -1255,6 +1258,7 @@ fun EncoreSearchScreen(
                                 onArtistClick = onArtistClick,
                                 onPlaylistClick = onPlaylistClick,
                                 onToggleSaved = onToggleSaved,
+                                onTrackHeart = onTrackHeart,
                                 onOpen = { openHit(hit) },
                                 onRecordRecent = onRecordRecent
                             )
@@ -1361,7 +1365,7 @@ fun EncoreSearchScreen(
                                 .fillMaxWidth(0.65f)
                         ) {
                             Text(
-                                text = localizeBrowseCategory(category.title),
+                                text = category.title,
                                 style = EncoreTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -1830,6 +1834,7 @@ private fun SearchHitRow(
     onArtistClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
     onToggleSaved: (uri: String, currentlySaved: Boolean) -> Unit,
+    onTrackHeart: ((TrackItem) -> Unit)? = null,
     onOpen: () -> Unit,
     onRecordRecent: (SearchHit) -> Unit = {},
 ) {
@@ -1844,7 +1849,7 @@ private fun SearchHitRow(
                     onTrackSelect(item)
                 },
                 onMoreClick = { onTrackOptionsClick(item) },
-                onLikeClick = { onToggleSaved(item.uri, item.saved == true) },
+                onLikeClick = { onTrackHeart?.invoke(item) ?: onToggleSaved(item.uri, item.saved == true) },
                 onAddToQueue = onTrackAddToQueue?.let { handler -> { handler(item) } }
             )
         }

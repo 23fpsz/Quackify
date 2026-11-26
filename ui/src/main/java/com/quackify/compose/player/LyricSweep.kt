@@ -23,7 +23,6 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /**
  * The song position, ticking every frame.
@@ -33,8 +32,7 @@ import kotlin.math.roundToInt
  * singer. Between readings this advances the last known position at one
  * millisecond per frame millisecond, and each new reading steers — rather
  * than sets — the clock: a reading only a little ahead of or behind the
- * estimate nudges it, one far away (a seek) snaps to it. Adapted from
- * BitChord's LyricClock.
+ * estimate nudges it, one far away (a seek) snaps to it
  *
  * While paused, every reading is the truth, including a seek made while
  * paused.
@@ -104,12 +102,13 @@ internal fun rememberLyricClock(
             if (reading != lastReported) {
                 val estimate = clock.longValue
                 // Steer, don't set: small corrections ease in, big jumps
-                // (seeks) are taken whole. A reading only slightly behind the
-                // estimate is reporting jitter, not truth — rewinding the sweep
-                // by a few frames reads as a stutter, so it is held.
+                // (seeks) are taken whole. Reading jitter only ever nudges
+                // the clock forward and in small steps, so the boundary
+                // never snaps or rewinds mid-word — both read as a stutter
+                // on fast words.
                 val delta = reading - estimate
                 clock.longValue = when {
-                    delta in -60L..60L -> reading.coerceAtLeast(estimate - 8L)
+                    abs(delta) <= 60L -> estimate + (delta / 4).coerceAtLeast(0L)
                     abs(delta) < 600L -> estimate + delta / 2
                     else -> reading
                 }

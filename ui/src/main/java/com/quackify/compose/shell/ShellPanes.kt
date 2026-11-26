@@ -21,7 +21,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,6 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quackify.backend.api.Search
 import com.quackify.backend.model.AlbumDetail
 import com.quackify.backend.model.ArtistDetail
 import com.quackify.backend.model.BrowseCard
@@ -69,6 +72,7 @@ import com.quackify.backend.model.PlaylistMember
 import com.quackify.backend.model.ProfileTopContent
 import com.quackify.backend.model.ProfileTopTrack
 import com.quackify.backend.model.ActivityNotification
+import com.quackify.backend.model.FriendActivityEntry
 import com.quackify.backend.model.SelfProfile
 import com.quackify.backend.model.UserProfile
 import com.quackify.backend.model.SearchHit
@@ -82,6 +86,7 @@ import com.quackify.compose.components.DetailPageSkeleton
 import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.format.parseHexColor
 import com.quackify.compose.home.HomeShelf
@@ -95,6 +100,7 @@ import com.quackify.compose.playlist.EncorePlaylistScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.ActivityScreen
 import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.screens.FriendActivityScreen
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.HistoryScreen
@@ -164,15 +170,28 @@ internal fun nowPlayingContext(
     val uri = contextUri.orEmpty()
     return when {
         !trackLoaded -> stringResource(R.string.nothing_playing) to stringResource(R.string.pick_a_song_to_get_started)
-        origin != null -> when (origin.screen) {
+        uri.startsWith("spotify:search:") -> {
+            val query = Search.queryOfSearchUri(uri)
+            val sub = searchSub(query.ifBlank { if (origin?.screen == ShellScreen.SEARCH) origin.label else contextLabel })
+            stringResource(R.string.playing_from_search) to sub
+        }
+        uri.startsWith("spotify:album:") -> stringResource(R.string.playing_from_album) to contextLabel.ifBlank { if (origin?.screen == ShellScreen.ALBUM) origin.label else "" }
+        uri.startsWith("spotify:artist:") -> stringResource(R.string.playing_from_artist) to contextLabel.ifBlank { if (origin?.screen == ShellScreen.ARTIST) origin.label else "" }
+        origin != null && (
+            uri.isBlank() ||
+            uri.startsWith("spotify:track:") ||
+            uri.startsWith("spotify:episode:") ||
+            origin.screen == ShellScreen.SEARCH ||
+            (origin.screen == ShellScreen.PLAYLIST && (uri.startsWith("spotify:playlist:") || uri.startsWith("spotify:collection:"))) ||
+            (origin.screen == ShellScreen.ALBUM && uri.startsWith("spotify:album:")) ||
+            (origin.screen == ShellScreen.ARTIST && uri.startsWith("spotify:artist:"))
+        ) -> when (origin.screen) {
             ShellScreen.SEARCH -> stringResource(R.string.playing_from_search) to searchSub(origin.label)
             ShellScreen.ALBUM -> stringResource(R.string.playing_from_album) to origin.label
             ShellScreen.ARTIST -> stringResource(R.string.playing_from_artist) to origin.label
             ShellScreen.HOME -> stringResource(R.string.playing_from_home) to origin.label
             else -> playlistContext(origin.label)
         }
-        uri.startsWith("spotify:album:") -> stringResource(R.string.playing_from_album) to contextLabel
-        uri.startsWith("spotify:artist:") -> stringResource(R.string.playing_from_artist) to contextLabel
         else -> playlistContext(contextLabel)
     }
 }
@@ -227,6 +246,7 @@ internal fun ShellSettingsPane(
     updateError: String? = null,
     updateVersion: String? = null,
     onCheckUpdates: () -> Unit = {},
+    toastState: QuackifyToastState? = null,
 ) {
     SettingsScreen(
         onBackClick = onBackClick,
@@ -248,7 +268,8 @@ internal fun ShellSettingsPane(
         updateChecked = updateChecked,
         updateError = updateError,
         updateVersion = updateVersion,
-        onCheckUpdates = onCheckUpdates
+        onCheckUpdates = onCheckUpdates,
+        toastState = toastState
     )
 }
 
@@ -300,6 +321,29 @@ internal fun ShellActivityPane(
         selfAvatarUrl = self?.avatarUrl?.takeIf { it.isNotBlank() } ?: fallbackAvatarUrl,
         selfAvatarColor = self?.avatarBackgroundColor ?: 0,
         onOpenNotification = onOpenNotification
+    )
+}
+
+@Composable
+internal fun ShellFriendActivityPane(
+    onBackClick: () -> Unit,
+    friends: List<FriendActivityEntry>,
+    loading: Boolean,
+    loadFailed: Boolean,
+    onRetry: () -> Unit,
+    onSilentRefresh: () -> Unit,
+    onOpenFriend: (FriendActivityEntry) -> Unit,
+    onOpenFriendProfile: (FriendActivityEntry) -> Unit,
+) {
+    FriendActivityScreen(
+        onBackClick = onBackClick,
+        friends = friends,
+        loading = loading,
+        loadFailed = loadFailed,
+        onRetry = onRetry,
+        onSilentRefresh = onSilentRefresh,
+        onOpenFriend = onOpenFriend,
+        onOpenFriendProfile = onOpenFriendProfile
     )
 }
 
@@ -488,6 +532,7 @@ internal fun ShellSearchPane(
     onPromoteRecentSearch: (SearchHistoryItem) -> Unit,
     onRecordRecentSearch: (SearchHit) -> Unit,
     onToggleSaved: (String, Boolean) -> Unit,
+    onTrackHeart: ((TrackItem) -> Unit)? = null,
     onLoadSearchSection: (suspend (SearchKind, Int) -> List<SearchHit>)?,
     onCategoryClick: (CategoryCard) -> Unit,
     onAlbumClick: (String, String, String) -> Unit,
@@ -534,6 +579,7 @@ internal fun ShellSearchPane(
         onPromoteRecent = onPromoteRecentSearch,
         onRecordRecent = onRecordRecentSearch,
         onToggleSaved = onToggleSaved,
+        onTrackHeart = onTrackHeart,
         savedOverrides = searchSavedOverrides,
         onLoadSection = onLoadSearchSection,
         browseCategories = remember(browseCategories) {
@@ -678,6 +724,7 @@ internal fun ShellHomePane(
     onOpenShow: (String) -> Unit,
     onOpenEpisode: (String) -> Unit,
     onOpenPlaylist: (String, String, String?) -> Unit,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     EncoreHomeScreen(
         onPlaylistClick = { playlist, uri ->
@@ -715,7 +762,8 @@ internal fun ShellHomePane(
         onArtistClick = onArtistClick,
         userDisplayName = userDisplayName,
         userAvatarUrl = userAvatarUrl,
-        userColorHex = userColorHex
+        userColorHex = userColorHex,
+        listState = listState
     )
 }
 

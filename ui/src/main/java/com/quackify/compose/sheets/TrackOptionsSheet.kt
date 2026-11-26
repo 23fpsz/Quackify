@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quackify.compose.R
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
@@ -85,6 +86,9 @@ fun TrackOptionsSheet(
     sleepTimer: SleepTimerOption? = null,
     /** Opens the "Save in" picker; null hides the row (non-track entities). */
     onAddToPlaylist: (() -> Unit)? = null,
+    /** Shows the audio pipeline row; the caller gates it to the now-playing three-dot on tracks. */
+    showAudioPipeline: Boolean = false,
+    onAudioPipeline: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (!isOpen || track == null) return
@@ -143,17 +147,26 @@ fun TrackOptionsSheet(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(
-                text = track.artist,
-                style = EncoreTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    color = EncoreColors.TextSecondary
-                ),
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-            )
+            ) {
+                if (track.isExplicit) {
+                    EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
+                }
+                Text(
+                    text = track.artist,
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        fontSize = 14.sp,
+                        color = EncoreColors.TextSecondary
+                    ),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+            }
 
             streamCount?.takeIf { it > 0L }?.let { plays ->
                 Spacer(modifier = Modifier.height(4.dp))
@@ -297,6 +310,17 @@ fun TrackOptionsSheet(
                     onClick = {
                         onDismiss()
                         onShowCredits()
+                    }
+                )
+            }
+
+            if (showAudioPipeline) {
+                ContextMenuRowItem(
+                    title = stringResource(R.string.audio_pipeline),
+                    iconRes = R.drawable.encore_icon_audio_24,
+                    onClick = {
+                        onDismiss()
+                        onAudioPipeline()
                     }
                 )
             }
