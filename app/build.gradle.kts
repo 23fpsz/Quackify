@@ -23,6 +23,14 @@ android {
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
     }
 
+    val lastFmApiKey = System.getenv("LASTFM_API_KEY")
+        ?.takeIf { it.isNotBlank() }
+        ?: keystoreProperties.getProperty("lastfm.apiKey", "")
+
+    val lastFmSharedSecret = System.getenv("LASTFM_SHARED_SECRET")
+        ?.takeIf { it.isNotBlank() }
+        ?: keystoreProperties.getProperty("lastfm.sharedSecret", "")
+
     defaultConfig {
         applicationId = "com.quackify.app"
         minSdk = 24
@@ -30,6 +38,17 @@ android {
         versionCode = 26112301
         versionName = "0.12.26.11.23"
         multiDexEnabled = true
+
+        buildConfigField(
+            "String",
+            "LASTFM_API_KEY",
+            "\"${lastFmApiKey.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        )
+        buildConfigField(
+            "String",
+            "LASTFM_SHARED_SECRET",
+            "\"${lastFmSharedSecret.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        )
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
@@ -112,6 +131,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -139,6 +159,7 @@ androidComponents {
 
 dependencies {
     implementation(project(":ui"))
+    implementation(project(":krespot-core"))
     implementation(project(":krespot-connect"))
     implementation(project(":krespot-player"))
 

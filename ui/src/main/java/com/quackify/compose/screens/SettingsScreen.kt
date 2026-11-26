@@ -213,6 +213,36 @@ fun SettingsScreen(
     val clientPrefs = remember {
         com.quackify.backend.core.store.AppPrefs.prefs(context, "quackify.client")
     }
+
+    var lastFmSettings by remember {
+        mutableStateOf(com.quackify.backend.core.lastfm.LastFmSettings.load(context))
+    }
+    fun updateLastFmSettings(
+        transform: (com.quackify.backend.core.lastfm.LastFmSettings) -> com.quackify.backend.core.lastfm.LastFmSettings
+    ) {
+        val updated = transform(lastFmSettings)
+        lastFmSettings = updated
+        com.quackify.backend.core.lastfm.LastFmSettings.save(context, updated)
+    }
+
+    val lastFmAuthPrefs = remember {
+        context.getSharedPreferences("lastfm_auth_state", android.content.Context.MODE_PRIVATE)
+    }
+    val lastFmAuthScope = rememberCoroutineScope()
+    var lastFmConnected by remember {
+        mutableStateOf(
+            com.quackify.backend.core.lastfm.LastFmSecureStore.getSessionKey(context) != null
+        )
+    }
+    var lastFmAccountName by remember {
+        mutableStateOf(lastFmAuthPrefs.getString("username", "").orEmpty())
+    }
+    var lastFmPendingToken by remember {
+        mutableStateOf(lastFmAuthPrefs.getString("pending_token", "").orEmpty())
+    }
+    var lastFmAuthBusy by remember { mutableStateOf(false) }
+    var lastFmAuthMessage by remember { mutableStateOf("") }
+
     var autoplayOnStartup by remember {
         mutableStateOf(clientPrefs.getBoolean("autoplayOnStartup", false))
     }
@@ -339,6 +369,7 @@ fun SettingsScreen(
                     1 -> stringResource(R.string.personalization)
                     2 -> stringResource(R.string.more)
                     3 -> stringResource(R.string.debug)
+                    4 -> "Last.fm"
                     else -> stringResource(R.string.settings)
                 },
                 style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
@@ -391,6 +422,11 @@ fun SettingsScreen(
                             title = stringResource(R.string.more),
                             description = stringResource(R.string.playback_and_app_information),
                             onClick = { category = 2 }
+                        )
+                        SettingsCategoryRow(
+                            title = "Last.fm",
+                            description = "Scrobbling, Now Playing, and liked tracks",
+                            onClick = { category = 4 }
                         )
                         if (debugUnlocked) {
                             SettingsCategoryRow(
@@ -969,6 +1005,187 @@ fun SettingsScreen(
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(120.dp))
+                    }
+                }
+
+                if (target == 4) {
+                    item {
+                        SettingsSectionHeader(title = "Last.fm")
+                        Text(
+                            text = "Connect a Last.fm account to enable scrobbling. A valid Last.fm session is required.",
+                            style = EncoreTheme.typography.bodySmall.copy(
+                                color = EncoreColors.TextSecondary
+                            ),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        Text(
+                            text = if (lastFmConnected) {
+                                "Connected: " + lastFmAccountName.ifBlank { "Last.fm" }
+                            } else {
+                                "Not connected"
+                            },
+                            style = EncoreTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 6.dp)
+                        )
+
+                        androidx.compose.material3.Button(
+                            enabled = !lastFmAuthBusy &&
+                                !lastFmConnected &&
+                                com.quackify.backend.core.lastfm.LastFmRuntime.isConfigured(),
+                            onClick = {
+                                lastFmAuthScope.launch {
+                                    lastFmAuthBusy = true
+                                    lastFmAuthMessage = ""
+                                    try {
+                                        if (lastFmPendingToken.isBlank()) {
+                                            val result =
+                                                com.quackify.backend.core.lastfm.LastFmRuntime
+                                                    .client().call("auth.getToken")
+                                            val token = result.optString("token")
+                                            check(token.isNotBlank()) {
+                                                "Last.fm tidak memberikan token."
+                                            }
+
+                                            lastFmPendingToken = token
+                                            lastFmAuthPrefs.edit()
+                                                .putString("pending_token", token)
+                                                .apply()
+
+                                            val url =
+                                                com.quackify.backend.core.lastfm.LastFmRuntime
+                                                    .authorizationUrl(token)
+                                            context.startActivity(
+                                                android.content.Intent(
+                                                    android.content.Intent.ACTION_VIEW,
+                                                    android.net.Uri.parse(url)
+                                                )
+                                            )
+                                            lastFmAuthMessage =
+                                                "Setujui akses di browser, kembali ke Quackify, lalu tekan Finish connection."
+                                        } else {
+                                            val result =
+                                                com.quackify.backend.core.lastfm.LastFmRuntime
+                                                    .client().call(
+                                                        "auth.getSession",
+                                                        mapOf("token" to lastFmPendingToken)
+                                                    )
+                                            val session = result.getJSONObject("session")
+                                            val key = session.getString("key")
+                                            val username = session.optString("name")
+
+                                            com.quackify.backend.core.lastfm.LastFmSecureStore
+                                                .saveSessionKey(context, key)
+
+                                            lastFmAuthPrefs.edit()
+                                                .putString("username", username)
+                                                .remove("pending_token")
+                                                .apply()
+
+                                            lastFmAccountName = username
+                                            lastFmPendingToken = ""
+                                            lastFmConnected = true
+                                            lastFmAuthMessage = "Berhasil terhubung ke Last.fm."
+                                        }
+                                    } catch (e: Exception) {
+                                        lastFmAuthMessage =
+                                            e.message ?: "Autentikasi Last.fm gagal."
+                                    } finally {
+                                        lastFmAuthBusy = false
+                                    }
+                                }
+                            }
+                        ) {
+                            androidx.compose.material3.Text(
+                                when {
+                                    lastFmAuthBusy -> "Connecting..."
+                                    lastFmPendingToken.isNotBlank() ->
+                                        "Finish connection"
+                                    else -> "Connect to Last.fm"
+                                }
+                            )
+                        }
+
+                        if (!com.quackify.backend.core.lastfm.LastFmRuntime.isConfigured()) {
+                            Text(
+                                text = "Last.fm API credentials belum tersedia pada build ini.",
+                                style = EncoreTheme.typography.bodySmall.copy(
+                                    color = EncoreColors.TextSecondary
+                                )
+                            )
+                        }
+
+                        if (lastFmConnected) {
+                            androidx.compose.material3.TextButton(
+                                onClick = {
+                                    com.quackify.backend.core.lastfm.LastFmSecureStore
+                                        .clearSessionKey(context)
+                                    lastFmAuthPrefs.edit().clear().apply()
+                                    lastFmConnected = false
+                                    lastFmAccountName = ""
+                                    lastFmPendingToken = ""
+                                    updateLastFmSettings {
+                                        it.copy(
+                                            scrobblingEnabled = false,
+                                            syncLikesEnabled = false
+                                        )
+                                    }
+                                    lastFmAuthMessage = "Akun Last.fm diputus."
+                                }
+                            ) {
+                                androidx.compose.material3.Text("Disconnect")
+                            }
+                        }
+
+                        if (lastFmAuthMessage.isNotBlank()) {
+                            Text(
+                                text = lastFmAuthMessage,
+                                style = EncoreTheme.typography.bodySmall.copy(
+                                    color = EncoreColors.TextSecondary
+                                ),
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+
+                        SettingsToggleRow(
+                            title = "Scrobbling",
+                            subtitle = "Send tracks to your Last.fm listening history",
+                            isChecked = lastFmSettings.scrobblingEnabled,
+                            enabled = lastFmConnected,
+                            onCheckedChange = { enabled ->
+                                updateLastFmSettings { it.copy(scrobblingEnabled = enabled) }
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = "Now Playing",
+                            subtitle = "Show the track currently playing on Last.fm",
+                            isChecked = lastFmSettings.nowPlayingEnabled,
+                            enabled = lastFmSettings.scrobblingEnabled,
+                            onCheckedChange = { enabled ->
+                                updateLastFmSettings { it.copy(nowPlayingEnabled = enabled) }
+                            }
+                        )
+                        SettingsToggleRow(
+                            title = "Sync Likes",
+                            subtitle = "Love or unlove tracks on Last.fm when you like or unlike them in Quackify",
+                            isChecked = lastFmSettings.syncLikesEnabled,
+                            enabled = lastFmConnected,
+                            onCheckedChange = { enabled ->
+                                updateLastFmSettings { it.copy(syncLikesEnabled = enabled) }
+                            }
+                        )
+                        SettingsSliderRow(
+                            title = "Scrobble threshold",
+                            subtitle = "Scrobble after this percentage of the track has played",
+                            value = lastFmSettings.thresholdPercent,
+                            maxValue = 100,
+                            valueLabel = "${lastFmSettings.thresholdPercent}%",
+                            onValueChange = { percent ->
+                                updateLastFmSettings {
+                                    it.copy(thresholdPercent = percent.coerceIn(1, 100))
+                                }
+                            }
+                        )
                     }
                 }
 

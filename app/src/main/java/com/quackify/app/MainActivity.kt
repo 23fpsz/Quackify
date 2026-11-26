@@ -310,6 +310,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.quackify.backend.core.lastfm.LastFmRuntime.configure(
+            BuildConfig.LASTFM_API_KEY,
+            BuildConfig.LASTFM_SHARED_SECRET
+        )
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
             WebView.setWebContentsDebuggingEnabled(true)
         }
