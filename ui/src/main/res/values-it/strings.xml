@@ -93,6 +93,7 @@
     <string name="couldnt_load">Impossibile caricare</string>
     <string name="couldn_t_load_categories">Impossibile caricare le categorie</string>
     <string name="couldn_t_load_contributors">Impossibile caricare i collaboratori</string>
+    <string name="couldn_t_load_friend_activity">Impossibile caricare l\'attività degli amici</string>
     <string name="couldn_t_load_notifications">Impossibile caricare le notifiche</string>
     <string name="couldn_t_load_this_album">Impossibile caricare questo album</string>
     <string name="couldn_t_load_this_artist">Impossibile caricare questo artista</string>
@@ -146,6 +147,7 @@
     <string name="followers_and_following">Follower e seguiti</string>
     <string name="following">Seguiti</string>
     <string name="forward_15_seconds">Avanti di 15 secondi</string>
+    <string name="friend_activity">Attività degli amici</string>
     <string name="from_your_liked_songs">Dai tuoi brani preferiti</string>
     <string name="gallery">Galleria</string>
     <string name="gapless_playback">Riproduzione senza interruzioni</string>
@@ -250,6 +252,7 @@
     <string name="no_credits_for_this_track">Nessun credito per questo brano</string>
     <string name="no_music_video_for_this_track">Nessun video musicale per questo brano</string>
     <string name="no_folders_yet_create_one_from_the_button">Nessuna cartella. Creane una dal pulsante +.</string>
+    <string name="no_friend_activity_yet">Ancora nessuna attività degli amici</string>
     <string name="no_notifications_yet">Ancora nessuna notifica</string>
     <string name="no_release_notes">Nessuna nota di rilascio.</string>
     <string name="no_tracks_in_this_album">Nessun brano in questo album</string>
@@ -434,6 +437,7 @@
     <string name="whats_new_lowercase">Novità</string>
     <string name="when_off_music_videos_and_live_performances_play">Se disattivato, i video musicali e le esibizioni dal vivo vengono riprodotti solo in audio.</string>
     <string name="when_someone_follows_you_or_interacts_with_your">Quando qualcuno ti segue o interagisce con le tue playlist, lo vedrai qui.</string>
+    <string name="when_friends_you_follow_play_something_it_ll_show_up_here">Quando gli amici che segui ascoltano qualcosa, lo vedrai qui.</string>
     <string name="when_you_open_the_app_the_loaded_track_starts_pl">Quando apri l\'app, il brano caricato inizia subito a suonare.</string>
     <string name="widget">Widget</string>
     <string name="yesterday">Ieri</string>

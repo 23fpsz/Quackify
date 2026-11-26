@@ -317,6 +317,7 @@
     <string name="stop_audio_in">Audio stoppt in</string>
     <string name="back_15_seconds">15 Sekunden zurück</string>
     <string name="forward_15_seconds">15 Sekunden vor</string>
+    <string name="friend_activity">Freundesaktivität</string>
     <string name="explore_category">%1$s entdecken</string>
     <string name="rating_stars">★ %1$s</string>
     <string name="podcast_with_host">Podcast • %1$s</string>
@@ -441,6 +442,7 @@
     <string name="could_not_load_this_section">Dieser Abschnitt konnte nicht geladen werden</string>
     <string name="couldn_t_load_categories">Kategorien konnten nicht geladen werden</string>
     <string name="couldn_t_load_contributors">Mitwirkende konnten nicht geladen werden</string>
+    <string name="couldn_t_load_friend_activity">Freundesaktivität konnte nicht geladen werden</string>
     <string name="couldn_t_load_notifications">Benachrichtigungen konnten nicht geladen werden</string>
     <string name="couldn_t_load_this_album">Dieses Album konnte nicht geladen werden</string>
     <string name="couldn_t_load_this_artist">Dieser Künstler konnte nicht geladen werden</string>
@@ -505,6 +507,7 @@
     <string name="new_releases_from_the_artists_and_podcasts_you_f">Neue Veröffentlichungen der Künstler und Podcasts, denen Du folgst, erscheinen hier.</string>
     <string name="no_contributors_yet">Noch keine Mitwirkenden</string>
     <string name="no_folders_yet_create_one_from_the_button">Noch keine Ordner. Erstelle einen über die +-Schaltfläche.</string>
+    <string name="no_friend_activity_yet">Noch keine Freundesaktivität</string>
     <string name="no_notifications_yet">Noch keine Benachrichtigungen</string>
     <string name="no_release_notes">Keine Release-Notes.</string>
     <string name="no_tracks_in_this_album">Keine Titel in diesem Album</string>
@@ -606,6 +609,7 @@
     <string name="whats_new_lowercase">Neuigkeiten</string>
     <string name="when_off_music_videos_and_live_performances_play">Wenn deaktiviert, laufen Musikvideos und Live-Auftritte nur als Audio.</string>
     <string name="when_someone_follows_you_or_interacts_with_your">Wenn Dir jemand folgt oder mit Deinen Playlists interagiert, siehst Du es hier.</string>
+    <string name="when_friends_you_follow_play_something_it_ll_show_up_here">Wenn Freunde, denen du folgst, etwas abspielen, siehst du es hier.</string>
     <string name="when_you_open_the_app_the_loaded_track_starts_pl">Beim Öffnen der App startet der geladene Titel sofort.</string>
     <string name="widget">Widget</string>
     <string name="you_re_all_caught_up">Du bist auf dem neuesten Stand</string>

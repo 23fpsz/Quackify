@@ -247,6 +247,11 @@ internal class ShellNavController(
         nav.openScreen(ShellScreen.ACTIVITY, "activity")
     }
 
+    fun openFriendActivity() {
+        pushCurrentState()
+        nav.openScreen(ShellScreen.FRIEND_ACTIVITY, "friend_activity")
+    }
+
     fun openProfile() {
         pushCurrentState()
         nav.openScreen(ShellScreen.PROFILE, "profile")

@@ -9,6 +9,7 @@ import com.quackify.backend.model.BrowseCard
 import com.quackify.backend.model.BrowsePage
 import com.quackify.backend.model.CollectionDetail
 import com.quackify.backend.model.EpisodeDetail
+import com.quackify.backend.model.FriendActivityEntry
 import com.quackify.backend.model.HomeChip
 import com.quackify.backend.model.PlaylistPermissions
 import com.quackify.backend.model.ProfileTopContent
@@ -612,6 +613,38 @@ internal fun ShellActivityRoute(
             }
         },
         onLeave = { onLeave?.invoke() }
+    )
+}
+
+@Composable
+internal fun ShellFriendActivityRoute(
+    env: ShellRouteEnv,
+    friends: List<FriendActivityEntry>,
+    loading: Boolean,
+    loadFailed: Boolean,
+    onRetry: (() -> Unit)?,
+    onSilentRefresh: (() -> Unit)?,
+) {
+    ShellFriendActivityPane(
+        onBackClick = env.handleBack,
+        friends = friends,
+        loading = loading,
+        loadFailed = loadFailed,
+        onRetry = { onRetry?.invoke() },
+        onSilentRefresh = { onSilentRefresh?.invoke() },
+        onOpenFriend = { friend ->
+            when {
+                friend.trackUri.startsWith("spotify:episode:") ->
+                    env.openEpisode(friend.trackUri)
+                friend.albumUri.startsWith("spotify:album:") ->
+                    env.openAlbum(friend.albumName.ifBlank { friend.trackName }, friend.artistLine, friend.albumUri)
+                friend.primaryArtistUri.startsWith("spotify:artist:") ->
+                    env.openArtist(friend.primaryArtistName.ifBlank { friend.artistLine }, friend.primaryArtistUri)
+            }
+        },
+        onOpenFriendProfile = { friend ->
+            env.openUserProfile(friend.userUri, friend.userName)
+        }
     )
 }
 

@@ -234,6 +234,7 @@ fun EncoreAppShell(
     notificationsFailed: Boolean = false,
     onRefreshWhatsNew: (() -> Unit)? = null,
     activityState: ActivityFeedState? = null,
+    friendActivityState: FriendActivityState? = null,
     historyToday: List<TrackItem> = emptyList(),
     historyYesterday: List<TrackItem> = emptyList(),
     historyEarlier: List<TrackItem> = emptyList(),
@@ -394,6 +395,12 @@ fun EncoreAppShell(
     val onRetryActivity = activityState?.onRetry
     val onLeaveActivity = activityState?.onLeave
     val onProfileDrawerOpened = activityState?.onDrawerOpened
+    val friendActivityFeed = friendActivityState?.feed.orEmpty()
+    val friendActivityLoading = friendActivityState?.loading == true
+    val friendActivityFailed = friendActivityState?.failed == true
+    val onOpenFriendActivity = friendActivityState?.onOpen
+    val onRetryFriendActivity = friendActivityState?.onRetry
+    val onSilentRefreshFriendActivity = friendActivityState?.onSilentRefresh
     val searchQueryNow = searchQuery
     val navController = remember(
         searchQueryNow,
@@ -906,6 +913,7 @@ fun EncoreAppShell(
             onLoadProfile = onLoadProfile,
             onOpenHistory = onOpenHistory,
             onOpenActivity = onOpenActivity,
+            onOpenFriendActivity = onOpenFriendActivity,
             activityUnread = activityUnread,
             onShowCredits = onShowCredits,
             onEditPlaylist = onEditPlaylist,
@@ -1120,6 +1128,15 @@ fun EncoreAppShell(
                         self = activitySelf,
                         onRetry = onRetryActivity,
                         onLeave = onLeaveActivity,
+                    )
+
+                    ShellScreen.FRIEND_ACTIVITY -> ShellFriendActivityRoute(
+                        env = hosts.route(),
+                        friends = friendActivityFeed,
+                        loading = friendActivityLoading,
+                        loadFailed = friendActivityFailed,
+                        onRetry = onRetryFriendActivity,
+                        onSilentRefresh = onSilentRefreshFriendActivity,
                     )
     
                     ShellScreen.HISTORY -> ShellHistoryRoute(

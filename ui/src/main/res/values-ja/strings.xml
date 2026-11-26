@@ -317,6 +317,7 @@
     <string name="stop_audio_in">音声を停止するまで</string>
     <string name="back_15_seconds">15秒戻る</string>
     <string name="forward_15_seconds">15秒進む</string>
+    <string name="friend_activity">フレンドのアクティビティ</string>
     <string name="explore_category">%1$sを探索</string>
     <string name="rating_stars">★ %1$s</string>
     <string name="podcast_with_host">ポッドキャスト • %1$s</string>
@@ -439,6 +440,7 @@
     <string name="could_not_load_this_section">このセクションを読み込めませんでした</string>
     <string name="couldn_t_load_categories">カテゴリを読み込めませんでした</string>
     <string name="couldn_t_load_contributors">コラボレーターを読み込めませんでした</string>
+    <string name="couldn_t_load_friend_activity">フレンドのアクティビティを読み込めませんでした</string>
     <string name="couldn_t_load_notifications">通知を読み込めませんでした</string>
     <string name="couldn_t_load_this_album">このアルバムを読み込めませんでした</string>
     <string name="couldn_t_load_this_artist">このアーティストを読み込めませんでした</string>
@@ -503,6 +505,7 @@
     <string name="new_releases_from_the_artists_and_podcasts_you_f">フォロー中のアーティストやポッドキャストの新作がここに表示されます。</string>
     <string name="no_contributors_yet">コラボレーターはまだいません</string>
     <string name="no_folders_yet_create_one_from_the_button">フォルダはまだありません。+ ボタンから作成できます。</string>
+    <string name="no_friend_activity_yet">フレンドのアクティビティはまだありません</string>
     <string name="no_notifications_yet">通知はまだありません</string>
     <string name="no_release_notes">リリースノートはありません。</string>
     <string name="no_tracks_in_this_album">このアルバムに曲がありません</string>
@@ -604,6 +607,7 @@
     <string name="whats_new_lowercase">新着情報</string>
     <string name="when_off_music_videos_and_live_performances_play">オフの場合、ミュージックビデオやライブ映像は音声のみで再生されます。</string>
     <string name="when_someone_follows_you_or_interacts_with_your">誰かがあなたをフォローしたり、あなたのプレイリストに反応すると、ここに表示されます。</string>
+    <string name="when_friends_you_follow_play_something_it_ll_show_up_here">フォローしているフレンドが何か再生すると、ここに表示されます。</string>
     <string name="when_you_open_the_app_the_loaded_track_starts_pl">アプリを開くと、読み込まれた曲がすぐに再生されます。</string>
     <string name="widget">ウィジェット</string>
     <string name="you_re_all_caught_up">すべて確認済みです</string>
