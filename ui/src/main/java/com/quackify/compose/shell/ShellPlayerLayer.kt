@@ -94,6 +94,7 @@ internal class ShellPlayerEnv(
     val onAddToPlaylist: ((TrackItem) -> Unit)?,
     val openAlbum: (String, String, String) -> Unit,
     val openArtist: (String, String) -> Unit,
+    val openShow: (String) -> Unit,
     val shareEntity: (String) -> Unit,
     val copyTrackTitle: (String) -> Unit = {},
 )
@@ -407,20 +408,31 @@ private fun NowPlayingScreenLayer(
         onArtistClick = {
             // A tap jumps straight into the artist page when the track names
             // one artist; two or more credited artists open the picker sheet
-            // so each artist has their own row instead.
+            // so each artist has their own row instead. Podcast episodes
+            // credit a show rather than artists, so the tap opens the show.
+            val showUri = env.nowPlayingShow?.uri.orEmpty()
+                .takeIf { it.startsWith("spotify:show:") }
             val uris = env.playbackState?.artistUris.orEmpty()
                 .filter { it.startsWith("spotify:artist:") }
-            if (uris.size > 1) {
-                env.local.artistListTrack = null
-                env.flags.isArtistListOpen = true
-            } else {
-                env.setIsPlayerExpanded(false)
-                env.openArtist(env.currentArtist, env.resolvedArtistUri)
+            when {
+                showUri != null && uris.isEmpty() -> {
+                    env.setIsPlayerExpanded(false)
+                    env.openShow(showUri)
+                }
+                uris.size > 1 -> {
+                    env.local.artistListTrack = null
+                    env.flags.isArtistListOpen = true
+                }
+                else -> {
+                    env.setIsPlayerExpanded(false)
+                    env.openArtist(env.currentArtist, env.resolvedArtistUri)
+                }
             }
         },
         onArtistLongClick = {
             // Long-press mirrors the tap: the picker for a multi-artist
             // credit, the follow / ban / radio / share options sheet for one.
+            // Episodes have no artist image, so the show cover stands in.
             val uris = env.playbackState?.artistUris.orEmpty()
                 .filter { it.startsWith("spotify:artist:") }
             if (uris.size > 1) {
@@ -430,6 +442,7 @@ private fun NowPlayingScreenLayer(
                 env.local.artistOptionsName = env.currentArtist
                 env.local.artistOptionsUri = env.resolvedArtistUri
                 env.local.artistOptionsAvatarUrl = env.nowPlayingArtistImageUrl
+                    ?: env.nowPlayingShow?.imageUrl?.takeIf { it.isNotBlank() }
                 env.local.artistOptionsFollowed = env.nowPlayingArtistFollowed
                 env.flags.isArtistOptionsFromPlayer = true
                 env.flags.isArtistOptionsOpen = true

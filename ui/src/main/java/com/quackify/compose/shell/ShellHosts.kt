@@ -299,6 +299,7 @@ internal class ShellHosts(
         onAddToPlaylist = onAddToPlaylist,
         openAlbum = openAlbum,
         openArtist = openArtist,
+        openShow = openShow,
         shareEntity = shareEntity,
         copyTrackTitle = copyTrackTitle,
     )
