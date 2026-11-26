@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="classic_login_button">Inicio de sesión clásico con correo y contraseña</string>
+</resources>

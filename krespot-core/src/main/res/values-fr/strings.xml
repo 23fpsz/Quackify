@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="classic_login_button">Connexion classique par e-mail et mot de passe</string>
+</resources>

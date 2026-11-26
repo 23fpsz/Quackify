@@ -44,6 +44,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.quackify.backend.core.auth.EncoreAuth
 import com.quackify.backend.core.locale.AppLocale
+import com.quackify.backend.core.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -237,7 +238,10 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 }
                 if (url != null && isLoginPageUrl(url)) {
                     log.d("classic login pill fallback injected")
-                    view?.evaluateJavascript(ClassicLoginButton.CONTENT, null)
+                    view?.evaluateJavascript(
+                        ClassicLoginButton.content(context.getString(R.string.classic_login_button)),
+                        null
+                    )
                 }
             }
 
