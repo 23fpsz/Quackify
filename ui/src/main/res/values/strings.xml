@@ -44,6 +44,8 @@
     <string name="transcript_offset">Transcript offset</string>
     <string name="transcript_offset_desc">Shifts the transcript timing when it feels out of sync with the audio</string>
     <string name="transcript_menu">Transcript options</string>
+    <string name="transcript_translation">Translate transcript</string>
+    <string name="transcript_translation_desc">Show a translation of each transcript line</string>
     <string name="next_episode">Next episode</string>
     <string name="previous_episode">Previous episode</string>
     <string name="account">Account</string>

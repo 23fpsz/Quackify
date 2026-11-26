@@ -405,6 +405,8 @@
     <string name="transcript_offset">Décalage de la transcription</string>
     <string name="transcript_offset_desc">Décale le minutage de la transcription quand il semble désynchronisé de l\'audio</string>
     <string name="transcript_menu">Options de transcription</string>
+    <string name="transcript_translation">Traduire la transcription</string>
+    <string name="transcript_translation_desc">Affiche une traduction de chaque ligne de la transcription</string>
     <string name="next_episode">Épisode suivant</string>
     <string name="previous_episode">Épisode précédent</string>
     <string name="add_contributor">Ajouter un contributeur</string>
