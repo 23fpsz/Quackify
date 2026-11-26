@@ -645,4 +645,5 @@
     <string name="app_icon_and_player_controls">App icon and player controls</string>
     <string name="player_controls_and_app_icon">Player controls and app icon</string>
     <string name="session_expired_toast">Your session expired. Sign in again to keep listening.</string>
+    <string name="music">Music</string>
 </resources>
