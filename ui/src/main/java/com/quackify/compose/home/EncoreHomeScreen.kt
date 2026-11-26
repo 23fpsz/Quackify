@@ -1,5 +1,7 @@
 package com.quackify.compose.home
 
+import com.quackify.compose.util.localizeBrowseCategory
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -202,7 +204,7 @@ fun EncoreHomeScreen(
                         ) {
                             items(filterChips, key = { it.id }) { chip ->
                                 EncoreChip(
-                                    text = chip.label,
+                                    text = localizeBrowseCategory(chip.label),
                                     isSelected = selectedFacet == chip.id,
                                     onClick = {
                                         onFacetSelected(
