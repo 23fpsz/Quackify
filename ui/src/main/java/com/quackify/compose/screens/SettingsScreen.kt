@@ -269,7 +269,7 @@ fun SettingsScreen(
         if (EncoreAuth.customSpDc(context)) EncoreAuth.spDc(context) else ""
     }
     val scope = rememberCoroutineScope()
-    val disableDebug = {
+    val disableDebug: () -> Unit = {
         debugUnlocked = false
         debugLogging = false
         versionTaps = 0
