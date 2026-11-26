@@ -1258,6 +1258,7 @@ fun EncoreNowPlayingScreen(
                 isPlaying = isPlaying,
                 dominantColor = dominantColor,
                 artworkColor = dynamicArtworkColor,
+                isExplicit = isExplicit,
                 lyrics = lyrics,
                 nextTrack = nextTrack,
                 nextTrackLyrics = nextTrackLyrics,
@@ -3027,6 +3028,7 @@ private fun FullscreenLyricsView(
     isPlaying: Boolean,
     dominantColor: Color,
     artworkColor: Color,
+    isExplicit: Boolean = false,
     lyrics: List<TimeSyncedLyric>,
     nextTrack: TrackItem?,
     nextTrackLyrics: List<TimeSyncedLyric>,
@@ -3289,12 +3291,17 @@ private fun FullscreenLyricsView(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = sheetArtist,
-                        style = EncoreTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isExplicit) {
+                            EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
+                        }
+                        Text(
+                            text = sheetArtist,
+                            style = EncoreTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }

@@ -138,6 +138,7 @@ internal fun BoxScope.ShellPlayerLayer(
             isLiked = env.isLiked,
             coverUrl = env.currentCoverUrl,
             coverColor = nowPlayingDominantColor,
+            isExplicit = playbackState?.explicit ?: false,
             connectedDevice = effectiveConnectedDevice,
             connectedDeviceKind = activeDeviceKind,
             navItems = env.navItems,
