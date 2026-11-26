@@ -347,6 +347,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 }
                 installSpoofScripts(child)
                 NetworkTap.install(child, context)
+                LoginCodeRelay.install(child)
                 container.addView(
                     child,
                     FrameLayout.LayoutParams(
@@ -369,6 +370,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
         }
         installSpoofScripts(webView)
         NetworkTap.install(webView, context)
+        LoginCodeRelay.install(webView)
         log.i("loading $startUrl")
         webView.loadUrl(startUrl)
     }
