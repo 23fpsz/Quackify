@@ -107,6 +107,8 @@
     <string name="export_my_sp_dc">Exporter le sp_dc de mon compte actuel</string>
     <string name="export_my_sp_dc_subtitle">Copie le cookie sp_dc de cette session dans le presse-papiers</string>
     <string name="sp_dc_copied">sp_dc copié dans le presse-papiers</string>
+    <string name="sp_dc_export_unavailable">Aucun sp_dc de session à exporter</string>
+    <string name="sp_dc_export_failed">Impossible de copier le sp_dc dans le presse-papiers</string>
     <string name="title_copied">Titre copié</string>
     <string name="lyrics_copied">Paroles copiées</string>
     <string name="lyrics_selection_count">%1$d sélectionnées</string>

@@ -107,6 +107,8 @@
     <string name="export_my_sp_dc">Mein aktuelles Konto-sp_dc exportieren</string>
     <string name="export_my_sp_dc_subtitle">Den sp_dc-Cookie dieser Sitzung in die Zwischenablage kopieren</string>
     <string name="sp_dc_copied">sp_dc in die Zwischenablage kopiert</string>
+    <string name="sp_dc_export_unavailable">Es gibt kein Sitzungs-sp_dc zum Exportieren</string>
+    <string name="sp_dc_export_failed">sp_dc konnte nicht in die Zwischenablage kopiert werden</string>
     <string name="title_copied">Titel kopiert</string>
     <string name="lyrics_copied">Songtext kopiert</string>
     <string name="lyrics_selection_count">%1$d ausgewählt</string>

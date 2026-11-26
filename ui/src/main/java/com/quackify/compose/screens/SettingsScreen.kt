@@ -252,6 +252,8 @@ fun SettingsScreen(
     val debugUnlockedLabel = stringResource(R.string.debug_unlocked)
     val debugDisabledLabel = stringResource(R.string.debug_disabled)
     val spDcExportedLabel = stringResource(R.string.sp_dc_copied)
+    val spDcExportUnavailableLabel = stringResource(R.string.sp_dc_export_unavailable)
+    val spDcExportFailedLabel = stringResource(R.string.sp_dc_export_failed)
     var playerButtonsConfig by remember { mutableStateOf(PlayerButtonsStore.load(context)) }
     var playerButtonsSheetOpen by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf<Int?>(null) }
@@ -267,6 +269,12 @@ fun SettingsScreen(
     // the logout row and feeds the door's prefilled field.
     val activeSpDc = remember(spDcRevision) {
         if (EncoreAuth.customSpDc(context)) EncoreAuth.spDc(context) else ""
+    }
+    // The export row only makes sense on a web-login session: a custom sp_dc
+    // came from the user's own clipboard, and a fresh install has no session
+    // to read at all.
+    val spDcExportable = remember(spDcRevision) {
+        EncoreAuth.isLoggedIn(context) && !EncoreAuth.customSpDc(context)
     }
     val scope = rememberCoroutineScope()
     val disableDebug: () -> Unit = {
@@ -1064,14 +1072,17 @@ fun SettingsScreen(
                                 .padding(vertical = 6.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(EncoreColors.Card)
-                                .clickable { spDcExportWarnOpen = true }
+                                .clickable(enabled = spDcExportable) { spDcExportWarnOpen = true }
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = stringResource(R.string.export_my_sp_dc),
-                                    style = EncoreTheme.typography.bodyMediumBold
+                                    style = EncoreTheme.typography.bodyMediumBold.copy(
+                                        color = if (spDcExportable) Color.Unspecified
+                                        else EncoreColors.TextSecondary
+                                    )
                                 )
                                 Text(
                                     text = stringResource(R.string.export_my_sp_dc_subtitle),
@@ -1138,10 +1149,20 @@ fun SettingsScreen(
         onConfirm = {
             spDcExportWarnOpen = false
             val spDc = EncoreAuth.spDc(context)
-            if (spDc.isNotBlank()) {
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                clipboard?.setPrimaryClip(ClipData.newPlainText("sp_dc", "sp_dc=$spDc"))
+            if (spDc.isBlank()) {
+                toastState?.show(spDcExportUnavailableLabel)
+                return@SpDcExportWarnDialog
+            }
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val copied = clipboard?.let {
+                runCatching {
+                    it.setPrimaryClip(ClipData.newPlainText("sp_dc", "sp_dc=$spDc"))
+                }.isSuccess
+            } == true
+            if (copied) {
                 toastState?.show(spDcExportedLabel)
+            } else {
+                toastState?.show(spDcExportFailedLabel)
             }
         },
         onDismiss = { spDcExportWarnOpen = false }

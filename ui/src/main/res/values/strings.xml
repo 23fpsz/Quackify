@@ -569,6 +569,8 @@
     <string name="export_my_sp_dc">Export my current account sp_dc</string>
     <string name="export_my_sp_dc_subtitle">Copy this session\'s sp_dc cookie to the clipboard</string>
     <string name="sp_dc_copied">sp_dc copied to the clipboard</string>
+    <string name="sp_dc_export_unavailable">There is no session sp_dc to export</string>
+    <string name="sp_dc_export_failed">Could not copy the sp_dc to the clipboard</string>
     <string name="title_copied">Title copied</string>
     <string name="lyrics_copied">Lyrics copied</string>
     <string name="lyrics_selection_count">%1$d selected</string>
