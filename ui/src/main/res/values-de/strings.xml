@@ -67,6 +67,9 @@
     <string name="copy_link">Link kopieren</string>
     <string name="link_copied">Link kopiert</string>
     <string name="version_copied">Version kopiert</string>
+    <string name="export_my_sp_dc">Mein aktuelles Konto-sp_dc exportieren</string>
+    <string name="export_my_sp_dc_subtitle">Den sp_dc-Cookie dieser Sitzung in die Zwischenablage kopieren</string>
+    <string name="sp_dc_copied">sp_dc in die Zwischenablage kopiert</string>
     <string name="title_copied">Titel kopiert</string>
     <string name="lyrics_copied">Songtext kopiert</string>
     <string name="lyrics_selection_count">%1$d ausgewählt</string>

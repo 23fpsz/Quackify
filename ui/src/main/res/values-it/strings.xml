@@ -416,6 +416,9 @@
     <string name="copyright">© 2026 Quackify Team</string>
     <string name="link_copied">Link copiato</string>
     <string name="version_copied">Versione copiata</string>
+    <string name="export_my_sp_dc">Esporta lo sp_dc del mio account attuale</string>
+    <string name="export_my_sp_dc_subtitle">Copia il cookie sp_dc di questa sessione negli appunti</string>
+    <string name="sp_dc_copied">sp_dc copiato negli appunti</string>
     <string name="title_copied">Titolo copiato</string>
     <string name="lyrics_copied">Testi copiati</string>
     <string name="lyrics_selection_count">%1$d selezionati</string>
