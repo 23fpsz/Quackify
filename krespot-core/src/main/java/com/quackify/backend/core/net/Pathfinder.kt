@@ -307,6 +307,7 @@ object Pathfinder {
     ): Map<String, String> = buildMap {
         put("Authorization", "Bearer $token")
         put("Accept", "application/json")
+        put("Accept-Language", AppLocale.acceptLanguage(context))
         if (operation != HOME_OP) {
             put("app-platform", "WebPlayer")
             put("spotify-app-version", "9.1.92.3058")
