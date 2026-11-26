@@ -61,6 +61,30 @@ object AppLocale {
 
     fun nativeName(tag: String): String? = NATIVE_NAMES[tag]
 
+    /** Formats a standard HTTP Accept-Language header matching the active app or system locale. */
+    fun acceptLanguage(context: Context): String {
+        val tag = current(context)
+        val preferred = if (tag != SYSTEM) {
+            tag
+        } else {
+            val systemLocale = runCatching {
+                context.resources.configuration.locales[0]
+            }.getOrNull() ?: Locale.getDefault()
+            systemLocale.toLanguageTag().ifBlank { systemLocale.language }
+        }
+        val clean = when (preferred.lowercase()) {
+            "in" -> "id"
+            "iw" -> "he"
+            "ji" -> "yi"
+            else -> preferred
+        }
+        return if (clean.startsWith("en", ignoreCase = true)) {
+            "en-US,en;q=0.9"
+        } else {
+            "$clean,en;q=0.8"
+        }
+    }
+
     fun wrap(base: Context): Context {
         val tag = current(base)
         val config = base.resources.configuration
