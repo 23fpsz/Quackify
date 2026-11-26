@@ -665,6 +665,7 @@ class LoginWebViewHost(val context: Context, private val startUrl: String = LOGI
                 javaScriptCanOpenWindowsAutomatically = true
                 cacheMode = WebSettings.LOAD_DEFAULT
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                userAgentString = LOGIN_UA
             }
             view.setBackgroundColor(0xFF000000.toInt())
             return view
