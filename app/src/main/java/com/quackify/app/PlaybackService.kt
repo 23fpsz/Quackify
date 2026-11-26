@@ -64,6 +64,8 @@ class PlaybackService : MediaBrowserServiceCompat() {
 
     private var watcher: Job? = null
 
+    private var lastFmScrobbler: com.quackify.backend.core.lastfm.LastFmPlaybackScrobbler? = null
+
     /** Artwork for the current track and cover URL. Stored together so stale bitmaps never leak. */
     private var currentArtTrackUri = ""
     private var currentArtUrl = ""
@@ -358,6 +360,49 @@ class PlaybackService : MediaBrowserServiceCompat() {
 
     private fun apply(state: ComposePlaybackState, progress: PlaybackProgressSnapshot) {
         if (finished) return
+
+        // Last.fm playback integration. Missing credentials/session never
+        // interrupts normal playback.
+        if (
+            BuildConfig.LASTFM_API_KEY.isNotBlank() &&
+            BuildConfig.LASTFM_SHARED_SECRET.isNotBlank()
+        ) {
+            runCatching {
+                val scrobbler = lastFmScrobbler
+                    ?: com.quackify.backend.core.lastfm.LastFmPlaybackScrobbler(
+                        applicationContext,
+                        com.quackify.backend.core.lastfm.LastFmApiClient(
+                            BuildConfig.LASTFM_API_KEY,
+                            BuildConfig.LASTFM_SHARED_SECRET
+                        ),
+                        scope
+                    ).also { lastFmScrobbler = it }
+
+                val track = if (
+                    state.trackUri.startsWith("spotify:track:")
+                ) {
+                    com.quackify.backend.core.lastfm.LastFmTrack(
+                        identity = state.trackUri,
+                        title = state.title,
+                        artist = state.artist,
+                        durationMs = progress.durationMs
+                    )
+                } else {
+                    null
+                }
+
+                scrobbler.onPlaybackUpdate(
+                    track = track,
+                    isPlaying = state.isPlaying,
+                    positionMs = progress.positionMs,
+                    sessionKey = com.quackify.backend.core.lastfm.LastFmSecureStore
+                        .getSessionKey(applicationContext)
+                )
+            }.onFailure {
+                log.w("Last.fm playback integration failed: ${it.message}")
+            }
+        }
+
         val hasTrack = state.trackUri.isNotBlank() || state.title.isNotBlank()
         val session = session ?: return
         log.d("apply: track='${state.title}' playing=${state.isPlaying} buffering=${state.isBuffering} pos=${progress.positionMs}/${progress.durationMs}")

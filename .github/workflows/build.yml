@@ -2,7 +2,7 @@ name: Build Quackify
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "feature/lastfm-scrobbling" ]
     paths:
       - 'app/**'
       - 'ui/**'
@@ -18,9 +18,10 @@ on:
       - 'settings.gradle.kts'
       - 'gradlew'
       - 'gradlew.bat'
+      - '.github/workflows/build.yml'
 
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "feature/lastfm-scrobbling" ]
 
   workflow_dispatch:
     inputs:
@@ -102,10 +103,15 @@ jobs:
             exit 0
           fi
 
-          # Automated pushes build only release variants
+          # Feature branch: build Standard Debug APK for testing
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "tasks=assembleRelease" >> "$GITHUB_OUTPUT"
-            echo "Selected tasks: assembleRelease (automated push)"
+            if [ "${GITHUB_REF_NAME}" = "feature/lastfm-scrobbling" ]; then
+              echo "tasks=assembleStandardDebug" >> "$GITHUB_OUTPUT"
+              echo "Selected tasks: assembleStandardDebug (Last.fm feature test)"
+            else
+              echo "tasks=assembleRelease" >> "$GITHUB_OUTPUT"
+              echo "Selected tasks: assembleRelease (automated push)"
+            fi
             exit 0
           fi
 
@@ -132,6 +138,8 @@ jobs:
 
       - name: Build APKs with Gradle
         env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SHARED_SECRET: ${{ secrets.LASTFM_SHARED_SECRET }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
