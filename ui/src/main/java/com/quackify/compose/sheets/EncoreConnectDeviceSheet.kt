@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.quackify.compose.R
@@ -180,19 +181,39 @@ fun EncoreConnectDeviceSheet(
             Spacer(modifier = Modifier.height(EncoreSpacers.Tighter2))
 
             val playingRemote = devices.any { it.isCurrent && !it.local }
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.85f)
-            ) {
-                items(
-                    devices.filter { !it.isCurrent && (!it.local || playingRemote) },
-                    key = { it.id }
-                ) { device ->
-                    DeviceRow(
-                        device = device,
-                        onClick = { onSelectDevice(device) }
+            val otherDevices = devices.filter { !it.isCurrent && (!it.local || playingRemote) }
+            if (otherDevices.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = EncoreSpacers.Base)
+                        .clip(RoundedCornerShape(EncoreCornerRadii.Larger2))
+                        .background(Color(0xFF242424))
+                        .padding(EncoreSpacers.Base),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.connect_no_devices),
+                        style = EncoreTheme.typography.bodyMedium.copy(color = EncoreColors.TextSecondary),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.85f)
+                ) {
+                    items(
+                        otherDevices,
+                        key = { it.id }
+                    ) { device ->
+                        DeviceRow(
+                            device = device,
+                            onClick = { onSelectDevice(device) }
+                        )
+                    }
                 }
             }
         }

@@ -239,6 +239,7 @@
     <string name="listening_on">Écoute sur</string>
     <string name="connected_devices">Appareils connectés</string>
     <string name="connect">Connecter</string>
+    <string name="connect_no_devices">Aucun autre appareil trouvé. Connectez-vous sur un autre appareil avec le même compte et il apparaîtra ici.</string>
     <string name="this_phone">Ce téléphone</string>
     <string name="unknown_device">Appareil inconnu</string>
     <string name="select_another_device">Choisir un autre appareil</string>

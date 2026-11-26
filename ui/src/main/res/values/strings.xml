@@ -494,6 +494,7 @@
     <string name="save_to_your_library">Save to Your Library</string>
     <string name="remove_from_your_library">Remove from Your Library</string>
     <string name="connect">Connect</string>
+    <string name="connect_no_devices">No other devices found. Sign in on another device with the same account and it will show up here.</string>
     <string name="unknown_device">Unknown device</string>
     <string name="track_on_device">%1$s - %2$s</string>
     <string name="this_phone">This Phone</string>

@@ -468,6 +468,7 @@
     <string name="save_to_your_library">Guardar en Tu Biblioteca</string>
     <string name="remove_from_your_library">Quitar de Tu Biblioteca</string>
     <string name="connect">Conectar</string>
+    <string name="connect_no_devices">No se encontraron otros dispositivos. Inicia sesión en otro dispositivo con la misma cuenta y aparecerá aquí.</string>
     <string name="unknown_device">Dispositivo desconocido</string>
     <string name="track_on_device">%1$s - %2$s</string>
     <string name="this_phone">Este teléfono</string>

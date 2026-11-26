@@ -239,6 +239,7 @@
     <string name="listening_on">Слушают на</string>
     <string name="connected_devices">Подключённые устройства</string>
     <string name="connect">Подключить</string>
+    <string name="connect_no_devices">Другие устройства не найдены. Войдите на другом устройстве с тем же аккаунтом — и оно появится здесь.</string>
     <string name="this_phone">Этот телефон</string>
     <string name="unknown_device">Неизвестное устройство</string>
     <string name="select_another_device">Выбрать другое устройство</string>
