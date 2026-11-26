@@ -87,6 +87,7 @@ internal class ShellSheetsEnv(
     val onLoadProfile: (() -> Unit)?,
     val onOpenHistory: (() -> Unit)?,
     val onOpenActivity: (() -> Unit)?,
+    val onOpenFriendActivity: (() -> Unit)? = null,
     val activityUnread: Boolean,
     val onAddToPlaylist: ((TrackItem) -> Unit)?,
     val onShowCredits: ((String) -> Unit)?,
@@ -403,6 +404,10 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
             env.onOpenActivity?.invoke()
         },
         notificationsUnread = env.activityUnread,
+        onFriendActivity = {
+            env.navController.openFriendActivity()
+            env.onOpenFriendActivity?.invoke()
+        },
         onProfile = {
             env.pushCurrentState()
             env.setCurrentScreen(ShellScreen.PROFILE)

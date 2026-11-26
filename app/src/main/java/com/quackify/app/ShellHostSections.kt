@@ -28,6 +28,7 @@ import com.quackify.compose.player.TimeSyncedLyric
 import com.quackify.compose.player.TranscriptLine
 import com.quackify.compose.player.TranscriptWordSpan
 import com.quackify.compose.shell.ActivityFeedState
+import com.quackify.compose.shell.FriendActivityState
 import com.quackify.compose.screens.CategoryRecommendationItem
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.shell.EncoreAppShell
@@ -457,6 +458,7 @@ internal fun MainActivity.ShellAppHostSection(
     nowPlaying: ShellNowPlayingData,
     contributors: PlaylistContributorController,
     activity: ActivityFeedController,
+    friendActivity: FriendActivityFeedController,
     recents: List<RecentSearches.Entry>,
 ) {
     val onAddRecommendedBound: (TrackItem) -> Unit = { track -> onAddRecommendedHandler(scope, track) }
@@ -706,7 +708,9 @@ onToggleSetting = onToggleSettingBound,
     notificationsLoading = whatsNewLoading,
     notificationsFailed = whatsNewFailed,
     onRefreshWhatsNew = { whatsNewFetch++ },
-    activityState = buildActivityFeedState(activity),    historyToday = home.historyToday,
+    activityState = buildActivityFeedState(activity),
+    friendActivityState = buildFriendActivityState(friendActivity),
+    historyToday = home.historyToday,
     historyYesterday = home.historyYesterday,
     historyEarlier = home.historyEarlier,
     historyStats = home.historyStats,
@@ -1550,6 +1554,17 @@ private fun buildActivityFeedState(activity: ActivityFeedController): ActivityFe
         onRetry = activity::open,
         onLeave = activity::leave,
         onDrawerOpened = activity::refreshUnread,
+    )
+}
+
+private fun buildFriendActivityState(friendActivity: FriendActivityFeedController): FriendActivityState {
+    return FriendActivityState(
+        feed = friendActivity.feed,
+        loading = friendActivity.loading,
+        failed = friendActivity.failed,
+        onOpen = friendActivity::open,
+        onRetry = friendActivity::open,
+        onSilentRefresh = friendActivity::refreshSilently,
     )
 }
 

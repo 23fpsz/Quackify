@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import com.quackify.backend.model.ActivityNotification
 import com.quackify.backend.model.ConnectDevice
+import com.quackify.backend.model.FriendActivityEntry
 import com.quackify.backend.model.SelfProfile
 import com.quackify.compose.components.RepeatMode
 import com.quackify.compose.components.ShuffleMode
@@ -34,6 +35,7 @@ enum class ShellScreen {
     SETTINGS,
     NOTIFICATIONS,
     ACTIVITY,
+    FRIEND_ACTIVITY,
     HISTORY,
     FOLDER,
     SHOW,
@@ -67,6 +69,15 @@ data class ActivityFeedState(
     val onRetry: () -> Unit = {},
     val onLeave: () -> Unit = {},
     val onDrawerOpened: () -> Unit = {},
+)
+
+data class FriendActivityState(
+    val feed: List<FriendActivityEntry> = emptyList(),
+    val loading: Boolean = false,
+    val failed: Boolean = false,
+    val onOpen: () -> Unit = {},
+    val onRetry: () -> Unit = {},
+    val onSilentRefresh: () -> Unit = {},
 )
 
 data class BackStackItem(

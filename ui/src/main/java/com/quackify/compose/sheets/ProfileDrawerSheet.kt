@@ -53,6 +53,7 @@ fun ProfileDrawerSheet(
     onSettingsClick: () -> Unit,
     onNotificationsClick: (() -> Unit)? = null,
     notificationsUnread: Boolean = false,
+    onFriendActivityClick: (() -> Unit)? = null,
     onLogoutClick: (() -> Unit)? = null,
     accountsLocked: Boolean = false,
     userDisplayName: String = "Duck User",
@@ -163,6 +164,17 @@ fun ProfileDrawerSheet(
                     onProfileClick()
                 }
             )
+
+            if (onFriendActivityClick != null) {
+                ProfileDrawerItem(
+                    title = stringResource(R.string.friend_activity),
+                    iconRes = R.drawable.encore_icon_people_24,
+                    onClick = {
+                        onDismiss()
+                        onFriendActivityClick()
+                    }
+                )
+            }
 
             ProfileDrawerItem(
                 title = stringResource(R.string.whats_new_lowercase),

@@ -317,6 +317,7 @@
     <string name="stop_audio_in">오디오 중지까지</string>
     <string name="back_15_seconds">15초 뒤로</string>
     <string name="forward_15_seconds">15초 앞으로</string>
+    <string name="friend_activity">친구 활동</string>
     <string name="explore_category">%1$s 탐색</string>
     <string name="rating_stars">★ %1$s</string>
     <string name="podcast_with_host">팟캐스트 • %1$s</string>
@@ -439,6 +440,7 @@
     <string name="could_not_load_this_section">이 섹션을 불러올 수 없습니다</string>
     <string name="couldn_t_load_categories">카테고리를 불러올 수 없습니다</string>
     <string name="couldn_t_load_contributors">공동 작업자를 불러올 수 없습니다</string>
+    <string name="couldn_t_load_friend_activity">친구 활동을 불러올 수 없습니다</string>
     <string name="couldn_t_load_notifications">알림을 불러올 수 없습니다</string>
     <string name="couldn_t_load_this_album">이 앨범을 불러올 수 없습니다</string>
     <string name="couldn_t_load_this_artist">이 아티스트를 불러올 수 없습니다</string>
@@ -503,6 +505,7 @@
     <string name="new_releases_from_the_artists_and_podcasts_you_f">팔로우한 아티스트와 팟캐스트의 새 릴리스가 여기에 표시됩니다.</string>
     <string name="no_contributors_yet">아직 공동 작업자가 없습니다</string>
     <string name="no_folders_yet_create_one_from_the_button">아직 폴더가 없습니다. + 버튼으로 만들어 보세요.</string>
+    <string name="no_friend_activity_yet">아직 친구 활동이 없습니다</string>
     <string name="no_notifications_yet">아직 알림이 없습니다</string>
     <string name="no_release_notes">릴리스 노트가 없습니다.</string>
     <string name="no_tracks_in_this_album">이 앨범에 곡이 없습니다</string>
@@ -604,6 +607,7 @@
     <string name="whats_new_lowercase">새 소식</string>
     <string name="when_off_music_videos_and_live_performances_play">끄면 뮤직비디오와 라이브 공연이 오디오로만 재생됩니다.</string>
     <string name="when_someone_follows_you_or_interacts_with_your">누군가 나를 팔로우하거나 내 플레이리스트에 반응하면 여기에 표시됩니다.</string>
+    <string name="when_friends_you_follow_play_something_it_ll_show_up_here">팔로우하는 친구가 무언가를 재생하면 여기에 표시됩니다.</string>
     <string name="when_you_open_the_app_the_loaded_track_starts_pl">앱을 열면 불러온 곡이 바로 재생됩니다.</string>
     <string name="widget">위젯</string>
     <string name="you_re_all_caught_up">모두 확인했습니다</string>

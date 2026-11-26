@@ -1662,8 +1662,12 @@ class MainActivity : ComponentActivity() {
         val playback = bridge.state
         val contributors = rememberPlaylistContributorController(context, playlistUri)
         val activity = remember { ActivityFeedController(context.applicationContext, scope) }
+        val friendActivity = remember { FriendActivityFeedController(context.applicationContext, scope) }
         LaunchedEffect(activity.fetchTick) {
             if (activity.fetchTick > 0) activity.load()
+        }
+        LaunchedEffect(friendActivity.fetchTick) {
+            if (friendActivity.fetchTick > 0) friendActivity.load()
         }
         LaunchedEffect(Unit) {
             activity.refreshUnread()
@@ -1699,6 +1703,7 @@ class MainActivity : ComponentActivity() {
                 nowPlaying = nowPlaying,
                 contributors = contributors,
                 activity = activity,
+                friendActivity = friendActivity,
                 recents = recents,
             )
         }

@@ -317,6 +317,7 @@
     <string name="stop_audio_in">Звук остановится через</string>
     <string name="back_15_seconds">Назад на 15 секунд</string>
     <string name="forward_15_seconds">Вперёд на 15 секунд</string>
+    <string name="friend_activity">Активность друзей</string>
     <string name="explore_category">Обзор: %1$s</string>
     <string name="rating_stars">★ %1$s</string>
     <string name="podcast_with_host">Подкаст • %1$s</string>
@@ -451,6 +452,7 @@
     <string name="could_not_load_this_section">Не удалось загрузить этот раздел</string>
     <string name="couldn_t_load_categories">Не удалось загрузить категории</string>
     <string name="couldn_t_load_contributors">Не удалось загрузить участников</string>
+    <string name="couldn_t_load_friend_activity">Не удалось загрузить активность друзей</string>
     <string name="couldn_t_load_notifications">Не удалось загрузить уведомления</string>
     <string name="couldn_t_load_this_album">Не удалось загрузить этот альбом</string>
     <string name="couldn_t_load_this_artist">Не удалось загрузить этого артиста</string>
@@ -515,6 +517,7 @@
     <string name="new_releases_from_the_artists_and_podcasts_you_f">Здесь появятся новинки артистов и подкастов, на которые Вы подписаны.</string>
     <string name="no_contributors_yet">Пока нет участников</string>
     <string name="no_folders_yet_create_one_from_the_button">Пока нет папок. Создайте её кнопкой +.</string>
+    <string name="no_friend_activity_yet">Пока нет активности друзей</string>
     <string name="no_notifications_yet">Пока нет уведомлений</string>
     <string name="no_release_notes">Нет примечаний к релизу.</string>
     <string name="no_tracks_in_this_album">В этом альбоме нет треков</string>
@@ -616,6 +619,7 @@
     <string name="whats_new_lowercase">Новинки</string>
     <string name="when_off_music_videos_and_live_performances_play">Если выключено, клипы и живые выступления играют только как аудио.</string>
     <string name="when_someone_follows_you_or_interacts_with_your">Когда кто-то подписывается на Вас или взаимодействует с Вашими плейлистами, это появится здесь.</string>
+    <string name="when_friends_you_follow_play_something_it_ll_show_up_here">Когда друзья, на которых вы подписаны, что-то слушают, вы увидите это здесь.</string>
     <string name="when_you_open_the_app_the_loaded_track_starts_pl">При открытии приложения загруженный трек сразу начинает играть.</string>
     <string name="widget">Виджет</string>
     <string name="you_re_all_caught_up">Вы всё просмотрели</string>

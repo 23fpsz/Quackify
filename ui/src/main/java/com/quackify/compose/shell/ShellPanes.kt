@@ -72,6 +72,7 @@ import com.quackify.backend.model.PlaylistMember
 import com.quackify.backend.model.ProfileTopContent
 import com.quackify.backend.model.ProfileTopTrack
 import com.quackify.backend.model.ActivityNotification
+import com.quackify.backend.model.FriendActivityEntry
 import com.quackify.backend.model.SelfProfile
 import com.quackify.backend.model.UserProfile
 import com.quackify.backend.model.SearchHit
@@ -99,6 +100,7 @@ import com.quackify.compose.playlist.EncorePlaylistScreen
 import com.quackify.compose.playlist.TrackItem
 import com.quackify.compose.screens.ActivityScreen
 import com.quackify.compose.screens.ArtistRelease
+import com.quackify.compose.screens.FriendActivityScreen
 import com.quackify.compose.screens.CategoryShelf
 import com.quackify.compose.screens.HistoryStats
 import com.quackify.compose.screens.HistoryScreen
@@ -319,6 +321,29 @@ internal fun ShellActivityPane(
         selfAvatarUrl = self?.avatarUrl?.takeIf { it.isNotBlank() } ?: fallbackAvatarUrl,
         selfAvatarColor = self?.avatarBackgroundColor ?: 0,
         onOpenNotification = onOpenNotification
+    )
+}
+
+@Composable
+internal fun ShellFriendActivityPane(
+    onBackClick: () -> Unit,
+    friends: List<FriendActivityEntry>,
+    loading: Boolean,
+    loadFailed: Boolean,
+    onRetry: () -> Unit,
+    onSilentRefresh: () -> Unit,
+    onOpenFriend: (FriendActivityEntry) -> Unit,
+    onOpenFriendProfile: (FriendActivityEntry) -> Unit,
+) {
+    FriendActivityScreen(
+        onBackClick = onBackClick,
+        friends = friends,
+        loading = loading,
+        loadFailed = loadFailed,
+        onRetry = onRetry,
+        onSilentRefresh = onSilentRefresh,
+        onOpenFriend = onOpenFriend,
+        onOpenFriendProfile = onOpenFriendProfile
     )
 }
 

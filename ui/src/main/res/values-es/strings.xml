@@ -93,6 +93,7 @@
     <string name="couldnt_load">No se pudo cargar</string>
     <string name="couldn_t_load_categories">No se pudieron cargar las categorías</string>
     <string name="couldn_t_load_contributors">No se pudieron cargar los colaboradores</string>
+    <string name="couldn_t_load_friend_activity">No se pudo cargar la actividad de amigos</string>
     <string name="couldn_t_load_notifications">No se pudieron cargar las notificaciones</string>
     <string name="couldn_t_load_this_album">No se pudo cargar este álbum</string>
     <string name="couldn_t_load_this_artist">No se pudo cargar este artista</string>
@@ -146,6 +147,7 @@
     <string name="followers_and_following">Seguidores y siguiendo</string>
     <string name="following">Siguiendo</string>
     <string name="forward_15_seconds">Avanzar 15 segundos</string>
+    <string name="friend_activity">Actividad de amigos</string>
     <string name="from_your_liked_songs">De tus canciones favoritas</string>
     <string name="gallery">Galería</string>
     <string name="gapless_playback">Reproducción sin pausas</string>
@@ -250,6 +252,7 @@
     <string name="no_credits_for_this_track">No hay créditos para esta canción</string>
     <string name="no_music_video_for_this_track">No hay vídeo musical para esta canción</string>
     <string name="no_folders_yet_create_one_from_the_button">Aún no hay carpetas. Crea una desde el botón +.</string>
+    <string name="no_friend_activity_yet">Aún no hay actividad de amigos</string>
     <string name="no_notifications_yet">Aún no hay notificaciones</string>
     <string name="no_release_notes">No hay notas de la versión.</string>
     <string name="no_tracks_in_this_album">No hay canciones en este álbum</string>
@@ -434,6 +437,7 @@
     <string name="whats_new_lowercase">Novedades</string>
     <string name="when_off_music_videos_and_live_performances_play">Si está desactivado, los videos musicales y las actuaciones en vivo se reproducen solo en audio.</string>
     <string name="when_someone_follows_you_or_interacts_with_your">Cuando alguien te siga o interactúe con tus playlists, lo verás aquí.</string>
+    <string name="when_friends_you_follow_play_something_it_ll_show_up_here">Cuando los amigos que sigues escuchen algo, lo verás aquí.</string>
     <string name="when_you_open_the_app_the_loaded_track_starts_pl">Al abrir la app, la canción cargada empieza a sonar de inmediato.</string>
     <string name="widget">Widget</string>
     <string name="yesterday">Ayer</string>

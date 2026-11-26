@@ -317,6 +317,7 @@
     <string name="stop_audio_in">音频将在以下时间后停止</string>
     <string name="back_15_seconds">后退 15 秒</string>
     <string name="forward_15_seconds">前进 15 秒</string>
+    <string name="friend_activity">好友动态</string>
     <string name="explore_category">探索%1$s</string>
     <string name="rating_stars">★ %1$s</string>
     <string name="podcast_with_host">播客 • %1$s</string>
@@ -439,6 +440,7 @@
     <string name="could_not_load_this_section">无法加载此部分</string>
     <string name="couldn_t_load_categories">无法加载分类</string>
     <string name="couldn_t_load_contributors">无法加载协作者</string>
+    <string name="couldn_t_load_friend_activity">无法加载好友动态</string>
     <string name="couldn_t_load_notifications">无法加载通知</string>
     <string name="couldn_t_load_this_album">无法加载此专辑</string>
     <string name="couldn_t_load_this_artist">无法加载此艺人</string>
@@ -503,6 +505,7 @@
     <string name="new_releases_from_the_artists_and_podcasts_you_f">你关注的艺人和播客的新作品会显示在这里。</string>
     <string name="no_contributors_yet">还没有协作者</string>
     <string name="no_folders_yet_create_one_from_the_button">还没有文件夹。用 + 按钮创建一个。</string>
+    <string name="no_friend_activity_yet">暂无好友动态</string>
     <string name="no_notifications_yet">还没有通知</string>
     <string name="no_release_notes">没有发行说明。</string>
     <string name="no_tracks_in_this_album">此专辑没有曲目</string>
@@ -604,6 +607,7 @@
     <string name="whats_new_lowercase">新内容</string>
     <string name="when_off_music_videos_and_live_performances_play">关闭后，音乐视频和现场表演仅以音频播放。</string>
     <string name="when_someone_follows_you_or_interacts_with_your">当有人关注你或与你的歌单互动时，你会在这里看到。</string>
+    <string name="when_friends_you_follow_play_something_it_ll_show_up_here">你关注的好友播放内容时，就会显示在这里。</string>
     <string name="when_you_open_the_app_the_loaded_track_starts_pl">打开应用后，已加载的曲目会立即开始播放。</string>
     <string name="widget">小组件</string>
     <string name="you_re_all_caught_up">你已全部看完</string>
