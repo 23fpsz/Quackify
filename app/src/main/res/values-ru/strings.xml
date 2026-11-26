@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="custom_spdc_startup_toast">Работает на пользовательской сессии sp_dc (%1$d байт)</string>
+    <string name="widget_4x1_desc">Панель воспроизведения с обложкой, лайком и управлением</string>
+    <string name="widget_3x2_desc">Карточка воспроизведения с обложкой, прогрессом и управлением</string>
+    <string name="widget_3x3_desc">Большая карточка воспроизведения с крупной обложкой и управлением</string>
+    <string name="slim_player">Компактный плеер</string>
+    <string name="music_card_label">Музыкальная карточка</string>
+    <string name="square_art_label">Обложка альбома</string>
+    <string name="txt_not_playing">Ничего не воспроизводится</string>
+    <string name="txt_notrack">Нет трека</string>
+    <string name="txt_noartist">Нет исполнителя</string>
+    <string name="android_auto_navigation_home">Главная</string>
+    <string name="android_auto_navigation_recently_played">Недавно прослушанные</string>
+    <string name="android_auto_navigation_your_library">Моя медиатека</string>
+    <string name="android_auto_navigation_browse">Обзор</string>
+    <string name="your_library_content_filter_playlists">Плейлисты</string>
+    <string name="your_library_content_filter_albums">Альбомы</string>
+    <string name="your_library_content_filter_artists">Исполнители</string>
+    <string name="your_library_content_filter_podcasts">Подкасты</string>
+    <string name="collection_liked_songs_title">Любимые треки</string>
+</resources>
