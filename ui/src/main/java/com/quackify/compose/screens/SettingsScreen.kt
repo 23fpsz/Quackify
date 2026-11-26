@@ -1080,7 +1080,7 @@ fun SettingsScreen(
                                 Text(
                                     text = stringResource(R.string.export_my_sp_dc),
                                     style = EncoreTheme.typography.bodyMediumBold.copy(
-                                        color = if (spDcExportable) Color.Unspecified
+                                        color = if (spDcExportable) EncoreColors.Error
                                         else EncoreColors.TextSecondary
                                     )
                                 )
@@ -1172,6 +1172,9 @@ fun SettingsScreen(
         spDc = spDcUnchecked,
         onConfirm = {
             val spDc = spDcUnchecked
+                ?.trim()
+                ?.removePrefix("sp_dc=")
+                ?.trim()
             spDcUnchecked = null
             if (spDc.isNullOrBlank()) return@SpDcUncheckedConfirmDialog
             scope.launch {
