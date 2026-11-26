@@ -973,7 +973,7 @@ class PlaybackBridge(private val context: Context) {
         if (tracks.size != uris.size) {
             log.w("queue set: ${uris.size - tracks.size} of ${uris.size} rows have no metadata")
         }
-        val ok = connect.setQueue(tracks, prevRows)
+        val ok = connect.setQueue(tracks, prevRows, queueCommandTarget())
         log.i("queue = ${tracks.size} rows ok=$ok")
         return ok
     }
@@ -2294,11 +2294,12 @@ class PlaybackBridge(private val context: Context) {
                     queuedTail = queuedTail + TrackItem(title = "", artist = "", uri = uri)
                 }
                 publishQueue(connect.cluster.value)
-                var added = connect.addToQueue(uri)
+                val target = queueCommandTarget()
+                var added = connect.addToQueue(uri, target)
                 if (!added) {
                     connect.refreshCluster()
                     delay(QUEUE_RETRY_MS.milliseconds)
-                    added = connect.addToQueue(uri)
+                    added = connect.addToQueue(uri, target)
                 }
                 log.i("queue += '$uri' ok=$added")
                 val cluster = connect.cluster.value
@@ -3574,6 +3575,10 @@ class PlaybackBridge(private val context: Context) {
         val active = connect.cluster.value?.activeDevice ?: return ""
         return if (active.id != deviceId) active.id else ""
     }
+
+    /** Queue edits belong to the machine that owns the slot: the active
+     * device while another one plays, this device otherwise. */
+    private fun queueCommandTarget(): String = remoteTarget().ifBlank { deviceId }
 
     private suspend fun playConfirmed(
         context: String,
