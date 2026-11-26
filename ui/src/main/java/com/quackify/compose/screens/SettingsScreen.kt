@@ -100,6 +100,7 @@ import com.quackify.backend.core.log.Logs
 import com.quackify.backend.core.store.StreamSource
 import com.quackify.backend.core.store.StreamSources
 import com.quackify.compose.components.EncoreIconButton
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.theme.EncoreAnimation
 import com.quackify.compose.theme.EncoreColors
 import com.quackify.compose.theme.EncoreAppTheme
@@ -165,6 +166,7 @@ fun SettingsScreen(
     onAppIconChange: (String) -> Unit = {},
     onOpenLogcat: () -> Unit = {},
     onSpDcSignedIn: () -> Unit = {},
+    toastState: QuackifyToastState? = null,
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
@@ -246,6 +248,9 @@ fun SettingsScreen(
         mutableStateOf(clientPrefs.getBoolean("debugLogging", false))
     }
     var versionTaps by remember { mutableIntStateOf(0) }
+    val versionCopiedLabel = stringResource(R.string.version_copied)
+    val debugUnlockedLabel = stringResource(R.string.debug_unlocked)
+    val debugDisabledLabel = stringResource(R.string.debug_disabled)
     var playerButtonsConfig by remember { mutableStateOf(PlayerButtonsStore.load(context)) }
     var playerButtonsSheetOpen by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf<Int?>(null) }
@@ -271,7 +276,7 @@ fun SettingsScreen(
         Logs.floor = Logs.Level.INFO
         clientPrefs.edit().putLong("logcatEpochMs", System.currentTimeMillis()).apply()
         if (category == 3) category = null
-        Toast.makeText(context, R.string.debug_disabled, Toast.LENGTH_SHORT).show()
+        toastState?.show(debugDisabledLabel)
     }
     var lyricsProviderSheetOpen by remember { mutableStateOf(false) }
     var translationLanguageSheetOpen by remember { mutableStateOf(false) }
@@ -897,7 +902,7 @@ fun SettingsScreen(
                                         if (versionTaps >= 5) {
                                             debugUnlocked = true
                                             clientPrefs.edit().putBoolean("debugUnlocked", true).apply()
-                                            Toast.makeText(context, R.string.debug_unlocked, Toast.LENGTH_SHORT).show()
+                                            toastState?.show(debugUnlockedLabel)
                                         }
                                     }
                                 },
@@ -905,7 +910,7 @@ fun SettingsScreen(
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                                     if (clipboard != null) {
                                         clipboard.setPrimaryClip(ClipData.newPlainText("Version", version))
-                                        Toast.makeText(context, R.string.version_copied, Toast.LENGTH_SHORT).show()
+                                        toastState?.show(versionCopiedLabel)
                                     }
                                     if (debugUnlocked || debugLogging) disableDebug()
                                 }

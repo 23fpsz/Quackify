@@ -85,6 +85,7 @@ import com.quackify.compose.components.DetailPageSkeleton
 import com.quackify.compose.components.EncoreChip
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.EncoreArtworkImage
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.components.TrackListSkeleton
 import com.quackify.compose.format.parseHexColor
 import com.quackify.compose.home.HomeShelf
@@ -243,6 +244,7 @@ internal fun ShellSettingsPane(
     updateError: String? = null,
     updateVersion: String? = null,
     onCheckUpdates: () -> Unit = {},
+    toastState: QuackifyToastState? = null,
 ) {
     SettingsScreen(
         onBackClick = onBackClick,
@@ -264,7 +266,8 @@ internal fun ShellSettingsPane(
         updateChecked = updateChecked,
         updateError = updateError,
         updateVersion = updateVersion,
-        onCheckUpdates = onCheckUpdates
+        onCheckUpdates = onCheckUpdates,
+        toastState = toastState
     )
 }
 

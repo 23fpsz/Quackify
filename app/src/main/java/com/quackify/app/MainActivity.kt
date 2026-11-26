@@ -83,6 +83,7 @@ import com.quackify.backend.model.TrackLyrics
 import com.quackify.backend.model.UserProfile
 import com.quackify.compose.R as ComposeR
 import com.quackify.compose.components.QuackifyToastHost
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.components.UpdateDialog
 import com.quackify.compose.components.UpdateInstallPhase
 import com.quackify.compose.components.rememberQuackifyToastState
@@ -1141,6 +1142,7 @@ class MainActivity : ComponentActivity() {
                             updates = updates,
                             onBack = { loginSettingsOpen = false },
                             onOpenLogcat = { loginLogcatOpen = true },
+                            toastState = sessionToast,
                         )
                     }
                     if (loginLogcatOpen) {
@@ -1619,6 +1621,7 @@ class MainActivity : ComponentActivity() {
         updates: UpdateController,
         onBack: () -> Unit,
         onOpenLogcat: () -> Unit,
+        toastState: QuackifyToastState? = null,
     ) {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
@@ -1641,6 +1644,7 @@ class MainActivity : ComponentActivity() {
             onCheckUpdates = updates::requestManualCheck,
             onAppIconChange = { option -> onAppIconChangeHandler(context, option) },
             onOpenLogcat = onOpenLogcat,
+            toastState = toastState,
         )
     }
 
