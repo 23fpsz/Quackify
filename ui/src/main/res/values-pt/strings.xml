@@ -404,6 +404,8 @@
     <string name="transcript_offset">Ajuste da transcrição</string>
     <string name="transcript_offset_desc">Adianta ou atrasa o tempo da transcrição quando ela está fora de sincronia com o áudio</string>
     <string name="transcript_menu">Opções da transcrição</string>
+    <string name="show_transcript">Mostrar transcrição</string>
+    <string name="hide_transcript">Ocultar transcrição</string>
     <string name="transcript_translation">Traduzir transcrição</string>
     <string name="transcript_translation_desc">Mostra uma tradução de cada linha da transcrição</string>
     <string name="next_episode">Próximo episódio</string>
