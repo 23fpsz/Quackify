@@ -4217,13 +4217,19 @@ class PlaybackBridge(private val context: Context) {
      * device picker: the cluster flips the active device to this one long
      * before any command lands here. If nothing picks the stream up the phone
      * sits silent while the server waits for it, and once it gives up the
-     * phone vanishes from every "Listening on" list. Watch for that flip
-     * while nothing is loaded here and take the stream over.
+     * phone vanishes from every "Listening on" list. The flip is honored even
+     * over a loaded engine: without the claim the server keeps serving the
+     * old device's machine, so every control stays gated by its restrictions
+     * and queue edits aimed here die as a 202 no-op. A pending remote play, a
+     * held machine row or a playing ad is a mid-transition window and left
+     * for the next cluster read, while the freshness window keeps a stale
+     * snapshot from hijacking a live session.
      */
     private fun watchForIncomingTransfer(cluster: ClusterState) {
         if (cluster.activeDeviceId != deviceId) return
         if (activeSeen.isBlank() || activeSeen == deviceId) return
-        if (player.hasSource || pendingActive()) return
+        if (pendingActive() || held != null) return
+        if (player.state.value.trackUri.startsWith(AD_PREFIX)) return
         val track = cluster.track
         if (track.uri.isBlank() || track.isAd) return
         val age = System.currentTimeMillis() - cluster.stateAtMs
@@ -4232,7 +4238,8 @@ class PlaybackBridge(private val context: Context) {
         if (stamp == takeOverTried) return
         takeOverTried = stamp
         log.i("the stream was moved here, taking it at ${cluster.positionNow()}ms " +
-                "of '${track.title}' paused=${!cluster.isPlaying}"
+                "of '${track.title}' paused=${!cluster.isPlaying}" +
+                if (player.hasSource) " over the loaded '${player.state.value.trackUri.takeLast(12)}'" else ""
         )
         scope.launch { takeBackHere() }
     }
