@@ -4255,7 +4255,9 @@ class PlaybackBridge(private val context: Context) {
 
     private fun publishDevices(cluster: ClusterState) {
         val active = cluster.activeDevice
-        val localPlaybackActive = connect.holdsStream || (player.hasSource && !state.controllingRemote)
+        val localPlaybackActive = connect.holdsStream ||
+                (player.hasSource && !state.controllingRemote &&
+                        (player.isPlaying || remoteTarget().isBlank()))
         val mine = (active != null && active.id == deviceId) || localPlaybackActive
         val label = if (localPlaybackActive) "Quackify" else active?.name.orEmpty()
         val effectiveActiveId = if (localPlaybackActive) deviceId else active?.id.orEmpty()
@@ -4267,7 +4269,7 @@ class PlaybackBridge(private val context: Context) {
             rawDevices
         }
         val noneActive = active == null && !player.hasSource && !localPlaybackActive
-        val remoteActive = !mine && !noneActive && !player.hasSource && !localPlaybackActive
+        val remoteActive = !mine && !noneActive && !localPlaybackActive
         val connectedLabel = if (mine) localOutputLabel() else label
         if (state.devices != devices || state.activeDeviceName != label ||
             state.controllingRemote != remoteActive
@@ -4304,7 +4306,8 @@ class PlaybackBridge(private val context: Context) {
         val fromServer = cluster.devices
         val isMineActive = cluster.activeDeviceId == deviceId ||
                 connect.holdsStream ||
-                (player.hasSource && !state.controllingRemote)
+                (player.hasSource && !state.controllingRemote &&
+                        (player.isPlaying || remoteTarget().isBlank()))
         if (fromServer.any { it.id == deviceId }) {
             return fromServer.map { dev ->
                 if (dev.id == deviceId) {
