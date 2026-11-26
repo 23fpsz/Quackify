@@ -71,9 +71,6 @@ object Browse {
                 card(node)?.let(out::add)
             }
         }
-        out.forEach { category ->
-            log.i("browseAll category: uri=${category.uri}, title=${category.title}")
-        }
         cachedCards = out
         return out
     }
