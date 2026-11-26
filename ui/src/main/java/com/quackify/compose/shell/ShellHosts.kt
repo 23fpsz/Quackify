@@ -230,6 +230,7 @@ internal class ShellHosts(
         handleLibraryLongPress = handleLibraryLongPress,
         handleFolderClick = handleFolderClick,
         shareEntity = shareEntity,
+        toastState = toastState,
     )
 
     fun player(): ShellPlayerEnv = ShellPlayerEnv(
@@ -298,6 +299,7 @@ internal class ShellHosts(
         onAddToPlaylist = onAddToPlaylist,
         openAlbum = openAlbum,
         openArtist = openArtist,
+        openShow = openShow,
         shareEntity = shareEntity,
         copyTrackTitle = copyTrackTitle,
     )
@@ -416,6 +418,7 @@ internal class ShellHosts(
         onLoadPlaylistFolder = onLoadPlaylistFolder,
         onLoadTrackCount = onLoadTrackCount,
         onCreatePlaylistWith = onCreatePlaylistWith,
+        toastState = toastState,
         openArtist = openArtist,
         openAlbum = openAlbum,
         openUserProfile = openUserProfile,

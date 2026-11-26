@@ -13,12 +13,18 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -122,6 +128,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -133,6 +140,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.quackify.backend.core.store.StreamSource
+import com.quackify.backend.library.lyrics.translationLanguageName
 import com.quackify.compose.R
 import com.quackify.compose.components.CanvasVideoPlayer
 import com.quackify.compose.components.EncoreArtworkImage
@@ -162,6 +170,7 @@ import com.quackify.compose.theme.EncoreSpacers
 import com.quackify.compose.theme.EncoreTheme
 import com.quackify.compose.util.rememberDominantColor
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
@@ -386,6 +395,7 @@ fun EncoreNowPlayingScreen(
             }
             VideoFullscreenLayout(
                 title = title,
+                transcript = transcript,
                 videoQualities = videoQualities,
                 onVideoQuality = onVideoQuality,
                 onVideoSurface = onVideoSurface,
@@ -507,7 +517,11 @@ fun EncoreNowPlayingScreen(
         label = "lyricLineHeight"
     )
     val transcriptLineHeight by animateDpAsState(
-        targetValue = if (previewTranscriptVisible) 44.dp else 0.dp,
+        targetValue = when {
+            !previewTranscriptVisible -> 0.dp
+            previewTranscriptRow?.translation?.isNotBlank() == true -> 62.dp
+            else -> 44.dp
+        },
         animationSpec = tween(
             durationMillis = 350,
             easing = EncoreAnimation.DecelerateInterpolator
@@ -824,7 +838,11 @@ fun EncoreNowPlayingScreen(
                                         clockMs = transcriptClock,
                                         ink = contrastInk(dynamicArtworkColor),
                                         visible = previewTranscriptVisible,
-                                        height = if (previewTranscriptVisible) 44.dp else 0.dp,
+                                        height = if (previewTranscriptVisible) {
+                                            if (previewTranscriptRow?.translation?.isNotBlank() == true) 62.dp else 44.dp
+                                        } else {
+                                            0.dp
+                                        },
                                         onOpenTranscript = { isTranscriptFullscreen = true }
                                     )
 
@@ -1258,6 +1276,7 @@ fun EncoreNowPlayingScreen(
                 isPlaying = isPlaying,
                 dominantColor = dominantColor,
                 artworkColor = dynamicArtworkColor,
+                isExplicit = isExplicit,
                 lyrics = lyrics,
                 nextTrack = nextTrack,
                 nextTrackLyrics = nextTrackLyrics,
@@ -1288,6 +1307,7 @@ fun EncoreNowPlayingScreen(
                 dominantColor = dominantColor,
                 lines = transcript,
                 onSeekMs = { targetMs -> if (durationMs > 0L) onSeek(targetMs.toFloat() / durationMs.toFloat()) },
+                onOpenTranslationLanguage = { isTranslationLanguageSheetOpen = true },
                 onClose = { isTranscriptFullscreen = false }
             )
         }
@@ -1599,6 +1619,7 @@ private fun NowPlayingArtworkCard(
     onVideoQuality: (Int) -> Unit = {},
     onVideoSurface: (android.view.Surface?) -> Unit = {},
     onToggleVideoFullscreen: () -> Unit = {},
+    hideOverlayActions: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val corner = when {
@@ -1720,62 +1741,64 @@ private fun NowPlayingArtworkCard(
                                 .fillMaxSize()
                                 .background(Color.Black.copy(alpha = 0.25f))
                         ) {
-                            var menuOpen by remember { mutableStateOf(false) }
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
+                            if (!hideOverlayActions) {
+                                var menuOpen by remember { mutableStateOf(false) }
+                                Row(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(50))
-                                        .background(Color.Black.copy(alpha = 0.45f))
-                                        .clickable { onToggleVideoFullscreen() }
-                                        .padding(7.dp)
+                                        .align(Alignment.TopEnd)
+                                        .padding(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.encore_icon_fullscreen_24),
-                                        contentDescription = stringResource(R.string.toggle_fullscreen_video),
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                Box {
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(50))
                                             .background(Color.Black.copy(alpha = 0.45f))
-                                            .clickable { menuOpen = true }
+                                            .clickable { onToggleVideoFullscreen() }
                                             .padding(7.dp)
                                     ) {
                                         Icon(
-                                            painter = painterResource(R.drawable.encore_icon_settings_24),
-                                            contentDescription = stringResource(R.string.video_quality),
+                                            painter = painterResource(R.drawable.encore_icon_fullscreen_24),
+                                            contentDescription = stringResource(R.string.toggle_fullscreen_video),
                                             tint = Color.White,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
-                                    EncoreMenu(
-                                        expanded = menuOpen,
-                                        onDismiss = { menuOpen = false },
-                                    ) {
-                                        EncoreMenuItem(
-                                            label = stringResource(R.string.auto),
-                                            onClick = {
-                                                onVideoQuality(0)
-                                                menuOpen = false
-                                            }
-                                        )
-                                        videoQualities.forEach { height ->
+                                    Box {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(50))
+                                                .background(Color.Black.copy(alpha = 0.45f))
+                                                .clickable { menuOpen = true }
+                                                .padding(7.dp)
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.encore_icon_settings_24),
+                                                contentDescription = stringResource(R.string.video_quality),
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        EncoreMenu(
+                                            expanded = menuOpen,
+                                            onDismiss = { menuOpen = false },
+                                        ) {
                                             EncoreMenuItem(
-                                                label = "${height}p",
+                                                label = stringResource(R.string.auto),
                                                 onClick = {
-                                                    onVideoQuality(height)
+                                                    onVideoQuality(0)
                                                     menuOpen = false
                                                 }
                                             )
+                                            videoQualities.forEach { height ->
+                                                EncoreMenuItem(
+                                                    label = "${height}p",
+                                                    onClick = {
+                                                        onVideoQuality(height)
+                                                        menuOpen = false
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -2022,6 +2045,7 @@ private fun SwipeTrackArtworkSlot(
 @Composable
 private fun VideoFullscreenLayout(
     title: String,
+    transcript: List<TranscriptLine>,
     videoQualities: List<Int>,
     onVideoQuality: (Int) -> Unit,
     onVideoSurface: (android.view.Surface?) -> Unit,
@@ -2040,9 +2064,27 @@ private fun VideoFullscreenLayout(
     onSkipNext: () -> Unit,
     onExit: () -> Unit,
 ) {
+    val context = LocalContext.current
     var overlayVisible by remember { mutableStateOf(true) }
-    LaunchedEffect(overlayVisible) {
-        if (overlayVisible) {
+    var transcriptShown by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var languageSheetOpen by remember { mutableStateOf(false) }
+    val appLocale = LocalConfiguration.current.locales[0] ?: java.util.Locale.getDefault()
+    val translationLanguage = LyricsOptions.translationLanguage
+    val deviceLanguageName = remember(appLocale) {
+        appLocale.displayLanguage.takeIf { it.isNotBlank() && !it.equals(appLocale.language, ignoreCase = true) }
+            ?: appLocale.getDisplayLanguage(appLocale)
+    }
+    val deviceLanguageTemplate = stringResource(R.string.lyrics_translation_device_language, deviceLanguageName)
+    val translationLanguageValue = if (translationLanguage == TRANSLATION_DEVICE_LANGUAGE) {
+        deviceLanguageTemplate
+    } else {
+        remember(translationLanguage, appLocale) {
+            translationLanguageName(translationLanguage, appLocale)
+        }
+    }
+    LaunchedEffect(overlayVisible, menuOpen) {
+        if (overlayVisible && !menuOpen) {
             delay(3000.milliseconds)
             overlayVisible = false
         }
@@ -2066,10 +2108,24 @@ private fun VideoFullscreenLayout(
             onVideoQuality = onVideoQuality,
             onVideoSurface = onVideoSurface,
             onToggleVideoFullscreen = onExit,
+            hideOverlayActions = true,
             onVideoOverlayTap = { overlayVisible = !overlayVisible },
             onDoubleTapSeek = onSkipSeek,
             modifier = Modifier.fillMaxSize()
         )
+        if (transcriptShown && transcript.isNotEmpty()) {
+            val transcriptBottomPadding by animateDpAsState(
+                targetValue = if (overlayVisible) 140.dp else 28.dp,
+                animationSpec = tween(durationMillis = 250),
+                label = "videoTranscriptBottomPadding"
+            )
+            VideoTranscriptOverlay(
+                lines = transcript,
+                currentPositionMs = currentPositionMs,
+                bottomPadding = transcriptBottomPadding,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
         AnimatedVisibility(
             visible = overlayVisible,
             enter = fadeIn(tween(durationMillis = 250)),
@@ -2090,6 +2146,88 @@ private fun VideoFullscreenLayout(
                     tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
+            }
+        }
+        AnimatedVisibility(
+            visible = overlayVisible,
+            enter = fadeIn(tween(durationMillis = 250)),
+            exit = fadeOut(tween(durationMillis = 250)),
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
+            Box {
+                Box(
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .clickable { menuOpen = true }
+                        .padding(7.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.encore_icon_more_android_24),
+                        contentDescription = stringResource(R.string.more_options),
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                EncoreMenu(
+                    expanded = menuOpen,
+                    onDismiss = { menuOpen = false },
+                ) {
+                    if (transcript.isNotEmpty()) {
+                        EncoreMenuItem(
+                            label = stringResource(
+                                if (transcriptShown) R.string.hide_transcript else R.string.show_transcript
+                            ),
+                            onClick = {
+                                transcriptShown = !transcriptShown
+                                menuOpen = false
+                            }
+                        )
+                        if (transcriptShown) {
+                            EncoreMenuItem(
+                                label = stringResource(R.string.transcript_translation),
+                                selected = LyricsOptions.transcriptTranslationEnabled,
+                                onClick = {
+                                    LyricsOptions.setTranscriptTranslationEnabled(
+                                        context,
+                                        !LyricsOptions.transcriptTranslationEnabled
+                                    )
+                                }
+                            )
+                            EncoreMenuItem(
+                                label = stringResource(R.string.lyrics_translation_language) + ": " + translationLanguageValue,
+                                onClick = {
+                                    menuOpen = false
+                                    languageSheetOpen = true
+                                }
+                            )
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.video_quality),
+                        style = EncoreTheme.typography.bodySmall.copy(
+                            color = Color.White.copy(alpha = 0.6f)
+                        ),
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp)
+                    )
+                    EncoreMenuItem(
+                        label = stringResource(R.string.auto),
+                        onClick = {
+                            onVideoQuality(0)
+                            menuOpen = false
+                        }
+                    )
+                    videoQualities.forEach { height ->
+                        EncoreMenuItem(
+                            label = "${height}p",
+                            onClick = {
+                                onVideoQuality(height)
+                                menuOpen = false
+                            }
+                        )
+                    }
+                }
             }
         }
         AnimatedVisibility(
@@ -2144,6 +2282,62 @@ private fun VideoFullscreenLayout(
                     markers = chapterFractions(chapters, durationMs)
                 )
             }
+        }
+        if (languageSheetOpen) {
+            TranslationLanguageSheet(
+                selectedCode = LyricsOptions.translationLanguage,
+                onLanguageSelected = { code ->
+                    LyricsOptions.setTranslationLanguage(context, code)
+                },
+                onDismiss = { languageSheetOpen = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun VideoTranscriptOverlay(
+    lines: List<TranscriptLine>,
+    currentPositionMs: Long,
+    bottomPadding: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val activeIndex = remember(currentPositionMs, lines) {
+        lines.indexOfLast { currentPositionMs >= it.startMs }.coerceAtLeast(0)
+    }
+    val activeRow = lines.getOrNull(activeIndex)
+    val row = if (activeRow?.speaker == true) lines.getOrNull(activeIndex + 1) ?: activeRow else activeRow
+    if (row == null || row.speaker) return
+    val translationOn = LyricsOptions.transcriptTranslationEnabled
+    val text = if (translationOn) row.translation.ifBlank { row.text } else row.text
+    Box(
+        modifier = modifier
+            .padding(bottom = bottomPadding)
+            .padding(horizontal = 40.dp)
+    ) {
+        AnimatedContent(
+            targetState = text,
+            transitionSpec = {
+                (fadeIn(tween(durationMillis = 200)) + slideInVertically { it / 6 })
+                    .togetherWith(fadeOut(tween(durationMillis = 150)) + slideOutVertically { -it / 6 })
+            },
+            label = "videoTranscriptOverlay"
+        ) { value ->
+            Text(
+                text = value,
+                style = EncoreTheme.typography.bodyMedium.copy(
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
     }
 }
@@ -3027,6 +3221,7 @@ private fun FullscreenLyricsView(
     isPlaying: Boolean,
     dominantColor: Color,
     artworkColor: Color,
+    isExplicit: Boolean = false,
     lyrics: List<TimeSyncedLyric>,
     nextTrack: TrackItem?,
     nextTrackLyrics: List<TimeSyncedLyric>,
@@ -3223,78 +3418,103 @@ private fun FullscreenLyricsView(
                 .padding(horizontal = EncoreSpacers.Looser2)
                 .padding(vertical = EncoreSpacers.Tighter2)
         ) {
-            if (selectionMode) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    EncoreIconButton(
-                        iconRes = R.drawable.encore_icon_x_24,
-                        contentDescription = stringResource(R.string.close),
-                        onClick = { selectionMode = false },
-                        tint = ink
+            AnimatedContent(
+                targetState = selectionMode,
+                transitionSpec = {
+                    (fadeIn(
+                        animationSpec = tween(durationMillis = 220, easing = EncoreAnimation.DecelerateInterpolator)
+                    ) + slideInVertically(
+                        animationSpec = tween(durationMillis = 220, easing = EncoreAnimation.DecelerateInterpolator)
+                    ) { it / 3 }).togetherWith(
+                        fadeOut(
+                            animationSpec = tween(durationMillis = 160, easing = EncoreAnimation.DecelerateInterpolator)
+                        ) + slideOutVertically(
+                            animationSpec = tween(durationMillis = 160, easing = EncoreAnimation.DecelerateInterpolator)
+                        ) { -it / 3 }
                     )
-                    Text(
-                        text = stringResource(R.string.lyrics_selection_count, selectedLines.size),
-                        style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
-                        maxLines = 1
-                    )
-                    EncoreIconButton(
-                        iconRes = R.drawable.encore_icon_copy_24,
-                        contentDescription = stringResource(R.string.copy_selected_lyrics),
-                        onClick = copySelectedLyrics,
-                        tint = ink
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    EncoreIconButton(
-                        iconRes = R.drawable.encore_icon_chevron_down_24,
-                        contentDescription = stringResource(R.string.close_lyrics),
-                        onClick = onClose,
-                        tint = ink
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                },
+                label = "lyricsSelectionHeader"
+            ) { mode ->
+                if (mode) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         EncoreIconButton(
-                            iconRes = R.drawable.encore_icon_deepfeel_24,
-                            contentDescription = stringResource(R.string.lyrics_deepfeel),
-                            onClick = { LyricsOptions.setDeepFeelEnabled(context, !deepFeel) },
-                            tint = ink,
-                            isActive = deepFeel,
-                            activeTint = deepFeelPalette.accent
+                            iconRes = R.drawable.encore_icon_x_24,
+                            contentDescription = stringResource(R.string.close),
+                            onClick = { selectionMode = false },
+                            tint = ink
+                        )
+                        Text(
+                            text = stringResource(R.string.lyrics_selection_count, selectedLines.size),
+                            style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
+                            maxLines = 1
                         )
                         EncoreIconButton(
-                            iconRes = R.drawable.encore_icon_more_android_24,
-                            contentDescription = stringResource(R.string.lyrics_menu),
-                            onClick = onLyricsMenuClick,
+                            iconRes = R.drawable.encore_icon_copy_24,
+                            contentDescription = stringResource(R.string.copy_selected_lyrics),
+                            onClick = copySelectedLyrics,
                             tint = ink
                         )
                     }
-                }
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .fillMaxWidth()
-                        .padding(horizontal = 96.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = sheetTitle,
-                        style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = sheetArtist,
-                        style = EncoreTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            EncoreIconButton(
+                                iconRes = R.drawable.encore_icon_chevron_down_24,
+                                contentDescription = stringResource(R.string.close_lyrics),
+                                onClick = onClose,
+                                tint = ink
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                EncoreIconButton(
+                                    iconRes = R.drawable.encore_icon_deepfeel_24,
+                                    contentDescription = stringResource(R.string.lyrics_deepfeel),
+                                    onClick = { LyricsOptions.setDeepFeelEnabled(context, !deepFeel) },
+                                    tint = ink,
+                                    isActive = deepFeel,
+                                    activeTint = deepFeelPalette.accent
+                                )
+                                EncoreIconButton(
+                                    iconRes = R.drawable.encore_icon_more_android_24,
+                                    contentDescription = stringResource(R.string.lyrics_menu),
+                                    onClick = onLyricsMenuClick,
+                                    tint = ink
+                                )
+                            }
+                        }
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .fillMaxWidth()
+                                .padding(horizontal = 96.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = sheetTitle,
+                                style = EncoreTheme.typography.bodySmallBold.copy(color = ink),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isExplicit) {
+                                    EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
+                                }
+                                Text(
+                                    text = sheetArtist,
+                                    style = EncoreTheme.typography.marginal.copy(color = ink.copy(alpha = 0.7f)),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -3387,6 +3607,7 @@ private fun FullscreenLyricsView(
                     label = "deepFeelLineVerticalPadding"
                 )
                 val lineInteraction = remember { MutableInteractionSource() }
+                val swipeDrag = remember { Animatable(0f) }
                 val linePressed by lineInteraction.collectIsPressedAsState()
                 val holdConsumed = remember { mutableStateOf(false) }
                 // A ~360ms press means "let me read this", in DeepFeel and
@@ -3414,27 +3635,52 @@ private fun FullscreenLyricsView(
                             progress = activation
                         )
                         .graphicsLayer {
+                            translationX = (swipeDrag.value * 0.22f).coerceAtMost(28.dp.toPx())
                             scaleX = lineScale
                             scaleY = lineScale
                             alpha = lineAlpha
                             transformOrigin = TransformOrigin(0f, 0.5f)
                         }
                         .pointerInput(selectionSwipeThresholdPx) {
-                            var swipedRight = 0f
-                            detectHorizontalDragGestures(
-                                onHorizontalDrag = { change, dragAmount ->
-                                    change.consume()
-                                    swipedRight = (swipedRight + dragAmount).coerceAtLeast(0f)
-                                },
-                                onDragEnd = {
-                                    if (swipedRight >= selectionSwipeThresholdPx) {
-                                        selectionMode = true
-                                        if (!selectedLines.remove(index)) selectedLines.add(index)
+                            coroutineScope {
+                                var swipedRight = 0f
+                                detectHorizontalDragGestures(
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        swipedRight = (swipedRight + dragAmount).coerceAtLeast(0f)
+                                        launch { swipeDrag.snapTo(swipedRight) }
+                                    },
+                                    onDragEnd = {
+                                        if (swipedRight >= selectionSwipeThresholdPx) {
+                                            if (!selectionMode) selectedLines.clear()
+                                            selectionMode = true
+                                            if (!selectedLines.remove(index)) selectedLines.add(index)
+                                        }
+                                        swipedRight = 0f
+                                        launch {
+                                            swipeDrag.animateTo(
+                                                0f,
+                                                spring(
+                                                    dampingRatio = 0.75f,
+                                                    stiffness = Spring.StiffnessMediumLow
+                                                )
+                                            )
+                                        }
+                                    },
+                                    onDragCancel = {
+                                        swipedRight = 0f
+                                        launch {
+                                            swipeDrag.animateTo(
+                                                0f,
+                                                spring(
+                                                    dampingRatio = 0.75f,
+                                                    stiffness = Spring.StiffnessMediumLow
+                                                )
+                                            )
+                                        }
                                     }
-                                    swipedRight = 0f
-                                },
-                                onDragCancel = { swipedRight = 0f }
-                            )
+                                )
+                            }
                         }
                         .clickable(
                             interactionSource = lineInteraction,
@@ -3451,13 +3697,29 @@ private fun FullscreenLyricsView(
                         .padding(horizontal = EncoreSpacers.Looser2)
                 ) {
                     Row(verticalAlignment = Alignment.Top) {
-                        if (selectionMode) {
-                            LyricSelectionCheckbox(
-                                checked = index in selectedLines,
-                                ink = ink,
-                                modifier = Modifier.padding(top = 8.dp)
+                        AnimatedVisibility(
+                            visible = selectionMode,
+                            enter = fadeIn(
+                                animationSpec = tween(durationMillis = 220, easing = EncoreAnimation.DecelerateInterpolator)
+                            ) + expandHorizontally(
+                                expandFrom = Alignment.Start,
+                                animationSpec = tween(durationMillis = 220, easing = EncoreAnimation.DecelerateInterpolator)
+                            ),
+                            exit = fadeOut(
+                                animationSpec = tween(durationMillis = 160, easing = EncoreAnimation.DecelerateInterpolator)
+                            ) + shrinkHorizontally(
+                                shrinkTowards = Alignment.Start,
+                                animationSpec = tween(durationMillis = 160, easing = EncoreAnimation.DecelerateInterpolator)
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
+                        ) {
+                            Row {
+                                LyricSelectionCheckbox(
+                                    checked = index in selectedLines,
+                                    ink = ink,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                            }
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             if (isCurrentLine && line.isWordSynced) {
@@ -3616,7 +3878,7 @@ private fun NextTrackPeekReveal(
 
 /**
  * The pick marker beside a lyric line while the reader is in selection mode:
- * a quiet ring that snaps to the app green with a check the moment the line
+ * a quiet ring that settles to the app green with a check the moment the line
  * is chosen, sized to sit beside the 28sp lyric text.
  */
 @Composable
@@ -3625,19 +3887,48 @@ private fun LyricSelectionCheckbox(
     ink: Color,
     modifier: Modifier = Modifier,
 ) {
+    val ringColor by animateColorAsState(
+        targetValue = if (checked) EncoreColors.Green else ink.copy(alpha = 0.55f),
+        animationSpec = tween(durationMillis = 200, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "lyricCheckboxRingColor"
+    )
+    val fillColor by animateColorAsState(
+        targetValue = if (checked) EncoreColors.Green else Color.Transparent,
+        animationSpec = tween(durationMillis = 200, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "lyricCheckboxFillColor"
+    )
+    val ringWidth by animateDpAsState(
+        targetValue = if (checked) 0.dp else 2.dp,
+        animationSpec = tween(durationMillis = 200, easing = EncoreAnimation.DecelerateInterpolator),
+        label = "lyricCheckboxRingWidth"
+    )
     Box(
         modifier = modifier
             .size(22.dp)
             .clip(CircleShape)
-            .background(if (checked) EncoreColors.Green else Color.Transparent)
+            .background(fillColor)
             .border(
-                width = if (checked) 0.dp else 2.dp,
-                color = if (checked) EncoreColors.Green else ink.copy(alpha = 0.55f),
+                width = ringWidth,
+                color = ringColor,
                 shape = CircleShape
             ),
         contentAlignment = Alignment.Center
     ) {
-        if (checked) {
+        AnimatedVisibility(
+            visible = checked,
+            enter = scaleIn(
+                animationSpec = tween(durationMillis = 180, easing = EncoreAnimation.DecelerateInterpolator),
+                initialScale = 0.4f
+            ) + fadeIn(
+                animationSpec = tween(durationMillis = 180, easing = EncoreAnimation.DecelerateInterpolator)
+            ),
+            exit = scaleOut(
+                animationSpec = tween(durationMillis = 140, easing = EncoreAnimation.DecelerateInterpolator),
+                targetScale = 0.4f
+            ) + fadeOut(
+                animationSpec = tween(durationMillis = 140, easing = EncoreAnimation.DecelerateInterpolator)
+            )
+        ) {
             Icon(
                 painter = painterResource(id = R.drawable.encore_icon_check_24),
                 contentDescription = null,
@@ -3785,45 +4076,60 @@ private fun NowPlayingTranscriptLine(
                 },
                 label = "transcriptPreviewContent"
             ) { row ->
-                // Same sweep as the fullscreen view when the smooth animation
-                // is on: the boundary is clipped in the draw phase against the
-                // frame clock, so the one-line strip never recomposes per frame.
-                if (row != null && LyricsOptions.transcriptSmoothSweep && row.words.isNotEmpty()) {
-                    TranscriptSweepText(
-                        line = row,
-                        positionMs = clockMs,
-                        sungColor = ink,
-                        unsungColor = ink.copy(alpha = 0.55f),
-                        style = EncoreTheme.typography.titleMedium.copy(
-                            fontSize = 15.sp,
-                            lineHeight = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                        ),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenTranscript() }
-                    )
-                } else {
-                    Text(
-                        text = buildAnnotatedString {
-                            append(row?.text.orEmpty())
-                            val prefixEnd = row?.let { spokenPrefixEnd(it, clockMs.value) } ?: 0
-                            if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
-                        },
-                        style = EncoreTheme.typography.titleMedium.copy(
-                            fontSize = 15.sp,
-                            lineHeight = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = ink.copy(alpha = 0.55f)
-                        ),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenTranscript() }
-                    )
+                Column {
+                    // Same sweep as the fullscreen view when the smooth animation
+                    // is on: the boundary is clipped in the draw phase against the
+                    // frame clock, so the one-line strip never recomposes per frame.
+                    if (row != null && LyricsOptions.transcriptSmoothSweep && row.words.isNotEmpty()) {
+                        TranscriptSweepText(
+                            line = row,
+                            positionMs = clockMs,
+                            sungColor = ink,
+                            unsungColor = ink.copy(alpha = 0.55f),
+                            style = EncoreTheme.typography.titleMedium.copy(
+                                fontSize = 15.sp,
+                                lineHeight = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenTranscript() }
+                        )
+                    } else {
+                        Text(
+                            text = buildAnnotatedString {
+                                append(row?.text.orEmpty())
+                                val prefixEnd = row?.let { spokenPrefixEnd(it, clockMs.value) } ?: 0
+                                if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
+                            },
+                            style = EncoreTheme.typography.titleMedium.copy(
+                                fontSize = 15.sp,
+                                lineHeight = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ink.copy(alpha = 0.55f)
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenTranscript() }
+                        )
+                    }
+                    if (row != null && row.translation.isNotBlank()) {
+                        Text(
+                            text = row.translation,
+                            style = EncoreTheme.typography.bodySmall.copy(
+                                fontSize = 12.sp,
+                                lineHeight = 15.sp,
+                                color = ink.copy(alpha = 0.6f)
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }
@@ -3911,44 +4217,64 @@ private fun NowPlayingTranscriptCard(
                             )
                         } else {
                             val isActive = i == activeIndex
-                            if (isActive && LyricsOptions.transcriptSmoothSweep && line.words.isNotEmpty()) {
-                                TranscriptSweepText(
-                                    line = line,
-                                    positionMs = clockMs,
-                                    sungColor = ink,
-                                    unsungColor = ink.copy(alpha = 0.5f),
-                                    style = EncoreTheme.typography.titleMedium.copy(
-                                        fontSize = 17.sp,
-                                        lineHeight = 26.sp,
-                                        fontWeight = FontWeight.Bold,
-                                    ),
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = buildAnnotatedString {
-                                        append(line.text)
-                                        if (isActive) {
-                                            val prefixEnd = spokenPrefixEnd(line, clockMs.value)
-                                            if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
-                                        }
-                                    },
-                                    style = EncoreTheme.typography.titleMedium.copy(
-                                        fontSize = 17.sp,
-                                        lineHeight = 26.sp,
-                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
-                                        color = when {
-                                            isActive -> ink.copy(alpha = 0.5f)
-                                            i < activeIndex -> ink.copy(alpha = 0.45f)
-                                            else -> ink.copy(alpha = 0.55f)
-                                        }
-                                    ),
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
+                            val showsTranslation = isActive && line.translation.isNotBlank()
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                if (isActive && LyricsOptions.transcriptSmoothSweep && line.words.isNotEmpty()) {
+                                    TranscriptSweepText(
+                                        line = line,
+                                        positionMs = clockMs,
+                                        sungColor = ink,
+                                        unsungColor = ink.copy(alpha = 0.5f),
+                                        style = EncoreTheme.typography.titleMedium.copy(
+                                            fontSize = 17.sp,
+                                            lineHeight = 26.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        ),
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(
+                                            bottom = if (showsTranslation) 2.dp else 8.dp
+                                        )
+                                    )
+                                } else {
+                                    Text(
+                                        text = buildAnnotatedString {
+                                            append(line.text)
+                                            if (isActive) {
+                                                val prefixEnd = spokenPrefixEnd(line, clockMs.value)
+                                                if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
+                                            }
+                                        },
+                                        style = EncoreTheme.typography.titleMedium.copy(
+                                            fontSize = 17.sp,
+                                            lineHeight = 26.sp,
+                                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
+                                            color = when {
+                                                isActive -> ink.copy(alpha = 0.5f)
+                                                i < activeIndex -> ink.copy(alpha = 0.45f)
+                                                else -> ink.copy(alpha = 0.55f)
+                                            }
+                                        ),
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(
+                                            bottom = if (showsTranslation) 2.dp else 8.dp
+                                        )
+                                    )
+                                }
+                                if (showsTranslation) {
+                                    Text(
+                                        text = line.translation,
+                                        style = EncoreTheme.typography.bodyMedium.copy(
+                                            fontSize = 14.sp,
+                                            lineHeight = 19.sp,
+                                            color = ink.copy(alpha = 0.65f)
+                                        ),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -3973,6 +4299,7 @@ private fun FullscreenTranscriptView(
     dominantColor: Color,
     lines: List<TranscriptLine>,
     onSeekMs: (Long) -> Unit,
+    onOpenTranslationLanguage: () -> Unit,
     onClose: () -> Unit
 ) {
     val clockMs = rememberLyricClock(
@@ -4065,42 +4392,71 @@ private fun FullscreenTranscriptView(
                 } else {
                     val isCurrentLine = index == activeIndex
                     val smooth = isCurrentLine && LyricsOptions.transcriptSmoothSweep && line.words.isNotEmpty()
-                    if (smooth) {
-                        TranscriptSweepText(
-                            line = line,
-                            positionMs = clockMs,
-                            sungColor = ink,
-                            unsungColor = ink.copy(alpha = 0.35f),
-                            style = EncoreTheme.typography.titleLarge.copy(
-                                fontSize = 22.sp,
-                                lineHeight = 32.sp,
-                                fontWeight = FontWeight.Bold,
+                    Column {
+                        if (smooth) {
+                            TranscriptSweepText(
+                                line = line,
+                                positionMs = clockMs,
+                                sungColor = ink,
+                                unsungColor = ink.copy(alpha = 0.35f),
+                                style = EncoreTheme.typography.titleLarge.copy(
+                                    fontSize = 22.sp,
+                                    lineHeight = 32.sp,
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSeekMs(line.startMs) }
+                                    .padding(vertical = EncoreSpacers.Tighter)
+                            )
+                        } else {
+                            Text(
+                                text = buildAnnotatedString {
+                                    append(line.text)
+                                    if (isCurrentLine) {
+                                        val prefixEnd = spokenPrefixEnd(line, clockMs.value)
+                                        if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
+                                    }
+                                },
+                                style = EncoreTheme.typography.titleLarge.copy(
+                                    fontSize = 22.sp,
+                                    lineHeight = 32.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isCurrentLine) ink.copy(alpha = 0.5f) else ink.copy(alpha = 0.35f)
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSeekMs(line.startMs) }
+                                    .padding(vertical = EncoreSpacers.Tighter)
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = isCurrentLine && line.translation.isNotBlank(),
+                            enter = fadeIn(
+                                animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
+                            ) + expandVertically(
+                                expandFrom = Alignment.Top,
+                                animationSpec = tween(durationMillis = 320, easing = EncoreAnimation.DecelerateInterpolator)
                             ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onSeekMs(line.startMs) }
-                                .padding(vertical = EncoreSpacers.Tighter)
-                        )
-                    } else {
-                        Text(
-                            text = buildAnnotatedString {
-                                append(line.text)
-                                if (isCurrentLine) {
-                                    val prefixEnd = spokenPrefixEnd(line, clockMs.value)
-                                    if (prefixEnd > 0) addStyle(SpanStyle(color = ink), 0, prefixEnd)
-                                }
-                            },
-                            style = EncoreTheme.typography.titleLarge.copy(
-                                fontSize = 22.sp,
-                                lineHeight = 32.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isCurrentLine) ink.copy(alpha = 0.5f) else ink.copy(alpha = 0.35f)
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onSeekMs(line.startMs) }
-                                .padding(vertical = EncoreSpacers.Tighter)
-                        )
+                            exit = fadeOut(
+                                animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+                            ) + shrinkVertically(
+                                shrinkTowards = Alignment.Top,
+                                animationSpec = tween(durationMillis = 240, easing = EncoreAnimation.DecelerateInterpolator)
+                            )
+                        ) {
+                            Text(
+                                text = line.translation,
+                                style = EncoreTheme.typography.bodyMedium.copy(
+                                    fontSize = 15.sp,
+                                    lineHeight = 21.sp,
+                                    color = ink.copy(alpha = 0.55f)
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 3.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -4108,7 +4464,10 @@ private fun FullscreenTranscriptView(
     }
 
     if (isMenuOpen) {
-        TranscriptShortcutSheet(onDismiss = { isMenuOpen = false })
+        TranscriptShortcutSheet(
+            onDismiss = { isMenuOpen = false },
+            onOpenTranslationLanguage = onOpenTranslationLanguage
+        )
     }
 }
 
@@ -4209,10 +4568,28 @@ private fun transcriptBoundary(line: TranscriptLine, positionMs: Long): Float {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TranscriptShortcutSheet(onDismiss: () -> Unit) {
+private fun TranscriptShortcutSheet(
+    onDismiss: () -> Unit,
+    onOpenTranslationLanguage: () -> Unit,
+) {
     val context = LocalContext.current
     val smooth = LyricsOptions.transcriptSmoothSweep
     val offsetTenths = LyricsOptions.transcriptOffsetTenths
+    val translationEnabled = LyricsOptions.transcriptTranslationEnabled
+    val translationLanguage = LyricsOptions.translationLanguage
+    val appLocale = LocalConfiguration.current.locales[0] ?: java.util.Locale.getDefault()
+    val deviceLanguageName = remember(appLocale) {
+        appLocale.displayLanguage.takeIf { it.isNotBlank() && !it.equals(appLocale.language, ignoreCase = true) }
+            ?: appLocale.getDisplayLanguage(appLocale)
+    }
+    val deviceLanguageTemplate = stringResource(R.string.lyrics_translation_device_language, deviceLanguageName)
+    val translationLanguageLabel = if (translationLanguage == TRANSLATION_DEVICE_LANGUAGE) {
+        deviceLanguageTemplate
+    } else {
+        remember(translationLanguage, appLocale) {
+            translationLanguageName(translationLanguage, appLocale)
+        }
+    }
     val offsetLabel = remember(offsetTenths) {
         String.format(java.util.Locale.US, "%+.1f s", offsetTenths / 10f)
     }
@@ -4250,6 +4627,53 @@ private fun TranscriptShortcutSheet(onDismiss: () -> Unit) {
                 Switch(checked = smooth, onCheckedChange = { on ->
                     LyricsOptions.setTranscriptSmoothSweep(context, on)
                 })
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.transcript_translation),
+                        style = EncoreTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                    )
+                    Text(
+                        text = stringResource(R.string.transcript_translation_desc),
+                        style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary)
+                    )
+                }
+                Switch(checked = translationEnabled, onCheckedChange = { on ->
+                    LyricsOptions.setTranscriptTranslationEnabled(context, on)
+                })
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = translationEnabled) {
+                        onDismiss()
+                        onOpenTranslationLanguage()
+                    }
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.lyrics_translation_language),
+                    style = EncoreTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium,
+                        color = if (translationEnabled) Color.Unspecified else EncoreColors.TextSecondary
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = translationLanguageLabel,
+                    style = EncoreTheme.typography.bodySmallBold.copy(
+                        color = if (translationEnabled) EncoreColors.Green else EncoreColors.TextSecondary
+                    )
+                )
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -4298,9 +4722,11 @@ private fun TranscriptShortcutSheet(onDismiss: () -> Unit) {
 
 private fun formatTime(ms: Long): String {
     val totalSeconds = (ms / 1000).coerceAtLeast(0)
-    val minutes = totalSeconds / 60
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
-    return String.format("%d:%02d", minutes, seconds)
+    return if (hours > 0L) String.format("%d:%02d:%02d", hours, minutes, seconds)
+    else String.format("%d:%02d", minutes, seconds)
 }
 
 private data class CommentReplyState(

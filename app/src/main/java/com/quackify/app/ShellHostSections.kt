@@ -359,13 +359,42 @@ internal fun MainActivity.rememberNowPlayingData(
             }
         )
     }
-    LaunchedEffect(playback?.trackUri) {
+    LaunchedEffect(
+        playback?.trackUri,
+        LyricsOptions.transcriptTranslationEnabled,
+        LyricsOptions.translationLanguage,
+    ) {
         val uri = playback?.trackUri.orEmpty()
         if (!uri.startsWith("spotify:episode:")) {
             writers.setTranscript(null)
             return@LaunchedEffect
         }
-        writers.setTranscript(Krespot.transcripts.transcript(this@rememberNowPlayingData, uri))
+        var transcript = Krespot.transcripts.transcript(this@rememberNowPlayingData, uri)
+        if (transcript != null && LyricsOptions.transcriptTranslationEnabled) {
+            val speakable = transcript.lines.filter { !it.speaker && it.text.isNotBlank() }
+            if (speakable.isNotEmpty()) {
+                val translated = com.quackify.backend.library.lyrics.LyricsTranslation.translate(
+                    context = this@rememberNowPlayingData,
+                    trackId = uri,
+                    lines = speakable.map { it.text },
+                    targetLanguageTag = LyricsOptions.translationTargetTag(this@rememberNowPlayingData),
+                )
+                if (translated is com.quackify.backend.library.lyrics.LyricsTranslation.Result.Translated) {
+                    val texts = translated.texts
+                    var slot = 0
+                    transcript = transcript.copy(
+                        lines = transcript.lines.map { line ->
+                            if (!line.speaker && line.text.isNotBlank()) {
+                                line.copy(translation = texts.getOrNull(slot++).orEmpty())
+                            } else {
+                                line
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        writers.setTranscript(transcript)
     }
     LaunchedEffect(playback?.trackUri, canvasAllowed, canvasResolution) {
         writers.setCanvasFile(null)
@@ -1462,6 +1491,7 @@ internal fun MainActivity.mapNowPlayingTranscript(nowPlayingTranscript: EpisodeT
             words = line.words.map { span ->
                 TranscriptWordSpan(span.startMs, span.startChar, span.endChar)
             },
+            translation = line.translation,
         )
     }.orEmpty()
 }

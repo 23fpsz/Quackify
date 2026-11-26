@@ -944,12 +944,17 @@ class PlaybackBridge(private val context: Context) {
                 )
             }
             val currentDecorated = rows[state.trackUri]
-            if (currentDecorated != null && currentDecorated.imageUrl.isNotBlank() && state.coverUrl.isBlank()) {
-                state = state.copy(
-                    coverUrl = currentDecorated.imageUrl,
-                    title = state.title.ifBlank { currentDecorated.title },
-                    artist = state.artist.ifBlank { currentDecorated.artists },
-                )
+            if (currentDecorated != null) {
+                if (currentDecorated.explicit && !state.explicit) {
+                    state = state.copy(explicit = true)
+                }
+                if (currentDecorated.imageUrl.isNotBlank() && state.coverUrl.isBlank()) {
+                    state = state.copy(
+                        coverUrl = currentDecorated.imageUrl,
+                        title = state.title.ifBlank { currentDecorated.title },
+                        artist = state.artist.ifBlank { currentDecorated.artists },
+                    )
+                }
             }
         }
         // A uri seated in both sections keeps both roles: the first pass in
@@ -1207,6 +1212,7 @@ class PlaybackBridge(private val context: Context) {
                         albumUri = if (engineOwns && engineUri != state.trackUri) {
                             candidate?.albumUri?.takeIf { it.isNotBlank() } ?: albumUriOf(engineUri)
                         } else state.albumUri,
+                        explicit = if (sameTrack) state.explicit else candidate?.isExplicit ?: false,
                         isPlaying = if (engineOwns) playing.playing else state.isPlaying,
                         isBuffering = if (engineOwns) playing.buffering else false,
                     )
@@ -2694,6 +2700,7 @@ class PlaybackBridge(private val context: Context) {
                     imageUrl = found.imageUrl,
                     albumUri = found.albumUri,
                     durationMs = if (found.durationMs > 0L) found.durationMs else row.durationMs,
+                    explicit = found.explicit,
                 )
                 decorated[row.uri] = TrackItem(
                     title = found.title,
@@ -2724,6 +2731,7 @@ class PlaybackBridge(private val context: Context) {
             artistUris = nextUris,
             artistNames = state.artistNames.takeIf { nextUris == state.artistUris }.orEmpty(),
             albumUri = row.albumUri.ifBlank { state.albumUri.takeIf { state.trackUri == row.uri }.orEmpty() },
+            explicit = row.explicit,
             isPlaying = playing,
             isBuffering = playing,
             contextUri = contextUri,
@@ -3755,6 +3763,7 @@ class PlaybackBridge(private val context: Context) {
             artist = track.artists,
             coverUrl = track.imageUrl,
             trackUri = track.uri,
+            explicit = track.explicit,
             isPlaying = false,
             isBuffering = false,
         )
@@ -4636,12 +4645,17 @@ class PlaybackBridge(private val context: Context) {
                 )
             }
             val currentDecorated = rows[state.trackUri]
-            if (currentDecorated != null && currentDecorated.imageUrl.isNotBlank() && state.coverUrl.isBlank()) {
-                state = state.copy(
-                    coverUrl = currentDecorated.imageUrl,
-                    title = state.title.ifBlank { currentDecorated.title },
-                    artist = state.artist.ifBlank { currentDecorated.artists },
-                )
+            if (currentDecorated != null) {
+                if (currentDecorated.explicit && !state.explicit) {
+                    state = state.copy(explicit = true)
+                }
+                if (currentDecorated.imageUrl.isNotBlank() && state.coverUrl.isBlank()) {
+                    state = state.copy(
+                        coverUrl = currentDecorated.imageUrl,
+                        title = state.title.ifBlank { currentDecorated.title },
+                        artist = state.artist.ifBlank { currentDecorated.artists },
+                    )
+                }
             }
             log.i("decorated ${rows.size} of ${uris.size} upcoming row(s)")
             publishQueue(connect.cluster.value)

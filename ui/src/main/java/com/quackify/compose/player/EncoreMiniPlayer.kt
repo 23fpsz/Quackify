@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.quackify.backend.model.DeviceKind
 import com.quackify.compose.R
+import com.quackify.compose.components.EncoreExplicitTag
 import com.quackify.compose.components.EncoreHeartButton
 import com.quackify.compose.components.EncoreIconButton
 import com.quackify.compose.components.rememberSmoothColor
@@ -112,7 +113,8 @@ fun EncoreMiniPlayer(
     connectedDeviceKind: DeviceKind? = null,
     coverColor: Color = Color(0xFF5A3E85),
     coverUrl: String? = null,
-    hasTrack: Boolean = true
+    hasTrack: Boolean = true,
+    isExplicit: Boolean = false
 ) {
     val coroutineScope = rememberCoroutineScope()
     val titleOffsetX = remember { Animatable(0f) }
@@ -243,13 +245,8 @@ fun EncoreMiniPlayer(
                             )
                             if (!deviceRow) {
                                 if (artist.isNotBlank()) {
-                                    Text(
-                                        text = artist,
-                                        style = EncoreTheme.typography.bodySmall.copy(
-                                            color = EncoreColors.TextSecondary
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Clip,
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .basicMarquee(
@@ -257,7 +254,19 @@ fun EncoreMiniPlayer(
                                                 initialDelayMillis = 2000,
                                                 velocity = 30.dp
                                             )
-                                    )
+                                    ) {
+                                        if (isExplicit) {
+                                            EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
+                                        }
+                                        Text(
+                                            text = artist,
+                                            style = EncoreTheme.typography.bodySmall.copy(
+                                                color = EncoreColors.TextSecondary
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Clip
+                                        )
+                                    }
                                 }
                             } else {
                                 Spacer(modifier = Modifier.height(2.dp))

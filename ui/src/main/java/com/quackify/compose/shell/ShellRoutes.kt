@@ -43,6 +43,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import com.quackify.compose.R
+import com.quackify.compose.components.QuackifyToastState
 import com.quackify.compose.components.matchesCurrentContext
 
 internal class ShellRouteEnv(
@@ -81,6 +82,7 @@ internal class ShellRouteEnv(
     val handleLibraryLongPress: (LibraryItem) -> Unit,
     val handleFolderClick: (LibraryItem) -> Unit,
     val shareEntity: (String) -> Unit,
+    val toastState: QuackifyToastState? = null,
 )
 
 @Composable
@@ -536,7 +538,8 @@ internal fun ShellSettingsRoute(
         updateChecked = updateChecked,
         updateError = updateError,
         updateVersion = updateVersion,
-        onCheckUpdates = { onCheckUpdates?.invoke() }
+        onCheckUpdates = { onCheckUpdates?.invoke() },
+        toastState = env.toastState,
     )
 }
 
