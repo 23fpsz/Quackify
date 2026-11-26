@@ -1079,17 +1079,21 @@ class PlaybackBridge(private val context: Context) {
             while (true) {
                 delay((if (deviceSheetOpen || state.controllingRemote) DEVICE_WATCH_MS else DEVICE_POLL_MS).milliseconds)
                 when {
-                    player.hasSource && remoteTarget().isNotBlank() -> {
-                        connect.holdsStream = false
-                        connect.refreshCluster()
-                    }
                     player.hasSource -> {
-                        val other = connect.cluster.value?.activeDeviceId
+                        val cluster = connect.cluster.value
+                        val other = cluster?.activeDeviceId
                             ?.takeIf { it.isNotBlank() && it != deviceId }
-                        if (other != null && !player.isPlaying) {
+                        val remoteLive = other != null && cluster != null &&
+                                cluster.isPlaying &&
+                                System.currentTimeMillis() - cluster.stateAtMs < TRANSFER_FRESH_MS
+                        if (other != null && (!player.isPlaying || remoteLive)) {
                             connect.holdsStream = false
                             connect.refreshCluster()
                         } else {
+                            if (other != null && !connect.holdsStream) {
+                                log.i("the engine plays while the slot still names " +
+                                        "'${other.take(8)}', claiming it by publishing")
+                            }
                             connect.holdsStream = true
                             publishLocalFromEngine()
                         }
