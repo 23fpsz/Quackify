@@ -230,6 +230,7 @@ internal class ShellHosts(
         handleLibraryLongPress = handleLibraryLongPress,
         handleFolderClick = handleFolderClick,
         shareEntity = shareEntity,
+        toastState = toastState,
     )
 
     fun player(): ShellPlayerEnv = ShellPlayerEnv(
