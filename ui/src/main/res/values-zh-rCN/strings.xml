@@ -239,6 +239,7 @@
     <string name="listening_on">正在此设备上收听</string>
     <string name="connected_devices">已连接的设备</string>
     <string name="connect">连接</string>
+    <string name="connect_no_devices">未找到其他设备。在其他设备上使用同一账号登录，它就会显示在这里。</string>
     <string name="this_phone">此手机</string>
     <string name="unknown_device">未知设备</string>
     <string name="select_another_device">选择其他设备</string>

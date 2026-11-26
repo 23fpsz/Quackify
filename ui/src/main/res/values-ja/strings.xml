@@ -239,6 +239,7 @@
     <string name="listening_on">再生中のデバイス</string>
     <string name="connected_devices">接続済みのデバイス</string>
     <string name="connect">接続</string>
+    <string name="connect_no_devices">他のデバイスが見つかりません。同じアカウントで別のデバイスにログインすると、ここに表示されます。</string>
     <string name="this_phone">この電話</string>
     <string name="unknown_device">不明なデバイス</string>
     <string name="select_another_device">別のデバイスを選択</string>
