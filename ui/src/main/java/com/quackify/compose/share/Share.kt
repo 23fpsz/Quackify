@@ -24,7 +24,7 @@ object Share {
         return "https://open.spotify.com"
     }
 
-    fun copy(context: Context, uri: String, label: String = "Link copied") {
+    fun copy(context: Context, uri: String, label: String = context.getString(com.quackify.compose.R.string.link_copied)) {
         val link = url(uri)
         val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         if (manager == null) {
@@ -56,7 +56,7 @@ object Share {
             putExtra(Intent.EXTRA_SUBJECT, title)
             putExtra(Intent.EXTRA_TEXT, body)
         }
-        val chooser = Intent.createChooser(intent, "Share")
+        val chooser = Intent.createChooser(intent, context.getString(com.quackify.compose.R.string.share))
         if (context !is android.app.Activity) chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
         log.i("share $link")
