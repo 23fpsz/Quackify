@@ -43,7 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.quackify.backend.library.lyrics.LyricsProvider
+import com.quackify.backend.core.store.StreamSource
 import com.quackify.backend.library.lyrics.translationLanguageName
 import com.quackify.compose.R
 import com.quackify.compose.player.LyricsOptions
@@ -64,6 +64,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LyricsShortcutSheet(
+    streamSource: String = "",
     onDismiss: () -> Unit,
     onShareClick: () -> Unit,
     onOpenTranslationLanguage: () -> Unit,
@@ -75,11 +76,12 @@ fun LyricsShortcutSheet(
     val translationEnabled = LyricsOptions.translationEnabled
     val translationLanguage = LyricsOptions.translationLanguage
     val prioritizeWordSynced = LyricsOptions.prioritizeWordSynced
-    val providerOrder = LyricsOptions.providerOrder
     val keepScreenOn = LyricsOptions.keepScreenOn
     val deepFeelEnabled = LyricsOptions.deepFeelEnabled
     val nextTrackPeek = LyricsOptions.nextTrackPeek
     val offsetTenths = LyricsOptions.offsetTenths
+    val activeStream = StreamSource.entries.firstOrNull { it.key == streamSource }
+    val providerOrder = LyricsOptions.providerOrderFor(activeStream ?: StreamSource.SPOTIFY)
     val offsetLabel = remember(offsetTenths) {
         String.format(Locale.US, "%+.1f s", offsetTenths / 10f)
     }
@@ -209,8 +211,7 @@ fun LyricsShortcutSheet(
 
             ShortcutValueRow(
                 title = stringResource(R.string.lyrics_source),
-                value = providerOrder.firstOrNull()?.label
-                    ?: LyricsProvider.offered.firstOrNull()?.label.orEmpty(),
+                value = providerOrder.firstOrNull()?.label.orEmpty(),
                 iconRes = R.drawable.encore_icon_check_24,
                 onClick = {
                     onDismiss()

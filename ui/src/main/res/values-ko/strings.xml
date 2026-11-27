@@ -20,8 +20,8 @@
     <string name="lyrics_prioritize_word_synced">단어 동기화 가사 우선</string>
     <string name="lyrics_prioritize_word_synced_desc">최상위 소스에 줄 동기화 가사만 있으면 단어별 타이밍을 다른 소스에서 계속 찾습니다</string>
     <string name="lyrics_source">가사 소스</string>
-    <string name="lyrics_source_desc">소스를 탭하면 맨 위로 이동합니다. 소스는 이 순서대로 시도됩니다.</string>
-    <string name="lyrics_source_stream_desc">%1$s에서 오디오를 스트리밍하는 동안 사용되는 공급자입니다. 소스를 탭하면 맨 위로 이동합니다.</string>
+    <string name="lyrics_source_desc">화살표로 순서를 바꾸세요. 소스는 이 순서대로 시도됩니다.</string>
+    <string name="lyrics_source_stream_desc">%1$s에서 오디오를 스트리밍하는 동안 사용되는 공급자입니다. 화살표로 순서를 바꾸세요. 소스는 이 순서대로 시도됩니다.</string>
     <string name="lyrics_provider_word_synced">단어 동기화</string>
     <string name="lyrics_provider_line_synced">줄 동기화</string>
     <string name="lyrics_translation">가사 번역</string>
@@ -688,4 +688,5 @@
     <string name="player_controls_and_app_icon">플레이어 컨트롤 및 앱 아이콘</string>
     <string name="name_your_folder">폴더 이름을 지정하세요</string>
     <string name="session_expired_toast">세션이 만료되었습니다. 계속 듣으려면 다시 로그인하세요.</string>
+    <string name="lyrics_source_streams_desc">스트림별 가사 체인입니다. 화살표로 순서를 바꾸세요. 소스는 이 순서대로 시도됩니다.</string>
 </resources>

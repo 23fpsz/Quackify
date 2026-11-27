@@ -346,6 +346,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         onCanvasResolution = { res -> env.onCanvasResolution?.invoke(res) },
         lyricsProviderOrder = LyricsOptions.providerOrder,
         onLyricsProviderOrder = { order -> LyricsOptions.setProviderOrder(env.context, order) },
+        activeStreamKey = playbackState?.streamSource.orEmpty(),
         onDismissLyricsProvider = { flags.isLyricsProviderSheetOpen = false },
         onDismissProfile = { flags.isProfileDrawerOpen = false },
         onDismissAccounts = { flags.isAccountsSheetOpen = false },

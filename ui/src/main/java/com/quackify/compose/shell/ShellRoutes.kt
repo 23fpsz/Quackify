@@ -544,6 +544,7 @@ internal fun ShellSettingsRoute(
         updateVersion = updateVersion,
         onCheckUpdates = { onCheckUpdates?.invoke() },
         toastState = env.toastState,
+        activeStreamKey = env.playbackState?.streamSource.orEmpty(),
     )
 }
 

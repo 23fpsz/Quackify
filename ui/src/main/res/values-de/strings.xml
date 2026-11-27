@@ -20,8 +20,8 @@
     <string name="lyrics_prioritize_word_synced">Wortgenaue Songtexte bevorzugen</string>
     <string name="lyrics_prioritize_word_synced_desc">Sucht weitere Quellen nach Wort-für-Wort-Timing ab, wenn die oberste Quelle nur zeilensynchrone Songtexte liefert</string>
     <string name="lyrics_source">Songtext-Quelle</string>
-    <string name="lyrics_source_desc">Tippe auf eine Quelle, um sie nach oben zu verschieben. Die Quellen werden in dieser Reihenfolge ausprobiert.</string>
-    <string name="lyrics_source_stream_desc">Anbieter, die genutzt werden, während der Ton von %1$s gestreamt wird. Tippe auf eine Quelle, um sie nach oben zu verschieben.</string>
+    <string name="lyrics_source_desc">Nutze die Pfeile zum Sortieren. Die Quellen werden in dieser Reihenfolge ausprobiert.</string>
+    <string name="lyrics_source_stream_desc">Anbieter, die genutzt werden, während der Ton von %1$s gestreamt wird. Nutze die Pfeile zum Sortieren; die Quellen werden in dieser Reihenfolge ausprobiert.</string>
     <string name="lyrics_provider_word_synced">Wortsynchron</string>
     <string name="lyrics_provider_line_synced">Zeilensynchron</string>
     <string name="lyrics_translation">Songtext übersetzen</string>
@@ -690,4 +690,5 @@
     <string name="player_controls_and_app_icon">Player-Steuerung und App-Symbol</string>
     <string name="name_your_folder">Gib Deinem Ordner einen Namen</string>
     <string name="session_expired_toast">Deine Sitzung ist abgelaufen. Melde dich erneut an, um weiter zu hören.</string>
+    <string name="lyrics_source_streams_desc">Die Liedtextkette pro Stream. Nutze die Pfeile zum Sortieren; die Quellen werden in dieser Reihenfolge ausprobiert.</string>
 </resources>

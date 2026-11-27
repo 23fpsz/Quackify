@@ -20,8 +20,8 @@
     <string name="lyrics_prioritize_word_synced">単語同期歌詞を優先</string>
     <string name="lyrics_prioritize_word_synced_desc">先頭のソースが行同期歌詞しか持たない場合、単語ごとのタイミングを他のソースで探し続ける</string>
     <string name="lyrics_source">歌詞のソース</string>
-    <string name="lyrics_source_desc">ソースをタップすると先頭に移動します。ソースはこの順番で試されます。</string>
-    <string name="lyrics_source_stream_desc">%1$s から音声をストリーミング中に使われるプロバイダー。ソースをタップすると先頭に移動します。</string>
+    <string name="lyrics_source_desc">矢印で並べ替えます。ソースはこの順番で試されます。</string>
+    <string name="lyrics_source_stream_desc">%1$s から音声をストリーミング中に使われるプロバイダー。矢印で並べ替えます。ソースはこの順番で試されます。</string>
     <string name="lyrics_provider_word_synced">単語同期</string>
     <string name="lyrics_provider_line_synced">行同期</string>
     <string name="lyrics_translation">歌詞を翻訳</string>
@@ -688,4 +688,5 @@
     <string name="player_controls_and_app_icon">プレーヤー操作とアプリアイコン</string>
     <string name="name_your_folder">フォルダに名前を付けてください</string>
     <string name="session_expired_toast">セッションの有効期限が切れました。再生を続けるには再度ログインしてください。</string>
+    <string name="lyrics_source_streams_desc">ストリームごとの歌詞チェーン。矢印で並べ替えます。ソースはこの順番で試されます。</string>
 </resources>
