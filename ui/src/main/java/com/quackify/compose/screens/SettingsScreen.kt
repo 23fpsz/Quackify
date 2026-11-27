@@ -1019,6 +1019,26 @@ fun SettingsScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
+                        androidx.compose.material3.OutlinedTextField(
+                            value = lastFmSettings.apiKey,
+                            onValueChange = { value ->
+                                updateLastFmSettings { it.copy(apiKey = value) }
+                            },
+                            label = { Text(stringResource(R.string.lastfm_api_key)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = lastFmSettings.sharedSecret,
+                            onValueChange = { value ->
+                                updateLastFmSettings { it.copy(sharedSecret = value) }
+                            },
+                            label = { Text(stringResource(R.string.lastfm_shared_secret)) },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
                         Text(
                             text = if (lastFmConnected) {
                                 context.getString(R.string.lastfm_connected, lastFmAccountName.ifBlank { "Last.fm" })
@@ -1032,7 +1052,10 @@ fun SettingsScreen(
                         androidx.compose.material3.Button(
                             enabled = !lastFmAuthBusy &&
                                 !lastFmConnected &&
-                                com.quackify.backend.core.lastfm.LastFmRuntime.isConfigured(),
+                                com.quackify.backend.core.lastfm.LastFmRuntime.isConfigured(
+                                    lastFmSettings.apiKey,
+                                    lastFmSettings.sharedSecret
+                                ),
                             onClick = {
                                 lastFmAuthScope.launch {
                                     lastFmAuthBusy = true
@@ -1041,7 +1064,8 @@ fun SettingsScreen(
                                         if (lastFmPendingToken.isBlank()) {
                                             val result =
                                                 com.quackify.backend.core.lastfm.LastFmRuntime
-                                                    .client().call("auth.getToken")
+                                                    .client(lastFmSettings.apiKey, lastFmSettings.sharedSecret)
+                                                    .call("auth.getToken")
                                             val token = result.optString("token")
                                             check(token.isNotBlank()) {
                                                 context.getString(R.string.lastfm_token_missing)
@@ -1054,7 +1078,7 @@ fun SettingsScreen(
 
                                             val url =
                                                 com.quackify.backend.core.lastfm.LastFmRuntime
-                                                    .authorizationUrl(token)
+                                                    .authorizationUrl(token, lastFmSettings.apiKey)
                                             context.startActivity(
                                                 android.content.Intent(
                                                     android.content.Intent.ACTION_VIEW,
@@ -1066,7 +1090,8 @@ fun SettingsScreen(
                                         } else {
                                             val result =
                                                 com.quackify.backend.core.lastfm.LastFmRuntime
-                                                    .client().call(
+                                                    .client(lastFmSettings.apiKey, lastFmSettings.sharedSecret)
+                                                    .call(
                                                         "auth.getSession",
                                                         mapOf("token" to lastFmPendingToken)
                                                     )
@@ -1106,7 +1131,11 @@ fun SettingsScreen(
                             )
                         }
 
-                        if (!com.quackify.backend.core.lastfm.LastFmRuntime.isConfigured()) {
+                        if (!com.quackify.backend.core.lastfm.LastFmRuntime.isConfigured(
+                                lastFmSettings.apiKey,
+                                lastFmSettings.sharedSecret
+                            )
+                        ) {
                             Text(
                                 text = stringResource(R.string.lastfm_api_credentials_unavailable),
                                 style = EncoreTheme.typography.bodySmall.copy(

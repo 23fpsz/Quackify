@@ -8,7 +8,9 @@ data class LastFmSettings(
     val syncLikesEnabled: Boolean = false,
     val thresholdPercent: Int = 50,
     val minimumTrackDurationMs: Long = 30_000L,
-    val maximumScrobbleTimeMs: Long = 240_000L
+    val maximumScrobbleTimeMs: Long = 240_000L,
+    val apiKey: String = "",
+    val sharedSecret: String = ""
 ) {
     companion object {
         private const val PREFS = "lastfm_settings"
@@ -28,7 +30,9 @@ data class LastFmSettings(
                 ).coerceAtLeast(0L),
                 maximumScrobbleTimeMs = p.getLong(
                     "maximum_scrobble_time_ms", 240_000L
-                ).coerceAtLeast(1L)
+                ).coerceAtLeast(1L),
+                apiKey = p.getString("api_key", "").orEmpty(),
+                sharedSecret = p.getString("shared_secret", "").orEmpty()
             )
         }
 
@@ -51,6 +55,8 @@ data class LastFmSettings(
                     "maximum_scrobble_time_ms",
                     settings.maximumScrobbleTimeMs.coerceAtLeast(1L)
                 )
+                .putString("api_key", settings.apiKey.trim())
+                .putString("shared_secret", settings.sharedSecret.trim())
                 .apply()
         }
     }

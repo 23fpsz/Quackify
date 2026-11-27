@@ -654,6 +654,8 @@
     <string name="recently_played_artists">Artis yang terakhir diputar</string>
     <string name="go_to_chapter">Ke chapter ini</string>
     <string name="lastfm_category_description">Pencatatan lagu, Sedang Diputar, dan lagu yang disukai</string>
+    <string name="lastfm_api_key">Kunci API Last.fm</string>
+    <string name="lastfm_shared_secret">Rahasia bersama Last.fm</string>
     <string name="lastfm_description">Hubungkan akun Last.fm untuk mengaktifkan pencatatan lagu. Sesi Last.fm yang valid diperlukan.</string>
     <string name="lastfm_connected">Terhubung: %1$s</string>
     <string name="lastfm_not_connected">Belum terhubung</string>
@@ -664,7 +666,7 @@
     <string name="lastfm_auth_success">Berhasil terhubung ke Last.fm.</string>
     <string name="lastfm_token_missing">Last.fm tidak memberikan token.</string>
     <string name="lastfm_auth_failed">Autentikasi Last.fm gagal.</string>
-    <string name="lastfm_api_credentials_unavailable">Kredensial API Last.fm tidak tersedia pada versi aplikasi ini.</string>
+    <string name="lastfm_api_credentials_unavailable">Masukkan kunci API dan rahasia bersama Last.fm untuk menghubungkan akun.</string>
     <string name="lastfm_disconnected_message">Akun Last.fm telah diputus.</string>
     <string name="lastfm_disconnect">Putuskan koneksi</string>
     <string name="lastfm_scrobbling">Pencatatan lagu</string>

@@ -67,6 +67,7 @@ class PlaybackService : MediaBrowserServiceCompat() {
 
     private var lastFmScrobbler: com.quackify.backend.core.lastfm.LastFmPlaybackScrobbler? = null
 
+    private var lastFmCredentialsFingerprint: String? = null
     /** Artwork for the current track and cover URL. Stored together so stale bitmaps never leak. */
     private var currentArtTrackUri = ""
     private var currentArtUrl = ""
@@ -388,17 +389,29 @@ class PlaybackService : MediaBrowserServiceCompat() {
 
         // Last.fm playback integration. Missing credentials/session never
         // interrupts normal playback.
-        if (
-            BuildConfig.LASTFM_API_KEY.isNotBlank() &&
-            BuildConfig.LASTFM_SHARED_SECRET.isNotBlank()
+        val lastFmSettings =
+            com.quackify.backend.core.lastfm.LastFmSettings.load(applicationContext)
+
+        val credentialsFingerprint =
+            lastFmSettings.apiKey.trim() + "\u0000" + lastFmSettings.sharedSecret.trim()
+        if (credentialsFingerprint != lastFmCredentialsFingerprint) {
+            // Discard the cached client when the user's credentials change.
+            lastFmScrobbler?.reset()
+            lastFmScrobbler = null
+            lastFmCredentialsFingerprint = credentialsFingerprint
+        }
+        if (com.quackify.backend.core.lastfm.LastFmRuntime.isConfigured(
+                lastFmSettings.apiKey,
+                lastFmSettings.sharedSecret
+            )
         ) {
             runCatching {
                 val scrobbler = lastFmScrobbler
                     ?: com.quackify.backend.core.lastfm.LastFmPlaybackScrobbler(
                         applicationContext,
-                        com.quackify.backend.core.lastfm.LastFmApiClient(
-                            BuildConfig.LASTFM_API_KEY,
-                            BuildConfig.LASTFM_SHARED_SECRET
+                        com.quackify.backend.core.lastfm.LastFmRuntime.client(
+                            lastFmSettings.apiKey,
+                            lastFmSettings.sharedSecret
                         ),
                         scope
                     ).also { lastFmScrobbler = it }

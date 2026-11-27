@@ -846,13 +846,15 @@ class PlaybackBridge(private val context: Context) {
                     if (
                         lastFmSettings.syncLikesEnabled &&
                         !sessionKey.isNullOrBlank() &&
-                        BuildConfig.LASTFM_API_KEY.isNotBlank() &&
-                        BuildConfig.LASTFM_SHARED_SECRET.isNotBlank()
+                        com.quackify.backend.core.lastfm.LastFmRuntime.isConfigured(
+                            lastFmSettings.apiKey,
+                            lastFmSettings.sharedSecret
+                        )
                     ) {
                         runCatching {
-                            val api = com.quackify.backend.core.lastfm.LastFmApiClient(
-                                BuildConfig.LASTFM_API_KEY,
-                                BuildConfig.LASTFM_SHARED_SECRET
+                            val api = com.quackify.backend.core.lastfm.LastFmRuntime.client(
+                                lastFmSettings.apiKey,
+                                lastFmSettings.sharedSecret
                             )
                             com.quackify.backend.core.lastfm.LastFmLikeSync(api).setLoved(
                                 title = state.title,
