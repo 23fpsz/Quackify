@@ -20,8 +20,8 @@
     <string name="lyrics_prioritize_word_synced">Prioriser les paroles synchronisées par mot</string>
     <string name="lyrics_prioritize_word_synced_desc">Continue de chercher dans d\'autres sources un minutage mot à mot quand la source principale n\'a que des paroles synchronisées par ligne</string>
     <string name="lyrics_source">Source des paroles</string>
-    <string name="lyrics_source_desc">Touchez une source pour la placer en tête. Les sources sont essayées dans cet ordre.</string>
-    <string name="lyrics_source_stream_desc">Fournisseurs utilisés pendant que l\'audio est diffusé depuis %1$s. Touchez une source pour la placer en tête.</string>
+    <string name="lyrics_source_desc">Utilisez les flèches pour réorganiser. Les sources sont essayées dans cet ordre.</string>
+    <string name="lyrics_source_stream_desc">Fournisseurs utilisés pendant que l'audio est diffusé depuis %1$s. Utilisez les flèches pour réorganiser ; les sources sont essayées dans cet ordre.</string>
     <string name="lyrics_provider_word_synced">Synchronisées par mot</string>
     <string name="lyrics_provider_line_synced">Synchronisées par ligne</string>
     <string name="lyrics_translation">Traduire les paroles</string>
@@ -691,4 +691,5 @@
     <string name="player_controls_and_app_icon">Commandes du lecteur et icône de l\'appli</string>
     <string name="name_your_folder">Donne un nom à ton dossier</string>
     <string name="session_expired_toast">Votre session a expiré. Reconnectez-vous pour continuer à écouter.</string>
+    <string name="lyrics_source_streams_desc">La chaîne de paroles pour chaque flux. Utilisez les flèches pour réorganiser ; les sources sont essayées dans cet ordre.</string>
 </resources>

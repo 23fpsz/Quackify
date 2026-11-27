@@ -247,6 +247,7 @@ internal fun ShellSettingsPane(
     updateVersion: String? = null,
     onCheckUpdates: () -> Unit = {},
     toastState: QuackifyToastState? = null,
+    activeStreamKey: String = "",
 ) {
     SettingsScreen(
         onBackClick = onBackClick,
@@ -269,7 +270,8 @@ internal fun ShellSettingsPane(
         updateError = updateError,
         updateVersion = updateVersion,
         onCheckUpdates = onCheckUpdates,
-        toastState = toastState
+        toastState = toastState,
+        activeStreamKey = activeStreamKey
     )
 }
 

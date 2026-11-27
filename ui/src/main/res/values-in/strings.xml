@@ -218,7 +218,7 @@
 <string name="lyrics_prioritize_word_synced">Utamakan lirik tersinkronisasi per kata</string>
 <string name="lyrics_prioritize_word_synced_desc">Terus cari sumber lain yang menyediakan pengaturan waktu per kata jika sumber utama hanya menyediakan sinkronisasi per baris</string>
 <string name="lyrics_source">Sumber lirik</string>
-<string name="lyrics_source_desc">Ketuk sumber untuk memindahkannya ke urutan teratas. Sumber akan dicoba sesuai urutan ini.</string>
+<string name="lyrics_source_desc">Gunakan panah untuk mengurutkan ulang. Sumber dicoba sesuai urutan ini.</string>
 <string name="lyrics_provider_word_synced">Tersinkronisasi per kata</string>
 <string name="lyrics_provider_line_synced">Tersinkronisasi per baris</string>
 <string name="lyrics_translation">Terjemahkan lirik</string>
@@ -629,7 +629,7 @@
     <string name="lyrics_next_track_name">%1$s (%2$s)</string>
     <string name="lyrics_next_up">Berikutnya</string>
     <string name="lyrics_next_up_desc">Lihat sekilas baris pembuka lagu berikutnya saat lirik mencapai akhir</string>
-    <string name="lyrics_source_stream_desc">Penyedia yang digunakan saat audio diputar dari %1$s. Ketuk sumber untuk memindahkannya ke urutan teratas.</string>
+    <string name="lyrics_source_stream_desc">Penyedia yang digunakan saat audio diputar dari %1$s. Gunakan panah untuk mengurutkan ulang; sumber dicoba sesuai urutan ini.</string>
     <string name="remove_custom_sp_dc">Hapus sp_dc khusus</string>
     <string name="session_expired_toast">Sesi Anda telah berakhir. Masuk kembali untuk melanjutkan mendengarkan.</string>
     <string name="sp_dc_check_failed_body">Spotify tidak dapat dihubungi untuk memverifikasi cookie, sehingga statusnya belum dapat dipastikan. Anda dapat tetap menyimpannya dan profil akan terisi nanti, atau membatalkan dan mencoba lagi saat koneksi kembali tersedia.</string>
@@ -648,4 +648,5 @@
     <string name="stream_sources_desc">Pemutaran akan mencoba setiap sumber sesuai urutan ini dan beralih ke sumber berikutnya jika terjadi kegagalan</string>
     <string name="stream_sources_row_desc">Pilih sumber audio yang akan dicoba terlebih dahulu</string>
     <string name="music">Musik</string>
+    <string name="lyrics_source_streams_desc">Rantai lirik untuk tiap sumber streaming. Gunakan panah untuk mengurutkan ulang; sumber dicoba sesuai urutan ini.</string>
 </resources>

@@ -1334,8 +1334,8 @@ fun EncoreNowPlayingScreen(
         }
 
         if (isLyricsMenuOpen) {
-            val context = LocalContext.current
             LyricsShortcutSheet(
+                streamSource = streamSource,
                 onDismiss = { isLyricsMenuOpen = false },
                 onShareClick = { isLyricsShareOpen = true },
                 onOpenTranslationLanguage = { isTranslationLanguageSheetOpen = true },
@@ -1353,20 +1353,10 @@ fun EncoreNowPlayingScreen(
             )
         }
         if (isLyricsProviderSheetOpen) {
-            val context = LocalContext.current
-            val stream = streamSource
+            val activeStream = streamSource
                 .let { key -> StreamSource.entries.firstOrNull { it.key == key } }
-                ?: StreamSource.SPOTIFY
             LyricsProviderSheet(
-                orderedProviders = LyricsOptions.providerOrderFor(stream),
-                stream = stream,
-                onOrderSelected = { order ->
-                    if (stream == StreamSource.YT_MUSIC) {
-                        LyricsOptions.setYtmProviderOrder(context, order)
-                    } else {
-                        LyricsOptions.setProviderOrder(context, order)
-                    }
-                },
+                activeStream = activeStream,
                 onDismiss = { isLyricsProviderSheetOpen = false }
             )
         }

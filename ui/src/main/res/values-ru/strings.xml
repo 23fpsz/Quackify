@@ -20,8 +20,8 @@
     <string name="lyrics_prioritize_word_synced">Приоритет пословному тексту</string>
     <string name="lyrics_prioritize_word_synced_desc">Продолжает искать в других источниках пословную синхронизацию, если верхний источник даёт только построчный текст</string>
     <string name="lyrics_source">Источник текста песни</string>
-    <string name="lyrics_source_desc">Нажмите на источник, чтобы поднять его наверх. Источники опробуются в этом порядке.</string>
-    <string name="lyrics_source_stream_desc">Провайдеры, используемые, пока звук воспроизводится из %1$s. Нажмите на источник, чтобы поднять его наверх.</string>
+    <string name="lyrics_source_desc">Меняйте порядок стрелками. Источники опробуются в этом порядке.</string>
+    <string name="lyrics_source_stream_desc">Провайдеры, используемые, пока звук воспроизводится из %1$s. Меняйте порядок стрелками; источники опробуются в этом порядке.</string>
     <string name="lyrics_provider_word_synced">Пословная синхронизация</string>
     <string name="lyrics_provider_line_synced">Построчная синхронизация</string>
     <string name="lyrics_translation">Перевод текста песни</string>
@@ -700,4 +700,5 @@
     <string name="player_controls_and_app_icon">Управление плеером и значок приложения</string>
     <string name="name_your_folder">Дайте папке название</string>
     <string name="session_expired_toast">Ваш сеанс истёк. Войдите снова, чтобы продолжить прослушивание.</string>
+    <string name="lyrics_source_streams_desc">Цепочка текстов песен для каждого потока. Меняйте порядок стрелками; источники опробуются в этом порядке.</string>
 </resources>

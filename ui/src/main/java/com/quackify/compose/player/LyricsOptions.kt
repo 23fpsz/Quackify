@@ -67,6 +67,7 @@ object LyricsOptions {
     var translationEnabled by mutableStateOf(false)
         private set
 
+    /** The saved master chain; per-stream chains are filtered views of it. */
     var providerOrder by mutableStateOf(LyricsProvider.offered)
         private set
 
@@ -107,9 +108,12 @@ object LyricsOptions {
         preview = prefs.getBoolean(KEY_PREVIEW, true)
         prioritizeWordSynced = prefs.getBoolean(KEY_PRIORITIZE_WORD_SYNCED, true)
         providerOrder = readProviderOrder(prefs.getString(KEY_PROVIDER_ORDER, null))
-        ytmProviderOrder = readProviderOrder(
-            prefs.getString(KEY_YTM_PROVIDER_ORDER, null),
-            LyricsProvider.offeredFor(StreamSource.YT_MUSIC),
+        ytmProviderOrder = LyricsProvider.orderedFor(
+            readProviderOrder(
+                prefs.getString(KEY_YTM_PROVIDER_ORDER, null),
+                LyricsProvider.offeredFor(StreamSource.YT_MUSIC),
+            ),
+            StreamSource.YT_MUSIC,
         )
         translationEnabled = prefs.getBoolean(KEY_TRANSLATION_ENABLED, false)
         translationLanguage = prefs.getString(KEY_TRANSLATION_LANGUAGE, null)
@@ -175,9 +179,17 @@ object LyricsOptions {
             .apply()
     }
 
+    /** Persists the chain the given stream should be asked through, in its own order. */
+    fun setOrderFor(context: Context, stream: StreamSource, providers: List<LyricsProvider>) {
+        when (stream) {
+            StreamSource.SPOTIFY -> setProviderOrder(context, providers)
+            StreamSource.YT_MUSIC -> setYtmProviderOrder(context, providers)
+        }
+    }
+
     /** The chain the given stream should be asked through, in its own order. */
     fun providerOrderFor(stream: StreamSource): List<LyricsProvider> = when (stream) {
-        StreamSource.SPOTIFY -> providerOrder
+        StreamSource.SPOTIFY -> LyricsProvider.orderedFor(providerOrder, StreamSource.SPOTIFY)
         StreamSource.YT_MUSIC -> ytmProviderOrder
     }
 

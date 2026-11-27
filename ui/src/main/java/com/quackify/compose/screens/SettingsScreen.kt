@@ -167,6 +167,7 @@ fun SettingsScreen(
     onOpenLogcat: () -> Unit = {},
     onSpDcSignedIn: () -> Unit = {},
     toastState: QuackifyToastState? = null,
+    activeStreamKey: String = "",
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
@@ -176,7 +177,8 @@ fun SettingsScreen(
     val lyricsEnabled = LyricsOptions.enabled
     val lyricsPreview = LyricsOptions.preview
     val lyricsPrioritizeWordSynced = LyricsOptions.prioritizeWordSynced
-    val lyricsProviderOrder = LyricsOptions.providerOrder
+    val lyricsActiveStream = StreamSource.entries.firstOrNull { it.key == activeStreamKey }
+    val lyricsProviderOrder = LyricsOptions.providerOrderFor(lyricsActiveStream ?: StreamSource.SPOTIFY)
     val lyricsKeepScreenOn = LyricsOptions.keepScreenOn
     val lyricsNextTrackPeek = LyricsOptions.nextTrackPeek
     val lyricsOffsetTenths = LyricsOptions.offsetTenths + LYRICS_OFFSET_TENTHS_MAX
@@ -494,10 +496,7 @@ fun SettingsScreen(
                         )
                         if (lyricsProviderSheetOpen) {
                             LyricsProviderSheet(
-                                orderedProviders = lyricsProviderOrder,
-                                onOrderSelected = { order ->
-                                    LyricsOptions.setProviderOrder(context, order)
-                                },
+                                activeStream = lyricsActiveStream,
                                 onDismiss = { lyricsProviderSheetOpen = false }
                             )
                         }

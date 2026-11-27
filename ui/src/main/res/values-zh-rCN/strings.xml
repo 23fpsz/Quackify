@@ -20,8 +20,8 @@
     <string name="lyrics_prioritize_word_synced">优先使用逐字歌词</string>
     <string name="lyrics_prioritize_word_synced_desc">当首选来源只有逐行歌词时，继续在其他来源中寻找逐字时间轴</string>
     <string name="lyrics_source">歌词来源</string>
-    <string name="lyrics_source_desc">点按来源可将其移到顶部。来源将按此顺序依次尝试。</string>
-    <string name="lyrics_source_stream_desc">从 %1$s 流式传输音频时使用的提供商。点按来源可将其移到顶部。</string>
+    <string name="lyrics_source_desc">用箭头调整顺序。来源将按此顺序依次尝试。</string>
+    <string name="lyrics_source_stream_desc">从 %1$s 流式传输音频时使用的提供商。用箭头调整顺序；来源将按此顺序依次尝试。</string>
     <string name="lyrics_provider_word_synced">逐字同步</string>
     <string name="lyrics_provider_line_synced">逐行同步</string>
     <string name="lyrics_translation">翻译歌词</string>
@@ -688,4 +688,5 @@
     <string name="player_controls_and_app_icon">播放控件和应用图标</string>
     <string name="name_your_folder">给你的文件夹起个名字</string>
     <string name="session_expired_toast">你的会话已过期。请重新登录以继续收听。</string>
+    <string name="lyrics_source_streams_desc">各音源对应的歌词链。用箭头调整顺序；来源将按此顺序依次尝试。</string>
 </resources>

@@ -202,8 +202,8 @@
     <string name="lyrics_prioritize_word_synced">Priorizar letras sincronizadas por palabra</string>
     <string name="lyrics_prioritize_word_synced_desc">Sigue buscando en otras fuentes una sincronización palabra por palabra cuando la fuente principal solo tiene letras sincronizadas por línea</string>
     <string name="lyrics_source">Fuente de letras</string>
-    <string name="lyrics_source_desc">Toca una fuente para moverla al principio. Las fuentes se prueban en este orden.</string>
-    <string name="lyrics_source_stream_desc">Proveedores usados mientras el audio se transmite desde %1$s. Toca una fuente para moverla al principio.</string>
+    <string name="lyrics_source_desc">Usa las flechas para reordenar. Las fuentes se prueban en este orden.</string>
+    <string name="lyrics_source_stream_desc">Proveedores usados mientras el audio se transmite desde %1$s. Usa las flechas para reordenar; las fuentes se prueban en este orden.</string>
     <string name="lyrics_provider_word_synced">Sincronizada por palabra</string>
     <string name="lyrics_provider_line_synced">Sincronizada por línea</string>
     <string name="lyrics_translation">Traducir letras</string>
@@ -692,4 +692,5 @@
     <string name="sorted_descending">Orden descendente</string>
     <string name="name_your_folder">Dale un nombre a tu carpeta</string>
     <string name="session_expired_toast">Tu sesión ha caducado. Inicia sesión de nuevo para seguir escuchando.</string>
+    <string name="lyrics_source_streams_desc">La cadena de letras de cada fuente de transmisión. Usa las flechas para reordenar; las fuentes se prueban en este orden.</string>
 </resources>

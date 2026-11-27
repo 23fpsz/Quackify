@@ -26,6 +26,7 @@ import com.quackify.compose.sheets.EncoreQueueSheet
 import com.quackify.compose.sheets.ShowOptionsSheet
 import com.quackify.compose.sheets.TrackOptionsSheet
 import com.quackify.compose.sheets.toEncoreDevice
+import com.quackify.backend.core.store.StreamSource
 import com.quackify.compose.components.QuackifyToastState
 
 internal data class SheetFlags(
@@ -117,6 +118,7 @@ internal fun ShellSheets(
     onPlaylistPrivacyToggle: (Boolean) -> Unit = {},
     lyricsProviderOrder: List<com.quackify.backend.library.lyrics.LyricsProvider> = com.quackify.backend.library.lyrics.LyricsProvider.offered,
     onLyricsProviderOrder: (List<com.quackify.backend.library.lyrics.LyricsProvider>) -> Unit = {},
+    activeStreamKey: String = "",
     onDismissLyricsProvider: () -> Unit = {},
     onDismissProfile: () -> Unit,
     onDismissAccounts: () -> Unit,
@@ -299,6 +301,7 @@ internal fun ShellSheets(
         onDismissCanvasResolution = onDismissCanvasResolution,
         lyricsProviderOrder = lyricsProviderOrder,
         onLyricsProviderOrder = onLyricsProviderOrder,
+        activeStreamKey = activeStreamKey,
         onDismissLyricsProvider = onDismissLyricsProvider,
         onCreatePlaylist = onCreatePlaylist,
         onCreateFolder = onCreateFolder,
@@ -568,6 +571,7 @@ private fun ShellLibrarySheets(
     onDismissAudioPipeline: () -> Unit = {},
     lyricsProviderOrder: List<com.quackify.backend.library.lyrics.LyricsProvider>,
     onLyricsProviderOrder: (List<com.quackify.backend.library.lyrics.LyricsProvider>) -> Unit,
+    activeStreamKey: String = "",
     onDismissLyricsProvider: () -> Unit,
     onCreatePlaylist: () -> Unit,
     onCreateFolder: () -> Unit,
@@ -658,8 +662,7 @@ private fun ShellLibrarySheets(
 
     if (flags.lyricsProviderSheet) {
         LyricsProviderSheet(
-            orderedProviders = lyricsProviderOrder,
-            onOrderSelected = onLyricsProviderOrder,
+            activeStream = StreamSource.entries.firstOrNull { it.key == activeStreamKey },
             onDismiss = onDismissLyricsProvider
         )
     }
