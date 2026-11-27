@@ -696,4 +696,26 @@
     <string name="follows_you">Follows you</string>
     <string name="recently_played_artists">Recently played artists</string>
     <string name="go_to_chapter">Go to this chapter</string>
+    <string name="lastfm_category_description">Scrobbling, Now Playing, and liked tracks</string>
+    <string name="lastfm_description">Connect a Last.fm account to enable scrobbling. A valid Last.fm session is required.</string>
+    <string name="lastfm_connected">Connected: %1$s</string>
+    <string name="lastfm_not_connected">Not connected</string>
+    <string name="lastfm_connecting">Connecting...</string>
+    <string name="lastfm_finish_connection">Finish connection</string>
+    <string name="lastfm_connect">Connect to Last.fm</string>
+    <string name="lastfm_browser_authorization_instructions">Approve access in your browser, return to Quackify, then tap Finish connection.</string>
+    <string name="lastfm_auth_success">Successfully connected to Last.fm.</string>
+    <string name="lastfm_token_missing">Last.fm did not provide a token.</string>
+    <string name="lastfm_auth_failed">Last.fm authentication failed.</string>
+    <string name="lastfm_api_credentials_unavailable">Last.fm API credentials are unavailable in this build.</string>
+    <string name="lastfm_disconnected_message">Last.fm account disconnected.</string>
+    <string name="lastfm_disconnect">Disconnect</string>
+    <string name="lastfm_scrobbling">Scrobbling</string>
+    <string name="lastfm_scrobbling_description">Send tracks to your Last.fm listening history</string>
+    <string name="lastfm_now_playing">Now Playing</string>
+    <string name="lastfm_now_playing_description">Show the track currently playing on Last.fm</string>
+    <string name="lastfm_sync_likes">Sync Likes</string>
+    <string name="lastfm_sync_likes_description">Love or unlove tracks on Last.fm when you like or unlike them in Quackify</string>
+    <string name="lastfm_scrobble_threshold">Scrobble threshold</string>
+    <string name="lastfm_scrobble_threshold_description">Scrobble after this percentage of the track has played</string>
 </resources>
