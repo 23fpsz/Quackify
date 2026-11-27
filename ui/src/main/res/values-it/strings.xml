@@ -203,7 +203,7 @@
     <string name="lyrics_prioritize_word_synced_desc">Continua a cercare in altre fonti una sincronizzazione parola per parola quando la fonte principale ha solo testi sincronizzati per riga</string>
     <string name="lyrics_source">Fonte dei testi</string>
     <string name="lyrics_source_desc">Usa le frecce per riordinare. Le fonti vengono provate in questo ordine.</string>
-    <string name="lyrics_source_stream_desc">Fornitori usati mentre l'audio è in streaming da %1$s. Usa le frecce per riordinare; le fonti vengono provate in questo ordine.</string>
+    <string name="lyrics_source_stream_desc">Fornitori usati mentre l\'audio è in streaming da %1$s. Usa le frecce per riordinare; le fonti vengono provate in questo ordine.</string>
     <string name="lyrics_provider_word_synced">Sincronizzato per parola</string>
     <string name="lyrics_provider_line_synced">Sincronizzato per riga</string>
     <string name="lyrics_translation">Traduci i testi</string>
