@@ -237,6 +237,7 @@ internal fun ShellSheetsHost(env: ShellSheetsEnv) {
         currentTrackArtist = env.currentArtist,
         currentTrackUri = currentTrackUri,
         currentTrackCoverUrl = env.currentCoverUrl.takeIf { it.isNotBlank() },
+        currentTrackIsExplicit = playbackState?.explicit ?: false,
         playlistEntity = playlistEntity,
         playlistEditable = active.playlistUri.startsWith("spotify:playlist:") && env.playlistDetail?.editable == true,
         playlistSaved = if (active.playlistUri.startsWith("spotify:playlist:")) env.playlistSaved else null,

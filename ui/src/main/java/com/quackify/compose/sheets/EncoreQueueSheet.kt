@@ -72,6 +72,7 @@ fun EncoreQueueSheet(
     currentTrackTitle: String,
     currentTrackArtist: String,
     currentTrackCoverUrl: String? = null,
+    currentTrackIsExplicit: Boolean = false,
     queueSourceContext: String, // e.g. "Today's Top Hits"
     userQueue: List<TrackItem>,
     nextFromContext: List<TrackItem>,
@@ -185,12 +186,17 @@ fun EncoreQueueSheet(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = currentTrackArtist,
-                                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (currentTrackIsExplicit) {
+                                    EncoreExplicitTag(modifier = Modifier.padding(end = 4.dp))
+                                }
+                                Text(
+                                    text = currentTrackArtist,
+                                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
 
                         EncorePlayIndicator(

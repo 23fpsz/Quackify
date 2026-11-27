@@ -689,4 +689,8 @@
     <string name="name_your_folder">フォルダに名前を付けてください</string>
     <string name="session_expired_toast">セッションの有効期限が切れました。再生を続けるには再度ログインしてください。</string>
     <string name="lyrics_source_streams_desc">ストリームごとの歌詞チェーン。矢印で並べ替えます。ソースはこの順番で試されます。</string>
+    <string name="follow">フォロー</string>
+    <string name="follows_you">フォロー中</string>
+    <string name="recently_played_artists">最近再生したアーティスト</string>
+    <string name="go_to_chapter">このチャプターへ移動</string>
 </resources>

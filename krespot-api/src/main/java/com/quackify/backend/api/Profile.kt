@@ -101,6 +101,66 @@ object Profile {
         people(context, "followers", userId)
 
     /**
+     * Whether we follow the given user, straight from the isFollowingUsers
+     * persisted query. The web player asks this whenever it renders someone
+     * else's profile, so the follow button never guesses from a stale cache.
+     */
+    suspend fun isFollowingUser(context: Context, userId: String): Boolean {
+        val token = EncoreAuth.token(context)
+        if (token.isBlank()) {
+            log.w("isFollowingUser: no token")
+            return false
+        }
+        val uri = "spotify:user:${normalizeUserId(userId)}"
+        val variables = JSONObject()
+            .put("uris", JSONArray().put(uri))
+            .toString()
+        val data = Pathfinder.queryPost(context, token, "isFollowingUsers", variables) ?: run {
+            log.w("isFollowingUser: no response for $uri")
+            return false
+        }
+        val following = data.optJSONObject("data")
+            ?.optJSONArray("users")
+            ?.optJSONObject(0)
+            ?.optBoolean("following", false) ?: false
+        log.i("isFollowingUser $uri -> $following")
+        return following
+    }
+
+    /**
+     * Follow or unfollow a user through the same persisted query the web
+     * player uses. Returns the outcome so the caller can refresh the profile
+     * (the v3 endpoint's follow counts only move once it is re-read).
+     */
+    suspend fun setUserFollowed(context: Context, userId: String, followed: Boolean): Boolean {
+        val token = EncoreAuth.token(context)
+        if (token.isBlank()) {
+            log.w("setUserFollowed: no token")
+            return false
+        }
+        val username = normalizeUserId(userId)
+        if (username.isBlank()) {
+            log.w("setUserFollowed: no user id")
+            return false
+        }
+        val operation = if (followed) "followUsers" else "unfollowUsers"
+        val variables = JSONObject()
+            .put("usernames", JSONArray().put(username))
+            .toString()
+        val data = Pathfinder.queryPost(context, token, operation, variables) ?: run {
+            log.w("setUserFollowed: no response for $username")
+            return false
+        }
+        val ok = data.optJSONObject("data")
+            ?.optJSONObject(operation)
+            ?.optJSONArray("responses")
+            ?.optJSONObject(0)
+            ?.optBoolean("result", false) ?: false
+        log.i("setUserFollowed $username followed=$followed -> $ok")
+        return ok
+    }
+
+    /**
      * Top artists/tracks of a profile. Without [userUri] the persisted query
      * answers for the signed-in user (`me`); with it we ask for another user's
      * public top content — when that user keeps it private (or the query has

@@ -35,6 +35,7 @@ import com.quackify.compose.shell.EncoreAppShell
 import com.quackify.compose.search.SearchHistoryItem
 import com.quackify.backend.model.SearchKind
 import com.quackify.compose.shell.ShellDeepLink
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import com.quackify.backend.api.Library
 import com.quackify.backend.api.Podcasts
@@ -651,6 +652,10 @@ onArtistRadio = onArtistRadioBound,
     profileContexts = profileContexts,
     profileLoading = profileLoading,
     profileFailed = profileFailed,
+    profileIsFollowing = profileIsFollowing,
+    profileFollowBusy = profileFollowBusy,
+    profileFollowsYou = profileFollowsYou,
+    onToggleProfileFollow = { onToggleProfileFollowHandler() },
 onLoadProfile = { onLoadProfileHandler() },
 onRetryProfile = { onRetryProfileHandler() },
 onOpenUserProfile = { uri, _ -> onOpenUserProfileHandler(uri, "ignored") },
@@ -1005,8 +1010,38 @@ if (profileUserId != uri) {
     profileTop = null
     profileTopUnavailable = false
     profileContexts = emptyList()
+    profileIsFollowing = false
+    profileFollowsYou = false
 }
 profileFetch++
+}
+
+
+/** Follows or unfollows the profile being viewed, then refreshes it the way
+ * the web player does: the mutation, then a re-read of the v3 profile so the
+ * follower count and the recently played chains move with the button. */
+internal fun MainActivity.onToggleProfileFollowHandler() {
+val target = profileUserId
+if (target.isBlank() || profileDetail?.isCurrentUser == true) return
+if (profileFollowBusy) return
+profileFollowBusy = true
+lifecycleScope.launch {
+    val nowFollowing = !profileIsFollowing
+    val ok = runCatching {
+        com.quackify.backend.api.Profile.setUserFollowed(this@onToggleProfileFollowHandler, target, nowFollowing)
+    }.getOrDefault(false)
+    if (ok) {
+        profileIsFollowing = nowFollowing
+        // The v3 endpoint only moves its follow counts once it is re-read.
+        val refreshed = runCatching {
+            com.quackify.backend.api.Profile.profile(this@onToggleProfileFollowHandler, target)
+        }.getOrNull()
+        if (refreshed != null && !refreshed.isCurrentUser) {
+            profileDetail = refreshed
+        }
+    }
+    profileFollowBusy = false
+}
 }
 
 

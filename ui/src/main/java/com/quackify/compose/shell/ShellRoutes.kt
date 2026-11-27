@@ -805,6 +805,17 @@ internal fun ShellEpisodeRoute(
                 env.playerListener?.onPlayEpisode(current.uri, current.showUri, current.video)
             }
         },
+        onChapterClick = { current, chapter ->
+            // Tapping a chapter starts the episode inside it when it is not
+            // the one playing; when it already is, the tap is just a seek.
+            if (env.playbackState?.trackUri == current.uri) {
+                env.playerListener?.onSeek(chapter.startMs)
+            } else {
+                env.playerListener?.onPlayEpisodeAtPosition(
+                    current.uri, current.showUri, current.video, chapter.startMs,
+                )
+            }
+        },
         onShowClick = { uri -> env.openShow(uri) }
     )
 }
@@ -864,6 +875,10 @@ internal fun ShellProfileRoute(
     contexts: List<ProfileContextCard>,
     loading: Boolean,
     loadFailed: Boolean,
+    isFollowingUser: Boolean = false,
+    isFollowBusy: Boolean = false,
+    followsYou: Boolean = false,
+    onFollowUser: (() -> Unit)? = null,
     onRetry: (() -> Unit)?,
     onLoadProfileFollows: (() -> Unit)?,
 ) {
@@ -874,6 +889,10 @@ internal fun ShellProfileRoute(
         contexts = contexts,
         loading = loading,
         loadFailed = loadFailed,
+        isFollowingUser = isFollowingUser,
+        isFollowBusy = isFollowBusy,
+        followsYou = followsYou,
+        onFollowUserClick = onFollowUser,
         onRetry = { onRetry?.invoke() },
         onBack = env.handleBack,
         currentTrackUri = env.playbackState?.trackUri.orEmpty(),

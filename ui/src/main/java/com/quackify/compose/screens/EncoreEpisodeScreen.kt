@@ -70,6 +70,7 @@ fun EncoreEpisodeScreen(
     onShowClick: () -> Unit = {},
     onMoreClick: (() -> Unit)? = null,
     chapters: List<ChapterSpan> = emptyList(),
+    onChapterClick: ((ChapterSpan) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var descriptionExpanded by remember { mutableStateOf(false) }
@@ -236,6 +237,14 @@ fun EncoreEpisodeScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .then(
+                                        if (onChapterClick != null) {
+                                            Modifier.clickable(onClick = { onChapterClick(chapter) })
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
                                     .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -284,6 +293,22 @@ fun EncoreEpisodeScreen(
                                     Text(
                                         text = formatTrackLength(chapter.endMs - chapter.startMs),
                                         style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                                    )
+                                }
+                                if (onChapterClick != null) {
+                                    Text(
+                                        text = stringResource(R.string.go_to_chapter),
+                                        style = EncoreTheme.typography.marginal.copy(
+                                            color = EncoreColors.TextSecondary,
+                                        ),
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(horizontal = 8.dp),
+                                    )
+                                    androidx.compose.material3.Icon(
+                                        painter = painterResource(id = R.drawable.encore_icon_play_16),
+                                        contentDescription = stringResource(R.string.go_to_chapter),
+                                        tint = EncoreColors.TextSecondary,
+                                        modifier = Modifier.size(16.dp),
                                     )
                                 }
                             }

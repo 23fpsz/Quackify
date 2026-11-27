@@ -691,4 +691,8 @@
     <string name="name_your_folder">Dai un nome alla tua cartella</string>
     <string name="session_expired_toast">La tua sessione è scaduta. Accedi di nuovo per continuare ad ascoltare.</string>
     <string name="lyrics_source_streams_desc">La catena di testi per ciascuna sorgente. Usa le frecce per riordinare; le fonti vengono provate in questo ordine.</string>
+    <string name="follow">Segui</string>
+    <string name="follows_you">Ti segue</string>
+    <string name="recently_played_artists">Artisti ascoltati di recente</string>
+    <string name="go_to_chapter">Vai a questo capitolo</string>
 </resources>

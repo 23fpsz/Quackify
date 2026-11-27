@@ -693,4 +693,8 @@
     <string name="name_your_folder">Dale un nombre a tu carpeta</string>
     <string name="session_expired_toast">Tu sesión ha caducado. Inicia sesión de nuevo para seguir escuchando.</string>
     <string name="lyrics_source_streams_desc">La cadena de letras de cada fuente de transmisión. Usa las flechas para reordenar; las fuentes se prueban en este orden.</string>
+    <string name="follow">Seguir</string>
+    <string name="follows_you">Te sigue</string>
+    <string name="recently_played_artists">Artistas escuchados recientemente</string>
+    <string name="go_to_chapter">Ir a este capítulo</string>
 </resources>

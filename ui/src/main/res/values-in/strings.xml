@@ -649,4 +649,8 @@
     <string name="stream_sources_row_desc">Pilih sumber audio yang akan dicoba terlebih dahulu</string>
     <string name="music">Musik</string>
     <string name="lyrics_source_streams_desc">Rantai lirik untuk tiap sumber streaming. Gunakan panah untuk mengurutkan ulang; sumber dicoba sesuai urutan ini.</string>
+    <string name="follow">Ikuti</string>
+    <string name="follows_you">Mengikutimu</string>
+    <string name="recently_played_artists">Artis yang terakhir diputar</string>
+    <string name="go_to_chapter">Ke chapter ini</string>
 </resources>
