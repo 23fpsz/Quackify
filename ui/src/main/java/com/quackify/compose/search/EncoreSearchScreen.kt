@@ -215,7 +215,7 @@ fun EncoreSearchScreen(
     var selectedSearchTab by remember { mutableIntStateOf(0) }
     var isSearchBarFocused by remember { mutableStateOf(false) }
     var suggestionsPinned by remember { mutableStateOf(false) }
-    val searchTabs = listOf("Top", stringResource(R.string.songs), stringResource(R.string.artists), stringResource(R.string.playlists), stringResource(R.string.albums), "Podcasts", stringResource(R.string.profiles))
+    val searchTabs = listOf(stringResource(R.string.top_result), stringResource(R.string.songs), stringResource(R.string.artists), stringResource(R.string.playlists), stringResource(R.string.albums), stringResource(R.string.podcasts), stringResource(R.string.profiles))
     val focusManager = LocalFocusManager.current
     val bottomPadding = rememberBottomPadding()
 

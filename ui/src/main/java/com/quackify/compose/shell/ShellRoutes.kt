@@ -197,13 +197,14 @@ internal fun ShellSearchRoute(
         onCategoryClick = { category ->
             env.navController.pushCurrentState()
             env.active.categoryTitle = category.title
+            env.active.categoryUri = category.uri
             env.active.categoryColor = category.color
             if (category.uri.startsWith("spotify:page:")) {
                 env.navController.currentScreen = ShellScreen.BROWSE
                 onOpenBrowse?.invoke(category.uri)
             } else {
                 env.navController.currentScreen = ShellScreen.CATEGORY
-                onOpenCategory?.invoke(category.title)
+                onOpenCategory?.invoke(category.uri)
             }
         },
         onAlbumClick = env.openAlbum,
@@ -476,6 +477,7 @@ internal fun ShellCategoryRoute(
 ) {
     EncoreCategoryScreen(
         categoryTitle = env.active.categoryTitle,
+        categoryUri = env.active.categoryUri,
         categoryColor = env.active.categoryColor,
         onBackClick = env.handleBack,
         onPlaylistClick = { title, uri ->
@@ -497,6 +499,7 @@ internal fun ShellCategoryRoute(
         onSubcategoryClick = { subcategory ->
             env.navController.pushCurrentState()
             env.active.categoryTitle = subcategory
+            env.active.categoryUri = ""
             env.active.categoryColor = getCategoryColor(subcategory)
             env.navController.currentScreen = ShellScreen.CATEGORY
         },

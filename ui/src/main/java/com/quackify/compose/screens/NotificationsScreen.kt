@@ -74,7 +74,7 @@ fun NotificationsScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedFilterIndex by remember { mutableIntStateOf(0) }
-    val filters = listOf(stringResource(R.string.all), "Music", stringResource(R.string.podcasts_and_shows))
+    val filters = listOf(stringResource(R.string.all), stringResource(R.string.music), stringResource(R.string.podcasts_and_shows))
     val bottomPadding = rememberBottomPadding()
 
     val filtered = remember(selectedFilterIndex, notifications) {

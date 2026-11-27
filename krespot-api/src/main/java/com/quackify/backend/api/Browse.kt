@@ -71,8 +71,8 @@ object Browse {
                 card(node)?.let(out::add)
             }
         }
-        log.i("browseAll -> ${out.size} categories ${out.map { it.title }.take(6)}")
         cachedCards = out
+        log.i("browseAll -> ${out.size} categories ${out.map { it.title }.take(6)}")
         return out
     }
 

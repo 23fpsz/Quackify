@@ -122,7 +122,13 @@ fun EncoreLibraryScreen(
     var searchFilterText by remember { mutableStateOf("") }
     val bottomPadding = rememberBottomPadding()
 
-    val filters = listOf(stringResource(R.string.playlists), "Podcasts", stringResource(R.string.albums), stringResource(R.string.artists), stringResource(R.string.downloaded))
+    val filters = listOf(
+        "Playlists" to stringResource(R.string.playlists),
+        "Podcasts" to stringResource(R.string.podcasts),
+        "Albums" to stringResource(R.string.albums),
+        "Artists" to stringResource(R.string.artists),
+        "Downloaded" to stringResource(R.string.downloaded)
+    )
 
     val allLibraryItems = items.orEmpty()
     val filteredItems = remember(allLibraryItems, selectedFilter, searchFilterText, currentSort, sortDirection) {
@@ -363,13 +369,13 @@ fun EncoreLibraryScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(filters, key = { it }) { filter ->
-                        val isSelected = selectedFilter == filter
+                    items(filters, key = { it.first }) { (filterKey, filterLabel) ->
+                        val isSelected = selectedFilter == filterKey
                         EncoreChip(
-                            text = filter,
+                            text = filterLabel,
                             isSelected = isSelected,
                             onClick = {
-                                selectedFilter = if (isSelected) null else filter
+                                selectedFilter = if (isSelected) null else filterKey
                             }
                         )
                     }
