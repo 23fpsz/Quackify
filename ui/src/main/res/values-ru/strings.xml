@@ -701,4 +701,8 @@
     <string name="name_your_folder">Дайте папке название</string>
     <string name="session_expired_toast">Ваш сеанс истёк. Войдите снова, чтобы продолжить прослушивание.</string>
     <string name="lyrics_source_streams_desc">Цепочка текстов песен для каждого потока. Меняйте порядок стрелками; источники опробуются в этом порядке.</string>
+    <string name="follow">Подписаться</string>
+    <string name="follows_you">Подписан на вас</string>
+    <string name="recently_played_artists">Недавно прослушанные исполнители</string>
+    <string name="go_to_chapter">К этому эпизоду</string>
 </resources>

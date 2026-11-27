@@ -691,4 +691,8 @@
     <string name="name_your_folder">Gib Deinem Ordner einen Namen</string>
     <string name="session_expired_toast">Deine Sitzung ist abgelaufen. Melde dich erneut an, um weiter zu hören.</string>
     <string name="lyrics_source_streams_desc">Die Liedtextkette pro Stream. Nutze die Pfeile zum Sortieren; die Quellen werden in dieser Reihenfolge ausprobiert.</string>
+    <string name="follow">Folgen</string>
+    <string name="follows_you">Folgt dir</string>
+    <string name="recently_played_artists">Zuletzt gehörte Künstler</string>
+    <string name="go_to_chapter">Zu diesem Kapitel</string>
 </resources>

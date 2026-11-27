@@ -30,6 +30,10 @@ data class UserProfile(
     val isCurrentUser: Boolean,
     val avatarUrl: String = "",
     val publicPlaylists: List<ProfilePlaylist> = emptyList(),
+    /** Only meaningful for other users: whether that user follows us. The v3
+     * endpoint does not carry it, so it is filled in from isFollowingUsers
+     * (asked with our own uri) once the profile loads. */
+    val followsYou: Boolean = false,
 )
 
 data class ProfilePlaylist(

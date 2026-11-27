@@ -692,4 +692,8 @@
     <string name="name_your_folder">Donne un nom à ton dossier</string>
     <string name="session_expired_toast">Votre session a expiré. Reconnectez-vous pour continuer à écouter.</string>
     <string name="lyrics_source_streams_desc">La chaîne de paroles pour chaque flux. Utilisez les flèches pour réorganiser ; les sources sont essayées dans cet ordre.</string>
+    <string name="follow">Suivre</string>
+    <string name="follows_you">Vous suit</string>
+    <string name="recently_played_artists">Artistes écoutés récemment</string>
+    <string name="go_to_chapter">Aller à ce chapitre</string>
 </resources>

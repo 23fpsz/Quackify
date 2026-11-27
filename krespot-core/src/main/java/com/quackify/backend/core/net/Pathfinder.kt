@@ -175,6 +175,12 @@ object Pathfinder {
             "3384085be84fbf2f855b024f99bc06cded1c0fd71af3a8fb8abb84e9656faba2",
         "getTrack" to
             "e7b1bf4e95cb3d733d48b442f93006e9712fd504e8b88d7a82e6e3bac9306a6b",
+        "isFollowingUsers" to
+            "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596",
+        "followUsers" to
+            "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596",
+        "unfollowUsers" to
+            "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596",
     )
 
     data class Op(

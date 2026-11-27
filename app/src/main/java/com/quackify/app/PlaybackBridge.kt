@@ -680,6 +680,35 @@ class PlaybackBridge(private val context: Context) {
             scope.launch { playTrack(uri, contextUri, -1) }
         }
 
+        override fun onPlayEpisodeAtPosition(uri: String, contextUri: String, hasVideo: Boolean, positionMs: Long) {
+            if (hasVideo) {
+                decorated[uri] = (decorated[uri] ?: TrackItem(title = "", artist = "", uri = uri))
+                    .copy(hasVideo = true)
+            }
+            captureChain(contextUri)
+            scope.launch {
+                playTrack(uri, contextUri, -1)
+                // A fresh episode start must land inside the chapter the user
+                // tapped, not at 0:00. The engine needs a moment to actually
+                // load the source, so the seek is retried briefly and stops
+                // as soon as the position sticks (or the track moves on).
+                val deadline = System.currentTimeMillis() + 10_000L
+                while (System.currentTimeMillis() < deadline && !player.isPlaying) {
+                    if (state.trackUri.isNotBlank() && state.trackUri != uri) return@launch
+                    delay(100L)
+                }
+                val duration = player.durationMs.takeIf { it > 0L } ?: progress.durationMs
+                val target = if (duration > 0L) positionMs.coerceIn(0L, duration) else positionMs
+                repeat(5) {
+                    if (state.trackUri != uri) return@launch
+                    player.seekTo(target)
+                    delay(250L)
+                    if (player.positionMs >= target - 500L) return@launch
+                }
+                log.i("episode chapter jump '$uri' -> ${target}ms")
+            }
+        }
+
         override fun onVideoQuality(height: Int) {
             player.selectVideoQuality(height)
         }

@@ -689,4 +689,8 @@
     <string name="name_your_folder">폴더 이름을 지정하세요</string>
     <string name="session_expired_toast">세션이 만료되었습니다. 계속 듣으려면 다시 로그인하세요.</string>
     <string name="lyrics_source_streams_desc">스트림별 가사 체인입니다. 화살표로 순서를 바꾸세요. 소스는 이 순서대로 시도됩니다.</string>
+    <string name="follow">팔로우</string>
+    <string name="follows_you">나를 팔로우함</string>
+    <string name="recently_played_artists">최근 재생한 아티스트</string>
+    <string name="go_to_chapter">이 챕터로 이동</string>
 </resources>

@@ -265,6 +265,12 @@ class MainActivity : ComponentActivity() {
     internal var profileContexts by mutableStateOf<List<ProfileContextCard>>(emptyList())
     internal var profileFollowers by mutableStateOf<List<ProfileUser>>(emptyList())
     internal var profileFollowing by mutableStateOf<List<ProfileUser>>(emptyList())
+    /** Whether we follow the profile being viewed (other users only). */
+    internal var profileIsFollowing by mutableStateOf(false)
+    /** True while a follow/unfollow call is in flight, to lock the button. */
+    internal var profileFollowBusy by mutableStateOf(false)
+    /** Whether the viewed profile follows us back. */
+    internal var profileFollowsYou by mutableStateOf(false)
     internal var playlistDetail by mutableStateOf<CollectionDetail?>(null)
     internal var playlistTracks by mutableStateOf<List<TrackItem>?>(null)
     internal var playlistRecommendations by mutableStateOf<List<TrackItem>>(emptyList())
@@ -600,6 +606,20 @@ class MainActivity : ComponentActivity() {
                                 if (isSelf && !profile?.colorHex.isNullOrBlank()) {
                                     userProfileColorHex = profile.colorHex
                                     EncoreAuth.saveProfileColor(context, profile.colorHex)
+                                }
+                                if (!isSelf && profile != null) {
+                                    // The follow button must never guess: ask the
+                                    // same isFollowingUsers query the web player
+                                    // uses before the button first renders.
+                                    profileIsFollowing = runCatching {
+                                        Profile.isFollowingUser(context, target)
+                                    }.getOrDefault(false)
+                                    // "Follows you": our uri inside their following
+                                    // list is the only public signal for it.
+                                    val selfUri = "spotify:user:${EncoreAuth.userId(context)}"
+                                    profileFollowsYou = runCatching {
+                                        Profile.following(context, target)
+                                    }.getOrNull().orEmpty().any { it.uri == selfUri }
                                 }
                                 profileTop = top
                                 profileTopUnavailable = !isSelf && top == null

@@ -247,6 +247,10 @@ interface ComposePlayerListener {
     fun onPlaybackSpeed(speed: Float) {}
     fun onSkipSeek(deltaMs: Long) {}
     fun onPlayEpisode(uri: String, contextUri: String, hasVideo: Boolean) {}
+    /** Starts the episode (or seeks it, when it is already the playing one) at [positionMs]. */
+    fun onPlayEpisodeAtPosition(uri: String, contextUri: String, hasVideo: Boolean, positionMs: Long) {
+        onPlayEpisode(uri, contextUri, hasVideo)
+    }
     fun onSleepTimer(option: SleepTimerOption) {}
 }
 

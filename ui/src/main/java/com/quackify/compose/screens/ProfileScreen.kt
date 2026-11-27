@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -98,6 +99,10 @@ fun EncoreProfileScreen(
     fallbackName: String = "",
     avatarUrl: String = "",
     topContentUnavailable: Boolean = false,
+    isFollowingUser: Boolean = false,
+    isFollowBusy: Boolean = false,
+    followsYou: Boolean = false,
+    onFollowUserClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -164,7 +169,11 @@ fun EncoreProfileScreen(
                         profile = profile,
                         fallbackName = fallbackName,
                         avatarUrl = avatarUrl,
-                        onFollowStatsClick = onFollowStatsClick
+                        onFollowStatsClick = onFollowStatsClick,
+                        isFollowingUser = isFollowingUser,
+                        isFollowBusy = isFollowBusy,
+                        followsYou = followsYou,
+                        onFollowUserClick = onFollowUserClick
                     )
                 }
                 val topArtists = topContent?.topArtists.orEmpty()
@@ -244,6 +253,30 @@ fun EncoreProfileScreen(
                         }
                     }
                 }
+                // Other users keep their listening footprint public through the
+                // v3 profile endpoint's recently_played_artists, which the web
+                // player shows right under the playlists. Self profiles read
+                // better with our own richer "Recently played" contexts above.
+                val recentlyPlayed = profile?.recentlyPlayedArtists.orEmpty()
+                if (profile?.isCurrentUser == false && recentlyPlayed.isNotEmpty()) {
+                    item {
+                        ProfileSectionTitle(title = stringResource(R.string.recently_played_artists))
+                    }
+                    item {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(recentlyPlayed) { artist ->
+                                ProfileArtistCard(
+                                    artist = artist,
+                                    onClick = { onArtistClick(artist.name, artist.uri) }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -270,7 +303,11 @@ private fun ProfileHeader(
     profile: UserProfile?,
     fallbackName: String,
     avatarUrl: String,
-    onFollowStatsClick: () -> Unit
+    onFollowStatsClick: () -> Unit,
+    isFollowingUser: Boolean = false,
+    isFollowBusy: Boolean = false,
+    followsYou: Boolean = false,
+    onFollowUserClick: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier
@@ -318,15 +355,66 @@ private fun ProfileHeader(
         )
         if (profile != null) {
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "${formatCount(profile.followersCount)} followers • ${formatCount(profile.followingCount)} following",
-                style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
-                textAlign = TextAlign.Center,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(horizontal = 12.dp)
+            ) {
+                Text(
+                    text = "${formatCount(profile.followersCount)} followers • ${formatCount(profile.followingCount)} following",
+                    style = EncoreTheme.typography.bodySmall.copy(color = EncoreColors.TextSecondary),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onFollowStatsClick)
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+                if (followsYou) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.follows_you),
+                        style = EncoreTheme.typography.marginal.copy(color = EncoreColors.TextSecondary),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(EncoreColors.Card)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+        if (onFollowUserClick != null && profile?.isCurrentUser == false) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClick = onFollowStatsClick)
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-            )
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        if (isFollowingUser) EncoreColors.Card
+                        else Color.White
+                    )
+                    .clickable(
+                        enabled = !isFollowBusy,
+                        onClick = onFollowUserClick
+                    )
+                    .padding(horizontal = 24.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isFollowBusy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = EncoreColors.TextPrimary
+                    )
+                } else {
+                    Text(
+                        text = if (isFollowingUser) stringResource(R.string.following)
+                        else stringResource(R.string.follow),
+                        style = EncoreTheme.typography.bodyMediumBold.copy(
+                            color = if (isFollowingUser) EncoreColors.TextPrimary
+                            else Color.Black
+                        )
+                    )
+                }
+            }
         }
     }
 }
