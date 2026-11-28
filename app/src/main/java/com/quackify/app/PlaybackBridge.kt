@@ -835,7 +835,38 @@ class PlaybackBridge(private val context: Context) {
             scope.launch {
                 val ok = Library.setSaved(context, listOf(uri), next)
                 log.i("like '${uri.takeLast(12)}' -> $next ok=$ok")
-                if (!ok) state = state.copy(isLiked = !next)
+                if (!ok) {
+                    state = state.copy(isLiked = !next)
+                } else {
+                    val lastFmSettings =
+                        com.quackify.app.lastfm.LastFmSettings.load(context)
+                    val sessionKey =
+                        com.quackify.app.lastfm.LastFmSecureStore.getSessionKey(context)
+
+                    if (
+                        lastFmSettings.syncLikesEnabled &&
+                        !sessionKey.isNullOrBlank() &&
+                        com.quackify.app.lastfm.LastFmRuntime.isConfigured(
+                            lastFmSettings.apiKey,
+                            lastFmSettings.sharedSecret
+                        )
+                    ) {
+                        runCatching {
+                            val api = com.quackify.app.lastfm.LastFmRuntime.client(
+                                lastFmSettings.apiKey,
+                                lastFmSettings.sharedSecret
+                            )
+                            com.quackify.app.lastfm.LastFmLikeSync(api).setLoved(
+                                title = state.title,
+                                artist = state.artist,
+                                loved = next,
+                                sessionKey = sessionKey
+                            )
+                        }.onFailure {
+                            log.w("Last.fm like sync failed: ${it.message}")
+                        }
+                    }
+                }
             }
         }
 

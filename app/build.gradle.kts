@@ -153,6 +153,7 @@ dependencies {
     implementation(libs.androidx.media)
     implementation(libs.androidx.palette.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.okhttp)
     implementation(libs.androidx.profileinstaller)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

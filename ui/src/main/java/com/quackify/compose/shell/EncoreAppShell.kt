@@ -383,7 +383,8 @@ fun EncoreAppShell(
     onLoadProfileFollows: (() -> Unit)? = null,
     userDisplayName: String = "Duck User",
     userAvatarUrl: String = "",
-    userProfileColorHex: String = ""
+    userProfileColorHex: String = "",
+    lastFmSection: (@Composable () -> Unit)? = null,
 ) {
     val flags = remember { ShellUiFlags() }
     val active = remember { ShellActiveEntity() }
@@ -1112,6 +1113,7 @@ fun EncoreAppShell(
                         onCheckUpdates = onCheckUpdates,
                         onLogout = onLogout,
                         onSpDcSignedIn = onSpDcSignedIn,
+                        lastFmSection = lastFmSection,
                     )
     
                     ShellScreen.NOTIFICATIONS -> ShellNotificationsRoute(

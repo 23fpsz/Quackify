@@ -168,6 +168,7 @@ fun SettingsScreen(
     onSpDcSignedIn: () -> Unit = {},
     toastState: QuackifyToastState? = null,
     activeStreamKey: String = "",
+    lastFmSection: (@Composable () -> Unit)? = null,
 ) {
     val bottomPadding = rememberBottomPadding()
     val context = LocalContext.current
@@ -339,6 +340,7 @@ fun SettingsScreen(
                     1 -> stringResource(R.string.personalization)
                     2 -> stringResource(R.string.more)
                     3 -> stringResource(R.string.debug)
+                    4 -> "Last.fm"
                     else -> stringResource(R.string.settings)
                 },
                 style = EncoreTheme.typography.titleLarge.copy(fontSize = 20.sp)
@@ -392,6 +394,13 @@ fun SettingsScreen(
                             description = stringResource(R.string.playback_and_app_information),
                             onClick = { category = 2 }
                         )
+                        if (lastFmSection != null) {
+                            SettingsCategoryRow(
+                                title = "Last.fm",
+                                description = stringResource(R.string.lastfm_category_description),
+                                onClick = { category = 4 }
+                            )
+                        }
                         if (debugUnlocked) {
                             SettingsCategoryRow(
                                 title = stringResource(R.string.debug),
@@ -1095,6 +1104,12 @@ fun SettingsScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                    }
+                }
+
+                if (target == 4) {
+                    item {
+                        lastFmSection?.invoke()
                     }
                 }
             }

@@ -249,6 +249,7 @@ internal fun ShellSettingsPane(
     onCheckUpdates: () -> Unit = {},
     toastState: QuackifyToastState? = null,
     activeStreamKey: String = "",
+    lastFmSection: (@Composable () -> Unit)? = null,
 ) {
     SettingsScreen(
         onBackClick = onBackClick,
@@ -272,7 +273,8 @@ internal fun ShellSettingsPane(
         updateVersion = updateVersion,
         onCheckUpdates = onCheckUpdates,
         toastState = toastState,
-        activeStreamKey = activeStreamKey
+        activeStreamKey = activeStreamKey,
+        lastFmSection = lastFmSection,
     )
 }
 

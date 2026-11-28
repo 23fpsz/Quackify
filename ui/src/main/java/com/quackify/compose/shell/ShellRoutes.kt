@@ -525,6 +525,7 @@ internal fun ShellSettingsRoute(
     onCheckUpdates: (() -> Unit)?,
     onLogout: (() -> Unit)?,
     onSpDcSignedIn: (() -> Unit)? = null,
+    lastFmSection: (@Composable () -> Unit)? = null,
 ) {
     ShellSettingsPane(
         onBackClick = env.handleBack,
@@ -545,6 +546,7 @@ internal fun ShellSettingsRoute(
         onCheckUpdates = { onCheckUpdates?.invoke() },
         toastState = env.toastState,
         activeStreamKey = env.playbackState?.streamSource.orEmpty(),
+        lastFmSection = lastFmSection,
     )
 }
 
